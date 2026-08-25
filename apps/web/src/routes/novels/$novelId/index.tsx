@@ -18,9 +18,9 @@ import { useSettings } from '@/hooks/useSettings.js';
 import { useTimelines } from '@/hooks/useTimelines.js';
 import type { Chapter, Character, ExtractResult, Section, Setting, Timeline } from '@/lib/types.js';
 import { countWords } from '@/lib/sse.js';
-import { MonacoEditor } from './_components/-MonacoEditor.js';
+import { MonacoEditor } from '../_components/-MonacoEditor.js';
 
-export const Route = createFileRoute('/novels/$novelId')({
+export const Route = createFileRoute('/novels/$novelId/')({
   component: NovelDetailPage,
 });
 
@@ -221,23 +221,9 @@ function SettingsTab({
   novel: NonNullable<ReturnType<typeof useNovel>['novel']>;
   onRefresh: () => Promise<void>;
 }) {
-  const {
-    settings,
-    loading,
-    createSetting,
-    updateSetting,
-    deleteSetting,
-    llmEditSetting,
-    creating,
-    updating,
-    deleting,
-    llmEditing,
-  } = useSettings(novel.id);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Setting | null>(null);
+  const { settings, loading, deleteSetting, deleting } = useSettings(novel.id);
+  const navigate = useNavigate();
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [llmTarget, setLlmTarget] = useState<Setting | null>(null);
-  const [llmInstruction, setLlmInstruction] = useState('');
 
   const grouped = useMemo(() => {
     const map = new Map<string, Setting[]>();
@@ -249,19 +235,6 @@ function SettingsTab({
     return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   }, [settings]);
 
-  async function handleCreate(input: { category: string; name: string; description: string }) {
-    await createSetting(input);
-    setIsCreateOpen(false);
-    await onRefresh();
-  }
-
-  async function handleUpdate(input: { category: string; name: string; description: string }) {
-    if (!editing) return;
-    await updateSetting(editing.id, input);
-    setEditing(null);
-    await onRefresh();
-  }
-
   async function handleDelete() {
     if (!deletingId) return;
     await deleteSetting(deletingId);
@@ -269,20 +242,17 @@ function SettingsTab({
     await onRefresh();
   }
 
-  async function handleLlmEdit() {
-    if (!llmTarget) return;
-    await llmEditSetting(llmTarget.id, llmInstruction);
-    setLlmTarget(null);
-    setLlmInstruction('');
-    await onRefresh();
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">設定一覧</h2>
-        <Button onClick={() => setIsCreateOpen(true)} leftIcon={<PlusIcon />}>
-          設定を追加
+        <Button
+          onClick={() =>
+            navigate({ to: '/novels/$novelId/settings/new', params: { novelId: novel.id } })
+          }
+          leftIcon={<PlusIcon />}
+        >
+          新規作成
         </Button>
       </div>
       {loading && <Loading message="設定を読み込み中..." />}
@@ -304,13 +274,13 @@ function SettingsTab({
                       <div className="flex gap-1">
                         <IconButton
                           label="編集"
-                          onClick={() => setEditing(setting)}
+                          onClick={() =>
+                            navigate({
+                              to: '/novels/$novelId/settings/$settingId',
+                              params: { novelId: novel.id, settingId: setting.id },
+                            })
+                          }
                           icon={<PencilIcon />}
-                        />
-                        <IconButton
-                          label="LLMで編集"
-                          onClick={() => setLlmTarget(setting)}
-                          icon={<SparklesIcon />}
                         />
                         <IconButton
                           label="削除"
@@ -328,45 +298,6 @@ function SettingsTab({
             </div>
           </div>
         ))}
-      <SettingFormModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSubmit={handleCreate}
-        isLoading={creating}
-        title="設定を新規作成"
-      />
-      <SettingFormModal
-        isOpen={!!editing}
-        onClose={() => setEditing(null)}
-        onSubmit={handleUpdate}
-        isLoading={updating}
-        title="設定を編集"
-        defaultValues={editing ?? undefined}
-      />
-      <Modal
-        isOpen={!!llmTarget}
-        onClose={() => setLlmTarget(null)}
-        title={`${llmTarget?.name ?? ''} をLLMで編集`}
-        size="md"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setLlmTarget(null)} disabled={llmEditing}>
-              キャンセル
-            </Button>
-            <Button onClick={handleLlmEdit} isLoading={llmEditing}>
-              適用
-            </Button>
-          </>
-        }
-      >
-        <Textarea
-          label="指示"
-          value={llmInstruction}
-          onChange={(e) => setLlmInstruction(e.target.value)}
-          placeholder="例: もっと詳細な歴史背景を追加して"
-          rows={4}
-        />
-      </Modal>
       <ConfirmDialog
         isOpen={!!deletingId}
         onClose={() => setDeletingId(null)}
@@ -377,86 +308,6 @@ function SettingsTab({
         isLoading={deleting}
       />
     </div>
-  );
-}
-
-function SettingFormModal({
-  isOpen,
-  onClose,
-  onSubmit,
-  isLoading,
-  title,
-  defaultValues,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (input: { category: string; name: string; description: string }) => Promise<void>;
-  isLoading: boolean;
-  title: string;
-  defaultValues?: Setting;
-}) {
-  const [category, setCategory] = useState(defaultValues?.category ?? 'world');
-  const [name, setName] = useState(defaultValues?.name ?? '');
-  const [description, setDescription] = useState(defaultValues?.description ?? '');
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setCategory(defaultValues?.category ?? 'world');
-      setName(defaultValues?.name ?? '');
-      setDescription(defaultValues?.description ?? '');
-      setError(null);
-    }
-  }, [isOpen, defaultValues]);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!category.trim() || !name.trim()) {
-      setError('カテゴリーと名前は必須です');
-      return;
-    }
-    await onSubmit({
-      category: category.trim(),
-      name: name.trim(),
-      description: description.trim(),
-    });
-  }
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={title}
-      size="md"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={isLoading}>
-            キャンセル
-          </Button>
-          <Button onClick={handleSubmit} isLoading={isLoading}>
-            保存
-          </Button>
-        </>
-      }
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="カテゴリー"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          placeholder="world, magic, geography, culture..."
-        />
-        <Input label="名前" value={name} onChange={(e) => setName(e.target.value)} />
-        <Textarea
-          label="説明"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={4}
-        />
-        {error && <p className="text-sm text-rose-500">{error}</p>}
-      </form>
-    </Modal>
   );
 }
 

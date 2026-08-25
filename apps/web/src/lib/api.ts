@@ -6,6 +6,7 @@ import type {
   Content,
   CreateChapterInput,
   CreateCharacterInput,
+  CreateLlmInstructionInput,
   CreateNovelInput,
   CreateSectionInput,
   CreateSettingInput,
@@ -14,11 +15,14 @@ import type {
   ExtractResult,
   GeneratedPlot,
   GeneratedSummary,
+  LlmInstruction,
   Novel,
   NovelDetail,
   Section,
   SectionWithContent,
   Setting,
+  SettingDraft,
+  SettingDraftInput,
   Timeline,
   UpdateChapterInput,
   UpdateCharacterInput,
@@ -66,6 +70,22 @@ export type ApiClient = {
             param: { id: string };
             json: CreateSettingInput;
           }) => Promise<{ json: () => Promise<Setting> }>;
+          draft: {
+            $post: (args: {
+              param: { id: string };
+              json: SettingDraftInput;
+            }) => Promise<{ json: () => Promise<SettingDraft> }>;
+          };
+        };
+        llmInstructions: {
+          $get: (args: {
+            param: { id: string };
+            query?: { entityType?: string };
+          }) => Promise<{ json: () => Promise<LlmInstruction[]> }>;
+          $post: (args: {
+            param: { id: string };
+            json: CreateLlmInstructionInput;
+          }) => Promise<{ json: () => Promise<LlmInstruction> }>;
         };
         timelines: {
           $get: (args: { param: { id: string } }) => Promise<{ json: () => Promise<Timeline[]> }>;
@@ -187,6 +207,13 @@ export type ApiClient = {
         }) => Promise<{ json: () => Promise<ApiSuccessResponse> }>;
       };
     };
+    llmInstructions: {
+      ':id': {
+        $delete: (args: {
+          param: { id: string };
+        }) => Promise<{ json: () => Promise<ApiSuccessResponse> }>;
+      };
+    };
   };
 };
 
@@ -262,6 +289,29 @@ function createApiClient(): ApiClient['api'] {
           $post: async ({ param, json }) => ({
             json: async () =>
               requestJson<Setting>('POST', `/api/novels/${param.id}/settings`, json),
+          }),
+          draft: {
+            $post: async ({ param, json }) => ({
+              json: async () =>
+                requestJson<SettingDraft>('POST', `/api/novels/${param.id}/settings/draft`, json),
+            }),
+          },
+        },
+        llmInstructions: {
+          $get: async ({ param, query }) => ({
+            json: async () => {
+              const qs = query?.entityType
+                ? `?entityType=${encodeURIComponent(query.entityType)}`
+                : '';
+              return requestJson<LlmInstruction[]>(
+                'GET',
+                `/api/novels/${param.id}/llm-instructions${qs}`,
+              );
+            },
+          }),
+          $post: async ({ param, json }) => ({
+            json: async () =>
+              requestJson<LlmInstruction>('POST', `/api/novels/${param.id}/llm-instructions`, json),
           }),
         },
         timelines: {
@@ -390,6 +440,14 @@ function createApiClient(): ApiClient['api'] {
       ':id': {
         $delete: async ({ param }) => ({
           json: async () => requestJson<ApiSuccessResponse>('DELETE', `/api/timelines/${param.id}`),
+        }),
+      },
+    },
+    llmInstructions: {
+      ':id': {
+        $delete: async ({ param }) => ({
+          json: async () =>
+            requestJson<ApiSuccessResponse>('DELETE', `/api/llm-instructions/${param.id}`),
         }),
       },
     },

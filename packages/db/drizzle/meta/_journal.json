@@ -8,6 +8,13 @@
       "when": 1787635346253,
       "tag": "0000_narrow_captain_midlands",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1787650837987,
+      "tag": "0001_rainy_boomerang",
+      "breakpoints": true
     }
   ]
 }

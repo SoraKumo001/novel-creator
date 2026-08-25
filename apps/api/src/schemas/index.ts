@@ -85,6 +85,24 @@ export const editInstructionSchema = z.object({
   instruction: z.string().min(1),
 });
 
+// ---- LLM指示履歴 ----
+export const createLlmInstructionSchema = z.object({
+  entityType: z.string().min(1),
+  instruction: z.string().min(1),
+});
+
+// ---- 設定ドラフト生成 ----
+export const settingDraftSchema = z.object({
+  instruction: z.string().min(1),
+  currentDraft: z
+    .object({
+      category: z.string(),
+      name: z.string(),
+      description: z.string().optional(),
+    })
+    .optional(),
+});
+
 // ---- パラメータ ----
 export const idParamSchema = z.object({
   id: z.uuid(),

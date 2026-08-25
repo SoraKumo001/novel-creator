@@ -3,11 +3,16 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 
 import { characters, settings } from '@novel-creator/db';
-import { editCharacter, editSetting, generateJSON } from '@novel-creator/llm';
+import { createSettingDraft, editCharacter, editSetting, generateJSON } from '@novel-creator/llm';
 
 import type { AppContext } from '../context.js';
 import { upsertEntityEmbedding } from '../rag.js';
-import { editInstructionSchema, idParamSchema } from '../schemas/index.js';
+import {
+  editInstructionSchema,
+  idParamSchema,
+  novelIdParamSchema,
+  settingDraftSchema,
+} from '../schemas/index.js';
 
 const llmEditRouter = new Hono<AppContext>();
 
@@ -112,6 +117,23 @@ llmEditRouter.post(
     );
 
     return c.json(row);
+  },
+);
+
+// POST /api/novels/:novelId/settings/draft - 設定ドラフトをLLMで生成（DB書き込みなし）
+llmEditRouter.post(
+  '/novels/:novelId/settings/draft',
+  zValidator('param', novelIdParamSchema),
+  zValidator('json', settingDraftSchema),
+  async (c) => {
+    const { instruction, currentDraft } = c.req.valid('json');
+    const prompt = createSettingDraft(instruction, currentDraft);
+    const result = await generateJSON<{
+      category: string;
+      name: string;
+      description: string;
+    }>(c.var.llm, prompt);
+    return c.json(result);
   },
 );
 

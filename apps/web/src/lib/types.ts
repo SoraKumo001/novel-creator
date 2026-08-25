@@ -164,6 +164,30 @@ export interface EditInstructionInput {
   instruction: string;
 }
 
+export interface SettingDraft {
+  category: string;
+  name: string;
+  description: string;
+}
+
+export interface SettingDraftInput {
+  instruction: string;
+  currentDraft?: { category: string; name: string; description?: string };
+}
+
+export interface LlmInstruction {
+  id: string;
+  novelId: string;
+  entityType: string;
+  instruction: string;
+  createdAt: string | null;
+}
+
+export interface CreateLlmInstructionInput {
+  entityType: string;
+  instruction: string;
+}
+
 // 生成系レスポンス型
 export interface GeneratedPlot {
   title: string;

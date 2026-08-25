@@ -9,6 +9,7 @@ import charactersRouter from './routes/characters.js';
 import contentsRouter from './routes/contents.js';
 import generateRouter from './routes/generate.js';
 import llmEditRouter from './routes/llm-edit.js';
+import llmInstructionsRouter from './routes/llm-instructions.js';
 import novelsRouter from './routes/novels.js';
 import sectionsRouter from './routes/sections.js';
 import settingsRouter from './routes/settings.js';
@@ -44,6 +45,7 @@ export function createApp(context: AppContext['Variables']): Hono<AppContext> {
   app.route('/api', timelinesRouter);
   app.route('/api', generateRouter);
   app.route('/api', llmEditRouter);
+  app.route('/api', llmInstructionsRouter);
 
   // ヘルスチェック
   app.get('/health', (c) => c.json({ status: 'ok' }));

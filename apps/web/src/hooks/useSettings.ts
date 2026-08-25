@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
-import type { CreateSettingInput, Setting, UpdateSettingInput } from '@/lib/types.js';
+import type { CreateSettingInput, Setting, SettingDraft, UpdateSettingInput } from '@/lib/types.js';
 
 interface UseSettingsReturn {
   settings: Setting[];
@@ -12,10 +12,15 @@ interface UseSettingsReturn {
   updateSetting: (id: string, input: UpdateSettingInput) => Promise<Setting>;
   deleteSetting: (id: string) => Promise<void>;
   llmEditSetting: (id: string, instruction: string) => Promise<Setting>;
+  generateDraft: (
+    instruction: string,
+    currentDraft?: { category: string; name: string; description?: string },
+  ) => Promise<SettingDraft>;
   creating: boolean;
   updating: boolean;
   deleting: boolean;
   llmEditing: boolean;
+  generatingDraft: boolean;
 }
 
 export function useSettings(novelId: string): UseSettingsReturn {
@@ -26,6 +31,7 @@ export function useSettings(novelId: string): UseSettingsReturn {
   const [updating, setUpdating] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [llmEditing, setLlmEditing] = useState(false);
+  const [generatingDraft, setGeneratingDraft] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -96,6 +102,25 @@ export function useSettings(novelId: string): UseSettingsReturn {
     }
   }, []);
 
+  const generateDraft = useCallback(
+    async (
+      instruction: string,
+      currentDraft?: { category: string; name: string; description?: string },
+    ): Promise<SettingDraft> => {
+      setGeneratingDraft(true);
+      try {
+        const res = await api.novels[':id'].settings.draft.$post({
+          param: { id: novelId },
+          json: { instruction, currentDraft },
+        });
+        return await res.json();
+      } finally {
+        setGeneratingDraft(false);
+      }
+    },
+    [novelId],
+  );
+
   return {
     settings,
     loading,
@@ -105,9 +130,11 @@ export function useSettings(novelId: string): UseSettingsReturn {
     updateSetting,
     deleteSetting,
     llmEditSetting,
+    generateDraft,
     creating,
     updating,
     deleting,
     llmEditing,
+    generatingDraft,
   };
 }
