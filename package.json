@@ -1,0 +1,54 @@
+{
+  "name": "novel-creator",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "setup": "pnpm install && pnpm --filter @novel-creator/shared build && docker compose up -d && pnpm --filter @novel-creator/db db:push",
+    "setup:db": "docker compose up -d && pnpm --filter @novel-creator/db db:push",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:push": "pnpm --filter @novel-creator/db db:push",
+    "db:generate": "pnpm --filter @novel-creator/db db:generate",
+    "db:studio": "pnpm --filter @novel-creator/db db:studio",
+    "dev:api": "pnpm --filter @novel-creator/api dev",
+    "dev:web": "pnpm --filter @novel-creator/web dev",
+    "dev:worker": "pnpm --filter @novel-creator/api dev:worker",
+    "storybook": "pnpm --filter @novel-creator/web storybook",
+    "build-storybook": "pnpm --filter @novel-creator/web build-storybook",
+    "deploy:api": "pnpm --filter @novel-creator/api deploy",
+    "deploy:web": "pnpm --filter @novel-creator/web deploy"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@vitest/coverage-v8": "^4.1.11",
+    "eslint": "^10.9.1",
+    "husky": "^9.0.0",
+    "lint-staged": "^17.3.0",
+    "prettier": "^3.0.0",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript-eslint": "^8.68.0",
+    "typescript7": "npm:typescript@^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yaml,yml,css,html}": [
+      "prettier --write"
+    ]
+  }
+}

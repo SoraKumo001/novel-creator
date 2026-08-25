@@ -1,0 +1,25 @@
+{
+  "name": "novel-creator-api",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "hyperdrive-id",
+      "localConnectionString": "postgres://novel:novel@localhost:5433/novel"
+    }
+  ],
+  "vectorize": [
+    {
+      "binding": "VECTORIZE_INDEX",
+      "index_name": "novel-creator"
+    }
+  ],
+  "vars": {
+    "LLM_PROVIDER": "openai",
+    "LLM_MODEL": "gpt-4o-mini",
+    "EMBEDDING_MODEL": "text-embedding-3-small",
+    "VECTOR_STORE_PROVIDER": "vectorize"
+  }
+}

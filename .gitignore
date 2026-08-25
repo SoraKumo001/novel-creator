@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+.env
+.env.local
+*.log
+*storybook.log
+.DS_Store
+.tanstack
+storybook-static
+apps/web/src/routeTree.gen.ts
+apps/web/node_modules/.tsbuild

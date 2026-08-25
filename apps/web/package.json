@@ -1,0 +1,47 @@
+{
+  "name": "@novel-creator/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsr generate && tsc -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "deploy": "vite build && wrangler pages deploy dist",
+    "typecheck": "tsr generate && tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
+  },
+  "dependencies": {
+    "@monaco-editor/react": "^4.7.0",
+    "@tanstack/react-router": "^1.170.32",
+    "@tanstack/router-devtools": "^1.167.1",
+    "hono": "^4.13.4",
+    "postcss": "^8.5.26",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "tailwindcss": "^4.3.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@tanstack/router-cli": "^1.167.33",
+    "@tanstack/router-plugin": "^1.168.35",
+    "@testing-library/dom": "^10.0.0",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@storybook/addon-docs": "next",
+    "@storybook/addon-mcp": "next",
+    "@storybook/react-vite": "next",
+    "@testing-library/react": "^16.0.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.0",
+    "jsdom": "^30.0.1",
+    "typescript": "npm:@typescript/typescript6@^6.0.2",
+    "typescript7": "npm:typescript@^7.0.2",
+    "storybook": "next",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11",
+    "wrangler": "^4.125.0"
+  }
+}

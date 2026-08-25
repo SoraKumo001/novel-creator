@@ -1,0 +1,17 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: novel-db
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_USER: novel
+      POSTGRES_PASSWORD: novel
+      POSTGRES_DB: novel
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+volumes:
+  pgdata:

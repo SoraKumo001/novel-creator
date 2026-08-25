@@ -1,0 +1,27 @@
+{
+  "name": "@novel-creator/llm",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.42",
+    "@ai-sdk/google": "4.0.51",
+    "@ai-sdk/openai": "^4.0.47",
+    "ai": "^7.0.79"
+  },
+  "peerDependencies": {
+    "@novel-creator/shared": "workspace:*"
+  }
+}

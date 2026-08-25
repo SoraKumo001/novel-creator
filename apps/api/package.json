@@ -1,0 +1,33 @@
+{
+  "name": "@novel-creator/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:worker": "tsc -p tsconfig.worker.json",
+    "dev:worker": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build:worker": "wrangler deploy --dry-run"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "@hono/zod-validator": "^0.9.0",
+    "@novel-creator/db": "workspace:*",
+    "@novel-creator/llm": "workspace:*",
+    "@novel-creator/shared": "workspace:*",
+    "@novel-creator/vector": "workspace:*",
+    "dotenv": "17.4.2",
+    "hono": "^4.6.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260825.1",
+    "@types/node": "^26.3.0",
+    "tsx": "^4.19.0",
+    "wrangler": "^4.125.0"
+  }
+}

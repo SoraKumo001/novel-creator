@@ -1,0 +1,53 @@
+import type { EmbeddingModel, LanguageModel } from 'ai';
+import type { Env as HonoEnv } from 'hono';
+
+import { createDb, createDbForHyperdrive, type Database } from '@novel-creator/db';
+import { createEmbeddingProvider, createLLMProvider } from '@novel-creator/llm';
+import type { Env } from '@novel-creator/shared';
+import { createVectorStore, type VectorStore } from '@novel-creator/vector';
+
+/**
+ * Hono の Context 変数として注入される DI コンテキスト。
+ */
+export interface AppContext extends HonoEnv {
+  Variables: {
+    env: Env;
+    db: Database;
+    llm: LanguageModel;
+    embedding: EmbeddingModel;
+    vectorStore: VectorStore;
+  };
+}
+
+/**
+ * 環境変数から全依存関係を初期化して DI コンテキストを構築する。
+ */
+export function createContext(env: Env): AppContext['Variables'] {
+  const db = createDb(env.DATABASE_URL);
+  const llm = createLLMProvider(env);
+  const embedding = createEmbeddingProvider(env);
+  const vectorStore = createVectorStore(env);
+  return { env, db, llm, embedding, vectorStore };
+}
+
+/**
+ * Cloudflare Workers 環境向けに全依存関係を初期化して DI コンテキストを構築する。
+ * Hyperdrive 経由で DB に接続し、Vectorize binding をベクトルストアとして使用する。
+ */
+export function createContextForWorkers(
+  env: Env,
+  bindings: { hyperdrive: Hyperdrive; vectorize: unknown },
+): AppContext['Variables'] {
+  const db = createDbForHyperdrive(bindings.hyperdrive);
+  const llm = createLLMProvider(env);
+  const embedding = createEmbeddingProvider(env);
+  const vectorStore = createVectorStore(env, { vectorizeBinding: bindings.vectorize });
+  return { env, db, llm, embedding, vectorStore };
+}
+
+/**
+ * Cloudflare Hyperdrive binding の最小型定義。
+ */
+export interface Hyperdrive {
+  connectionString: string;
+}
