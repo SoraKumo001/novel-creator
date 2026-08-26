@@ -1,9 +1,9 @@
 import { Code, ConnectError, type ConnectRouter } from '@connectrpc/connect';
-import { and, desc, eq } from 'drizzle-orm';
-import { llmInstructions } from '@novel-creator/db';
+import type { llmInstructions } from '@novel-creator/db';
 import { LlmInstructionService } from '@novel-creator/proto';
 
 import type { AppContext } from '../context.js';
+import { LlmInstructionDomainService, NotFoundError, ValidationError } from '../core/index.js';
 
 function formatLlmInstruction(row: typeof llmInstructions.$inferSelect) {
   return {
@@ -23,61 +23,41 @@ export function registerLlmInstructionService(
 ) {
   router.service(LlmInstructionService, {
     async listLlmInstructions(req) {
-      const db = getContext().db;
-      const conditions = [eq(llmInstructions.novelId, req.novelId)];
-      if (req.entityType) {
-        conditions.push(eq(llmInstructions.entityType, req.entityType));
-      }
-      const rows = await db
-        .select()
-        .from(llmInstructions)
-        .where(and(...conditions))
-        .orderBy(desc(llmInstructions.createdAt));
+      const service = new LlmInstructionDomainService(getContext());
+      const rows = await service.listInstructions(req.novelId, req.entityType || undefined);
       return {
         instructions: rows.map(formatLlmInstruction),
       };
     },
 
     async createLlmInstruction(req) {
-      const db = getContext().db;
-      if (!req.instruction.trim()) {
-        throw new ConnectError('Instruction is required', Code.InvalidArgument);
-      }
-      const [existing] = await db
-        .select()
-        .from(llmInstructions)
-        .where(
-          and(
-            eq(llmInstructions.novelId, req.novelId),
-            eq(llmInstructions.entityType, req.entityType),
-            eq(llmInstructions.instruction, req.instruction),
-          ),
-        );
-      if (existing) {
-        return formatLlmInstruction(existing);
-      }
-
-      const [row] = await db
-        .insert(llmInstructions)
-        .values({
+      const service = new LlmInstructionDomainService(getContext());
+      try {
+        const row = await service.createInstruction({
           novelId: req.novelId,
           entityType: req.entityType,
           instruction: req.instruction,
-        })
-        .returning();
-      return formatLlmInstruction(row);
+        });
+        return formatLlmInstruction(row);
+      } catch (err) {
+        if (err instanceof ValidationError) {
+          throw new ConnectError(err.message, Code.InvalidArgument);
+        }
+        throw err;
+      }
     },
 
     async deleteLlmInstruction(req) {
-      const db = getContext().db;
-      const [row] = await db
-        .delete(llmInstructions)
-        .where(eq(llmInstructions.id, req.id))
-        .returning();
-      if (!row) {
-        throw new ConnectError('Instruction not found', Code.NotFound);
+      const service = new LlmInstructionDomainService(getContext());
+      try {
+        await service.deleteInstruction(req.id);
+        return { success: true };
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-      return { success: true };
     },
   });
 }

@@ -42,6 +42,7 @@ export default tseslint.config(
             'apps/api/test/chat.test.ts',
             'apps/api/test/backup.test.ts',
             'apps/api/test/connect.test.ts',
+            'apps/api/test/domain-services.test.ts',
             'apps/api/src/worker.ts',
             'packages/llm/test/prompts.test.ts',
             'packages/vector/test/types.test.ts',

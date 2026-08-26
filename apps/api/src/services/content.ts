@@ -1,20 +1,9 @@
 import { Code, ConnectError, type ConnectRouter } from '@connectrpc/connect';
-import { eq } from 'drizzle-orm';
-import { contents } from '@novel-creator/db';
+import type { contents } from '@novel-creator/db';
 import { ContentService } from '@novel-creator/proto';
 
 import type { AppContext } from '../context.js';
-
-function countWords(text: string): number {
-  const trimmed = text.trim();
-  if (!trimmed) return 0;
-  // 日本語は文字数、それ以外は空白区切りの単語数で概算する。
-  const japanese = trimmed.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g);
-  if (japanese && japanese.length > 0) {
-    return japanese.length;
-  }
-  return trimmed.split(/\s+/).length;
-}
+import { ContentDomainService, NotFoundError } from '../core/index.js';
 
 function formatContent(row: typeof contents.$inferSelect) {
   return {
@@ -33,25 +22,21 @@ export function registerContentService(
 ) {
   router.service(ContentService, {
     async getContent(req) {
-      const db = getContext().db;
-      const [row] = await db.select().from(contents).where(eq(contents.sectionId, req.sectionId));
-      if (!row) {
-        throw new ConnectError('Content not found', Code.NotFound);
+      const service = new ContentDomainService(getContext());
+      try {
+        const row = await service.getContent(req.sectionId);
+        return formatContent(row);
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-      return formatContent(row);
     },
 
     async updateContent(req) {
-      const db = getContext().db;
-      const wordCount = countWords(req.body);
-      const [row] = await db
-        .insert(contents)
-        .values({ sectionId: req.sectionId, body: req.body, wordCount })
-        .onConflictDoUpdate({
-          target: contents.sectionId,
-          set: { body: req.body, wordCount, updatedAt: new Date() },
-        })
-        .returning();
+      const service = new ContentDomainService(getContext());
+      const row = await service.updateContent(req.sectionId, req.body);
       return formatContent(row);
     },
   });

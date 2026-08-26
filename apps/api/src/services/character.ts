@@ -1,22 +1,9 @@
 import { Code, ConnectError, type ConnectRouter } from '@connectrpc/connect';
-import { eq } from 'drizzle-orm';
-import { characters } from '@novel-creator/db';
-import {
-  editCharacter,
-  editCharacterDocument,
-  editCharacterSection,
-  generateJSON,
-  generateText,
-} from '@novel-creator/llm';
+import type { characters } from '@novel-creator/db';
 import { CharacterService } from '@novel-creator/proto';
-import {
-  diffCharacters,
-  parseCharactersMarkdown,
-  serializeCharactersToMarkdown,
-} from '@novel-creator/shared';
 
 import type { AppContext } from '../context.js';
-import { searchContext, upsertEntityEmbedding } from '../rag.js';
+import { CharacterDomainService, NotFoundError, ValidationError } from '../core/index.js';
 
 function formatCharacter(row: typeof characters.$inferSelect) {
   return {
@@ -32,43 +19,34 @@ function formatCharacter(row: typeof characters.$inferSelect) {
   };
 }
 
-function characterToText(ch: {
-  category?: string;
-  name: string;
-  description?: string | null;
-  traits?: string[] | null;
-}): string {
-  return `[${ch.category ?? '未分類'}] ${ch.name}\n${ch.description ?? ''}\n特徴: ${ch.traits?.join('、') ?? ''}`;
-}
-
 export function registerCharacterService(
   router: ConnectRouter,
   getContext: () => AppContext['Variables'],
 ) {
   router.service(CharacterService, {
     async listCharacters(req) {
-      const db = getContext().db;
-      const rows = await db.select().from(characters).where(eq(characters.novelId, req.novelId));
+      const service = new CharacterDomainService(getContext());
+      const rows = await service.listCharacters(req.novelId);
       return {
         characters: rows.map(formatCharacter),
       };
     },
 
     async getCharacter(req) {
-      const db = getContext().db;
-      const [character] = await db.select().from(characters).where(eq(characters.id, req.id));
-      if (!character) {
-        throw new ConnectError('Character not found', Code.NotFound);
+      const service = new CharacterDomainService(getContext());
+      try {
+        const character = await service.getCharacter(req.id);
+        return formatCharacter(character);
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-      return formatCharacter(character);
     },
 
     async createCharacter(req) {
-      const ctx = getContext();
-      const db = ctx.db;
-      if (!req.name.trim()) {
-        throw new ConnectError('Name is required', Code.InvalidArgument);
-      }
+      const service = new CharacterDomainService(getContext());
       let rel = {};
       try {
         if (req.relationshipsJson) {
@@ -77,34 +55,27 @@ export function registerCharacterService(
       } catch {
         rel = {};
       }
-      const [row] = await db
-        .insert(characters)
-        .values({
+
+      try {
+        const row = await service.createCharacter({
           novelId: req.novelId,
           category: req.category,
           name: req.name,
           description: req.description ?? null,
           traits: req.traits ?? [],
           relationships: rel,
-        })
-        .returning();
-
-      await upsertEntityEmbedding(
-        ctx.vectorStore,
-        ctx.embedding,
-        row.novelId,
-        'character',
-        row.id,
-        characterToText(row),
-        ctx.env,
-      );
-
-      return formatCharacter(row);
+        });
+        return formatCharacter(row);
+      } catch (err) {
+        if (err instanceof ValidationError) {
+          throw new ConnectError(err.message, Code.InvalidArgument);
+        }
+        throw err;
+      }
     },
 
     async updateCharacter(req) {
-      const ctx = getContext();
-      const db = ctx.db;
+      const service = new CharacterDomainService(getContext());
       let relUpdate: Record<string, unknown> | undefined;
       if (req.relationshipsJson !== undefined) {
         try {
@@ -114,212 +85,77 @@ export function registerCharacterService(
         }
       }
 
-      const [row] = await db
-        .update(characters)
-        .set({
-          ...(req.category !== undefined ? { category: req.category } : {}),
-          ...(req.name !== undefined ? { name: req.name } : {}),
-          ...(req.description !== undefined ? { description: req.description } : {}),
-          ...(req.traits !== undefined ? { traits: req.traits } : {}),
-          ...(relUpdate !== undefined ? { relationships: relUpdate } : {}),
-          updatedAt: new Date(),
-        })
-        .where(eq(characters.id, req.id))
-        .returning();
-      if (!row) {
-        throw new ConnectError('Character not found', Code.NotFound);
+      try {
+        const row = await service.updateCharacter(req.id, {
+          category: req.category !== undefined ? req.category : undefined,
+          name: req.name !== undefined ? req.name : undefined,
+          description: req.description !== undefined ? req.description : undefined,
+          traits: req.traits !== undefined ? req.traits : undefined,
+          relationships: relUpdate,
+        });
+        return formatCharacter(row);
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-
-      await upsertEntityEmbedding(
-        ctx.vectorStore,
-        ctx.embedding,
-        row.novelId,
-        'character',
-        row.id,
-        characterToText(row),
-        ctx.env,
-      );
-
-      return formatCharacter(row);
     },
 
     async deleteCharacter(req) {
-      const ctx = getContext();
-      const db = ctx.db;
-      const [row] = await db.delete(characters).where(eq(characters.id, req.id)).returning();
-      if (!row) {
-        throw new ConnectError('Character not found', Code.NotFound);
-      }
+      const service = new CharacterDomainService(getContext());
       try {
-        await ctx.vectorStore.deleteByEntity('character', req.id);
+        await service.deleteCharacter(req.id);
+        return { success: true };
       } catch (err) {
-        console.error('[vector] failed to delete character embedding', err);
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-      return { success: true };
     },
 
     async editCharacter(req) {
-      const ctx = getContext();
-      const db = ctx.db;
-      const [character] = await db.select().from(characters).where(eq(characters.id, req.id));
-      if (!character) {
-        throw new ConnectError('Character not found', Code.NotFound);
+      const service = new CharacterDomainService(getContext());
+      try {
+        const row = await service.editCharacterWithInstruction(req.id, req.instruction);
+        return formatCharacter(row);
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-
-      const prompt = editCharacter(
-        {
-          category: character.category ?? undefined,
-          name: character.name,
-          description: character.description ?? undefined,
-          traits: character.traits ?? undefined,
-        },
-        req.instruction,
-      );
-
-      const result = await generateJSON<{
-        category: string;
-        name: string;
-        description: string;
-        traits: string[];
-      }>(ctx.llm, prompt);
-
-      const [row] = await db
-        .update(characters)
-        .set({
-          category: result.category,
-          name: result.name,
-          description: result.description,
-          traits: result.traits,
-          updatedAt: new Date(),
-        })
-        .where(eq(characters.id, req.id))
-        .returning();
-
-      await upsertEntityEmbedding(
-        ctx.vectorStore,
-        ctx.embedding,
-        row.novelId,
-        'character',
-        row.id,
-        characterToText(row),
-        ctx.env,
-      );
-
-      return formatCharacter(row);
     },
 
     async getCharactersMarkdown(req) {
-      const db = getContext().db;
-      const rows = await db.select().from(characters).where(eq(characters.novelId, req.novelId));
-      const markdown = serializeCharactersToMarkdown(rows);
+      const service = new CharacterDomainService(getContext());
+      const markdown = await service.getMarkdown(req.novelId);
       return { markdown };
     },
 
     async saveCharactersMarkdown(req) {
-      const ctx = getContext();
-      const db = ctx.db;
-      const novelId = req.novelId;
-      const existing = await db.select().from(characters).where(eq(characters.novelId, novelId));
-      const parsed = parseCharactersMarkdown(req.markdown);
-      const diff = diffCharacters(existing, parsed);
-
-      const createdIds: string[] = [];
-      await db.transaction(async (tx) => {
-        for (const ch of diff.toCreate) {
-          const [row] = await tx
-            .insert(characters)
-            .values({
-              novelId,
-              name: ch.name,
-              category: ch.category,
-              description: ch.description,
-              traits: ch.traits,
-              relationships: ch.relationships,
-            })
-            .returning();
-          createdIds.push(row.id);
-        }
-
-        for (const u of diff.toUpdate) {
-          await tx
-            .update(characters)
-            .set({
-              category: u.category,
-              description: u.description,
-              traits: u.traits,
-              relationships: u.relationships,
-              updatedAt: new Date(),
-            })
-            .where(eq(characters.id, u.id));
-        }
-
-        for (const id of diff.toDelete) {
-          await tx.delete(characters).where(eq(characters.id, id));
-        }
-      });
-
-      for (let i = 0; i < diff.toCreate.length; i++) {
-        const ch = diff.toCreate[i];
-        await upsertEntityEmbedding(
-          ctx.vectorStore,
-          ctx.embedding,
-          novelId,
-          'character',
-          createdIds[i],
-          characterToText(ch),
-          ctx.env,
-        );
-      }
-      for (const u of diff.toUpdate) {
-        await upsertEntityEmbedding(
-          ctx.vectorStore,
-          ctx.embedding,
-          novelId,
-          'character',
-          u.id,
-          characterToText(u),
-          ctx.env,
-        );
-      }
-      for (const id of diff.toDelete) {
-        await ctx.vectorStore.deleteByEntity('character', id);
-      }
-
-      const updated = await db.select().from(characters).where(eq(characters.novelId, novelId));
-
+      const service = new CharacterDomainService(getContext());
+      const result = await service.saveMarkdown(req.novelId, req.markdown);
       return {
-        characters: updated.map(formatCharacter),
-        createdCount: diff.toCreate.length,
-        updatedCount: diff.toUpdate.length,
-        deletedCount: diff.toDelete.length,
+        characters: result.characters.map(formatCharacter),
+        createdCount: result.createdCount,
+        updatedCount: result.updatedCount,
+        deletedCount: result.deletedCount,
       };
     },
 
     async editCharacterSection(req) {
-      const ctx = getContext();
-      const novelId = req.novelId;
-
-      const ragCtx = await searchContext(
-        ctx.vectorStore,
-        ctx.embedding,
-        novelId,
-        { query: `${req.description} ${req.instruction}` },
-        ctx.env,
-      );
-
-      const prompt = editCharacterSection(
-        {
-          category: req.category,
-          name: req.name,
-          description: req.description,
-          traits: req.traits,
-          relationships: req.relationships,
-        },
-        req.instruction,
-        { settings: ragCtx.settings, characters: ragCtx.characters },
-      );
-
-      const result = await generateText(ctx.llm, prompt);
+      const service = new CharacterDomainService(getContext());
+      const result = await service.editCharacterSection({
+        novelId: req.novelId,
+        category: req.category,
+        name: req.name,
+        description: req.description,
+        traits: req.traits,
+        relationships: req.relationships,
+        instruction: req.instruction,
+      });
       return {
         updatedCharacters: [],
         parsedSummary: result,
@@ -327,23 +163,12 @@ export function registerCharacterService(
     },
 
     async editCharacterDocument(req) {
-      const ctx = getContext();
-      const novelId = req.novelId;
-
-      const ragCtx = await searchContext(
-        ctx.vectorStore,
-        ctx.embedding,
-        novelId,
-        { query: req.instruction },
-        ctx.env,
+      const service = new CharacterDomainService(getContext());
+      const result = await service.editCharacterDocument(
+        req.novelId,
+        req.markdown,
+        req.instruction,
       );
-
-      const prompt = editCharacterDocument(req.markdown, req.instruction, {
-        settings: ragCtx.settings,
-        characters: ragCtx.characters,
-      });
-
-      const result = await generateText(ctx.llm, prompt);
       return {
         updatedCharacters: [],
         parsedSummary: result,

@@ -1,23 +1,9 @@
 import { Code, ConnectError, type ConnectRouter } from '@connectrpc/connect';
-import { and, eq } from 'drizzle-orm';
-import { settings } from '@novel-creator/db';
-import {
-  createSettingDraft,
-  editSetting,
-  editSettingDocument,
-  editSettingSection,
-  generateJSON,
-  generateText,
-} from '@novel-creator/llm';
+import type { settings } from '@novel-creator/db';
 import { SettingService } from '@novel-creator/proto';
-import {
-  diffSettings,
-  parseSettingsMarkdown,
-  serializeSettingsToMarkdown,
-} from '@novel-creator/shared';
 
 import type { AppContext } from '../context.js';
-import { searchContext, upsertEntityEmbedding } from '../rag.js';
+import { NotFoundError, SettingDomainService, ValidationError } from '../core/index.js';
 
 function formatSetting(row: typeof settings.$inferSelect) {
   return {
@@ -32,45 +18,34 @@ function formatSetting(row: typeof settings.$inferSelect) {
   };
 }
 
-function settingToText(s: { category: string; name: string; description?: string | null }): string {
-  return `[${s.category}] ${s.name}\n${s.description ?? ''}`;
-}
-
 export function registerSettingService(
   router: ConnectRouter,
   getContext: () => AppContext['Variables'],
 ) {
   router.service(SettingService, {
     async listSettings(req) {
-      const db = getContext().db;
-      const conditions = [eq(settings.novelId, req.novelId)];
-      if (req.category) {
-        conditions.push(eq(settings.category, req.category));
-      }
-      const rows = await db
-        .select()
-        .from(settings)
-        .where(and(...conditions));
+      const service = new SettingDomainService(getContext());
+      const rows = await service.listSettings(req.novelId, req.category || undefined);
       return {
         settings: rows.map(formatSetting),
       };
     },
 
     async getSetting(req) {
-      const db = getContext().db;
-      const [setting] = await db.select().from(settings).where(eq(settings.id, req.id));
-      if (!setting) {
-        throw new ConnectError('Setting not found', Code.NotFound);
+      const service = new SettingDomainService(getContext());
+      try {
+        const setting = await service.getSetting(req.id);
+        return formatSetting(setting);
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-      return formatSetting(setting);
     },
 
     async createSetting(req) {
-      const ctx = getContext();
-      const db = ctx.db;
-      if (!req.name.trim()) {
-        throw new ConnectError('Name is required', Code.InvalidArgument);
-      }
+      const service = new SettingDomainService(getContext());
       let meta = {};
       try {
         if (req.metadataJson) {
@@ -80,33 +55,25 @@ export function registerSettingService(
         meta = {};
       }
 
-      const [row] = await db
-        .insert(settings)
-        .values({
+      try {
+        const row = await service.createSetting({
           novelId: req.novelId,
           category: req.category,
           name: req.name,
           description: req.description ?? null,
           metadata: meta,
-        })
-        .returning();
-
-      await upsertEntityEmbedding(
-        ctx.vectorStore,
-        ctx.embedding,
-        row.novelId,
-        'setting',
-        row.id,
-        settingToText(row),
-        ctx.env,
-      );
-
-      return formatSetting(row);
+        });
+        return formatSetting(row);
+      } catch (err) {
+        if (err instanceof ValidationError) {
+          throw new ConnectError(err.message, Code.InvalidArgument);
+        }
+        throw err;
+      }
     },
 
     async updateSetting(req) {
-      const ctx = getContext();
-      const db = ctx.db;
+      const service = new SettingDomainService(getContext());
       let metaUpdate: Record<string, unknown> | undefined;
       if (req.metadataJson !== undefined) {
         try {
@@ -116,109 +83,51 @@ export function registerSettingService(
         }
       }
 
-      const [row] = await db
-        .update(settings)
-        .set({
-          ...(req.category !== undefined ? { category: req.category } : {}),
-          ...(req.name !== undefined ? { name: req.name } : {}),
-          ...(req.description !== undefined ? { description: req.description } : {}),
-          ...(metaUpdate !== undefined ? { metadata: metaUpdate } : {}),
-          updatedAt: new Date(),
-        })
-        .where(eq(settings.id, req.id))
-        .returning();
-      if (!row) {
-        throw new ConnectError('Setting not found', Code.NotFound);
+      try {
+        const row = await service.updateSetting(req.id, {
+          category: req.category !== undefined ? req.category : undefined,
+          name: req.name !== undefined ? req.name : undefined,
+          description: req.description !== undefined ? req.description : undefined,
+          metadata: metaUpdate,
+        });
+        return formatSetting(row);
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-
-      await upsertEntityEmbedding(
-        ctx.vectorStore,
-        ctx.embedding,
-        row.novelId,
-        'setting',
-        row.id,
-        settingToText(row),
-        ctx.env,
-      );
-
-      return formatSetting(row);
     },
 
     async deleteSetting(req) {
-      const ctx = getContext();
-      const db = ctx.db;
-      const [row] = await db.delete(settings).where(eq(settings.id, req.id)).returning();
-      if (!row) {
-        throw new ConnectError('Setting not found', Code.NotFound);
-      }
+      const service = new SettingDomainService(getContext());
       try {
-        await ctx.vectorStore.deleteByEntity('setting', req.id);
+        await service.deleteSetting(req.id);
+        return { success: true };
       } catch (err) {
-        console.error('[vector] failed to delete setting embedding', err);
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-      return { success: true };
     },
 
     async editSetting(req) {
-      const ctx = getContext();
-      const db = ctx.db;
-      const [setting] = await db.select().from(settings).where(eq(settings.id, req.id));
-      if (!setting) {
-        throw new ConnectError('Setting not found', Code.NotFound);
+      const service = new SettingDomainService(getContext());
+      try {
+        const row = await service.editSettingWithInstruction(req.id, req.instruction);
+        return formatSetting(row);
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-
-      const prompt = editSetting(
-        {
-          category: setting.category,
-          name: setting.name,
-          description: setting.description ?? undefined,
-        },
-        req.instruction,
-      );
-
-      const result = await generateJSON<{
-        category: string;
-        name: string;
-        description: string;
-      }>(ctx.llm, prompt);
-
-      const [row] = await db
-        .update(settings)
-        .set({
-          category: result.category,
-          name: result.name,
-          description: result.description,
-          updatedAt: new Date(),
-        })
-        .where(eq(settings.id, req.id))
-        .returning();
-
-      await upsertEntityEmbedding(
-        ctx.vectorStore,
-        ctx.embedding,
-        row.novelId,
-        'setting',
-        row.id,
-        settingToText(row),
-        ctx.env,
-      );
-
-      return formatSetting(row);
     },
 
     async generateDraft(req) {
-      const ctx = getContext();
-      const prompt = createSettingDraft(req.query, {
-        category: req.category,
-        name: '',
-        description: '',
-      });
-      const result = await generateJSON<{
-        category: string;
-        name: string;
-        description: string;
-      }>(ctx.llm, prompt);
-
+      const service = new SettingDomainService(getContext());
+      const result = await service.generateDraft(req.query, req.category);
       return {
         name: result.name,
         description: result.description,
@@ -228,110 +137,31 @@ export function registerSettingService(
     },
 
     async getSettingsMarkdown(req) {
-      const db = getContext().db;
-      const rows = await db.select().from(settings).where(eq(settings.novelId, req.novelId));
-      const markdown = serializeSettingsToMarkdown(rows);
+      const service = new SettingDomainService(getContext());
+      const markdown = await service.getMarkdown(req.novelId);
       return { markdown };
     },
 
     async saveSettingsMarkdown(req) {
-      const ctx = getContext();
-      const db = ctx.db;
-      const novelId = req.novelId;
-      const existing = await db.select().from(settings).where(eq(settings.novelId, novelId));
-      const parsed = parseSettingsMarkdown(req.markdown);
-      const diff = diffSettings(existing, parsed);
-
-      const createdIds: string[] = [];
-      await db.transaction(async (tx) => {
-        for (const s of diff.toCreate) {
-          const [row] = await tx
-            .insert(settings)
-            .values({
-              novelId,
-              name: s.name,
-              category: s.category,
-              description: s.description,
-            })
-            .returning();
-          createdIds.push(row.id);
-        }
-
-        for (const u of diff.toUpdate) {
-          await tx
-            .update(settings)
-            .set({
-              category: u.category,
-              description: u.description,
-              updatedAt: new Date(),
-            })
-            .where(eq(settings.id, u.id));
-        }
-
-        for (const id of diff.toDelete) {
-          await tx.delete(settings).where(eq(settings.id, id));
-        }
-      });
-
-      for (let i = 0; i < diff.toCreate.length; i++) {
-        const s = diff.toCreate[i];
-        await upsertEntityEmbedding(
-          ctx.vectorStore,
-          ctx.embedding,
-          novelId,
-          'setting',
-          createdIds[i],
-          settingToText(s),
-          ctx.env,
-        );
-      }
-      for (const u of diff.toUpdate) {
-        await upsertEntityEmbedding(
-          ctx.vectorStore,
-          ctx.embedding,
-          novelId,
-          'setting',
-          u.id,
-          settingToText(u),
-          ctx.env,
-        );
-      }
-      for (const id of diff.toDelete) {
-        await ctx.vectorStore.deleteByEntity('setting', id);
-      }
-
-      const updated = await db.select().from(settings).where(eq(settings.novelId, novelId));
-
+      const service = new SettingDomainService(getContext());
+      const result = await service.saveMarkdown(req.novelId, req.markdown);
       return {
-        settings: updated.map(formatSetting),
-        createdCount: diff.toCreate.length,
-        updatedCount: diff.toUpdate.length,
-        deletedCount: diff.toDelete.length,
+        settings: result.settings.map(formatSetting),
+        createdCount: result.createdCount,
+        updatedCount: result.updatedCount,
+        deletedCount: result.deletedCount,
       };
     },
 
     async editSettingSection(req) {
-      const ctx = getContext();
-      const novelId = req.novelId;
-
-      const ragCtx = await searchContext(
-        ctx.vectorStore,
-        ctx.embedding,
-        novelId,
-        { query: `${req.description} ${req.instruction}` },
-        ctx.env,
-      );
-
-      const prompt = editSettingSection(
-        { category: req.category, name: req.name, description: req.description },
-        req.instruction,
-        {
-          settings: ragCtx.settings,
-          characters: ragCtx.characters,
-        },
-      );
-
-      const result = await generateText(ctx.llm, prompt);
+      const service = new SettingDomainService(getContext());
+      const result = await service.editSettingSection({
+        novelId: req.novelId,
+        category: req.category,
+        name: req.name,
+        description: req.description,
+        instruction: req.instruction,
+      });
       return {
         updatedSettings: [],
         parsedSummary: result,
@@ -339,23 +169,8 @@ export function registerSettingService(
     },
 
     async editSettingDocument(req) {
-      const ctx = getContext();
-      const novelId = req.novelId;
-
-      const ragCtx = await searchContext(
-        ctx.vectorStore,
-        ctx.embedding,
-        novelId,
-        { query: req.instruction },
-        ctx.env,
-      );
-
-      const prompt = editSettingDocument(req.markdown, req.instruction, {
-        settings: ragCtx.settings,
-        characters: ragCtx.characters,
-      });
-
-      const result = await generateText(ctx.llm, prompt);
+      const service = new SettingDomainService(getContext());
+      const result = await service.editSettingDocument(req.novelId, req.markdown, req.instruction);
       return {
         updatedSettings: [],
         parsedSummary: result,

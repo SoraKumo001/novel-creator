@@ -1,95 +1,225 @@
-import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 
-import { contents, sections } from '@novel-creator/db';
-
 import type { AppContext } from '../context.js';
 import {
-  chapterIdParamSchema,
-  createSectionSchema,
-  idParamSchema,
-  updateSectionSchema,
-} from '../schemas/index.js';
-import { getNextSectionOrder } from './helpers.js';
+  ContentDomainService,
+  GenerateDomainService,
+  NotFoundError,
+  SectionDomainService,
+} from '../core/index.js';
+import { idParamSchema, updateContentSchema, updateSectionSchema } from '../schemas/index.js';
 
 const sectionsRouter = new Hono<AppContext>();
 
-// GET /api/chapters/:chapterId/sections - 節一覧（order順）
-sectionsRouter.get(
-  '/chapters/:chapterId/sections',
-  zValidator('param', chapterIdParamSchema),
-  async (c) => {
-    const db = c.var.db;
-    const { chapterId } = c.req.valid('param');
-    const rows = await db
-      .select()
-      .from(sections)
-      .where(eq(sections.chapterId, chapterId))
-      .orderBy(sections.order);
-    return c.json(rows);
-  },
-);
-
-// POST /api/chapters/:chapterId/sections - 節作成
-sectionsRouter.post(
-  '/chapters/:chapterId/sections',
-  zValidator('param', chapterIdParamSchema),
-  zValidator('json', createSectionSchema),
-  async (c) => {
-    const db = c.var.db;
-    const { chapterId } = c.req.valid('param');
-    const body = c.req.valid('json');
-    const order = body.order ?? (await getNextSectionOrder(db, chapterId));
-    const [row] = await db
-      .insert(sections)
-      .values({
-        chapterId,
-        title: body.title ?? null,
-        order,
-        summary: body.summary ?? null,
-      })
-      .returning();
-    return c.json(row, 201);
-  },
-);
-
-// GET /api/sections/:id - 個別取得（content含む）
+// GET /api/sections/:id - 節個別取得（本文含む）
 sectionsRouter.get('/sections/:id', zValidator('param', idParamSchema), async (c) => {
-  const db = c.var.db;
+  const service = new SectionDomainService({
+    db: c.var.db,
+    llm: c.var.llm,
+    embedding: c.var.embedding,
+    vectorStore: c.var.vectorStore,
+    env: c.var.env,
+  });
   const { id } = c.req.valid('param');
-  const [section] = await db.select().from(sections).where(eq(sections.id, id));
-  if (!section) return c.json({ error: 'Section not found' }, 404);
-  const [content] = await db.select().from(contents).where(eq(contents.sectionId, id));
-  return c.json({ ...section, content: content ?? null });
+  try {
+    const result = await service.getSectionWithContent(id);
+    return c.json({
+      ...result.section,
+      content: result.content,
+    });
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      return c.json({ error: 'Section not found' }, 404);
+    }
+    throw err;
+  }
 });
 
-// PUT /api/sections/:id - 更新
+// PUT /api/sections/:id - 節更新
 sectionsRouter.put(
   '/sections/:id',
   zValidator('param', idParamSchema),
   zValidator('json', updateSectionSchema),
   async (c) => {
-    const db = c.var.db;
+    const service = new SectionDomainService({
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
+    });
     const { id } = c.req.valid('param');
     const body = c.req.valid('json');
-    const [row] = await db
-      .update(sections)
-      .set({ ...body, updatedAt: new Date() })
-      .where(eq(sections.id, id))
-      .returning();
-    if (!row) return c.json({ error: 'Section not found' }, 404);
+    try {
+      const row = await service.updateSection(id, body);
+      return c.json(row);
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return c.json({ error: 'Section not found' }, 404);
+      }
+      throw err;
+    }
+  },
+);
+
+// DELETE /api/sections/:id - 節削除
+sectionsRouter.delete('/sections/:id', zValidator('param', idParamSchema), async (c) => {
+  const service = new SectionDomainService({
+    db: c.var.db,
+    llm: c.var.llm,
+    embedding: c.var.embedding,
+    vectorStore: c.var.vectorStore,
+    env: c.var.env,
+  });
+  const { id } = c.req.valid('param');
+  try {
+    await service.deleteSection(id);
+    return c.json({ success: true });
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      return c.json({ error: 'Section not found' }, 404);
+    }
+    throw err;
+  }
+});
+
+// GET /api/sections/:id/content - 本文取得
+sectionsRouter.get('/sections/:id/content', zValidator('param', idParamSchema), async (c) => {
+  const service = new ContentDomainService({
+    db: c.var.db,
+    llm: c.var.llm,
+    embedding: c.var.embedding,
+    vectorStore: c.var.vectorStore,
+    env: c.var.env,
+  });
+  const { id } = c.req.valid('param');
+  try {
+    const row = await service.getContent(id);
+    return c.json(row);
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      return c.json({ error: 'Content not found' }, 404);
+    }
+    throw err;
+  }
+});
+
+// PUT /api/sections/:id/content - 本文更新
+sectionsRouter.put(
+  '/sections/:id/content',
+  zValidator('param', idParamSchema),
+  zValidator('json', updateContentSchema),
+  async (c) => {
+    const service = new ContentDomainService({
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
+    });
+    const { id } = c.req.valid('param');
+    const body = c.req.valid('json');
+    const row = await service.updateContent(id, body.body);
     return c.json(row);
   },
 );
 
-// DELETE /api/sections/:id - 削除
-sectionsRouter.delete('/sections/:id', zValidator('param', idParamSchema), async (c) => {
-  const db = c.var.db;
-  const { id } = c.req.valid('param');
-  const [row] = await db.delete(sections).where(eq(sections.id, id)).returning();
-  if (!row) return c.json({ error: 'Section not found' }, 404);
-  return c.json({ success: true });
-});
+// POST /api/sections/:id/generate/summary - 節概要生成
+sectionsRouter.post(
+  '/sections/:id/generate/summary',
+  zValidator('param', idParamSchema),
+  async (c) => {
+    const service = new GenerateDomainService({
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
+    });
+    const { id } = c.req.valid('param');
+    try {
+      const result = await service.generateSectionSummary(id);
+      return c.json(result);
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return c.json({ error: 'Section not found' }, 404);
+      }
+      throw err;
+    }
+  },
+);
+
+// POST /api/sections/:id/generate/content - 本文ストリーミング生成
+sectionsRouter.post(
+  '/sections/:id/generate/content',
+  zValidator('param', idParamSchema),
+  async (c) => {
+    const service = new GenerateDomainService({
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
+    });
+    const { id } = c.req.valid('param');
+
+    try {
+      const stream = service.generateSectionContent(id);
+      const encoder = new TextEncoder();
+      const readable = new ReadableStream({
+        async start(controller) {
+          try {
+            for await (const chunk of stream) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+            }
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            controller.close();
+          } catch (err) {
+            controller.error(err);
+          }
+        },
+      });
+
+      return new Response(readable, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+          Connection: 'keep-alive',
+        },
+      });
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return c.json({ error: 'Section not found' }, 404);
+      }
+      throw err;
+    }
+  },
+);
+
+// POST /api/sections/:id/generate/extract - 本文から設定・時系列を抽出
+sectionsRouter.post(
+  '/sections/:id/generate/extract',
+  zValidator('param', idParamSchema),
+  async (c) => {
+    const service = new GenerateDomainService({
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
+    });
+    const { id } = c.req.valid('param');
+    try {
+      const result = await service.extractEntities(id);
+      return c.json(result);
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return c.json({ error: 'Section not found' }, 404);
+      }
+      throw err;
+    }
+  },
+);
 
 export default sectionsRouter;

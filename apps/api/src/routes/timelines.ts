@@ -1,70 +1,79 @@
-import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 
-import { timelines, type Database } from '@novel-creator/db';
-
 import type { AppContext } from '../context.js';
-import { createTimelineSchema, idParamSchema, novelIdParamSchema } from '../schemas/index.js';
+import { NotFoundError, TimelineDomainService, ValidationError } from '../core/index.js';
+import { createTimelineSchema, idParamSchema } from '../schemas/index.js';
 
 const timelinesRouter = new Hono<AppContext>();
 
-// GET /api/novels/:novelId/timelines - 時系列一覧（order順）
-timelinesRouter.get(
-  '/novels/:novelId/timelines',
-  zValidator('param', novelIdParamSchema),
-  async (c) => {
-    const db = c.var.db;
-    const { novelId } = c.req.valid('param');
-    const rows = await db
-      .select()
-      .from(timelines)
-      .where(eq(timelines.novelId, novelId))
-      .orderBy(timelines.order);
-    return c.json(rows);
-  },
-);
-
-// POST /api/novels/:novelId/timelines - 作成
-timelinesRouter.post(
-  '/novels/:novelId/timelines',
-  zValidator('param', novelIdParamSchema),
-  zValidator('json', createTimelineSchema),
-  async (c) => {
-    const db = c.var.db;
-    const { novelId } = c.req.valid('param');
-    const body = c.req.valid('json');
-    const order = body.order ?? (await nextTimelineOrder(db, novelId));
-    const [row] = await db
-      .insert(timelines)
-      .values({
-        novelId,
-        sectionId: body.sectionId ?? null,
-        event: body.event,
-        order,
-        timestamp: body.timestamp ?? null,
-      })
-      .returning();
-    return c.json(row, 201);
-  },
-);
-
-// DELETE /api/timelines/:id - 削除
-timelinesRouter.delete('/timelines/:id', zValidator('param', idParamSchema), async (c) => {
-  const db = c.var.db;
+// GET /api/novels/:id/timelines - 時系列一覧
+timelinesRouter.get('/novels/:id/timelines', zValidator('param', idParamSchema), async (c) => {
+  const service = new TimelineDomainService({
+    db: c.var.db,
+    llm: c.var.llm,
+    embedding: c.var.embedding,
+    vectorStore: c.var.vectorStore,
+    env: c.var.env,
+  });
   const { id } = c.req.valid('param');
-  const [row] = await db.delete(timelines).where(eq(timelines.id, id)).returning();
-  if (!row) return c.json({ error: 'Timeline not found' }, 404);
-  return c.json({ success: true });
+  const rows = await service.listTimelines(id);
+  return c.json(rows);
 });
 
-async function nextTimelineOrder(db: Database, novelId: string): Promise<number> {
-  const rows = await db
-    .select({ order: timelines.order })
-    .from(timelines)
-    .where(eq(timelines.novelId, novelId))
-    .orderBy(timelines.order);
-  return rows.length > 0 ? (rows[rows.length - 1].order ?? 0) + 1 : 1;
-}
+// POST /api/novels/:id/timelines - 時系列作成
+timelinesRouter.post(
+  '/novels/:id/timelines',
+  zValidator('param', idParamSchema),
+  zValidator('json', createTimelineSchema),
+  async (c) => {
+    const service = new TimelineDomainService({
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
+    });
+    const { id: novelId } = c.req.valid('param');
+    const body = c.req.valid('json');
+
+    try {
+      const row = await service.createTimeline({
+        novelId,
+        sectionId: body.sectionId || null,
+        event: body.event,
+        order: body.order,
+        timestamp: body.timestamp || null,
+      });
+      return c.json(row, 201);
+    } catch (err) {
+      if (err instanceof ValidationError) {
+        return c.json({ error: err.message }, 400);
+      }
+      throw err;
+    }
+  },
+);
+
+// DELETE /api/timelines/:id - 時系列削除
+timelinesRouter.delete('/timelines/:id', zValidator('param', idParamSchema), async (c) => {
+  const service = new TimelineDomainService({
+    db: c.var.db,
+    llm: c.var.llm,
+    embedding: c.var.embedding,
+    vectorStore: c.var.vectorStore,
+    env: c.var.env,
+  });
+  const { id } = c.req.valid('param');
+  try {
+    await service.deleteTimeline(id);
+    return c.json({ success: true });
+  } catch (err) {
+    if (err instanceof NotFoundError) {
+      return c.json({ error: 'Timeline not found' }, 404);
+    }
+    throw err;
+  }
+});
 
 export default timelinesRouter;

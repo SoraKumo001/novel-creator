@@ -4,20 +4,17 @@ import { stream } from 'hono/streaming';
 import type { StreamingApi } from 'hono/utils/stream';
 import { zValidator } from '@hono/zod-validator';
 
-import { chapters, contents, novels, sections, settings, timelines } from '@novel-creator/db';
-import {
-  chapterSummary,
-  contentGeneration,
-  extractSettings,
-  extractTimeline,
-  generateJSON,
-  plotGeneration,
-  sectionSummary,
-  streamText,
-} from '@novel-creator/llm';
+import { contents, settings, timelines } from '@novel-creator/db';
+import { extractSettings, extractTimeline, generateJSON } from '@novel-creator/llm';
 
 import type { AppContext } from '../context.js';
-import { searchContext, upsertEntityEmbedding } from '../rag.js';
+import {
+  ChapterDomainService,
+  GenerateDomainService,
+  NotFoundError,
+  SectionDomainService,
+} from '../core/index.js';
+import { upsertEntityEmbedding } from '../rag.js';
 import { idParamSchema, novelIdParamSchema } from '../schemas/index.js';
 
 const generateRouter = new Hono<AppContext>();
@@ -27,35 +24,23 @@ generateRouter.post(
   '/novels/:novelId/generate/plot',
   zValidator('param', novelIdParamSchema),
   async (c) => {
-    const db = c.var.db;
-    const { novelId } = c.req.valid('param');
-    const [novel] = await db.select().from(novels).where(eq(novels.id, novelId));
-    if (!novel) return c.json({ error: 'Novel not found' }, 404);
-
-    const context = await searchContext(
-      c.var.vectorStore,
-      c.var.embedding,
-      novelId,
-      {
-        query: `${novel.title} ${novel.description ?? ''}`,
-      },
-      c.var.env,
-    );
-
-    const prompt = plotGeneration({
-      title: novel.title,
-      description: novel.description ?? '',
-      settings: context.settings,
-      characters: context.characters,
+    const service = new GenerateDomainService({
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
     });
-
-    const result = await generateJSON<{
-      title: string;
-      description: string;
-      chapters: { title: string; order: number; summary: string }[];
-    }>(c.var.llm, prompt);
-
-    return c.json(result);
+    const { novelId } = c.req.valid('param');
+    try {
+      const result = await service.generatePlot(novelId);
+      return c.json(result);
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return c.json({ error: 'Novel not found' }, 404);
+      }
+      throw err;
+    }
   },
 );
 
@@ -64,24 +49,23 @@ generateRouter.post(
   '/chapters/:id/generate/summary',
   zValidator('param', idParamSchema),
   async (c) => {
-    const db = c.var.db;
+    const service = new GenerateDomainService({
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
+    });
     const { id } = c.req.valid('param');
-    const [chapter] = await db.select().from(chapters).where(eq(chapters.id, id));
-    if (!chapter) return c.json({ error: 'Chapter not found' }, 404);
-    const [novel] = await db.select().from(novels).where(eq(novels.id, chapter.novelId));
-    if (!novel) return c.json({ error: 'Novel not found' }, 404);
-
-    const prompt = chapterSummary(
-      { title: novel.title, description: novel.description ?? '' },
-      { title: chapter.title, order: chapter.order, summary: chapter.summary ?? undefined },
-    );
-
-    const result = await generateJSON<{ title: string; order: number; summary: string }>(
-      c.var.llm,
-      prompt,
-    );
-
-    return c.json(result);
+    try {
+      const result = await service.generateChapterSummary(id);
+      return c.json(result);
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return c.json({ error: 'Chapter not found' }, 404);
+      }
+      throw err;
+    }
   },
 );
 
@@ -90,24 +74,23 @@ generateRouter.post(
   '/sections/:id/generate/summary',
   zValidator('param', idParamSchema),
   async (c) => {
-    const db = c.var.db;
+    const service = new GenerateDomainService({
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
+    });
     const { id } = c.req.valid('param');
-    const [section] = await db.select().from(sections).where(eq(sections.id, id));
-    if (!section) return c.json({ error: 'Section not found' }, 404);
-    const [chapter] = await db.select().from(chapters).where(eq(chapters.id, section.chapterId));
-    if (!chapter) return c.json({ error: 'Chapter not found' }, 404);
-
-    const prompt = sectionSummary(
-      { title: chapter.title, summary: chapter.summary ?? '' },
-      { title: section.title ?? undefined, order: section.order },
-    );
-
-    const result = await generateJSON<{ title: string; order: number; summary: string }>(
-      c.var.llm,
-      prompt,
-    );
-
-    return c.json(result);
+    try {
+      const result = await service.generateSectionSummary(id);
+      return c.json(result);
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return c.json({ error: 'Section not found' }, 404);
+      }
+      throw err;
+    }
   },
 );
 
@@ -116,130 +99,73 @@ generateRouter.post(
   '/sections/:id/generate/content',
   zValidator('param', idParamSchema),
   async (c) => {
-    const db = c.var.db;
-    const { id } = c.req.valid('param');
-    const [section] = await db.select().from(sections).where(eq(sections.id, id));
-    if (!section) return c.json({ error: 'Section not found' }, 404);
-    const [chapter] = await db.select().from(chapters).where(eq(chapters.id, section.chapterId));
-    if (!chapter) return c.json({ error: 'Chapter not found' }, 404);
-
-    // 前の節の本文を取得
-    const previousSections = await db
-      .select()
-      .from(sections)
-      .where(eq(sections.chapterId, section.chapterId))
-      .orderBy(sections.order);
-    const prevIndex = previousSections.findIndex((s) => s.id === id);
-    let previousContent: string | undefined;
-    if (prevIndex > 0) {
-      const prevSection = previousSections[prevIndex - 1];
-      const [prevContent] = await db
-        .select()
-        .from(contents)
-        .where(eq(contents.sectionId, prevSection.id));
-      previousContent = prevContent?.body;
-    }
-
-    const context = await searchContext(
-      c.var.vectorStore,
-      c.var.embedding,
-      chapter.novelId,
-      {
-        query: `${section.title ?? ''} ${section.summary ?? ''}`,
-        previousContent,
-      },
-      c.var.env,
-    );
-
-    const prompt = contentGeneration(
-      { title: section.title ?? undefined, summary: section.summary ?? '' },
-      {
-        previousContent: context.previousContent,
-        characters: context.characters,
-        settings: context.settings,
-      },
-    );
-
-    c.header('Content-Type', 'text/event-stream');
-    c.header('Cache-Control', 'no-cache');
-    c.header('Connection', 'keep-alive');
-
-    return stream(c, async (s: StreamingApi) => {
-      for await (const chunk of streamText(c.var.llm, prompt)) {
-        await s.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
-      }
-      await s.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    const service = new GenerateDomainService({
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
     });
+    const { id } = c.req.valid('param');
+
+    try {
+      const streamGenerator = service.generateSectionContent(id);
+
+      c.header('Content-Type', 'text/event-stream');
+      c.header('Cache-Control', 'no-cache');
+      c.header('Connection', 'keep-alive');
+
+      return stream(c, async (s: StreamingApi) => {
+        for await (const chunk of streamGenerator) {
+          await s.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
+        }
+        await s.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      });
+    } catch (err) {
+      if (err instanceof NotFoundError) {
+        return c.json({ error: 'Section not found' }, 404);
+      }
+      throw err;
+    }
   },
 );
 
 // POST /api/sections/:id/generate/content-auto - 本文生成 + 自動整合性更新
-// 本文を SSE でストリーミングし、完了後に時系列・設定の抽出結果を JSON イベントとして送信する。
-// 抽出結果は DB に保存せず、クライアントで確認後に保存できるよう返すのみ。
 generateRouter.post(
   '/sections/:id/generate/content-auto',
   zValidator('param', idParamSchema),
   async (c) => {
-    const db = c.var.db;
+    const ctx = {
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
+    };
+    const sectionService = new SectionDomainService(ctx);
+    const chapterService = new ChapterDomainService(ctx);
+    const generateService = new GenerateDomainService(ctx);
+
     const { id } = c.req.valid('param');
-    const [section] = await db.select().from(sections).where(eq(sections.id, id));
-    if (!section) return c.json({ error: 'Section not found' }, 404);
-    const [chapter] = await db.select().from(chapters).where(eq(chapters.id, section.chapterId));
-    if (!chapter) return c.json({ error: 'Chapter not found' }, 404);
+    const { section } = await sectionService.getSectionWithContent(id);
+    const { chapter } = await chapterService.getChapterWithSections(section.chapterId);
 
-    // 前の節の本文を取得
-    const previousSections = await db
-      .select()
-      .from(sections)
-      .where(eq(sections.chapterId, section.chapterId))
-      .orderBy(sections.order);
-    const prevIndex = previousSections.findIndex((s) => s.id === id);
-    let previousContent: string | undefined;
-    if (prevIndex > 0) {
-      const prevSection = previousSections[prevIndex - 1];
-      const [prevContent] = await db
-        .select()
-        .from(contents)
-        .where(eq(contents.sectionId, prevSection.id));
-      previousContent = prevContent?.body;
-    }
-
-    const context = await searchContext(
-      c.var.vectorStore,
-      c.var.embedding,
-      chapter.novelId,
-      {
-        query: `${section.title ?? ''} ${section.summary ?? ''}`,
-        previousContent,
-      },
-      c.var.env,
-    );
-
-    const prompt = contentGeneration(
-      { title: section.title ?? undefined, summary: section.summary ?? '' },
-      {
-        previousContent: context.previousContent,
-        characters: context.characters,
-        settings: context.settings,
-      },
-    );
+    const streamGenerator = generateService.generateSectionContent(id);
 
     c.header('Content-Type', 'text/event-stream');
     c.header('Cache-Control', 'no-cache');
     c.header('Connection', 'keep-alive');
 
     return stream(c, async (s: StreamingApi) => {
-      // 本文をストリーミングしつつ蓄積する
       let body = '';
-      for await (const chunk of streamText(c.var.llm, prompt)) {
+      for await (const chunk of streamGenerator) {
         body += chunk;
         await s.write(`event: chunk\ndata: ${JSON.stringify({ text: chunk })}\n\n`);
       }
 
-      // 本文生成完了後、整合性更新（時系列・設定の抽出）を実行する
       const novelId = chapter.novelId;
 
-      // 時系列抽出（DB 保存なし）
+      // 時系列抽出
       const timelinePrompt = extractTimeline(body);
       const timelineResult = await generateJSON<{ time?: string; event: string; order: number }[]>(
         c.var.llm,
@@ -251,14 +177,14 @@ generateRouter.post(
         timestamp: item.time ?? null,
       }));
 
-      // 設定抽出（DB 保存なし）
-      const existingSettings = await db
+      // 設定抽出
+      const existingSettings = await c.var.db
         .select()
         .from(settings)
         .where(eq(settings.novelId, novelId));
       const settingsPrompt = extractSettings(
         body,
-        existingSettings.map((s) => `${s.name}: ${s.description ?? ''}`),
+        existingSettings.map((item) => `${item.name}: ${item.description ?? ''}`),
       );
       const settingsResult = await generateJSON<
         { category: string; name: string; description: string }[]
@@ -269,7 +195,6 @@ generateRouter.post(
         description: item.description,
       }));
 
-      // 抽出結果を JSON イベントとして送信
       await s.write(
         `event: extract\ndata: ${JSON.stringify({
           timelines: timelinesResult,
@@ -277,30 +202,42 @@ generateRouter.post(
         })}\n\n`,
       );
 
-      // 完了イベント
       await s.write(`event: done\ndata: {}\n\n`);
     });
   },
 );
 
-// POST /api/sections/:id/generate/extract - 整合性更新
+// POST /api/sections/:id/generate/extract - 整合性更新（DB保存）
 generateRouter.post(
   '/sections/:id/generate/extract',
   zValidator('param', idParamSchema),
   async (c) => {
     const db = c.var.db;
     const { id } = c.req.valid('param');
-    const [section] = await db.select().from(sections).where(eq(sections.id, id));
-    if (!section) return c.json({ error: 'Section not found' }, 404);
-    const [chapter] = await db.select().from(chapters).where(eq(chapters.id, section.chapterId));
-    if (!chapter) return c.json({ error: 'Chapter not found' }, 404);
-    const [content] = await db.select().from(contents).where(eq(contents.sectionId, id));
-    if (!content) return c.json({ error: 'Content not found' }, 404);
+    const [section] = await db.select().from(contents).where(eq(contents.sectionId, id));
+    if (!section) return c.json({ error: 'Section content not found' }, 404);
 
+    const sectionService = new SectionDomainService({
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
+    });
+    const { section: sec } = await sectionService.getSectionWithContent(id);
+
+    const chapterService = new ChapterDomainService({
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+      env: c.var.env,
+    });
+    const { chapter } = await chapterService.getChapterWithSections(sec.chapterId);
     const novelId = chapter.novelId;
 
     // 時系列抽出
-    const timelinePrompt = extractTimeline(content.body);
+    const timelinePrompt = extractTimeline(section.body);
     const timelineResult = await generateJSON<{ time?: string; event: string; order: number }[]>(
       c.var.llm,
       timelinePrompt,
@@ -324,7 +261,7 @@ generateRouter.post(
     // 設定抽出
     const existingSettings = await db.select().from(settings).where(eq(settings.novelId, novelId));
     const settingsPrompt = extractSettings(
-      content.body,
+      section.body,
       existingSettings.map((s) => `${s.name}: ${s.description ?? ''}`),
     );
     const settingsResult = await generateJSON<

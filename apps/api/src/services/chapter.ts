@@ -1,10 +1,9 @@
 import { Code, ConnectError, type ConnectRouter } from '@connectrpc/connect';
-import { eq } from 'drizzle-orm';
-import { chapters, sections } from '@novel-creator/db';
+import type { chapters } from '@novel-creator/db';
 import { ChapterService } from '@novel-creator/proto';
 
 import type { AppContext } from '../context.js';
-import { getNextChapterOrder } from '../routes/helpers.js';
+import { ChapterDomainService, NotFoundError, ValidationError } from '../core/index.js';
 
 function formatChapter(row: typeof chapters.$inferSelect) {
   return {
@@ -24,86 +23,83 @@ export function registerChapterService(
 ) {
   router.service(ChapterService, {
     async listChapters(req) {
-      const db = getContext().db;
-      const rows = await db
-        .select()
-        .from(chapters)
-        .where(eq(chapters.novelId, req.novelId))
-        .orderBy(chapters.order);
+      const service = new ChapterDomainService(getContext());
+      const rows = await service.listChapters(req.novelId);
       return {
         chapters: rows.map(formatChapter),
       };
     },
 
     async getChapter(req) {
-      const db = getContext().db;
-      const [chapter] = await db.select().from(chapters).where(eq(chapters.id, req.id));
-      if (!chapter) {
-        throw new ConnectError('Chapter not found', Code.NotFound);
+      const service = new ChapterDomainService(getContext());
+      try {
+        const { chapter, sections } = await service.getChapterWithSections(req.id);
+        return {
+          chapter: formatChapter(chapter),
+          sections: sections.map((s) => ({
+            id: s.id,
+            chapterId: s.chapterId,
+            title: s.title ?? undefined,
+            order: s.order,
+            summary: s.summary ?? undefined,
+            createdAt: s.createdAt ? s.createdAt.toISOString() : undefined,
+            updatedAt: s.updatedAt ? s.updatedAt.toISOString() : undefined,
+          })),
+        };
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-      const sectionRows = await db
-        .select()
-        .from(sections)
-        .where(eq(sections.chapterId, req.id))
-        .orderBy(sections.order);
-
-      return {
-        chapter: formatChapter(chapter),
-        sections: sectionRows.map((s) => ({
-          id: s.id,
-          chapterId: s.chapterId,
-          title: s.title ?? undefined,
-          order: s.order,
-          summary: s.summary ?? undefined,
-          createdAt: s.createdAt ? s.createdAt.toISOString() : undefined,
-          updatedAt: s.updatedAt ? s.updatedAt.toISOString() : undefined,
-        })),
-      };
     },
 
     async createChapter(req) {
-      const db = getContext().db;
-      if (!req.title.trim()) {
-        throw new ConnectError('Title is required', Code.InvalidArgument);
-      }
-      const order = req.order > 0 ? req.order : await getNextChapterOrder(db, req.novelId);
-      const [row] = await db
-        .insert(chapters)
-        .values({
+      const service = new ChapterDomainService(getContext());
+      try {
+        const row = await service.createChapter({
           novelId: req.novelId,
           title: req.title,
-          order,
+          order: req.order > 0 ? req.order : undefined,
           summary: req.summary ?? null,
-        })
-        .returning();
-      return formatChapter(row);
+        });
+        return formatChapter(row);
+      } catch (err) {
+        if (err instanceof ValidationError) {
+          throw new ConnectError(err.message, Code.InvalidArgument);
+        }
+        throw err;
+      }
     },
 
     async updateChapter(req) {
-      const db = getContext().db;
-      const [row] = await db
-        .update(chapters)
-        .set({
-          ...(req.title ? { title: req.title } : {}),
-          ...(req.order !== undefined ? { order: req.order } : {}),
-          ...(req.summary !== undefined ? { summary: req.summary } : {}),
-          updatedAt: new Date(),
-        })
-        .where(eq(chapters.id, req.id))
-        .returning();
-      if (!row) {
-        throw new ConnectError('Chapter not found', Code.NotFound);
+      const service = new ChapterDomainService(getContext());
+      try {
+        const row = await service.updateChapter(req.id, {
+          title: req.title || undefined,
+          order: req.order !== undefined ? req.order : undefined,
+          summary: req.summary !== undefined ? req.summary : undefined,
+        });
+        return formatChapter(row);
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-      return formatChapter(row);
     },
 
     async deleteChapter(req) {
-      const db = getContext().db;
-      const [row] = await db.delete(chapters).where(eq(chapters.id, req.id)).returning();
-      if (!row) {
-        throw new ConnectError('Chapter not found', Code.NotFound);
+      const service = new ChapterDomainService(getContext());
+      try {
+        await service.deleteChapter(req.id);
+        return { success: true };
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-      return { success: true };
     },
   });
 }

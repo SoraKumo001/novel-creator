@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { OnMount } from '@monaco-editor/react';
-import { buildSettingTree, findSectionAtLine, getMarkdownSections } from '@novel-creator/shared';
+import { useCallback } from 'react';
+import {
+  buildSettingTree,
+  findSectionAtLine,
+  getMarkdownSections,
+  type SettingCategoryNode,
+} from '@novel-creator/shared';
 import { Button } from '@/components/Button.js';
 import { ConfirmDialog } from '@/components/ConfirmDialog.js';
 import { Input } from '@/components/Input.js';
 import { Loading } from '@/components/Loading.js';
-import { useMarkdownDraft } from '@/hooks/useMarkdownDraft.js';
+import { useMarkdownEntityEditor } from '@/hooks/useMarkdownEntityEditor.js';
 import type { SaveSettingsMarkdownResult } from '@/lib/types.js';
 import { MonacoEditor } from './-MonacoEditor.js';
-
-type MonacoEditorInstance = Parameters<OnMount>[0];
 
 interface SettingsMarkdownEditorProps {
   novelId: string;
@@ -37,105 +39,38 @@ export function SettingsMarkdownEditor({
   editingSection,
   editingDocument,
 }: SettingsMarkdownEditorProps) {
-  const [markdown, setMarkdown] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [instruction, setInstruction] = useState('');
-  const [editScope, setEditScope] = useState<'section' | 'document'>('section');
-  const [activeSection, setActiveSection] = useState<{
-    category: string;
-    name: string;
-  } | null>(null);
-  const [savedMarkdown, setSavedMarkdown] = useState('');
-  const [discardOpen, setDiscardOpen] = useState(false);
-
-  const editorRef = useRef<MonacoEditorInstance | null>(null);
-
-  const { hasDraft, draftContent, saveDraft, clearDraft, dismissDraft, checkDraft } =
-    useMarkdownDraft({
-      storageKey: `novel-creator:draft:settings:${novelId}`,
-    });
-
-  const tree = useMemo(() => buildSettingTree(markdown), [markdown]);
-
-  const isDirty = markdown !== savedMarkdown;
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError(null);
-    fetchSettingsMarkdown()
-      .then((md) => {
-        if (!active) return;
-        setMarkdown(md);
-        setSavedMarkdown(md);
-        checkDraft();
-      })
-      .catch((e) => {
-        if (!active) return;
-        setError(e instanceof Error ? e.message : '読み込みに失敗しました');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [fetchSettingsMarkdown, checkDraft]);
-
-  const handleEditorChange = useCallback(
-    (value: string) => {
-      setMarkdown(value);
-      saveDraft(value);
-    },
-    [saveDraft],
-  );
-
-  const handleRestoreDraft = useCallback(() => {
-    if (draftContent === null) return;
-    setMarkdown(draftContent);
-    saveDraft(draftContent);
-    dismissDraft();
-  }, [draftContent, saveDraft, dismissDraft]);
-
-  const handleDiscardDraft = useCallback(() => {
-    clearDraft();
-  }, [clearDraft]);
-
-  const handleDiscard = useCallback(async () => {
-    setDiscardOpen(false);
-    setError(null);
-    setMessage(null);
-    clearDraft();
-    try {
-      const md = await fetchSettingsMarkdown();
-      setMarkdown(md);
-      setSavedMarkdown(md);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '破棄に失敗しました');
-    }
-  }, [clearDraft, fetchSettingsMarkdown]);
-
-  const handleEditorMount = useCallback(
-    (editorInstance: MonacoEditorInstance) => {
-      editorRef.current = editorInstance;
-      editorInstance.onDidChangeCursorPosition((e) => {
-        const section = findSectionAtLine(markdown, e.position.lineNumber);
-        setActiveSection(section ? { category: section.category, name: section.name } : null);
-      });
-    },
-    [markdown],
-  );
-
-  const handleTreeClick = useCallback((headingLine: number) => {
-    const ed = editorRef.current;
-    if (!ed) return;
-    const lineNumber = headingLine + 1;
-    ed.revealLineInCenter(lineNumber);
-    ed.setPosition({ lineNumber, column: 1 });
-    ed.focus();
-  }, []);
+  const {
+    markdown,
+    setMarkdown,
+    setSavedMarkdown,
+    loading,
+    error,
+    setError,
+    message,
+    setMessage,
+    instruction,
+    setInstruction,
+    editScope,
+    setEditScope,
+    activeSection,
+    discardOpen,
+    setDiscardOpen,
+    hasDraft,
+    isDirty,
+    tree,
+    handleEditorChange,
+    handleRestoreDraft,
+    handleDiscardDraft,
+    handleDiscard,
+    handleEditorMount,
+    handleTreeClick,
+    clearDraft,
+  } = useMarkdownEntityEditor<SettingCategoryNode[]>({
+    storageKey: `novel-creator:draft:settings:${novelId}`,
+    fetchMarkdown: fetchSettingsMarkdown,
+    buildTree: buildSettingTree,
+    findSectionAtLine: findSectionAtLine,
+  });
 
   const handleRun = useCallback(async () => {
     setError(null);
@@ -144,219 +79,257 @@ export function SettingsMarkdownEditor({
       setMessage('指示を入力してください');
       return;
     }
-    if (editScope === 'section') {
-      if (!activeSection) {
-        setMessage('セクションを選択してください');
+
+    try {
+      if (editScope === 'document') {
+        const next = await editSettingDocument({ markdown, instruction });
+        setMarkdown(next);
+        setMessage('全体の編集が完了しました');
         return;
       }
+
+      if (!activeSection) {
+        setMessage('カーソルを編集対象の設定セクション（## 見出し配下）に移動してください');
+        return;
+      }
+
       const sections = getMarkdownSections(markdown);
       const target = sections.find(
         (s) => s.category === activeSection.category && s.name === activeSection.name,
       );
+
       if (!target) {
-        setMessage('対象のセクションが見つかりません');
+        setMessage(`設定「${activeSection.name}」のセクションが見つかりません`);
         return;
       }
-      try {
-        const result = await editSettingSection({
-          category: target.category,
-          name: target.name,
-          description: target.description,
-          instruction: instruction.trim(),
-        });
-        const lines = markdown.split('\n');
-        const newLines = [
-          ...lines.slice(0, target.startLine),
-          ...result.split('\n'),
-          ...lines.slice(target.endLine + 1),
-        ];
-        const updated = newLines.join('\n');
-        setMarkdown(updated);
-        saveDraft(updated);
-        setInstruction('');
-      } catch (e) {
-        setError(e instanceof Error ? e.message : '編集に失敗しました');
-      }
-      return;
-    }
-    try {
-      const result = await editSettingDocument({
-        markdown,
-        instruction: instruction.trim(),
+
+      const nextSummary = await editSettingSection({
+        category: target.category,
+        name: target.name,
+        description: target.description,
+        instruction,
       });
-      setMarkdown(result);
-      saveDraft(result);
-      setInstruction('');
+
+      const lines = markdown.split('\n');
+      const before = lines.slice(0, target.startLine);
+      const after = lines.slice(target.endLine);
+      const replaced = [...before, nextSummary.trim(), ...after].join('\n');
+      setMarkdown(replaced);
+      setMessage(`「${activeSection.name}」の編集が完了しました`);
     } catch (e) {
       setError(e instanceof Error ? e.message : '編集に失敗しました');
     }
   }, [
     activeSection,
+    editSettingDocument,
+    editSettingSection,
+    editScope,
     instruction,
     markdown,
-    editScope,
-    editSettingSection,
-    editSettingDocument,
-    saveDraft,
+    setError,
+    setMessage,
+    setMarkdown,
   ]);
 
   const handleSave = useCallback(async () => {
     setError(null);
     setMessage(null);
     try {
-      const result = await saveSettingsMarkdown(markdown);
-      clearDraft();
+      const res = await saveSettingsMarkdown(markdown);
       setSavedMarkdown(markdown);
+      clearDraft();
       setMessage(
-        `保存しました（作成: ${result.created} / 更新: ${result.updated} / 削除: ${result.deleted} / 重複: ${result.duplicateCount}）`,
+        `保存しました (作成: ${res.created}件, 更新: ${res.updated}件, 削除: ${res.deleted}件)`,
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存に失敗しました');
     }
-  }, [markdown, saveSettingsMarkdown, clearDraft]);
+  }, [clearDraft, markdown, saveSettingsMarkdown, setError, setMessage, setSavedMarkdown]);
 
-  if (loading) return <Loading message="設定マークダウンを読み込み中..." />;
+  if (loading) {
+    return <Loading message="設定マークダウンを読み込み中..." />;
+  }
+
+  const isBusy = savingMarkdown || editingSection || editingDocument;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
-      {hasDraft && draftContent !== null && draftContent !== savedMarkdown && (
-        <div className="flex shrink-0 items-center justify-between border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm dark:border-amber-900/30 dark:bg-amber-900/20">
-          <span className="text-amber-700 dark:text-amber-300">未保存の編集があります</span>
+    <div className="flex h-full flex-col">
+      {hasDraft && (
+        <div
+          role="region"
+          aria-label="自動保存されたドラフト"
+          className="bg-amber-500/10 border-b border-amber-500/30 px-4 py-2 text-sm text-amber-900 dark:text-amber-200 flex items-center justify-between"
+        >
+          <span>未保存のドラフトがあります。復元しますか？</span>
           <div className="flex gap-2">
-            <button
-              onClick={handleRestoreDraft}
-              className="text-sm font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-            >
-              復元
-            </button>
-            <button
-              onClick={handleDiscardDraft}
-              className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400"
-            >
-              破棄
-            </button>
+            <Button size="sm" variant="secondary" onClick={handleRestoreDraft}>
+              復元する
+            </Button>
+            <Button size="sm" variant="ghost" onClick={handleDiscardDraft}>
+              破棄する
+            </Button>
           </div>
         </div>
       )}
-      <div className="flex min-h-0 flex-1">
-        {/* ツリー */}
-        <div className="h-full w-60 shrink-0 overflow-auto border-r border-slate-200 p-3 dark:border-slate-700">
-          <h3 className="mb-3 px-2 text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            カテゴリ / 設定
-          </h3>
-          {tree.length === 0 && (
-            <p className="px-2 text-sm text-slate-400 dark:text-slate-500">設定がありません。</p>
-          )}
-          {tree.map((category) => (
-            <div key={category.category} className="mb-2">
-              <div className="px-2 py-1 text-sm font-semibold text-slate-700 dark:text-slate-200">
-                {category.category}
-              </div>
-              {category.children.map((child) => {
-                const isActive =
-                  activeSection?.category === category.category &&
-                  activeSection.name === child.name;
-                return (
-                  <button
-                    key={child.name}
-                    onClick={() => handleTreeClick(child.headingLine)}
-                    className={`block w-full rounded px-2 py-1 text-left text-sm transition ${
-                      isActive
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                        : 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-700'
-                    }`}
-                  >
-                    {child.name}
-                  </button>
-                );
-              })}
-            </div>
-          ))}
-        </div>
 
-        {/* エディタ */}
-        <div className="h-full min-w-0 flex-1 overflow-hidden">
+      {error && (
+        <div className="bg-red-500/10 border-b border-red-500/30 px-4 py-2 text-sm text-red-900 dark:text-red-300">
+          {error}
+        </div>
+      )}
+      {message && (
+        <div className="bg-emerald-500/10 border-b border-emerald-500/30 px-4 py-2 text-sm text-emerald-900 dark:text-emerald-300">
+          {message}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between border-b border-border px-4 py-2 bg-surface">
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={handleSave}
+            disabled={!isDirty || isBusy}
+            isLoading={savingMarkdown}
+          >
+            保存
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setDiscardOpen(true)}
+            disabled={!isDirty || isBusy}
+          >
+            変更を破棄
+          </Button>
+          {isDirty && (
+            <span className="text-xs text-muted-foreground">（未保存の変更があります）</span>
+          )}
+        </div>
+      </div>
+
+      <div className="border-b border-border p-4 bg-surface">
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-4 text-xs">
+            <span className="font-semibold text-muted-foreground">編集対象:</span>
+            <label className="flex items-center gap-1.5 cursor-pointer text-foreground">
+              <input
+                type="radio"
+                name="setting-edit-scope"
+                value="section"
+                checked={editScope === 'section'}
+                onChange={() => setEditScope('section')}
+                disabled={isBusy}
+              />
+              選択セクション
+              {activeSection && (
+                <span className="text-primary font-mono ml-1">
+                  [{activeSection.category}] {activeSection.name}
+                </span>
+              )}
+            </label>
+            <label className="flex items-center gap-1.5 cursor-pointer text-foreground">
+              <input
+                type="radio"
+                name="setting-edit-scope"
+                value="document"
+                checked={editScope === 'document'}
+                onChange={() => setEditScope('document')}
+                disabled={isBusy}
+              />
+              ドキュメント全体
+            </label>
+          </div>
+
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <Input
+                placeholder={
+                  editScope === 'section'
+                    ? activeSection
+                      ? `「${activeSection.name}」への指示（例: 魔法体系の制約を追加して）`
+                      : 'カーソルを設定セクション内に置いてください'
+                    : '全体への指示（例: 宗教・信仰に関する大項目を追加して）'
+                }
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                disabled={isBusy}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    void handleRun();
+                  }
+                }}
+              />
+            </div>
+            <Button
+              size="sm"
+              variant="primary"
+              onClick={handleRun}
+              disabled={isBusy || !instruction.trim()}
+              isLoading={editingSection || editingDocument}
+            >
+              LLMで編集
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+        <aside className="w-64 border-r border-border bg-surface overflow-y-auto p-2 text-xs">
+          <div className="font-semibold text-muted-foreground px-2 py-1 mb-1">
+            目次 (カテゴリ / 設定)
+          </div>
+          {tree.length === 0 ? (
+            <div className="text-muted-foreground p-2 italic">設定が見つかりません</div>
+          ) : (
+            tree.map((cat) => (
+              <div key={cat.category} className="mb-2">
+                <div className="font-bold text-foreground px-2 py-1 bg-surface-raised rounded">
+                  # {cat.category}
+                </div>
+                <div className="ml-2 mt-1 space-y-0.5">
+                  {cat.children.map((s) => {
+                    const isActive =
+                      activeSection?.category === cat.category && activeSection?.name === s.name;
+                    return (
+                      <button
+                        key={s.name}
+                        type="button"
+                        onClick={() => handleTreeClick(s.headingLine)}
+                        className={`w-full text-left px-2 py-1 rounded truncate block transition-colors ${
+                          isActive
+                            ? 'bg-primary text-primary-foreground font-semibold'
+                            : 'hover:bg-surface-raised text-foreground'
+                        }`}
+                        title={s.name}
+                      >
+                        ## {s.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          )}
+        </aside>
+
+        <main className="flex-1 overflow-hidden relative">
           <MonacoEditor
             value={markdown}
             onChange={handleEditorChange}
             onMount={handleEditorMount}
           />
-        </div>
+        </main>
       </div>
 
-      {/* LLM指示バー */}
-      <div className="flex shrink-0 items-center gap-2 border-t border-slate-200 px-4 py-3 dark:border-slate-700">
-        <div className="flex rounded-lg border border-slate-300 p-0.5 dark:border-slate-700">
-          <button
-            onClick={() => setEditScope('section')}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-              editScope === 'section'
-                ? 'bg-indigo-600 text-white dark:bg-indigo-500'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-            }`}
-          >
-            セクション
-          </button>
-          <button
-            onClick={() => setEditScope('document')}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-              editScope === 'document'
-                ? 'bg-indigo-600 text-white dark:bg-indigo-500'
-                : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
-            }`}
-          >
-            全体
-          </button>
-        </div>
-        <div className="flex-1">
-          <Input
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            placeholder="LLMへの指示を入力（例: もっと詳細に書いて）"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') void handleRun();
-            }}
-          />
-        </div>
-        <Button
-          variant="secondary"
-          onClick={handleRun}
-          isLoading={editingSection || editingDocument}
-          disabled={!instruction.trim()}
-        >
-          実行
-        </Button>
-        {isDirty && (
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-            未保存
-          </span>
-        )}
-        <Button onClick={handleSave} isLoading={savingMarkdown}>
-          保存
-        </Button>
-        <Button variant="secondary" onClick={() => setDiscardOpen(true)} disabled={!isDirty}>
-          破棄
-        </Button>
-      </div>
-
-      {message && (
-        <div className="border-t border-slate-100 bg-slate-50 px-4 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
-          {message}
-        </div>
-      )}
-      {error && (
-        <div className="border-t border-rose-100 bg-rose-50 px-4 py-2 text-xs text-rose-600 dark:border-rose-900/30 dark:bg-rose-900/20 dark:text-rose-300">
-          {error}
-        </div>
-      )}
       <ConfirmDialog
         isOpen={discardOpen}
-        onClose={() => setDiscardOpen(false)}
+        title="変更を破棄しますか？"
+        message="保存していない変更はすべて失われます。よろしいですか？"
+        confirmLabel="破棄する"
+        cancelLabel="キャンセル"
         onConfirm={handleDiscard}
-        title="編集内容を破棄しますか？"
-        message="サーバーに保存済みの内容に戻します。この操作は元に戻せません。"
-        confirmLabel="破棄"
-        isLoading={false}
+        onClose={() => setDiscardOpen(false)}
       />
     </div>
   );

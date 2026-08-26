@@ -1,9 +1,9 @@
 import { Code, ConnectError, type ConnectRouter } from '@connectrpc/connect';
-import { eq } from 'drizzle-orm';
-import { timelines, type Database } from '@novel-creator/db';
+import type { timelines } from '@novel-creator/db';
 import { TimelineService } from '@novel-creator/proto';
 
 import type { AppContext } from '../context.js';
+import { NotFoundError, TimelineDomainService, ValidationError } from '../core/index.js';
 
 function formatTimeline(row: typeof timelines.$inferSelect) {
   return {
@@ -17,58 +17,49 @@ function formatTimeline(row: typeof timelines.$inferSelect) {
   };
 }
 
-async function nextTimelineOrder(db: Database, novelId: string): Promise<number> {
-  const rows = await db
-    .select({ order: timelines.order })
-    .from(timelines)
-    .where(eq(timelines.novelId, novelId))
-    .orderBy(timelines.order);
-  return rows.length > 0 ? (rows[rows.length - 1].order ?? 0) + 1 : 1;
-}
-
 export function registerTimelineService(
   router: ConnectRouter,
   getContext: () => AppContext['Variables'],
 ) {
   router.service(TimelineService, {
     async listTimelines(req) {
-      const db = getContext().db;
-      const rows = await db
-        .select()
-        .from(timelines)
-        .where(eq(timelines.novelId, req.novelId))
-        .orderBy(timelines.order);
+      const service = new TimelineDomainService(getContext());
+      const rows = await service.listTimelines(req.novelId);
       return {
         timelines: rows.map(formatTimeline),
       };
     },
 
     async createTimeline(req) {
-      const db = getContext().db;
-      if (!req.event.trim()) {
-        throw new ConnectError('Event is required', Code.InvalidArgument);
-      }
-      const order = req.order > 0 ? req.order : await nextTimelineOrder(db, req.novelId);
-      const [row] = await db
-        .insert(timelines)
-        .values({
+      const service = new TimelineDomainService(getContext());
+      try {
+        const row = await service.createTimeline({
           novelId: req.novelId,
           sectionId: req.sectionId || null,
           event: req.event,
-          order,
+          order: req.order > 0 ? req.order : undefined,
           timestamp: req.timestamp || null,
-        })
-        .returning();
-      return formatTimeline(row);
+        });
+        return formatTimeline(row);
+      } catch (err) {
+        if (err instanceof ValidationError) {
+          throw new ConnectError(err.message, Code.InvalidArgument);
+        }
+        throw err;
+      }
     },
 
     async deleteTimeline(req) {
-      const db = getContext().db;
-      const [row] = await db.delete(timelines).where(eq(timelines.id, req.id)).returning();
-      if (!row) {
-        throw new ConnectError('Timeline not found', Code.NotFound);
+      const service = new TimelineDomainService(getContext());
+      try {
+        await service.deleteTimeline(req.id);
+        return { success: true };
+      } catch (err) {
+        if (err instanceof NotFoundError) {
+          throw new ConnectError(err.message, Code.NotFound);
+        }
+        throw err;
       }
-      return { success: true };
     },
   });
 }

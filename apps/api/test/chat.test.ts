@@ -10,6 +10,7 @@ vi.mock('@novel-creator/llm', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@novel-creator/llm')>();
   return {
     ...actual,
+    creativeChatSystemPrompt: vi.fn().mockReturnValue('mock prompt'),
     generateText: vi.fn().mockResolvedValue(
       JSON.stringify({
         characters: [
