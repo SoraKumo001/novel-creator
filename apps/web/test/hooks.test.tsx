@@ -1,4 +1,6 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useNovels } from '../src/hooks/useNovels.js';
@@ -8,9 +10,27 @@ import type { Novel } from '../src/lib/types.js';
 // useNovels は @/lib/api.js の api クライアント経由で fetch を呼び出す。
 const mockFetch = vi.fn();
 
+let queryClient: QueryClient;
+
+function createWrapper() {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  };
+}
+
 beforeEach(() => {
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
+  queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+      mutations: {
+        retry: false,
+      },
+    },
+  });
 });
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -34,7 +54,7 @@ describe('useNovels', () => {
   it('初期ロードで一覧を取得すること', async () => {
     mockFetch.mockResolvedValue(jsonResponse([sampleNovel]));
 
-    const { result } = renderHook(() => useNovels());
+    const { result } = renderHook(() => useNovels(), { wrapper: createWrapper() });
 
     // 初期状態
     expect(result.current.loading).toBe(true);
@@ -47,9 +67,9 @@ describe('useNovels', () => {
   });
 
   it('作成（createNovel）で一覧に追加されること', async () => {
-    mockFetch.mockResolvedValue(jsonResponse([sampleNovel]));
+    mockFetch.mockResolvedValueOnce(jsonResponse([sampleNovel]));
 
-    const { result } = renderHook(() => useNovels());
+    const { result } = renderHook(() => useNovels(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
     const newNovel: Novel = {
@@ -59,29 +79,37 @@ describe('useNovels', () => {
       createdAt: null,
       updatedAt: null,
     };
-    mockFetch.mockResolvedValue(jsonResponse(newNovel, 201));
+    // 1回目: POST (create) のレスポンス
+    // 2回目: invalidateQueries で再取得される GET (一覧) のレスポンス
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse(newNovel, 201))
+      .mockResolvedValueOnce(jsonResponse([sampleNovel, newNovel]));
 
     await act(async () => {
       await result.current.createNovel({ title: '新しい小説' });
     });
 
-    expect(result.current.novels).toHaveLength(2);
+    await waitFor(() => expect(result.current.novels).toHaveLength(2));
     expect(result.current.novels[1].title).toBe('新しい小説');
   });
 
   it('削除（deleteNovel）で一覧から除外されること', async () => {
-    mockFetch.mockResolvedValue(jsonResponse([sampleNovel]));
+    mockFetch.mockResolvedValueOnce(jsonResponse([sampleNovel]));
 
-    const { result } = renderHook(() => useNovels());
+    const { result } = renderHook(() => useNovels(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    mockFetch.mockResolvedValue(jsonResponse({ success: true }));
+    // 1回目: DELETE のレスポンス
+    // 2回目: invalidateQueries で再取得される GET (一覧) のレスポンス
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse({ success: true }))
+      .mockResolvedValueOnce(jsonResponse([]));
 
     await act(async () => {
       await result.current.deleteNovel(sampleNovel.id);
     });
 
-    expect(result.current.novels).toHaveLength(0);
+    await waitFor(() => expect(result.current.novels).toHaveLength(0));
   });
 
   it('API エラー時に error が設定されること', async () => {
@@ -89,7 +117,7 @@ describe('useNovels', () => {
       jsonResponse({ error: { code: 'INTERNAL_ERROR', message: 'サーバーエラー' } }, 500),
     );
 
-    const { result } = renderHook(() => useNovels());
+    const { result } = renderHook(() => useNovels(), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 

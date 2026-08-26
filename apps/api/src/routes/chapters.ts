@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 
-import { chapters, sections, type Database } from '@novel-creator/db';
+import { chapters, sections } from '@novel-creator/db';
 
 import type { AppContext } from '../context.js';
 import {
@@ -11,6 +11,7 @@ import {
   novelIdParamSchema,
   updateChapterSchema,
 } from '../schemas/index.js';
+import { getNextChapterOrder } from './helpers.js';
 
 const chaptersRouter = new Hono<AppContext>();
 
@@ -39,7 +40,7 @@ chaptersRouter.post(
     const db = c.var.db;
     const { novelId } = c.req.valid('param');
     const body = c.req.valid('json');
-    const order = body.order ?? (await nextChapterOrder(db, novelId));
+    const order = body.order ?? (await getNextChapterOrder(db, novelId));
     const [row] = await db
       .insert(chapters)
       .values({
@@ -94,14 +95,5 @@ chaptersRouter.delete('/chapters/:id', zValidator('param', idParamSchema), async
   if (!row) return c.json({ error: 'Chapter not found' }, 404);
   return c.json({ success: true });
 });
-
-async function nextChapterOrder(db: Database, novelId: string): Promise<number> {
-  const rows = await db
-    .select({ order: chapters.order })
-    .from(chapters)
-    .where(eq(chapters.novelId, novelId))
-    .orderBy(chapters.order);
-  return rows.length > 0 ? (rows[rows.length - 1].order ?? 0) + 1 : 1;
-}
 
 export default chaptersRouter;

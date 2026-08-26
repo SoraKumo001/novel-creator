@@ -1,6 +1,14 @@
 export { envSchema, parseEnv } from './env.js';
 export type { Env } from './env.js';
 export {
+  scanMarkdownSections,
+  buildMarkdownCategoryTree,
+  findSectionByLine,
+  calculateEntityDiff,
+  trimAndJoinLines,
+} from './markdownCore.js';
+export type { MarkdownCategoryNode, RawMarkdownSection } from './markdownCore.js';
+export {
   serializeSettingsToMarkdown,
   parseSettingsMarkdown,
   getMarkdownSections,

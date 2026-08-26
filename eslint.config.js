@@ -39,6 +39,7 @@ export default tseslint.config(
             'apps/api/src/worker.ts',
             'packages/llm/test/prompts.test.ts',
             'packages/vector/test/types.test.ts',
+            'packages/shared/test/markdown.test.ts',
           ],
         },
         tsconfigRootDir: import.meta.dirname,
