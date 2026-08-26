@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package novelcreator.v1;
+
+message LlmInstruction {
+  string id = 1;
+  string novel_id = 2;
+  string entity_type = 3;
+  optional string entity_id = 4;
+  string instruction = 5;
+  optional string created_at = 6;
+  optional string updated_at = 7;
+}
+
+message ListLlmInstructionsRequest {
+  string novel_id = 1;
+  optional string entity_type = 2;
+}
+
+message ListLlmInstructionsResponse {
+  repeated LlmInstruction instructions = 1;
+}
+
+message CreateLlmInstructionRequest {
+  string novel_id = 1;
+  string entity_type = 2;
+  optional string entity_id = 3;
+  string instruction = 4;
+}
+
+message DeleteLlmInstructionRequest {
+  string id = 1;
+}
+
+message DeleteLlmInstructionResponse {
+  bool success = 1;
+}
+
+service LlmInstructionService {
+  rpc ListLlmInstructions(ListLlmInstructionsRequest) returns (ListLlmInstructionsResponse);
+  rpc CreateLlmInstruction(CreateLlmInstructionRequest) returns (LlmInstruction);
+  rpc DeleteLlmInstruction(DeleteLlmInstructionRequest) returns (DeleteLlmInstructionResponse);
+}

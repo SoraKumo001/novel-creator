@@ -42,26 +42,20 @@ function NovelDetailPage() {
     <div className="flex h-full max-w-6xl flex-col">
       {loading && <Loading message="小説を読み込み中..." />}
       {!loading && error && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300">
+        <div className="rounded-lg border border-danger-border bg-danger-subtle p-4 text-sm text-danger-subtle-fg">
           {error}
         </div>
       )}
       {novel && (
         <>
           <header className="mb-6 shrink-0">
-            <div className="mb-1 text-sm font-medium text-indigo-600 dark:text-indigo-400">
-              小説詳細
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-              {novel.title}
-            </h1>
+            <div className="mb-1 text-sm font-medium text-primary">小説詳細</div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">{novel.title}</h1>
             {novel.description && (
-              <p className="mt-2 max-w-3xl text-slate-600 dark:text-slate-300">
-                {novel.description}
-              </p>
+              <p className="mt-2 max-w-3xl text-foreground-secondary">{novel.description}</p>
             )}
           </header>
-          <nav className="mb-6 shrink-0 border-b border-slate-200 dark:border-slate-700">
+          <nav className="mb-6 shrink-0 border-b border-border">
             <div className="flex gap-1 overflow-x-auto">
               {tabs.map((t) => (
                 <button
@@ -75,8 +69,6 @@ function NovelDetailPage() {
                   }
                   className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition ${
                     activeTab === t.id
-                      ? 'border-indigo-600 text-indigo-700 dark:border-indigo-400 dark:text-indigo-300'
-                      : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
                   }`}
                 >
                   {t.label}

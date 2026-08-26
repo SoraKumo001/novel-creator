@@ -14,10 +14,10 @@ function ToastDemo({
 }) {
   const toast = useToast();
   return (
-    <div className="flex h-64 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-900">
+    <div className="flex h-64 items-center justify-center rounded-lg border border-border bg-surface-muted">
       <button
         onClick={() => toast[type](message)}
-        className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
       >
         {children ?? `${type} トーストを表示`}
       </button>

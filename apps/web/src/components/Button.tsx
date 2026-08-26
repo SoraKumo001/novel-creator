@@ -15,14 +15,12 @@ const baseStyles =
   'inline-flex items-center justify-center rounded-lg font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary:
-    'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400',
+  primary: 'bg-primary text-primary-foreground hover:bg-primary-hover focus:ring-primary',
   secondary:
-    'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 focus:ring-slate-500 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700',
-  danger:
-    'bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500 dark:bg-rose-500 dark:hover:bg-rose-400',
+    'bg-surface text-foreground border border-border hover:bg-surface-hover focus:ring-primary',
+  danger: 'bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500',
   ghost:
-    'bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:ring-slate-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100',
+    'bg-transparent text-foreground-secondary hover:bg-surface-hover hover:text-foreground focus:ring-primary',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {

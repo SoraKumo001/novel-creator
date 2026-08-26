@@ -68,12 +68,9 @@ export function useToastContext(): ToastContextValue {
 }
 
 const typeStyles: Record<ToastType, string> = {
-  success:
-    'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-900/30 dark:text-emerald-200',
-  error:
-    'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-900/30 dark:text-rose-200',
-  loading:
-    'border-slate-200 bg-white text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
+  success: 'border-success-border bg-success-subtle text-success-subtle-fg',
+  error: 'border-danger-border bg-danger-subtle text-danger-subtle-fg',
+  loading: 'border-border bg-surface text-foreground',
 };
 
 const typeIcons: Record<ToastType, ReactNode> = {

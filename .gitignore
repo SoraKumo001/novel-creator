@@ -1,13 +1,29 @@
+# 依存・ビルド成果物
 node_modules
 dist
 coverage
+storybook-static
+*.tsbuildinfo
+.turbo
+.cache
+.vite
+
+# 環境変数・シークレット
 .env
+.env.*.local
 .env.local
+
+# ログ
 *.log
 *storybook.log
-.DS_Store
+
+# 開発ツール・クラウドキャッシュ
+.wrangler
+.playwright-mcp
 .tanstack
-storybook-static
+.DS_Store
+
+# 自動生成コード（再生成可能なもの）
 apps/web/src/routeTree.gen.ts
 apps/web/node_modules/.tsbuild
-.playwright-mcp
+packages/proto/src/gen

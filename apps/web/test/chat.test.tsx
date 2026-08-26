@@ -13,23 +13,19 @@ function createChatWrapper() {
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
-  return {
-    ok: status >= 200 && status < 300,
+  return new Response(JSON.stringify(body), {
     status,
-    json: async () => body,
-    text: async () => JSON.stringify(body),
-  } as unknown as Response;
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
 }
 
 beforeEach(() => {
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
-  mockFetch.mockImplementation(async (url: string, init?: RequestInit) => {
-    const method = init?.method ?? 'GET';
-    if (url.startsWith('/api/chat/sessions') && method === 'GET') {
-      return jsonResponse([]);
-    }
-    return jsonResponse({});
+  mockFetch.mockImplementation(async () => {
+    return jsonResponse({ sessions: [] });
   });
 });
 
@@ -69,12 +65,17 @@ describe('ChatContext & useChat', () => {
       updatedAt: new Date().toISOString(),
     };
 
-    mockFetch.mockImplementation(async (url: string, init?: RequestInit) => {
-      const method = init?.method ?? 'GET';
-      if (url === '/api/chat/sessions' && method === 'POST') {
-        return jsonResponse(newSession, 201);
+    mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
+      const urlStr =
+        typeof input === 'string'
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : (input as Request).url;
+      if (urlStr.includes('CreateChatSession')) {
+        return jsonResponse(newSession, 200);
       }
-      return jsonResponse([]);
+      return jsonResponse({ sessions: [] });
     });
 
     const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
@@ -119,6 +120,7 @@ describe('streamChat', () => {
 
     mockFetch.mockResolvedValue({
       ok: true,
+      headers: new Headers({ 'Content-Type': 'text/event-stream' }),
       body: stream,
     });
 

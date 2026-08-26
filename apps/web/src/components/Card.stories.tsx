@@ -15,9 +15,7 @@ export const Default: Story = {
     children: (
       <>
         <CardHeader title="Card Title" subtitle="A short subtitle describing the card." />
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          This is the main content of the card.
-        </p>
+        <p className="text-sm text-foreground-secondary">This is the main content of the card.</p>
       </>
     ),
   },
@@ -28,10 +26,10 @@ export const WithFooter: Story = {
     children: (
       <>
         <CardHeader title="Card Title" />
-        <p className="text-sm text-slate-600 dark:text-slate-300">
+        <p className="text-sm text-foreground-secondary">
           This card has a footer section below the content.
         </p>
-        <div className="mt-4 border-t border-slate-100 pt-4 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+        <div className="mt-4 border-t border-border-subtle pt-4 text-sm text-muted">
           Footer content
         </div>
       </>
@@ -45,7 +43,7 @@ export const Clickable: Story = {
     children: (
       <>
         <CardHeader title="小説タイトル" subtitle="3章・12節" />
-        <p className="line-clamp-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+        <p className="line-clamp-3 text-sm leading-relaxed text-foreground-secondary">
           遠い王国の王子が、失われた聖剣を探す旅に出る物語。森の魔女、山の巨人、そして王国の陰謀と立ち向かう。
         </p>
       </>
@@ -62,23 +60,23 @@ export const WithAction: Story = {
           subtitle="主人公"
           action={
             <div className="flex gap-1">
-              <button className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-700">
+              <button className="rounded p-1.5 text-muted hover:bg-surface-hover hover:text-foreground">
                 編集
               </button>
-              <button className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-700">
+              <button className="rounded p-1.5 text-muted hover:bg-surface-hover hover:text-foreground">
                 削除
               </button>
             </div>
           }
         />
-        <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
+        <p className="mb-3 text-sm text-foreground-secondary">
           18歳。王国の第一王子。聖剣「光輝」の継承者。
         </p>
-        <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-700/60">
-          <span className="inline-flex items-center rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-900/30 dark:text-indigo-300">
+        <div className="flex flex-wrap gap-1.5 border-t border-border-subtle pt-2">
+          <span className="inline-flex items-center rounded-full bg-primary-subtle px-2.5 py-0.5 text-xs font-medium text-primary-subtle-fg">
             勇敢
           </span>
-          <span className="inline-flex items-center rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 dark:border-indigo-900/50 dark:bg-indigo-900/30 dark:text-indigo-300">
+          <span className="inline-flex items-center rounded-full bg-primary-subtle px-2.5 py-0.5 text-xs font-medium text-primary-subtle-fg">
             正義感
           </span>
         </div>

@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package novelcreator.v1;
+
+message GeneratedChapter {
+  string title = 1;
+  int32 order = 2;
+  string summary = 3;
+}
+
+message GeneratePlotRequest {
+  string novel_id = 1;
+}
+
+message GeneratedPlotResponse {
+  string title = 1;
+  string description = 2;
+  repeated GeneratedChapter chapters = 3;
+}
+
+message GenerateChapterSummaryRequest {
+  string chapter_id = 1;
+}
+
+message GenerateSectionSummaryRequest {
+  string section_id = 1;
+}
+
+message GeneratedSummaryResponse {
+  string title = 1;
+  int32 order = 2;
+  string summary = 3;
+}
+
+message GenerateSectionContentRequest {
+  string section_id = 1;
+}
+
+message GenerateSectionContentChunk {
+  string chunk = 1;
+}
+
+message ExtractEntitiesRequest {
+  string section_id = 1;
+}
+
+message ExtractedCharacter {
+  string name = 1;
+  string category = 2;
+  string description = 3;
+  repeated string traits = 4;
+}
+
+message ExtractedSetting {
+  string name = 1;
+  string category = 2;
+  string description = 3;
+}
+
+message ExtractedTimeline {
+  string event = 1;
+  string timestamp = 2;
+  int32 order = 3;
+}
+
+message ExtractEntitiesResponse {
+  repeated ExtractedCharacter characters = 1;
+  repeated ExtractedSetting settings = 2;
+  repeated ExtractedTimeline timelines = 3;
+}
+
+service GenerateService {
+  rpc GeneratePlot(GeneratePlotRequest) returns (GeneratedPlotResponse);
+  rpc GenerateChapterSummary(GenerateChapterSummaryRequest) returns (GeneratedSummaryResponse);
+  rpc GenerateSectionSummary(GenerateSectionSummaryRequest) returns (GeneratedSummaryResponse);
+  rpc GenerateSectionContent(GenerateSectionContentRequest) returns (stream GenerateSectionContentChunk);
+  rpc ExtractEntities(ExtractEntitiesRequest) returns (ExtractEntitiesResponse);
+}

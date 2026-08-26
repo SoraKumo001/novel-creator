@@ -96,12 +96,10 @@ export function BackupPage() {
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
           バックアップ・リストア
         </h1>
-        <p className="mt-1 text-slate-500 dark:text-slate-400">
-          小説単位でデータをJSONファイルに保存・復元します。
-        </p>
+        <p className="mt-1 text-muted">小説単位でデータをJSONファイルに保存・復元します。</p>
       </div>
 
       <div className="space-y-6">
@@ -115,13 +113,13 @@ export function BackupPage() {
           {loadingNovels && <Loading message="読み込み中..." />}
 
           {!loadingNovels && novelsError && (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300">
+            <div className="rounded-lg border border-danger-border bg-danger-subtle p-4 text-sm text-danger-subtle-fg">
               {novelsError}
             </div>
           )}
 
           {!loadingNovels && !novelsError && novels.length === 0 && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+            <div className="rounded-lg border border-border bg-surface-muted p-4 text-sm text-foreground-secondary">
               小説がまだありません。新規作成してからバックアップしてください。
             </div>
           )}
@@ -131,7 +129,7 @@ export function BackupPage() {
               <div>
                 <label
                   htmlFor="novel-select"
-                  className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300"
+                  className="mb-1.5 block text-sm font-medium text-foreground-secondary"
                 >
                   小説を選択
                 </label>
@@ -139,7 +137,7 @@ export function BackupPage() {
                   id="novel-select"
                   value={selectedNovelId}
                   onChange={(e) => setSelectedNovelId(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:border-indigo-400"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 >
                   <option value="">選択してください</option>
                   {novels.map((novel) => (
@@ -169,7 +167,7 @@ export function BackupPage() {
             subtitle="バックアップファイルからデータを復元します"
           />
 
-          <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/40 dark:bg-amber-900/20 dark:text-amber-200">
+          <div className="mb-5 rounded-lg border border-warning-border bg-warning-subtle p-4 text-sm text-warning-subtle-fg">
             <div className="flex items-start gap-2.5">
               <WarningIcon className="mt-0.5 h-5 w-5 shrink-0" />
               <p>
@@ -182,7 +180,7 @@ export function BackupPage() {
             <div>
               <label
                 htmlFor="backup-file"
-                className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300"
+                className="mb-1.5 block text-sm font-medium text-foreground-secondary"
               >
                 バックアップファイル
               </label>
@@ -196,9 +194,9 @@ export function BackupPage() {
               />
               <label
                 htmlFor="backup-file"
-                className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700 transition hover:border-indigo-400 hover:bg-indigo-50/50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:bg-slate-700/50"
+                className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-foreground transition hover:border-primary hover:bg-primary-subtle"
               >
-                <UploadIcon className="h-5 w-5 text-slate-400 dark:text-slate-500" />
+                <UploadIcon className="h-5 w-5 text-muted" />
                 <span className="flex-1 truncate">{file ? file.name : 'JSONファイルを選択'}</span>
                 {file && (
                   <button
@@ -207,7 +205,7 @@ export function BackupPage() {
                       e.preventDefault();
                       resetFile();
                     }}
-                    className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+                    className="rounded p-1 text-muted transition hover:bg-surface-hover hover:text-foreground"
                     aria-label="クリア"
                   >
                     <svg
@@ -227,11 +225,11 @@ export function BackupPage() {
             </div>
 
             {parsed && counts && (
-              <div className="rounded-lg border border-indigo-100 bg-indigo-50/50 p-4 dark:border-indigo-900/30 dark:bg-indigo-900/15">
-                <h4 className="mb-2 text-sm font-semibold text-indigo-900 dark:text-indigo-200">
+              <div className="rounded-lg border border-border bg-primary-subtle p-4">
+                <h4 className="mb-2 text-sm font-semibold text-primary-subtle-fg">
                   バックアップ内容のプレビュー
                 </h4>
-                <div className="grid gap-2 text-sm text-slate-700 dark:text-slate-300 sm:grid-cols-2">
+                <div className="grid gap-2 text-sm text-foreground-secondary sm:grid-cols-2">
                   <PreviewRow label="タイトル" value={parsed.meta.novelTitle} />
                   <PreviewRow label="エクスポート日" value={formatDate(parsed.meta.exportedAt)} />
                   {Object.entries(counts).map(([label, value]) => (
@@ -318,8 +316,8 @@ function formatDate(value: string | null | undefined): string {
 function PreviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <span className="text-slate-500 dark:text-slate-400">{label}</span>
-      <span className="font-medium text-slate-900 dark:text-slate-100">{value}</span>
+      <span className="text-muted">{label}</span>
+      <span className="font-medium text-foreground">{value}</span>
     </div>
   );
 }

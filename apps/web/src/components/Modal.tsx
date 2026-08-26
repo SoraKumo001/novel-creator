@@ -33,14 +33,14 @@ export function Modal({ isOpen, onClose, title, children, footer, size = 'md' }:
       onClick={onClose}
     >
       <div
-        className={`flex max-h-[90vh] w-full flex-col ${sizeMap[size]} overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-800`}
+        className={`flex max-h-[90vh] w-full flex-col ${sizeMap[size]} overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-700">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
+        <div className="flex shrink-0 items-center justify-between border-b border-border-subtle px-6 py-4">
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
           <button
             onClick={onClose}
-            className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-300"
+            className="rounded p-1 text-muted transition hover:bg-surface-hover hover:text-foreground"
             aria-label="閉じる"
           >
             <svg
@@ -57,7 +57,7 @@ export function Modal({ isOpen, onClose, title, children, footer, size = 'md' }:
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
         {footer && (
-          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-6 py-4 dark:border-slate-700">
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border-subtle px-6 py-4">
             {footer}
           </div>
         )}

@@ -11,8 +11,8 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, description, actionLabel, onAction, icon }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/50 py-12 text-center dark:border-slate-700 dark:bg-slate-800/30">
-      {icon && <div className="mb-4 text-slate-400 dark:text-slate-500">{icon}</div>}
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface-muted/50 py-12 text-center">
+      {icon && <div className="mb-4 text-muted">{icon}</div>}
       {!icon && (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -20,7 +20,7 @@ export function EmptyState({ title, description, actionLabel, onAction, icon }: 
           viewBox="0 0 24 24"
           strokeWidth={1.5}
           stroke="currentColor"
-          className="mb-4 h-10 w-10 text-slate-300 dark:text-slate-600"
+          className="mb-4 h-10 w-10 text-muted"
         >
           <path
             strokeLinecap="round"
@@ -29,12 +29,8 @@ export function EmptyState({ title, description, actionLabel, onAction, icon }: 
           />
         </svg>
       )}
-      <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h3>
-      {description && (
-        <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500 dark:text-slate-400">
-          {description}
-        </p>
-      )}
+      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+      {description && <p className="mx-auto mt-2 max-w-sm text-sm text-muted">{description}</p>}
       {actionLabel && onAction && (
         <Button className="mt-6" onClick={onAction}>
           {actionLabel}

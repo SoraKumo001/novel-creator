@@ -51,12 +51,8 @@ function NovelsIndexPage() {
     <div className="max-w-6xl">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            小説一覧
-          </h1>
-          <p className="mt-1 text-slate-500 dark:text-slate-400">
-            あなたの物語をここから始めましょう。
-          </p>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">小説一覧</h1>
+          <p className="mt-1 text-muted">あなたの物語をここから始めましょう。</p>
         </div>
         <Button onClick={() => setIsModalOpen(true)} leftIcon={<PlusIcon />}>
           新規作成
@@ -66,7 +62,7 @@ function NovelsIndexPage() {
       {loading && <Loading message="読み込み中..." />}
 
       {!loading && error && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300">
+        <div className="rounded-lg border border-danger-border bg-danger-subtle p-4 text-sm text-danger-subtle-fg">
           {error}
         </div>
       )}
@@ -87,13 +83,11 @@ function NovelsIndexPage() {
               <Card className="h-full">
                 <CardHeader title={novel.title} subtitle={formatDate(novel.updatedAt)} />
                 {novel.description ? (
-                  <p className="line-clamp-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                  <p className="line-clamp-3 text-sm leading-relaxed text-foreground-secondary">
                     {novel.description}
                   </p>
                 ) : (
-                  <p className="text-sm italic text-slate-400 dark:text-slate-500">
-                    説明がありません。
-                  </p>
+                  <p className="text-sm italic text-muted">説明がありません。</p>
                 )}
               </Card>
             </Link>

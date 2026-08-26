@@ -1,7 +1,10 @@
 import { cors } from 'hono/cors';
 import { Hono } from 'hono';
 
+import { cors as connectCors } from '@connectrpc/connect';
+
 import type { AppContext } from './context.js';
+import { createConnectMiddleware } from './connect.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { logger } from './middleware/logger.js';
 import backupRouter from './routes/backup.js';
@@ -25,7 +28,14 @@ export function createApp(context: AppContext['Variables']): Hono<AppContext> {
   const app = new Hono<AppContext>();
 
   // ミドルウェア
-  app.use('*', cors());
+  app.use(
+    '*',
+    cors({
+      origin: (origin) => origin ?? '*',
+      allowHeaders: [...connectCors.allowedHeaders, 'Content-Type', 'Authorization'],
+      exposeHeaders: [...connectCors.exposedHeaders],
+    }),
+  );
   app.use('*', logger);
   app.use('*', async (c, next) => {
     c.set('env', context.env);
@@ -35,6 +45,16 @@ export function createApp(context: AppContext['Variables']): Hono<AppContext> {
     c.set('vectorStore', context.vectorStore);
     await next();
   });
+  app.use(
+    '*',
+    createConnectMiddleware((c) => ({
+      env: c.var.env,
+      db: c.var.db,
+      llm: c.var.llm,
+      embedding: c.var.embedding,
+      vectorStore: c.var.vectorStore,
+    })),
+  );
   app.onError(errorHandler);
 
   // ルーター登録

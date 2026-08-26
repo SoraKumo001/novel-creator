@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package novelcreator.v1;
+
+import "novelcreator/v1/chapter.proto";
+import "novelcreator/v1/character.proto";
+import "novelcreator/v1/setting.proto";
+
+message Novel {
+  string id = 1;
+  string title = 2;
+  optional string description = 3;
+  optional string created_at = 4;
+  optional string updated_at = 5;
+}
+
+message NovelDetail {
+  Novel novel = 1;
+  repeated Chapter chapters = 2;
+  repeated Character characters = 3;
+  repeated Setting settings = 4;
+}
+
+message ListNovelsRequest {}
+
+message ListNovelsResponse {
+  repeated Novel novels = 1;
+}
+
+message GetNovelDetailRequest {
+  string id = 1;
+}
+
+message CreateNovelRequest {
+  string title = 1;
+  optional string description = 2;
+}
+
+message UpdateNovelRequest {
+  string id = 1;
+  optional string title = 2;
+  optional string description = 3;
+}
+
+message DeleteNovelRequest {
+  string id = 1;
+}
+
+message DeleteNovelResponse {
+  bool success = 1;
+}
+
+service NovelService {
+  rpc ListNovels(ListNovelsRequest) returns (ListNovelsResponse);
+  rpc GetNovelDetail(GetNovelDetailRequest) returns (NovelDetail);
+  rpc CreateNovel(CreateNovelRequest) returns (Novel);
+  rpc UpdateNovel(UpdateNovelRequest) returns (Novel);
+  rpc DeleteNovel(DeleteNovelRequest) returns (DeleteNovelResponse);
+}

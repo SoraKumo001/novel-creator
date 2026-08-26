@@ -5,10 +5,10 @@ export function Nav() {
   const { toggleChat, isOpen } = useChat();
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+    <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-surface">
       <div className="p-4">
         <Link to="/" className="flex items-center gap-2 px-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white dark:bg-indigo-500">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
@@ -24,17 +24,15 @@ export function Nav() {
               />
             </svg>
           </div>
-          <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            Novel Creator
-          </span>
+          <span className="text-lg font-bold tracking-tight text-foreground">Novel Creator</span>
         </Link>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-2">
         <Link
           to="/novels"
-          className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground-secondary transition hover:bg-surface-hover hover:text-foreground"
           activeProps={{
-            className: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+            className: 'bg-primary-subtle text-primary-subtle-fg',
           }}
         >
           <svg
@@ -43,7 +41,7 @@ export function Nav() {
             viewBox="0 0 24 24"
             strokeWidth={1.5}
             stroke="currentColor"
-            className="h-5 w-5 text-slate-400 transition group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300"
+            className="h-5 w-5 text-muted transition group-hover:text-foreground"
           >
             <path
               strokeLinecap="round"
@@ -56,9 +54,9 @@ export function Nav() {
 
         <Link
           to="/backup"
-          className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+          className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-foreground-secondary transition hover:bg-surface-hover hover:text-foreground"
           activeProps={{
-            className: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+            className: 'bg-primary-subtle text-primary-subtle-fg',
           }}
         >
           <svg
@@ -67,7 +65,7 @@ export function Nav() {
             viewBox="0 0 24 24"
             strokeWidth={1.5}
             stroke="currentColor"
-            className="h-5 w-5 text-slate-400 transition group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300"
+            className="h-5 w-5 text-muted transition group-hover:text-foreground"
           >
             <path
               strokeLinecap="round"
@@ -83,8 +81,8 @@ export function Nav() {
           onClick={toggleChat}
           className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
             isOpen
-              ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
-              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+              ? 'bg-primary-subtle text-primary-subtle-fg'
+              : 'text-foreground-secondary hover:bg-surface-hover hover:text-foreground'
           }`}
         >
           <svg
@@ -94,9 +92,7 @@ export function Nav() {
             strokeWidth={1.5}
             stroke="currentColor"
             className={`h-5 w-5 transition ${
-              isOpen
-                ? 'text-indigo-600 dark:text-indigo-400'
-                : 'text-slate-400 group-hover:text-slate-600 dark:text-slate-500 dark:group-hover:text-slate-300'
+              isOpen ? 'text-primary' : 'text-muted group-hover:text-foreground'
             }`}
           >
             <path
@@ -108,7 +104,7 @@ export function Nav() {
           AI創作相談
         </button>
       </nav>
-      <div className="border-t border-slate-100 p-4 text-xs text-slate-400 dark:border-slate-800 dark:text-slate-500">
+      <div className="border-t border-border-subtle p-4 text-xs text-muted">
         <p>物語を創り、世界を紡ぐ。</p>
       </div>
     </aside>

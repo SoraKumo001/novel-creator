@@ -16,9 +16,7 @@ export const Default: Story = {
     isOpen: true,
     onClose: () => {},
     title: 'Modal Title',
-    children: (
-      <p className="text-sm text-slate-600 dark:text-slate-300">This is the modal body content.</p>
-    ),
+    children: <p className="text-sm text-foreground-secondary">This is the modal body content.</p>,
   },
 };
 
@@ -51,9 +49,7 @@ export const Small: Story = {
     title: 'Confirm Action',
     size: 'sm',
     children: (
-      <p className="text-sm text-slate-600 dark:text-slate-300">
-        この操作は元に戻せません。続行しますか？
-      </p>
+      <p className="text-sm text-foreground-secondary">この操作は元に戻せません。続行しますか？</p>
     ),
     footer: (
       <>
@@ -77,31 +73,25 @@ export const Large: Story = {
     children: (
       <div className="space-y-4">
         <div>
-          <h4 className="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-            抽出された時系列
-          </h4>
-          <ul className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
-            <li className="rounded bg-slate-50 px-3 py-2 dark:bg-slate-700/50">
-              <span className="mr-2 text-xs text-slate-500 dark:text-slate-400">第1章</span>
+          <h4 className="mb-2 text-sm font-semibold text-foreground">抽出された時系列</h4>
+          <ul className="space-y-1 text-sm text-foreground-secondary">
+            <li className="rounded bg-surface-muted px-3 py-2">
+              <span className="mr-2 text-xs text-muted">第1章</span>
               王子が城を出発する
             </li>
-            <li className="rounded bg-slate-50 px-3 py-2 dark:bg-slate-700/50">
-              <span className="mr-2 text-xs text-slate-500 dark:text-slate-400">第2章</span>
+            <li className="rounded bg-surface-muted px-3 py-2">
+              <span className="mr-2 text-xs text-muted">第2章</span>
               森で魔女と出会う
             </li>
           </ul>
         </div>
         <div>
-          <h4 className="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
-            抽出された設定
-          </h4>
+          <h4 className="mb-2 text-sm font-semibold text-foreground">抽出された設定</h4>
           <ul className="grid gap-2 sm:grid-cols-2">
-            <li className="rounded bg-slate-50 px-3 py-2 dark:bg-slate-700/50">
-              <span className="text-xs font-bold uppercase text-indigo-600 dark:text-indigo-400">
-                地理
-              </span>
-              <div className="font-medium text-slate-900 dark:text-slate-100">王国</div>
-              <div className="text-sm text-slate-600 dark:text-slate-300">大陸中央に位置する</div>
+            <li className="rounded bg-surface-muted px-3 py-2">
+              <span className="text-xs font-bold uppercase text-primary">地理</span>
+              <div className="font-medium text-foreground">王国</div>
+              <div className="text-sm text-foreground-secondary">大陸中央に位置する</div>
             </li>
           </ul>
         </div>

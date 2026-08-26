@@ -13,7 +13,7 @@ const sizeMap = {
 export function Loading({ message, fullScreen = false, size = 'md' }: LoadingProps) {
   const spinner = (
     <div
-      className={`${sizeMap[size]} animate-spin rounded-full border-indigo-600 border-t-transparent dark:border-indigo-400`}
+      className={`${sizeMap[size]} animate-spin rounded-full border-primary border-t-transparent`}
     />
   );
 
@@ -29,7 +29,7 @@ export function Loading({ message, fullScreen = false, size = 'md' }: LoadingPro
   return (
     <div className="flex flex-col items-center justify-center py-8">
       {spinner}
-      {message && <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">{message}</p>}
+      {message && <p className="mt-3 text-sm text-muted">{message}</p>}
     </div>
   );
 }
