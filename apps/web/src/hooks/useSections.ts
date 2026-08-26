@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import type { SectionWithContent } from '@/lib/types.js';
@@ -11,28 +11,23 @@ interface UseSectionReturn {
 }
 
 export function useSection(sectionId: string): UseSectionReturn {
-  const [section, setSection] = useState<SectionWithContent | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const {
+    data: section = null,
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['sections', sectionId],
+    queryFn: () => api.sections[':id'].$get({ param: { id: sectionId } }).then((r) => r.json()),
+    enabled: !!sectionId,
+  });
 
-  const fetchSection = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.sections[':id'].$get({ param: { id: sectionId } });
-      const data = await res.json();
-      setSection(data);
-    } catch (e) {
-      setError(toErrorMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [sectionId]);
-
-  useEffect(() => {
-    if (!sectionId) return;
-    void fetchSection();
-  }, [sectionId, fetchSection]);
-
-  return { section, loading, error, refetch: fetchSection };
+  return {
+    section,
+    loading,
+    error: error ? toErrorMessage(error) : null,
+    refetch: async () => {
+      await refetch();
+    },
+  };
 }

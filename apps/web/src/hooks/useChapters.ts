@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import type {
@@ -28,17 +28,16 @@ interface UseChaptersReturn {
 }
 
 export function useChapters(novelId: string): UseChaptersReturn {
-  const [chapters, setChapters] = useState<ChapterWithSections[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const queryClient = useQueryClient();
 
-  const fetchChapters = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
+  const {
+    data: chapters = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['novels', novelId, 'chapters'],
+    queryFn: async () => {
       const res = await api.novels[':id'].chapters.$get({ param: { id: novelId } });
       const rows = await res.json();
       const full: ChapterWithSections[] = [];
@@ -47,117 +46,72 @@ export function useChapters(novelId: string): UseChaptersReturn {
         const d = await detail.json();
         full.push(d);
       }
-      setChapters(full);
-    } catch (e) {
-      setError(toErrorMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [novelId]);
-
-  useEffect(() => {
-    if (!novelId) return;
-    void fetchChapters();
-  }, [novelId, fetchChapters]);
-
-  const createChapter = useCallback(
-    async (input: CreateChapterInput) => {
-      setCreating(true);
-      try {
-        const res = await api.novels[':id'].chapters.$post({ param: { id: novelId }, json: input });
-        const data = await res.json();
-        setChapters((prev) => [...prev, { ...data, sections: [] }]);
-        return data;
-      } finally {
-        setCreating(false);
-      }
+      return full;
     },
-    [novelId],
-  );
+    enabled: !!novelId,
+  });
 
-  const updateChapter = useCallback(async (id: string, input: UpdateChapterInput) => {
-    setUpdating(true);
-    try {
-      const res = await api.chapters[':id'].$put({ param: { id }, json: input });
-      const data = await res.json();
-      setChapters((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
-      return data;
-    } finally {
-      setUpdating(false);
-    }
-  }, []);
+  const createMutation = useMutation({
+    mutationFn: (input: CreateChapterInput) =>
+      api.novels[':id'].chapters
+        .$post({ param: { id: novelId }, json: input })
+        .then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
+  });
 
-  const deleteChapter = useCallback(async (id: string) => {
-    setDeleting(true);
-    try {
-      const res = await api.chapters[':id'].$delete({ param: { id } });
-      await res.json();
-      setChapters((prev) => prev.filter((c) => c.id !== id));
-    } finally {
-      setDeleting(false);
-    }
-  }, []);
+  const updateMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateChapterInput }) =>
+      api.chapters[':id'].$put({ param: { id }, json: input }).then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
+  });
 
-  const createSection = useCallback(async (chapterId: string, input: CreateSectionInput) => {
-    setUpdating(true);
-    try {
-      const res = await api.chapters[':id'].$post({ param: { id: chapterId }, json: input });
-      const data = await res.json();
-      setChapters((prev) =>
-        prev.map((c) => (c.id === chapterId ? { ...c, sections: [...c.sections, data] } : c)),
-      );
-      return data;
-    } finally {
-      setUpdating(false);
-    }
-  }, []);
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      api.chapters[':id'].$delete({ param: { id } }).then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
+  });
 
-  const updateSection = useCallback(async (id: string, input: UpdateSectionInput) => {
-    setUpdating(true);
-    try {
-      const res = await api.sections[':id'].$put({ param: { id }, json: input });
-      const data = await res.json();
-      setChapters((prev) =>
-        prev.map((c) => ({
-          ...c,
-          sections: c.sections.map((s) => (s.id === id ? data : s)),
-        })),
-      );
-      return data;
-    } finally {
-      setUpdating(false);
-    }
-  }, []);
+  const createSectionMutation = useMutation({
+    mutationFn: ({ chapterId, input }: { chapterId: string; input: CreateSectionInput }) =>
+      api.chapters[':id'].$post({ param: { id: chapterId }, json: input }).then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
+  });
 
-  const deleteSection = useCallback(async (id: string) => {
-    setDeleting(true);
-    try {
-      const res = await api.sections[':id'].$delete({ param: { id } });
-      await res.json();
-      setChapters((prev) =>
-        prev.map((c) => ({
-          ...c,
-          sections: c.sections.filter((s) => s.id !== id),
-        })),
-      );
-    } finally {
-      setDeleting(false);
-    }
-  }, []);
+  const updateSectionMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateSectionInput }) =>
+      api.sections[':id'].$put({ param: { id }, json: input }).then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
+  });
+
+  const deleteSectionMutation = useMutation({
+    mutationFn: (id: string) =>
+      api.sections[':id'].$delete({ param: { id } }).then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
+  });
 
   return {
     chapters,
     loading,
-    error,
-    refetch: fetchChapters,
-    createChapter,
-    updateChapter,
-    deleteChapter,
-    createSection,
-    updateSection,
-    deleteSection,
-    creating,
-    updating,
-    deleting,
+    error: error ? toErrorMessage(error) : null,
+    refetch: async () => {
+      await refetch();
+    },
+    createChapter: createMutation.mutateAsync,
+    updateChapter: (id, input) => updateMutation.mutateAsync({ id, input }),
+    deleteChapter: async (id) => {
+      await deleteMutation.mutateAsync(id);
+    },
+    createSection: (chapterId, input) => createSectionMutation.mutateAsync({ chapterId, input }),
+    updateSection: (id, input) => updateSectionMutation.mutateAsync({ id, input }),
+    deleteSection: async (id) => {
+      await deleteSectionMutation.mutateAsync(id);
+    },
+    creating: createMutation.isPending,
+    updating:
+      updateMutation.isPending ||
+      createSectionMutation.isPending ||
+      updateSectionMutation.isPending ||
+      deleteSectionMutation.isPending,
+    deleting: deleteMutation.isPending,
   };
 }

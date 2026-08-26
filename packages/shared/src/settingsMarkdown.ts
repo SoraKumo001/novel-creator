@@ -62,9 +62,11 @@ export function serializeSettingsToMarkdown(
     if (s.category !== currentCategory) {
       if (lines.length > 0) lines.push('');
       lines.push(`# ${s.category}`);
+      lines.push('');
       currentCategory = s.category;
     }
     lines.push(`## ${s.name}`);
+    lines.push('');
     const desc = (s.description ?? '').trim();
     if (desc) {
       lines.push(desc);
@@ -141,6 +143,10 @@ export function parseSettingsMarkdown(markdown: string): ParsedSettingSection[] 
         while (bodyLines.length > 0 && bodyLines[bodyLines.length - 1].trim() === '') {
           bodyLines.pop();
         }
+        // 先頭の空行を除去（見出し直後の空行）
+        while (bodyLines.length > 0 && bodyLines[0].trim() === '') {
+          bodyLines.shift();
+        }
         sections.push({
           category: currentCategory,
           name,
@@ -196,32 +202,41 @@ export function getMarkdownSections(markdown: string): SettingSectionRange[] {
       const name = h2[1].trim();
       if (currentCategory) {
         const headingLine = i;
-        const startLine = i + 1;
-        // 本文終端を探す
-        let endLine = lines.length - 1;
         let j = i + 1;
         let bodyInFence = false;
         const bodyLines: string[] = [];
+        let firstBodyLine = -1;
+        let lastBodyLine = -1;
         while (j < lines.length) {
           const bodyLine = lines[j];
           if (/^\s*```/.test(bodyLine)) {
             bodyInFence = !bodyInFence;
+            if (firstBodyLine === -1) firstBodyLine = j;
+            lastBodyLine = j;
             bodyLines.push(bodyLine);
             j++;
             continue;
           }
           if (!bodyInFence && /^(#{1,2})\s+/.test(bodyLine)) {
-            endLine = j - 1;
             break;
+          }
+          if (bodyLine.trim() !== '') {
+            if (firstBodyLine === -1) firstBodyLine = j;
+            lastBodyLine = j;
           }
           bodyLines.push(bodyLine);
           j++;
         }
-        if (j >= lines.length) endLine = lines.length - 1;
         // 末尾の空行を本文から除外
         while (bodyLines.length > 0 && bodyLines[bodyLines.length - 1].trim() === '') {
           bodyLines.pop();
         }
+        // 先頭の空行を本文から除外
+        while (bodyLines.length > 0 && bodyLines[0].trim() === '') {
+          bodyLines.shift();
+        }
+        const startLine = firstBodyLine === -1 ? i + 1 : firstBodyLine;
+        const endLine = lastBodyLine === -1 ? startLine - 1 : lastBodyLine;
         ranges.push({
           category: currentCategory,
           name,

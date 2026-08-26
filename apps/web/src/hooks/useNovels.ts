@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import type { CreateNovelInput, Novel, UpdateNovelInput } from '@/lib/types.js';
@@ -17,76 +17,45 @@ interface UseNovelsReturn {
 }
 
 export function useNovels(): UseNovelsReturn {
-  const [novels, setNovels] = useState<Novel[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const queryClient = useQueryClient();
 
-  const fetchNovels = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.novels.$get();
-      const data = await res.json();
-      setNovels(data);
-    } catch (e) {
-      setError(toErrorMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const {
+    data: novels = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['novels'],
+    queryFn: () => api.novels.$get().then((r) => r.json()),
+  });
 
-  useEffect(() => {
-    void fetchNovels();
-  }, [fetchNovels]);
+  const createMutation = useMutation({
+    mutationFn: (input: CreateNovelInput) =>
+      api.novels.$post({ json: input }).then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels'] }),
+  });
 
-  const createNovel = useCallback(async (input: CreateNovelInput) => {
-    setCreating(true);
-    try {
-      const res = await api.novels.$post({ json: input });
-      const data = await res.json();
-      setNovels((prev) => [...prev, data]);
-      return data;
-    } finally {
-      setCreating(false);
-    }
-  }, []);
+  const updateMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateNovelInput }) =>
+      api.novels[':id'].$put({ param: { id }, json: input }).then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels'] }),
+  });
 
-  const updateNovel = useCallback(async (id: string, input: UpdateNovelInput) => {
-    setUpdating(true);
-    try {
-      const res = await api.novels[':id'].$put({ param: { id }, json: input });
-      const data = await res.json();
-      setNovels((prev) => prev.map((n) => (n.id === id ? data : n)));
-      return data;
-    } finally {
-      setUpdating(false);
-    }
-  }, []);
-
-  const deleteNovel = useCallback(async (id: string) => {
-    setDeleting(true);
-    try {
-      const res = await api.novels[':id'].$delete({ param: { id } });
-      await res.json();
-      setNovels((prev) => prev.filter((n) => n.id !== id));
-    } finally {
-      setDeleting(false);
-    }
-  }, []);
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => api.novels[':id'].$delete({ param: { id } }).then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels'] }),
+  });
 
   return {
     novels,
     loading,
-    error,
-    refetch: fetchNovels,
-    createNovel,
-    updateNovel,
-    deleteNovel,
-    creating,
-    updating,
-    deleting,
+    error: error ? toErrorMessage(error) : null,
+    refetch: refetch as unknown as () => Promise<void>,
+    createNovel: createMutation.mutateAsync,
+    updateNovel: (id, input) => updateMutation.mutateAsync({ id, input }),
+    deleteNovel: (id) => deleteMutation.mutateAsync(id).then(() => undefined),
+    creating: createMutation.isPending,
+    updating: updateMutation.isPending,
+    deleting: deleteMutation.isPending,
   };
 }

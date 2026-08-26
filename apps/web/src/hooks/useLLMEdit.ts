@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { api } from '@/lib/api.js';
 import type { Character, Setting } from '@/lib/types.js';
 
@@ -10,28 +10,24 @@ interface UseLLMEditReturn {
 }
 
 export function useLLMEdit(): UseLLMEditReturn {
-  const [editingCharacter, setEditingCharacter] = useState(false);
-  const [editingSetting, setEditingSetting] = useState(false);
+  const editCharacterMutation = useMutation({
+    mutationFn: ({ id, instruction }: { id: string; instruction: string }) =>
+      api.characters[':id'].edit
+        .$post({ param: { id }, json: { instruction } })
+        .then((r) => r.json()),
+  });
 
-  const editCharacter = useCallback(async (id: string, instruction: string) => {
-    setEditingCharacter(true);
-    try {
-      const res = await api.characters[':id'].edit.$post({ param: { id }, json: { instruction } });
-      return await res.json();
-    } finally {
-      setEditingCharacter(false);
-    }
-  }, []);
+  const editSettingMutation = useMutation({
+    mutationFn: ({ id, instruction }: { id: string; instruction: string }) =>
+      api.settings[':id'].edit
+        .$post({ param: { id }, json: { instruction } })
+        .then((r) => r.json()),
+  });
 
-  const editSetting = useCallback(async (id: string, instruction: string) => {
-    setEditingSetting(true);
-    try {
-      const res = await api.settings[':id'].edit.$post({ param: { id }, json: { instruction } });
-      return await res.json();
-    } finally {
-      setEditingSetting(false);
-    }
-  }, []);
-
-  return { editingCharacter, editingSetting, editCharacter, editSetting };
+  return {
+    editingCharacter: editCharacterMutation.isPending,
+    editingSetting: editSettingMutation.isPending,
+    editCharacter: (id, instruction) => editCharacterMutation.mutateAsync({ id, instruction }),
+    editSetting: (id, instruction) => editSettingMutation.mutateAsync({ id, instruction }),
+  };
 }

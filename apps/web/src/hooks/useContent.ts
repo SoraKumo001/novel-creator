@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import type { Content, UpdateContentInput } from '@/lib/types.js';
@@ -13,47 +13,37 @@ interface UseContentReturn {
 }
 
 export function useContent(sectionId: string): UseContentReturn {
-  const [content, setContent] = useState<Content | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const fetchContent = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.sections[':id'].content.$get({ param: { id: sectionId } });
-      const data = await res.json();
-      setContent(data);
-    } catch (e) {
-      setError(toErrorMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [sectionId]);
+  const {
+    data: content = null,
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['sections', sectionId, 'content'],
+    queryFn: () =>
+      api.sections[':id'].content.$get({ param: { id: sectionId } }).then((r) => r.json()),
+    enabled: !!sectionId,
+  });
 
-  useEffect(() => {
-    if (!sectionId) return;
-    void fetchContent();
-  }, [sectionId, fetchContent]);
+  const updateMutation = useMutation({
+    mutationFn: (body: string) =>
+      api.sections[':id'].content
+        .$put({ param: { id: sectionId }, json: { body } satisfies UpdateContentInput })
+        .then((r) => r.json()),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['sections', sectionId, 'content'] }),
+  });
 
-  const updateContent = useCallback(
-    async (body: string) => {
-      setSaving(true);
-      try {
-        const res = await api.sections[':id'].content.$put({
-          param: { id: sectionId },
-          json: { body } satisfies UpdateContentInput,
-        });
-        const data = await res.json();
-        setContent(data);
-        return data;
-      } finally {
-        setSaving(false);
-      }
+  return {
+    content,
+    loading,
+    saving: updateMutation.isPending,
+    error: error ? toErrorMessage(error) : null,
+    refetch: async () => {
+      await refetch();
     },
-    [sectionId],
-  );
-
-  return { content, loading, saving, error, refetch: fetchContent, updateContent };
+    updateContent: updateMutation.mutateAsync,
+  };
 }

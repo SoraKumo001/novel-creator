@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import type {
@@ -41,104 +42,82 @@ interface UseSettingsReturn {
 }
 
 export function useSettings(novelId: string): UseSettingsReturn {
-  const [settings, setSettings] = useState<Setting[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [llmEditing, setLlmEditing] = useState(false);
-  const [generatingDraft, setGeneratingDraft] = useState(false);
-  const [savingMarkdown, setSavingMarkdown] = useState(false);
-  const [editingSection, setEditingSection] = useState(false);
+  const queryClient = useQueryClient();
 
-  const fetchSettings = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.novels[':id'].settings.$get({ param: { id: novelId } });
-      const data = await res.json();
-      setSettings(data);
-    } catch (e) {
-      setError(toErrorMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [novelId]);
+  const {
+    data: settings = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['novels', novelId, 'settings'],
+    queryFn: () =>
+      api.novels[':id'].settings.$get({ param: { id: novelId } }).then((r) => r.json()),
+  });
 
-  useEffect(() => {
-    if (!novelId) return;
-    void fetchSettings();
-  }, [novelId, fetchSettings]);
+  const createMutation = useMutation({
+    mutationFn: (input: CreateSettingInput) =>
+      api.novels[':id'].settings
+        .$post({ param: { id: novelId }, json: input })
+        .then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
+  });
 
-  const createSetting = useCallback(
-    async (input: CreateSettingInput) => {
-      setCreating(true);
-      try {
-        const res = await api.novels[':id'].settings.$post({ param: { id: novelId }, json: input });
-        const data = await res.json();
-        setSettings((prev) => [...prev, data]);
-        return data;
-      } finally {
-        setCreating(false);
-      }
-    },
-    [novelId],
-  );
+  const updateMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateSettingInput }) =>
+      api.settings[':id'].$put({ param: { id }, json: input }).then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
+  });
 
-  const updateSetting = useCallback(async (id: string, input: UpdateSettingInput) => {
-    setUpdating(true);
-    try {
-      const res = await api.settings[':id'].$put({ param: { id }, json: input });
-      const data = await res.json();
-      setSettings((prev) => prev.map((s) => (s.id === id ? data : s)));
-      return data;
-    } finally {
-      setUpdating(false);
-    }
-  }, []);
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      api.settings[':id'].$delete({ param: { id } }).then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
+  });
 
-  const deleteSetting = useCallback(async (id: string) => {
-    setDeleting(true);
-    try {
-      const res = await api.settings[':id'].$delete({ param: { id } });
-      await res.json();
-      setSettings((prev) => prev.filter((s) => s.id !== id));
-    } finally {
-      setDeleting(false);
-    }
-  }, []);
+  const llmEditMutation = useMutation({
+    mutationFn: ({ id, instruction }: { id: string; instruction: string }) =>
+      api.settings[':id'].edit
+        .$post({ param: { id }, json: { instruction } })
+        .then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
+  });
 
-  const llmEditSetting = useCallback(async (id: string, instruction: string) => {
-    setLlmEditing(true);
-    try {
-      const res = await api.settings[':id'].edit.$post({ param: { id }, json: { instruction } });
-      const data = await res.json();
-      setSettings((prev) => prev.map((s) => (s.id === id ? data : s)));
-      return data;
-    } finally {
-      setLlmEditing(false);
-    }
-  }, []);
+  const draftMutation = useMutation({
+    mutationFn: ({
+      instruction,
+      currentDraft,
+    }: {
+      instruction: string;
+      currentDraft?: { category: string; name: string; description?: string };
+    }) =>
+      api.novels[':id'].settings.draft
+        .$post({ param: { id: novelId }, json: { instruction, currentDraft } })
+        .then((r) => r.json()),
+  });
 
-  const generateDraft = useCallback(
-    async (
-      instruction: string,
-      currentDraft?: { category: string; name: string; description?: string },
-    ): Promise<SettingDraft> => {
-      setGeneratingDraft(true);
-      try {
-        const res = await api.novels[':id'].settings.draft.$post({
-          param: { id: novelId },
-          json: { instruction, currentDraft },
-        });
-        return await res.json();
-      } finally {
-        setGeneratingDraft(false);
-      }
-    },
-    [novelId],
-  );
+  const saveMarkdownMutation = useMutation({
+    mutationFn: (markdown: string) =>
+      api.novels[':id'].settings.markdown
+        .$put({ param: { id: novelId }, json: { markdown } })
+        .then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
+  });
+
+  const editSectionMutation = useMutation({
+    mutationFn: (input: {
+      category: string;
+      name: string;
+      description: string;
+      instruction: string;
+    }) =>
+      api.novels[':id'].settings.editSection
+        .$post({ param: { id: novelId }, json: input })
+        .then(async (r) => {
+          const data: EditSettingSectionResult = await r.json();
+          return data.markdown;
+        }),
+  });
 
   const fetchSettingsMarkdown = useCallback(async (): Promise<string> => {
     const res = await api.novels[':id'].settings.markdown.$get({ param: { id: novelId } });
@@ -146,65 +125,26 @@ export function useSettings(novelId: string): UseSettingsReturn {
     return data.markdown;
   }, [novelId]);
 
-  const saveSettingsMarkdown = useCallback(
-    async (markdown: string): Promise<SaveSettingsMarkdownResult> => {
-      setSavingMarkdown(true);
-      try {
-        const res = await api.novels[':id'].settings.markdown.$put({
-          param: { id: novelId },
-          json: { markdown },
-        });
-        const data = await res.json();
-        await fetchSettings();
-        return data;
-      } finally {
-        setSavingMarkdown(false);
-      }
-    },
-    [novelId, fetchSettings],
-  );
-
-  const editSettingSection = useCallback(
-    async (input: {
-      category: string;
-      name: string;
-      description: string;
-      instruction: string;
-    }): Promise<string> => {
-      setEditingSection(true);
-      try {
-        const res = await api.novels[':id'].settings.editSection.$post({
-          param: { id: novelId },
-          json: input,
-        });
-        const data: EditSettingSectionResult = await res.json();
-        return data.markdown;
-      } finally {
-        setEditingSection(false);
-      }
-    },
-    [novelId],
-  );
-
   return {
     settings,
     loading,
-    error,
-    refetch: fetchSettings,
-    createSetting,
-    updateSetting,
-    deleteSetting,
-    llmEditSetting,
-    generateDraft,
+    error: error ? toErrorMessage(error) : null,
+    refetch: refetch as unknown as () => Promise<void>,
+    createSetting: createMutation.mutateAsync,
+    updateSetting: (id, input) => updateMutation.mutateAsync({ id, input }),
+    deleteSetting: (id: string) => deleteMutation.mutateAsync(id).then(() => undefined),
+    llmEditSetting: (id, instruction) => llmEditMutation.mutateAsync({ id, instruction }),
+    generateDraft: (instruction, currentDraft) =>
+      draftMutation.mutateAsync({ instruction, currentDraft }),
     fetchSettingsMarkdown,
-    saveSettingsMarkdown,
-    editSettingSection,
-    creating,
-    updating,
-    deleting,
-    llmEditing,
-    generatingDraft,
-    savingMarkdown,
-    editingSection,
+    saveSettingsMarkdown: saveMarkdownMutation.mutateAsync,
+    editSettingSection: editSectionMutation.mutateAsync,
+    creating: createMutation.isPending,
+    updating: updateMutation.isPending,
+    deleting: deleteMutation.isPending,
+    llmEditing: llmEditMutation.isPending,
+    generatingDraft: draftMutation.isPending,
+    savingMarkdown: saveMarkdownMutation.isPending,
+    editingSection: editSectionMutation.isPending,
   };
 }

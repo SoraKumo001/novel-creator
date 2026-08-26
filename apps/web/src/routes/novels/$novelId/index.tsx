@@ -6,6 +6,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog.js';
 import { EmptyState } from '@/components/EmptyState.js';
 import { Input } from '@/components/Input.js';
 import { Loading } from '@/components/Loading.js';
+import { MarkdownText } from '@/components/MarkdownText.js';
 import { Modal } from '@/components/Modal.js';
 import { Tag } from '@/components/Tag.js';
 import { Textarea } from '@/components/Textarea.js';
@@ -238,7 +239,17 @@ function SettingsTab({
   novel: NonNullable<ReturnType<typeof useNovel>['novel']>;
   onRefresh: () => Promise<void>;
 }) {
-  const { settings, loading, deleteSetting, deleting } = useSettings(novel.id);
+  const {
+    settings,
+    loading,
+    deleteSetting,
+    deleting,
+    fetchSettingsMarkdown,
+    saveSettingsMarkdown,
+    editSettingSection,
+    savingMarkdown,
+    editingSection,
+  } = useSettings(novel.id);
   const navigate = useNavigate();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'cards' | 'markdown'>('cards');
@@ -300,7 +311,14 @@ function SettingsTab({
         </div>
       </div>
       {viewMode === 'markdown' ? (
-        <SettingsMarkdownEditor novelId={novel.id} />
+        <SettingsMarkdownEditor
+          novelId={novel.id}
+          fetchSettingsMarkdown={fetchSettingsMarkdown}
+          saveSettingsMarkdown={saveSettingsMarkdown}
+          editSettingSection={editSettingSection}
+          savingMarkdown={savingMarkdown}
+          editingSection={editingSection}
+        />
       ) : (
         <>
           {loading && <Loading message="設定を読み込み中..." />}
@@ -341,9 +359,10 @@ function SettingsTab({
                           </div>
                         }
                       />
-                      <p className="text-sm text-slate-600 dark:text-slate-300">
-                        {setting.description || '説明なし'}
-                      </p>
+                      <MarkdownText
+                        content={setting.description || '説明なし'}
+                        className="text-sm text-slate-600 dark:text-slate-300"
+                      />
                     </Card>
                   ))}
                 </div>

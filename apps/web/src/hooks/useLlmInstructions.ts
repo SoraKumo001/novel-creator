@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import type { CreateLlmInstructionInput, LlmInstruction } from '@/lib/types.js';
@@ -18,76 +18,50 @@ export function useLlmInstructions(
   novelId: string,
   entityType: string = 'setting',
 ): UseLlmInstructionsReturn {
-  const [instructions, setInstructions] = useState<LlmInstruction[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const queryClient = useQueryClient();
 
-  const fetchInstructions = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.novels[':id'].llmInstructions.$get({
-        param: { id: novelId },
-        query: { entityType },
-      });
-      const data = await res.json();
-      setInstructions(data);
-    } catch (e) {
-      setError(toErrorMessage(e));
-    } finally {
-      setLoading(false);
-    }
-  }, [novelId, entityType]);
+  const {
+    data: instructions = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ['novels', novelId, 'llmInstructions', entityType],
+    queryFn: () =>
+      api.novels[':id'].llmInstructions
+        .$get({ param: { id: novelId }, query: { entityType } })
+        .then((r) => r.json()),
+    enabled: !!novelId,
+  });
 
-  useEffect(() => {
-    if (!novelId) return;
-    void fetchInstructions();
-  }, [novelId, fetchInstructions]);
+  const saveMutation = useMutation({
+    mutationFn: (input: CreateLlmInstructionInput) =>
+      api.novels[':id'].llmInstructions
+        .$post({ param: { id: novelId }, json: input })
+        .then((r) => r.json()),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ['novels', novelId, 'llmInstructions', entityType],
+      }),
+  });
 
-  const saveInstruction = useCallback(
-    async (input: CreateLlmInstructionInput) => {
-      setSaving(true);
-      try {
-        const res = await api.novels[':id'].llmInstructions.$post({
-          param: { id: novelId },
-          json: input,
-        });
-        const data = await res.json();
-        // 重複時は既存が返るので、冪等にマージ
-        setInstructions((prev) =>
-          prev.some((i) => i.id === data.id)
-            ? prev.map((i) => (i.id === data.id ? data : i))
-            : [data, ...prev],
-        );
-        return data;
-      } finally {
-        setSaving(false);
-      }
-    },
-    [novelId],
-  );
-
-  const deleteInstruction = useCallback(async (id: string) => {
-    setDeleting(true);
-    try {
-      const res = await api.llmInstructions[':id'].$delete({ param: { id } });
-      await res.json();
-      setInstructions((prev) => prev.filter((i) => i.id !== id));
-    } finally {
-      setDeleting(false);
-    }
-  }, []);
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) =>
+      api.llmInstructions[':id'].$delete({ param: { id } }).then((r) => r.json()),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ['novels', novelId, 'llmInstructions', entityType],
+      }),
+  });
 
   return {
     instructions,
     loading,
-    error,
-    refetch: fetchInstructions,
-    saveInstruction,
-    deleteInstruction,
-    saving,
-    deleting,
+    error: error ? toErrorMessage(error) : null,
+    refetch: refetch as unknown as () => Promise<void>,
+    saveInstruction: saveMutation.mutateAsync,
+    deleteInstruction: (id) => deleteMutation.mutateAsync(id).then(() => undefined),
+    saving: saveMutation.isPending,
+    deleting: deleteMutation.isPending,
   };
 }

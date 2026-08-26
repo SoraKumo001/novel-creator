@@ -4,24 +4,32 @@ import { buildSettingTree, findSectionAtLine, getMarkdownSections } from '@novel
 import { Button } from '@/components/Button.js';
 import { Input } from '@/components/Input.js';
 import { Loading } from '@/components/Loading.js';
-import { useSettings } from '@/hooks/useSettings.js';
+import type { SaveSettingsMarkdownResult } from '@/lib/types.js';
 import { MonacoEditor } from './-MonacoEditor.js';
 
 type MonacoEditorInstance = Parameters<OnMount>[0];
 
 interface SettingsMarkdownEditorProps {
   novelId: string;
+  fetchSettingsMarkdown: () => Promise<string>;
+  saveSettingsMarkdown: (markdown: string) => Promise<SaveSettingsMarkdownResult>;
+  editSettingSection: (input: {
+    category: string;
+    name: string;
+    description: string;
+    instruction: string;
+  }) => Promise<string>;
+  savingMarkdown: boolean;
+  editingSection: boolean;
 }
 
-export function SettingsMarkdownEditor({ novelId }: SettingsMarkdownEditorProps) {
-  const {
-    fetchSettingsMarkdown,
-    saveSettingsMarkdown,
-    editSettingSection,
-    savingMarkdown,
-    editingSection,
-  } = useSettings(novelId);
-
+export function SettingsMarkdownEditor({
+  fetchSettingsMarkdown,
+  saveSettingsMarkdown,
+  editSettingSection,
+  savingMarkdown,
+  editingSection,
+}: SettingsMarkdownEditorProps) {
   const [markdown, setMarkdown] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
