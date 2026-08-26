@@ -12,6 +12,7 @@ import type {
   CreateSettingInput,
   CreateTimelineInput,
   EditInstructionInput,
+  EditSettingSectionResult,
   ExtractResult,
   GeneratedPlot,
   GeneratedSummary,
@@ -23,6 +24,7 @@ import type {
   Setting,
   SettingDraft,
   SettingDraftInput,
+  SaveSettingsMarkdownResult,
   Timeline,
   UpdateChapterInput,
   UpdateCharacterInput,
@@ -75,6 +77,21 @@ export type ApiClient = {
               param: { id: string };
               json: SettingDraftInput;
             }) => Promise<{ json: () => Promise<SettingDraft> }>;
+          };
+          markdown: {
+            $get: (args: {
+              param: { id: string };
+            }) => Promise<{ json: () => Promise<{ markdown: string }> }>;
+            $put: (args: {
+              param: { id: string };
+              json: { markdown: string };
+            }) => Promise<{ json: () => Promise<SaveSettingsMarkdownResult> }>;
+          };
+          editSection: {
+            $post: (args: {
+              param: { id: string };
+              json: { category: string; name: string; description: string; instruction: string };
+            }) => Promise<{ json: () => Promise<EditSettingSectionResult> }>;
           };
         };
         llmInstructions: {
@@ -294,6 +311,33 @@ function createApiClient(): ApiClient['api'] {
             $post: async ({ param, json }) => ({
               json: async () =>
                 requestJson<SettingDraft>('POST', `/api/novels/${param.id}/settings/draft`, json),
+            }),
+          },
+          markdown: {
+            $get: async ({ param }) => ({
+              json: async () =>
+                requestJson<{ markdown: string }>(
+                  'GET',
+                  `/api/novels/${param.id}/settings/markdown`,
+                ),
+            }),
+            $put: async ({ param, json }) => ({
+              json: async () =>
+                requestJson<SaveSettingsMarkdownResult>(
+                  'PUT',
+                  `/api/novels/${param.id}/settings/markdown`,
+                  json,
+                ),
+            }),
+          },
+          editSection: {
+            $post: async ({ param, json }) => ({
+              json: async () =>
+                requestJson<EditSettingSectionResult>(
+                  'POST',
+                  `/api/novels/${param.id}/settings/edit-section`,
+                  json,
+                ),
             }),
           },
         },

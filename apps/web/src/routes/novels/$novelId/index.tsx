@@ -19,8 +19,17 @@ import { useTimelines } from '@/hooks/useTimelines.js';
 import type { Chapter, Character, ExtractResult, Section, Setting, Timeline } from '@/lib/types.js';
 import { countWords } from '@/lib/sse.js';
 import { MonacoEditor } from '../_components/-MonacoEditor.js';
+import { SettingsMarkdownEditor } from '../_components/-SettingsMarkdownEditor.js';
 
 export const Route = createFileRoute('/novels/$novelId/')({
+  validateSearch: (search: Record<string, unknown>) =>
+    ({
+      tab: (['overview', 'settings', 'characters', 'plot', 'editor', 'timeline'].includes(
+        search.tab as string,
+      )
+        ? search.tab
+        : undefined) as TabId | undefined,
+    }) as { tab?: TabId },
   component: NovelDetailPage,
 });
 
@@ -29,7 +38,9 @@ type TabId = 'overview' | 'settings' | 'characters' | 'plot' | 'editor' | 'timel
 function NovelDetailPage() {
   const { novelId } = Route.useParams();
   const { novel, loading, error, refetch } = useNovel(novelId);
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const { tab } = Route.useSearch();
+  const activeTab: TabId = tab ?? 'overview';
+  const navigate = useNavigate();
 
   const tabs: { id: TabId; label: string }[] = [
     { id: 'overview', label: '概要' },
@@ -68,7 +79,13 @@ function NovelDetailPage() {
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() =>
+                    navigate({
+                      to: '/novels/$novelId',
+                      params: { novelId },
+                      search: { tab: tab.id },
+                    })
+                  }
                   className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition ${
                     activeTab === tab.id
                       ? 'border-indigo-600 text-indigo-700 dark:border-indigo-400 dark:text-indigo-300'
@@ -224,6 +241,7 @@ function SettingsTab({
   const { settings, loading, deleteSetting, deleting } = useSettings(novel.id);
   const navigate = useNavigate();
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'cards' | 'markdown'>('cards');
 
   const grouped = useMemo(() => {
     const map = new Map<string, Setting[]>();
@@ -246,58 +264,93 @@ function SettingsTab({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">設定一覧</h2>
-        <Button
-          onClick={() =>
-            navigate({ to: '/novels/$novelId/settings/new', params: { novelId: novel.id } })
-          }
-          leftIcon={<PlusIcon />}
-        >
-          新規作成
-        </Button>
-      </div>
-      {loading && <Loading message="設定を読み込み中..." />}
-      {!loading && settings.length === 0 && (
-        <EmptyState title="設定がありません" description="世界観や魔法体系などを登録しましょう。" />
-      )}
-      {!loading &&
-        grouped.map(([category, items]) => (
-          <div key={category}>
-            <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {category}
-            </h3>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((setting) => (
-                <Card key={setting.id}>
-                  <CardHeader
-                    title={setting.name}
-                    action={
-                      <div className="flex gap-1">
-                        <IconButton
-                          label="編集"
-                          onClick={() =>
-                            navigate({
-                              to: '/novels/$novelId/settings/$settingId',
-                              params: { novelId: novel.id, settingId: setting.id },
-                            })
-                          }
-                          icon={<PencilIcon />}
-                        />
-                        <IconButton
-                          label="削除"
-                          onClick={() => setDeletingId(setting.id)}
-                          icon={<TrashIcon />}
-                        />
-                      </div>
-                    }
-                  />
-                  <p className="text-sm text-slate-600 dark:text-slate-300">
-                    {setting.description || '説明なし'}
-                  </p>
-                </Card>
-              ))}
-            </div>
+        <div className="flex items-center gap-2">
+          {viewMode === 'cards' && (
+            <Button
+              onClick={() =>
+                navigate({ to: '/novels/$novelId/settings/new', params: { novelId: novel.id } })
+              }
+              leftIcon={<PlusIcon />}
+            >
+              新規作成
+            </Button>
+          )}
+          <div className="flex rounded-lg border border-slate-300 p-0.5 dark:border-slate-700">
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                viewMode === 'cards'
+                  ? 'bg-indigo-600 text-white dark:bg-indigo-500'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+            >
+              カード表示
+            </button>
+            <button
+              onClick={() => setViewMode('markdown')}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                viewMode === 'markdown'
+                  ? 'bg-indigo-600 text-white dark:bg-indigo-500'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+            >
+              マークダウン編集
+            </button>
           </div>
-        ))}
+        </div>
+      </div>
+      {viewMode === 'markdown' ? (
+        <SettingsMarkdownEditor novelId={novel.id} />
+      ) : (
+        <>
+          {loading && <Loading message="設定を読み込み中..." />}
+          {!loading && settings.length === 0 && (
+            <EmptyState
+              title="設定がありません"
+              description="世界観や魔法体系などを登録しましょう。"
+            />
+          )}
+          {!loading &&
+            grouped.map(([category, items]) => (
+              <div key={category}>
+                <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                  {category}
+                </h3>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {items.map((setting) => (
+                    <Card key={setting.id}>
+                      <CardHeader
+                        title={setting.name}
+                        action={
+                          <div className="flex gap-1">
+                            <IconButton
+                              label="編集"
+                              onClick={() =>
+                                navigate({
+                                  to: '/novels/$novelId/settings/$settingId',
+                                  params: { novelId: novel.id, settingId: setting.id },
+                                })
+                              }
+                              icon={<PencilIcon />}
+                            />
+                            <IconButton
+                              label="削除"
+                              onClick={() => setDeletingId(setting.id)}
+                              icon={<TrashIcon />}
+                            />
+                          </div>
+                        }
+                      />
+                      <p className="text-sm text-slate-600 dark:text-slate-300">
+                        {setting.description || '説明なし'}
+                      </p>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))}
+        </>
+      )}
       <ConfirmDialog
         isOpen={!!deletingId}
         onClose={() => setDeletingId(null)}

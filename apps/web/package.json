@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@novel-creator/shared": "workspace:*",
     "@tanstack/react-router": "^1.170.32",
     "@tanstack/router-devtools": "^1.167.1",
     "hono": "^4.13.4",

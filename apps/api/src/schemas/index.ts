@@ -103,6 +103,19 @@ export const settingDraftSchema = z.object({
     .optional(),
 });
 
+// ---- 設定マークダウン一括保存 ----
+export const saveSettingsMarkdownSchema = z.object({
+  markdown: z.string().min(1),
+});
+
+// ---- 設定セクションLLM編集 ----
+export const editSettingSectionSchema = z.object({
+  category: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string(),
+  instruction: z.string().min(1),
+});
+
 // ---- パラメータ ----
 export const idParamSchema = z.object({
   id: z.uuid(),

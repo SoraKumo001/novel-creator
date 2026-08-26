@@ -1,17 +1,19 @@
-import Editor from '@monaco-editor/react';
+import Editor, { type OnMount } from '@monaco-editor/react';
 
 interface MonacoEditorProps {
   value: string;
   onChange: (value: string) => void;
+  onMount?: OnMount;
 }
 
-export function MonacoEditor({ value, onChange }: MonacoEditorProps) {
+export function MonacoEditor({ value, onChange, onMount }: MonacoEditorProps) {
   return (
     <Editor
       height="100%"
       defaultLanguage="markdown"
       value={value}
       onChange={(v) => onChange(v ?? '')}
+      onMount={onMount}
       options={{
         wordWrap: 'on',
         minimap: { enabled: false },

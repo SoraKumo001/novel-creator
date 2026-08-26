@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
-import type { CreateSettingInput, Setting, SettingDraft, UpdateSettingInput } from '@/lib/types.js';
+import type {
+  CreateSettingInput,
+  EditSettingSectionResult,
+  SaveSettingsMarkdownResult,
+  Setting,
+  SettingDraft,
+  UpdateSettingInput,
+} from '@/lib/types.js';
 
 interface UseSettingsReturn {
   settings: Setting[];
@@ -16,11 +23,21 @@ interface UseSettingsReturn {
     instruction: string,
     currentDraft?: { category: string; name: string; description?: string },
   ) => Promise<SettingDraft>;
+  fetchSettingsMarkdown: () => Promise<string>;
+  saveSettingsMarkdown: (markdown: string) => Promise<SaveSettingsMarkdownResult>;
+  editSettingSection: (input: {
+    category: string;
+    name: string;
+    description: string;
+    instruction: string;
+  }) => Promise<string>;
   creating: boolean;
   updating: boolean;
   deleting: boolean;
   llmEditing: boolean;
   generatingDraft: boolean;
+  savingMarkdown: boolean;
+  editingSection: boolean;
 }
 
 export function useSettings(novelId: string): UseSettingsReturn {
@@ -32,6 +49,8 @@ export function useSettings(novelId: string): UseSettingsReturn {
   const [deleting, setDeleting] = useState(false);
   const [llmEditing, setLlmEditing] = useState(false);
   const [generatingDraft, setGeneratingDraft] = useState(false);
+  const [savingMarkdown, setSavingMarkdown] = useState(false);
+  const [editingSection, setEditingSection] = useState(false);
 
   const fetchSettings = useCallback(async () => {
     setLoading(true);
@@ -121,6 +140,52 @@ export function useSettings(novelId: string): UseSettingsReturn {
     [novelId],
   );
 
+  const fetchSettingsMarkdown = useCallback(async (): Promise<string> => {
+    const res = await api.novels[':id'].settings.markdown.$get({ param: { id: novelId } });
+    const data = await res.json();
+    return data.markdown;
+  }, [novelId]);
+
+  const saveSettingsMarkdown = useCallback(
+    async (markdown: string): Promise<SaveSettingsMarkdownResult> => {
+      setSavingMarkdown(true);
+      try {
+        const res = await api.novels[':id'].settings.markdown.$put({
+          param: { id: novelId },
+          json: { markdown },
+        });
+        const data = await res.json();
+        await fetchSettings();
+        return data;
+      } finally {
+        setSavingMarkdown(false);
+      }
+    },
+    [novelId, fetchSettings],
+  );
+
+  const editSettingSection = useCallback(
+    async (input: {
+      category: string;
+      name: string;
+      description: string;
+      instruction: string;
+    }): Promise<string> => {
+      setEditingSection(true);
+      try {
+        const res = await api.novels[':id'].settings.editSection.$post({
+          param: { id: novelId },
+          json: input,
+        });
+        const data: EditSettingSectionResult = await res.json();
+        return data.markdown;
+      } finally {
+        setEditingSection(false);
+      }
+    },
+    [novelId],
+  );
+
   return {
     settings,
     loading,
@@ -131,10 +196,15 @@ export function useSettings(novelId: string): UseSettingsReturn {
     deleteSetting,
     llmEditSetting,
     generateDraft,
+    fetchSettingsMarkdown,
+    saveSettingsMarkdown,
+    editSettingSection,
     creating,
     updating,
     deleting,
     llmEditing,
     generatingDraft,
+    savingMarkdown,
+    editingSection,
   };
 }

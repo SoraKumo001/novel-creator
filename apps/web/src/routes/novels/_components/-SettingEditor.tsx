@@ -102,7 +102,7 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
       } else {
         await createSetting(input);
       }
-      navigate({ to: '/novels/$novelId', params: { novelId } });
+      navigate({ to: '/novels/$novelId', params: { novelId }, search: { tab: 'settings' } });
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存に失敗しました');
     }
@@ -125,7 +125,9 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
       <div className="flex items-center justify-between">
         <div>
           <button
-            onClick={() => navigate({ to: '/novels/$novelId', params: { novelId } })}
+            onClick={() =>
+              navigate({ to: '/novels/$novelId', params: { novelId }, search: { tab: 'settings' } })
+            }
             className="mb-2 text-sm text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
           >
             ← 設定一覧に戻る

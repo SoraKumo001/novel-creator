@@ -213,3 +213,16 @@ export interface ExtractResult {
 export interface ApiSuccessResponse {
   success: true;
 }
+
+// 設定マークダウン一括保存レスポンス
+export interface SaveSettingsMarkdownResult {
+  created: number;
+  updated: number;
+  deleted: number;
+  duplicateCount: number;
+}
+
+// 設定セクションLLM編集レスポンス
+export interface EditSettingSectionResult {
+  markdown: string;
+}

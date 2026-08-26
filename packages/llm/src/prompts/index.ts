@@ -7,3 +7,4 @@ export { extractSettings } from './extractSettings.js';
 export { editCharacter } from './editCharacter.js';
 export { editSetting } from './editSetting.js';
 export { createSettingDraft } from './createSettingDraft.js';
+export { editSettingSection } from './editSettingSection.js';
