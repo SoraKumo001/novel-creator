@@ -63,13 +63,15 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 - Connect-Web（`@connectrpc/connect-web`）
 - TanStack Router（ファイルベースルーティング）
 - TanStack Query
-- TailwindCSS
-- MonacoEditor
+- Tailwind CSS（v4 セマンティックデザイントークン設計、ライト/ダークモード連動）
+- Monaco Editor（本文・Markdownエディタ）
+- Marked + DOMPurify + Mermaid.js（Markdownレンダリング & ダイアグラム表示）
+- Storybook
 
 ### バックエンド
 
 - ConnectRPC + Hono による gRPC / RPC API
-- Server Streaming RPC によるリアルタイム本文生成ストリーミング
+- Server Streaming RPC によるリアルタイム本文生成・チャット応答ストリーミング
 - LLM の AI 連携（Vercel AI SDK）
 - LLM と Embedding で別プロバイダを指定可能（例: LLM=Ollama / Embedding=Google）
 - VectorDB による検索機能（pgvector / Vectorize）
@@ -77,34 +79,48 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 
 ## データモデル
 
-| テーブル     | 内容                                            |
-| ------------ | ----------------------------------------------- |
-| `novels`     | 小説（タイトル、説明）                          |
-| `chapters`   | 章（タイトル、順序、概要）                      |
-| `sections`   | 節（章内のシーン、タイトル、順序、概要）        |
-| `contents`   | 本文（節に対する本文、文字数）                  |
-| `characters` | 人物（名前、説明、特徴、関係性）                |
-| `settings`   | 設定（カテゴリ別：世界観、魔法、地理、文化 等） |
-| `timelines`  | 時系列情報（イベント、順序、作中時間）          |
+| テーブル           | 内容                                            |
+| ------------------ | ----------------------------------------------- |
+| `novels`           | 小説（タイトル、説明）                          |
+| `chapters`         | 章（タイトル、順序、概要）                      |
+| `sections`         | 節（章内のシーン、タイトル、順序、概要）        |
+| `contents`         | 本文（節に対する本文、文字数）                  |
+| `characters`       | 人物（名前、説明、特徴、関係性）                |
+| `settings`         | 設定（カテゴリ別：世界観、魔法、地理、文化 等） |
+| `timelines`        | 時系列情報（イベント、順序、作中時間、節連携）  |
+| `chat_sessions`    | AI創作相談チャットのセッション・対話履歴        |
+| `llm_instructions` | LLM 指示履歴（再利用・プロンプト管理）          |
 
 ## 主な機能
 
-- 小説・章・節・本文の CRUD
-- 設定・人物情報の管理（VectorDB に embedding 保存）
-- LLM による生成:
-  - プロット生成（RAG で既存設定・人物をコンテキストに反映）
-  - 章の概要生成 / 節の概要生成
-  - 本文生成（SSE ストリーミング）
-  - 整合性更新（本文から時系列・設定を自動抽出）
-- LLM による編集（人物・設定を自然言語指示で編集）
-- 自動フロー（本文生成 → 整合性更新を一連実行）
+- **小説・章・節・本文の管理**:
+  - タイトル、概要、本文の作成・編集・削除
+  - Monaco Editor による本格的な執筆環境
+- **設定・登場人物の管理**:
+  - カード一覧表示 ⇄ Markdown 一括編集モードのシームレス切り替え
+  - Markdown の自動パース・ツリー同期およびドラフト自動復元
+  - 自然言語指示によるセクション単位・全体単位の LLM 編集
+  - VectorDB への Embedding 保存・セマンティック検索
+- **AI 創作相談チャット（Creative Chat）**:
+  - 全体の設定や文脈を参照したブレインストーミング対話
+  - チャットテキストから人物・設定を自動抽出・小説データへワンクリック反映（上書き / マージ / 新規）
+- **LLM 生成機能**:
+  - プロット生成（RAG で既存設定・人物をコンテキストに自動反映）
+  - 章・節の概要自動生成
+  - 本文ストリーミング生成
+  - 整合性更新（本文から時系列・設定情報を自動抽出）
+- **バックアップ & リストア**:
+  - 小説全データ・チャット履歴の JSON エクスポート / インポート
+- **モダンな UI / UX**:
+  - セマンティックトークンによる完全なライト / ダークモード自動追従
+  - トースト通知、確認ダイアログ、リアルタイム文字数カウント
 
 ## セットアップ
 
 ### 前提
 
-- Node.js 20+
-- pnpm 9+
+- Node.js 22+
+- pnpm 10+
 - Docker（ローカル DB 用）
 
 ### 手順
@@ -114,7 +130,7 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 cp .env.example .env
 # .env の LLM_API_KEY 等を編集
 
-# 初期セットアップ（依存インストール + shared ビルド + DB 起動 + マイグレーション）
+# 初期セットアップ（依存インストール + protoビルド + shared ビルド + DB 起動 + マイグレーション）
 pnpm setup
 
 # 開発サーバー起動（API: ポート3000 / Web: ポート5173）
@@ -139,14 +155,16 @@ http://localhost:5173 にアクセス。
 | `pnpm db:generate` | マイグレーション生成                                                                   |
 | `pnpm db:studio`   | Drizzle Studio                                                                         |
 
-### 開発
+### 開発・UI確認
 
-| コマンド          | 内容                                    |
-| ----------------- | --------------------------------------- |
-| `pnpm dev`        | 全パッケージ並列開発サーバー            |
-| `pnpm dev:api`    | API 開発サーバー（Node.js、ポート3000） |
-| `pnpm dev:web`    | Web 開発サーバー（Vite、ポート5173）    |
-| `pnpm dev:worker` | API 開発サーバー（Wrangler / Workers）  |
+| コマンド               | 内容                                    |
+| ---------------------- | --------------------------------------- |
+| `pnpm dev`             | 全パッケージ並列開発サーバー            |
+| `pnpm dev:api`         | API 開発サーバー（Node.js、ポート3000） |
+| `pnpm dev:web`         | Web 開発サーバー（Vite、ポート5173）    |
+| `pnpm dev:worker`      | API 開発サーバー（Wrangler / Workers）  |
+| `pnpm storybook`       | Storybook 起動（コンポーネント確認）    |
+| `pnpm build-storybook` | Storybook 静的ビルド                    |
 
 ### 品質チェック
 
