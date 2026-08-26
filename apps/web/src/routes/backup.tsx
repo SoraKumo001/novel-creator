@@ -91,7 +91,7 @@ export function BackupPage() {
   }
 
   const counts = parsed ? buildCounts(parsed) : null;
-  const restoreTitle = parsed?.meta?.title ?? '選択中の小説';
+  const restoreTitle = parsed?.meta?.novelTitle ?? '選択中の小説';
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -232,7 +232,7 @@ export function BackupPage() {
                   バックアップ内容のプレビュー
                 </h4>
                 <div className="grid gap-2 text-sm text-slate-700 dark:text-slate-300 sm:grid-cols-2">
-                  <PreviewRow label="タイトル" value={parsed.meta.title} />
+                  <PreviewRow label="タイトル" value={parsed.meta.novelTitle} />
                   <PreviewRow label="エクスポート日" value={formatDate(parsed.meta.exportedAt)} />
                   {Object.entries(counts).map(([label, value]) => (
                     <PreviewRow key={label} label={label} value={String(value)} />
@@ -273,7 +273,7 @@ function isBackupData(value: unknown): value is BackupData {
   const v = value as Record<string, unknown>;
   if (!v.meta || typeof v.meta !== 'object') return false;
   const meta = v.meta as Record<string, unknown>;
-  if (typeof meta.novelId !== 'string' || typeof meta.title !== 'string') return false;
+  if (typeof meta.novelId !== 'string' || typeof meta.novelTitle !== 'string') return false;
   if (!v.rdb || typeof v.rdb !== 'object' || Array.isArray(v.rdb)) return false;
   return true;
 }

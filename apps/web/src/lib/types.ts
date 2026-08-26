@@ -294,8 +294,9 @@ export interface ExtractedChatEntities {
 
 // ---- バックアップ・リストア ----
 export interface BackupMeta {
+  version: number;
   novelId: string;
-  title: string;
+  novelTitle: string;
   exportedAt: string;
 }
 
