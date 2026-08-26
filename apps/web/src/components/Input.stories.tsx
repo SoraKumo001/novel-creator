@@ -29,3 +29,18 @@ export const Disabled: Story = {
     disabled: true,
   },
 };
+
+export const WithError: Story = {
+  args: {
+    label: 'Email',
+    placeholder: 'email@example.com',
+    error: '有効なメールアドレスを入力してください',
+  },
+};
+
+export const WithValue: Story = {
+  args: {
+    label: 'タイトル',
+    value: '失われた聖剣の物語',
+  },
+};

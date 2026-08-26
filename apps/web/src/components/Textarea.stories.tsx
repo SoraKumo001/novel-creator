@@ -21,3 +21,19 @@ export const WithPlaceholder: Story = {
     placeholder: 'Type something here...',
   },
 };
+
+export const WithError: Story = {
+  args: {
+    label: '本文',
+    placeholder: '本文を入力...',
+    error: '100文字以上入力してください',
+  },
+};
+
+export const LongRows: Story = {
+  args: {
+    label: 'あらすじ',
+    placeholder: '小説のあらすじを入力...',
+    rows: 10,
+  },
+};

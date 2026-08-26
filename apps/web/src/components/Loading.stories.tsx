@@ -18,3 +18,22 @@ export const WithLabel: Story = {
     message: 'Loading...',
   },
 };
+
+export const Small: Story = {
+  args: {
+    size: 'sm',
+  },
+};
+
+export const Large: Story = {
+  args: {
+    size: 'lg',
+  },
+};
+
+export const FullScreen: Story = {
+  args: {
+    fullScreen: true,
+    message: '生成中...',
+  },
+};

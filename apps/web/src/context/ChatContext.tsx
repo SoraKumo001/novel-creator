@@ -61,7 +61,7 @@ export const QUICK_PROMPTS: QuickPrompt[] = [
   },
 ];
 
-interface ChatContextValue {
+export interface ChatContextValue {
   isOpen: boolean;
   openChat: (targetNovelId?: string | null) => void;
   closeChat: () => void;
@@ -92,7 +92,7 @@ interface ChatContextValue {
   clearMessages: () => void;
 }
 
-const ChatContext = createContext<ChatContextValue | null>(null);
+export const ChatContext = createContext<ChatContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);

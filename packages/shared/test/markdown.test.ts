@@ -83,6 +83,87 @@ describe('settingsMarkdown', () => {
     expect(diff.toUpdate[0].description).toBe('新しい説明');
     expect(diff.toDelete).toEqual(['2']);
   });
+
+  it('Mermaidブロックを含むdescriptionを正しくパースできること', () => {
+    const md = [
+      '# 地理',
+      '',
+      '## 大陸間の関係',
+      '',
+      '三大陸が海を挟んで鼎立する。交易路は南回りが主流。',
+      '',
+      '```mermaid',
+      'graph TD',
+      '    アストラ -->|北の海| ルミナ',
+      '    ルミナ -->|東の海峡| オリン',
+      '```',
+      '',
+      '## 王都アステル',
+      '',
+      '中央に位置する城塞都市。',
+    ].join('\n');
+    const parsed = parseSettingsMarkdown(md);
+    expect(parsed).toHaveLength(2);
+
+    expect(parsed[0].category).toBe('地理');
+    expect(parsed[0].name).toBe('大陸間の関係');
+    expect(parsed[0].description).toContain('三大陸が海を挟んで鼎立する。');
+    // Mermaidブロック全体がdescriptionに保持されること
+    expect(parsed[0].description).toContain('```mermaid');
+    expect(parsed[0].description).toContain('graph TD');
+    expect(parsed[0].description).toContain('アストラ');
+    expect(parsed[0].description).toContain('```');
+
+    // 次のセクションが正しく認識されること（フェンス終了後の ## 見出し）
+    expect(parsed[1].name).toBe('王都アステル');
+    expect(parsed[1].description).toBe('中央に位置する城塞都市。');
+  });
+
+  it('Mermaidブロック内の # / ## を見出しとして誤認しないこと', () => {
+    const md = [
+      '# 地理',
+      '',
+      '## 関係図',
+      '',
+      '```mermaid',
+      'graph TD',
+      '    A[都市A] --> B[都市B]',
+      '    %% この # はコメント',
+      '```',
+      '',
+      '## 隣接地域',
+      '',
+      '北側の山地。',
+    ].join('\n');
+    const parsed = parseSettingsMarkdown(md);
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0].name).toBe('関係図');
+    expect(parsed[1].name).toBe('隣接地域');
+  });
+
+  it('Mermaidブロックを含む設定の差分が正しく計算されること', () => {
+    const existing = [
+      {
+        id: '1',
+        category: '地理',
+        name: '大陸間の関係',
+        description: '旧い説明\n\n```mermaid\ngraph TD\n    A-->B\n```',
+      },
+    ];
+    const parsed = [
+      {
+        category: '地理',
+        name: '大陸間の関係',
+        description:
+          '三大陸が鼎立する。\n\n```mermaid\ngraph TD\n    アストラ-->ルミナ\n    ルミナ-->オリン\n```',
+      },
+    ];
+    const diff = diffSettings(existing, parsed);
+    expect(diff.toUpdate).toHaveLength(1);
+    expect(diff.toUpdate[0].id).toBe('1');
+    expect(diff.toUpdate[0].description).toContain('三大陸が鼎立する。');
+    expect(diff.toUpdate[0].description).toContain('アストラ-->ルミナ');
+  });
 });
 
 describe('charactersMarkdown', () => {
