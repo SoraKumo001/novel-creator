@@ -4,6 +4,7 @@ import { Hono } from 'hono';
 import type { AppContext } from './context.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { logger } from './middleware/logger.js';
+import backupRouter from './routes/backup.js';
 import chaptersRouter from './routes/chapters.js';
 import charactersRouter from './routes/characters.js';
 import contentsRouter from './routes/contents.js';
@@ -48,6 +49,7 @@ export function createApp(context: AppContext['Variables']): Hono<AppContext> {
   app.route('/api', llmEditRouter);
   app.route('/api', llmInstructionsRouter);
   app.route('/api/chat', chatRouter);
+  app.route('/api/backup', backupRouter);
 
   // ヘルスチェック
   app.get('/health', (c) => c.json({ status: 'ok' }));

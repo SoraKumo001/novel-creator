@@ -159,6 +159,7 @@ chatRouter.post('/', zValidator('json', chatRequestSchema), async (c) => {
   const db = c.var.db;
   const { sessionId, novelId, messages } = c.req.valid('json');
 
+  let systemPrompt: string;
   if (novelId) {
     const [novel] = await db.select().from(novels).where(eq(novels.id, novelId));
     if (novel) {

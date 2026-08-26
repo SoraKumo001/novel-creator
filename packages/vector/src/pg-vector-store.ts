@@ -154,6 +154,11 @@ export function createPgVectorStore(connectionString: string, dimensions = 3072)
           and(eq(vectorEmbeddings.entityType, entityType), eq(vectorEmbeddings.entityId, entityId)),
         );
     },
+
+    async deleteByNovel(novelId: string): Promise<void> {
+      await ensureSchema();
+      await db.delete(vectorEmbeddings).where(eq(vectorEmbeddings.novelId, novelId));
+    },
   };
 }
 

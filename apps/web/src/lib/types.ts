@@ -291,3 +291,21 @@ export interface ExtractedChatEntities {
   characters: ExtractedCharacterItem[];
   settings: ExtractedSettingItem[];
 }
+
+// ---- バックアップ・リストア ----
+export interface BackupMeta {
+  novelId: string;
+  title: string;
+  exportedAt: string;
+}
+
+export interface BackupData {
+  meta: BackupMeta;
+  rdb: Record<string, unknown[]>;
+}
+
+export interface ImportResult {
+  success: true;
+  novelId: string;
+  counts: Record<string, number>;
+}

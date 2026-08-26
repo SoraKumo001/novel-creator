@@ -30,4 +30,5 @@ export interface VectorStore {
   ): Promise<VectorSearchResult[]>;
   delete(id: string): Promise<void>;
   deleteByEntity(entityType: string, entityId: string): Promise<void>;
+  deleteByNovel(novelId: string): Promise<void>;
 }

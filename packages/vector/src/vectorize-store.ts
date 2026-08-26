@@ -90,5 +90,20 @@ export function createVectorizeStore(
         await binding.deleteByIds(ids);
       }
     },
+
+    async deleteByNovel(novelId: string): Promise<void> {
+      const result = await binding.query([], {
+        topK: 1000,
+        filter: { novelId },
+        returnMetadata: 'none',
+      });
+      const ids = (result.matches ?? []).map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (match: any) => match.id,
+      );
+      if (ids.length > 0) {
+        await binding.deleteByIds(ids);
+      }
+    },
   };
 }

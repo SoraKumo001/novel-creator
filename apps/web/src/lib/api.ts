@@ -21,6 +21,7 @@ import type {
   ExtractedChatEntities,
   GeneratedPlot,
   GeneratedSummary,
+  ImportResult,
   LlmInstruction,
   Novel,
   NovelDetail,
@@ -298,6 +299,10 @@ export type ApiClient = {
           }) => Promise<{ json: () => Promise<ApiSuccessResponse> }>;
         };
       };
+    };
+    backup: {
+      $export: (novelId: string) => Promise<Response>;
+      $import: (data: unknown) => Promise<{ json: () => Promise<ImportResult> }>;
     };
   };
 };
@@ -644,6 +649,13 @@ function createApiClient(): ApiClient['api'] {
           }),
         },
       },
+    },
+    backup: {
+      $export: async (novelId: string) =>
+        requestResponse('POST', `/api/backup/export?novelId=${encodeURIComponent(novelId)}`),
+      $import: async (data: unknown) => ({
+        json: async () => requestJson<ImportResult>('POST', '/api/backup/import', data),
+      }),
     },
   };
 }
