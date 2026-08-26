@@ -133,6 +133,18 @@ export const editCharacterSectionSchema = z.object({
   instruction: z.string().min(1),
 });
 
+// ---- 設定マークダウン全体LLM編集 ----
+export const editSettingDocumentSchema = z.object({
+  markdown: z.string().min(1),
+  instruction: z.string().min(1),
+});
+
+// ---- 人物マークダウン全体LLM編集 ----
+export const editCharacterDocumentSchema = z.object({
+  markdown: z.string().min(1),
+  instruction: z.string().min(1),
+});
+
 // ---- パラメータ ----
 export const idParamSchema = z.object({
   id: z.uuid(),

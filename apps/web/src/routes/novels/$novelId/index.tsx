@@ -54,7 +54,7 @@ function NovelDetailPage() {
   ];
 
   return (
-    <div className="max-w-6xl">
+    <div className="flex h-full max-w-6xl flex-col">
       {loading && <Loading message="小説を読み込み中..." />}
       {!loading && error && (
         <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300">
@@ -63,7 +63,7 @@ function NovelDetailPage() {
       )}
       {novel && (
         <>
-          <header className="mb-8">
+          <header className="mb-6 shrink-0">
             <div className="mb-1 text-sm font-medium text-indigo-600 dark:text-indigo-400">
               小説詳細
             </div>
@@ -76,7 +76,7 @@ function NovelDetailPage() {
               </p>
             )}
           </header>
-          <nav className="mb-8 border-b border-slate-200 dark:border-slate-700">
+          <nav className="mb-6 shrink-0 border-b border-slate-200 dark:border-slate-700">
             <div className="flex gap-1 overflow-x-auto">
               {tabs.map((tab) => (
                 <button
@@ -99,12 +99,14 @@ function NovelDetailPage() {
               ))}
             </div>
           </nav>
-          {activeTab === 'overview' && <OverviewTab novel={novel} onRefresh={refetch} />}
-          {activeTab === 'settings' && <SettingsTab novel={novel} onRefresh={refetch} />}
-          {activeTab === 'characters' && <CharactersTab novel={novel} onRefresh={refetch} />}
-          {activeTab === 'plot' && <PlotTab novel={novel} onRefresh={refetch} />}
-          {activeTab === 'editor' && <EditorTab novel={novel} onRefresh={refetch} />}
-          {activeTab === 'timeline' && <TimelineTab novel={novel} onRefresh={refetch} />}
+          <div className="min-h-0 flex-1 overflow-auto">
+            {activeTab === 'overview' && <OverviewTab novel={novel} onRefresh={refetch} />}
+            {activeTab === 'settings' && <SettingsTab novel={novel} onRefresh={refetch} />}
+            {activeTab === 'characters' && <CharactersTab novel={novel} onRefresh={refetch} />}
+            {activeTab === 'plot' && <PlotTab novel={novel} onRefresh={refetch} />}
+            {activeTab === 'editor' && <EditorTab novel={novel} onRefresh={refetch} />}
+            {activeTab === 'timeline' && <TimelineTab novel={novel} onRefresh={refetch} />}
+          </div>
         </>
       )}
     </div>
@@ -248,8 +250,10 @@ function SettingsTab({
     fetchSettingsMarkdown,
     saveSettingsMarkdown,
     editSettingSection,
+    editSettingDocument,
     savingMarkdown,
     editingSection,
+    editingDocument,
   } = useSettings(novel.id);
   const navigate = useNavigate();
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -273,8 +277,8 @@ function SettingsTab({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex h-full flex-col space-y-6">
+      <div className="flex shrink-0 items-center justify-between">
         <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">設定一覧</h2>
         <div className="flex items-center gap-2">
           {viewMode === 'cards' && (
@@ -312,16 +316,20 @@ function SettingsTab({
         </div>
       </div>
       {viewMode === 'markdown' ? (
-        <SettingsMarkdownEditor
-          novelId={novel.id}
-          fetchSettingsMarkdown={fetchSettingsMarkdown}
-          saveSettingsMarkdown={saveSettingsMarkdown}
-          editSettingSection={editSettingSection}
-          savingMarkdown={savingMarkdown}
-          editingSection={editingSection}
-        />
+        <div className="min-h-0 flex-1">
+          <SettingsMarkdownEditor
+            novelId={novel.id}
+            fetchSettingsMarkdown={fetchSettingsMarkdown}
+            saveSettingsMarkdown={saveSettingsMarkdown}
+            editSettingSection={editSettingSection}
+            editSettingDocument={editSettingDocument}
+            savingMarkdown={savingMarkdown}
+            editingSection={editingSection}
+            editingDocument={editingDocument}
+          />
+        </div>
       ) : (
-        <>
+        <div className="min-h-0 flex-1 overflow-auto">
           {loading && <Loading message="設定を読み込み中..." />}
           {!loading && settings.length === 0 && (
             <EmptyState
@@ -369,7 +377,7 @@ function SettingsTab({
                 </div>
               </div>
             ))}
-        </>
+        </div>
       )}
       <ConfirmDialog
         isOpen={!!deletingId}
@@ -402,12 +410,14 @@ function CharactersTab({
     fetchCharactersMarkdown,
     saveCharactersMarkdown,
     editCharacterSection,
+    editCharacterDocument,
     creating,
     updating,
     deleting,
     llmEditing,
     savingMarkdown,
     editingSection,
+    editingDocument,
   } = useCharacters(novel.id);
   const [viewMode, setViewMode] = useState<'cards' | 'markdown'>('cards');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -466,8 +476,8 @@ function CharactersTab({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex h-full flex-col space-y-6">
+      <div className="flex shrink-0 items-center justify-between">
         <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">人物一覧</h2>
         <div className="flex items-center gap-2">
           {viewMode === 'cards' && (
@@ -500,16 +510,20 @@ function CharactersTab({
         </div>
       </div>
       {viewMode === 'markdown' ? (
-        <CharactersMarkdownEditor
-          novelId={novel.id}
-          fetchCharactersMarkdown={fetchCharactersMarkdown}
-          saveCharactersMarkdown={saveCharactersMarkdown}
-          editCharacterSection={editCharacterSection}
-          savingMarkdown={savingMarkdown}
-          editingSection={editingSection}
-        />
+        <div className="min-h-0 flex-1">
+          <CharactersMarkdownEditor
+            novelId={novel.id}
+            fetchCharactersMarkdown={fetchCharactersMarkdown}
+            saveCharactersMarkdown={saveCharactersMarkdown}
+            editCharacterSection={editCharacterSection}
+            editCharacterDocument={editCharacterDocument}
+            savingMarkdown={savingMarkdown}
+            editingSection={editingSection}
+            editingDocument={editingDocument}
+          />
+        </div>
       ) : (
-        <>
+        <div className="min-h-0 flex-1 overflow-auto">
           {loading && <Loading message="人物を読み込み中..." />}
           {!loading && characters.length === 0 && (
             <EmptyState
@@ -562,7 +576,7 @@ function CharactersTab({
                 </div>
               </div>
             ))}
-        </>
+        </div>
       )}
       <CharacterFormModal
         isOpen={isCreateOpen}

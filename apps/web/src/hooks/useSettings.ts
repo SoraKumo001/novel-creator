@@ -32,6 +32,7 @@ interface UseSettingsReturn {
     description: string;
     instruction: string;
   }) => Promise<string>;
+  editSettingDocument: (input: { markdown: string; instruction: string }) => Promise<string>;
   creating: boolean;
   updating: boolean;
   deleting: boolean;
@@ -39,6 +40,7 @@ interface UseSettingsReturn {
   generatingDraft: boolean;
   savingMarkdown: boolean;
   editingSection: boolean;
+  editingDocument: boolean;
 }
 
 export function useSettings(novelId: string): UseSettingsReturn {
@@ -119,6 +121,16 @@ export function useSettings(novelId: string): UseSettingsReturn {
         }),
   });
 
+  const editDocumentMutation = useMutation({
+    mutationFn: (input: { markdown: string; instruction: string }) =>
+      api.novels[':id'].settings.editDocument
+        .$post({ param: { id: novelId }, json: input })
+        .then(async (r) => {
+          const data: EditSettingSectionResult = await r.json();
+          return data.markdown;
+        }),
+  });
+
   const fetchSettingsMarkdown = useCallback(async (): Promise<string> => {
     const res = await api.novels[':id'].settings.markdown.$get({ param: { id: novelId } });
     const data = await res.json();
@@ -139,6 +151,7 @@ export function useSettings(novelId: string): UseSettingsReturn {
     fetchSettingsMarkdown,
     saveSettingsMarkdown: saveMarkdownMutation.mutateAsync,
     editSettingSection: editSectionMutation.mutateAsync,
+    editSettingDocument: editDocumentMutation.mutateAsync,
     creating: createMutation.isPending,
     updating: updateMutation.isPending,
     deleting: deleteMutation.isPending,
@@ -146,5 +159,6 @@ export function useSettings(novelId: string): UseSettingsReturn {
     generatingDraft: draftMutation.isPending,
     savingMarkdown: saveMarkdownMutation.isPending,
     editingSection: editSectionMutation.isPending,
+    editingDocument: editDocumentMutation.isPending,
   };
 }

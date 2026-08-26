@@ -13,5 +13,10 @@ export function MarkdownText({ content, className }: MarkdownTextProps) {
     return DOMPurify.sanitize(raw);
   }, [content]);
 
-  return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+  return (
+    <div
+      className={`prose prose-sm max-w-none dark:prose-invert ${className ?? ''}`}
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  );
 }

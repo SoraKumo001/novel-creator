@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 
 import { settings } from '@novel-creator/db';
-import { editSettingSection, generateText } from '@novel-creator/llm';
+import { editSettingDocument, editSettingSection, generateText } from '@novel-creator/llm';
 import {
   diffSettings,
   parseSettingsMarkdown,
@@ -14,6 +14,7 @@ import type { AppContext } from '../context.js';
 import { searchContext, upsertEntityEmbedding } from '../rag.js';
 import {
   createSettingSchema,
+  editSettingDocumentSchema,
   editSettingSectionSchema,
   idParamSchema,
   novelIdParamSchema,
@@ -131,6 +132,33 @@ settingsRouter.post(
     );
 
     const prompt = editSettingSection({ category, name, description }, instruction, {
+      settings: ctx.settings,
+      characters: ctx.characters,
+    });
+
+    const result = await generateText(c.var.llm, prompt);
+    return c.json({ markdown: result });
+  },
+);
+
+// POST /api/novels/:novelId/settings/edit-document - 文書全体をLLMで編集（DB書き込みなし）
+settingsRouter.post(
+  '/novels/:novelId/settings/edit-document',
+  zValidator('param', novelIdParamSchema),
+  zValidator('json', editSettingDocumentSchema),
+  async (c) => {
+    const { novelId } = c.req.valid('param');
+    const { markdown, instruction } = c.req.valid('json');
+
+    const ctx = await searchContext(
+      c.var.vectorStore,
+      c.var.embedding,
+      novelId,
+      { query: instruction },
+      c.var.env,
+    );
+
+    const prompt = editSettingDocument(markdown, instruction, {
       settings: ctx.settings,
       characters: ctx.characters,
     });

@@ -9,3 +9,5 @@ export { editSetting } from './editSetting.js';
 export { createSettingDraft } from './createSettingDraft.js';
 export { editSettingSection } from './editSettingSection.js';
 export { editCharacterSection } from './editCharacterSection.js';
+export { editSettingDocument } from './editSettingDocument.js';
+export { editCharacterDocument } from './editCharacterDocument.js';

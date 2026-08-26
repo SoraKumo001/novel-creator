@@ -13,4 +13,6 @@ export {
   createSettingDraft,
   editSettingSection,
   editCharacterSection,
+  editSettingDocument,
+  editCharacterDocument,
 } from './prompts/index.js';

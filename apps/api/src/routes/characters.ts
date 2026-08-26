@@ -3,7 +3,7 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 
 import { characters } from '@novel-creator/db';
-import { editCharacterSection, generateText } from '@novel-creator/llm';
+import { editCharacterDocument, editCharacterSection, generateText } from '@novel-creator/llm';
 import {
   diffCharacters,
   parseCharactersMarkdown,
@@ -14,6 +14,7 @@ import type { AppContext } from '../context.js';
 import { searchContext, upsertEntityEmbedding } from '../rag.js';
 import {
   createCharacterSchema,
+  editCharacterDocumentSchema,
   editCharacterSectionSchema,
   idParamSchema,
   novelIdParamSchema,
@@ -143,6 +144,33 @@ charactersRouter.post(
       instruction,
       { settings: ctx.settings, characters: ctx.characters },
     );
+
+    const result = await generateText(c.var.llm, prompt);
+    return c.json({ markdown: result });
+  },
+);
+
+// POST /api/novels/:novelId/characters/edit-document - 文書全体をLLMで編集（DB書き込みなし）
+charactersRouter.post(
+  '/novels/:novelId/characters/edit-document',
+  zValidator('param', novelIdParamSchema),
+  zValidator('json', editCharacterDocumentSchema),
+  async (c) => {
+    const { novelId } = c.req.valid('param');
+    const { markdown, instruction } = c.req.valid('json');
+
+    const ctx = await searchContext(
+      c.var.vectorStore,
+      c.var.embedding,
+      novelId,
+      { query: instruction },
+      c.var.env,
+    );
+
+    const prompt = editCharacterDocument(markdown, instruction, {
+      settings: ctx.settings,
+      characters: ctx.characters,
+    });
 
     const result = await generateText(c.var.llm, prompt);
     return c.json({ markdown: result });

@@ -86,6 +86,12 @@ export type ApiClient = {
               };
             }) => Promise<{ json: () => Promise<EditCharacterSectionResult> }>;
           };
+          editDocument: {
+            $post: (args: {
+              param: { id: string };
+              json: { markdown: string; instruction: string };
+            }) => Promise<{ json: () => Promise<EditCharacterSectionResult> }>;
+          };
         };
         settings: {
           $get: (args: {
@@ -115,6 +121,12 @@ export type ApiClient = {
             $post: (args: {
               param: { id: string };
               json: { category: string; name: string; description: string; instruction: string };
+            }) => Promise<{ json: () => Promise<EditSettingSectionResult> }>;
+          };
+          editDocument: {
+            $post: (args: {
+              param: { id: string };
+              json: { markdown: string; instruction: string };
             }) => Promise<{ json: () => Promise<EditSettingSectionResult> }>;
           };
         };
@@ -346,6 +358,16 @@ function createApiClient(): ApiClient['api'] {
                 ),
             }),
           },
+          editDocument: {
+            $post: async ({ param, json }) => ({
+              json: async () =>
+                requestJson<EditCharacterSectionResult>(
+                  'POST',
+                  `/api/novels/${param.id}/characters/edit-document`,
+                  json,
+                ),
+            }),
+          },
         },
         settings: {
           $get: async ({ param, query }) => ({
@@ -387,6 +409,16 @@ function createApiClient(): ApiClient['api'] {
                 requestJson<EditSettingSectionResult>(
                   'POST',
                   `/api/novels/${param.id}/settings/edit-section`,
+                  json,
+                ),
+            }),
+          },
+          editDocument: {
+            $post: async ({ param, json }) => ({
+              json: async () =>
+                requestJson<EditSettingSectionResult>(
+                  'POST',
+                  `/api/novels/${param.id}/settings/edit-document`,
                   json,
                 ),
             }),

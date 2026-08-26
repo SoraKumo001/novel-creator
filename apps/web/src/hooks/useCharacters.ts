@@ -29,12 +29,14 @@ interface UseCharactersReturn {
     relationships: string;
     instruction: string;
   }) => Promise<string>;
+  editCharacterDocument: (input: { markdown: string; instruction: string }) => Promise<string>;
   creating: boolean;
   updating: boolean;
   deleting: boolean;
   llmEditing: boolean;
   savingMarkdown: boolean;
   editingSection: boolean;
+  editingDocument: boolean;
 }
 
 export function useCharacters(novelId: string): UseCharactersReturn {
@@ -105,6 +107,16 @@ export function useCharacters(novelId: string): UseCharactersReturn {
         }),
   });
 
+  const editDocumentMutation = useMutation({
+    mutationFn: (input: { markdown: string; instruction: string }) =>
+      api.novels[':id'].characters.editDocument
+        .$post({ param: { id: novelId }, json: input })
+        .then(async (r) => {
+          const data: EditCharacterSectionResult = await r.json();
+          return data.markdown;
+        }),
+  });
+
   const fetchCharactersMarkdown = useCallback(async (): Promise<string> => {
     const res = await api.novels[':id'].characters.markdown.$get({ param: { id: novelId } });
     const data = await res.json();
@@ -127,11 +139,13 @@ export function useCharacters(novelId: string): UseCharactersReturn {
     fetchCharactersMarkdown,
     saveCharactersMarkdown: saveMarkdownMutation.mutateAsync,
     editCharacterSection: editSectionMutation.mutateAsync,
+    editCharacterDocument: editDocumentMutation.mutateAsync,
     creating: createMutation.isPending,
     updating: updateMutation.isPending,
     deleting: deleteMutation.isPending,
     llmEditing: llmEditMutation.isPending,
     savingMarkdown: saveMarkdownMutation.isPending,
     editingSection: editSectionMutation.isPending,
+    editingDocument: editDocumentMutation.isPending,
   };
 }
