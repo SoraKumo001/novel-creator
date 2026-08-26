@@ -33,10 +33,10 @@ export function Modal({ isOpen, onClose, title, children, footer, size = 'md' }:
       onClick={onClose}
     >
       <div
-        className={`w-full ${sizeMap[size]} max-h-[85vh] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-800`}
+        className={`flex max-h-[90vh] w-full flex-col ${sizeMap[size]} overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-slate-800`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-700">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-6 py-4 dark:border-slate-700">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{title}</h2>
           <button
             onClick={onClose}
@@ -55,9 +55,9 @@ export function Modal({ isOpen, onClose, title, children, footer, size = 'md' }:
             </svg>
           </button>
         </div>
-        <div className="overflow-y-auto px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
         {footer && (
-          <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4 dark:border-slate-700">
+          <div className="flex shrink-0 items-center justify-end gap-3 border-t border-slate-100 px-6 py-4 dark:border-slate-700">
             {footer}
           </div>
         )}

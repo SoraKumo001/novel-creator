@@ -3,9 +3,12 @@ import type {
   Character,
   Chapter,
   ChapterWithSections,
+  ChatSession,
+  ChatSessionDetail,
   Content,
   CreateChapterInput,
   CreateCharacterInput,
+  CreateChatSessionInput,
   CreateLlmInstructionInput,
   CreateNovelInput,
   CreateSectionInput,
@@ -15,6 +18,7 @@ import type {
   EditInstructionInput,
   EditSettingSectionResult,
   ExtractResult,
+  ExtractedChatEntities,
   GeneratedPlot,
   GeneratedSummary,
   LlmInstruction,
@@ -30,6 +34,7 @@ import type {
   Timeline,
   UpdateChapterInput,
   UpdateCharacterInput,
+  UpdateChatSessionInput,
   UpdateContentInput,
   UpdateNovelInput,
   UpdateSectionInput,
@@ -265,6 +270,33 @@ export type ApiClient = {
         $delete: (args: {
           param: { id: string };
         }) => Promise<{ json: () => Promise<ApiSuccessResponse> }>;
+      };
+    };
+    chat: {
+      extractEntities: {
+        $post: (args: {
+          json: { text: string };
+        }) => Promise<{ json: () => Promise<ExtractedChatEntities> }>;
+      };
+      sessions: {
+        $get: (args?: {
+          query?: { novelId?: string };
+        }) => Promise<{ json: () => Promise<ChatSession[]> }>;
+        $post: (args: {
+          json: CreateChatSessionInput;
+        }) => Promise<{ json: () => Promise<ChatSession> }>;
+        ':id': {
+          $get: (args: {
+            param: { id: string };
+          }) => Promise<{ json: () => Promise<ChatSessionDetail> }>;
+          $put: (args: {
+            param: { id: string };
+            json: UpdateChatSessionInput;
+          }) => Promise<{ json: () => Promise<ChatSession> }>;
+          $delete: (args: {
+            param: { id: string };
+          }) => Promise<{ json: () => Promise<ApiSuccessResponse> }>;
+        };
       };
     };
   };
@@ -576,6 +608,41 @@ function createApiClient(): ApiClient['api'] {
           json: async () =>
             requestJson<ApiSuccessResponse>('DELETE', `/api/llm-instructions/${param.id}`),
         }),
+      },
+    },
+    chat: {
+      extractEntities: {
+        $post: async ({ json }) => ({
+          json: async () =>
+            requestJson<ExtractedChatEntities>('POST', '/api/chat/extract-entities', json),
+        }),
+      },
+      sessions: {
+        $get: async (args) => ({
+          json: async () => {
+            const qs = args?.query?.novelId
+              ? `?novelId=${encodeURIComponent(args.query.novelId)}`
+              : '';
+            return requestJson<ChatSession[]>('GET', `/api/chat/sessions${qs}`);
+          },
+        }),
+        $post: async ({ json }) => ({
+          json: async () => requestJson<ChatSession>('POST', '/api/chat/sessions', json),
+        }),
+        ':id': {
+          $get: async ({ param }) => ({
+            json: async () =>
+              requestJson<ChatSessionDetail>('GET', `/api/chat/sessions/${param.id}`),
+          }),
+          $put: async ({ param, json }) => ({
+            json: async () =>
+              requestJson<ChatSession>('PUT', `/api/chat/sessions/${param.id}`, json),
+          }),
+          $delete: async ({ param }) => ({
+            json: async () =>
+              requestJson<ApiSuccessResponse>('DELETE', `/api/chat/sessions/${param.id}`),
+          }),
+        },
       },
     },
   };

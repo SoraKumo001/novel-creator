@@ -145,7 +145,7 @@ export function CharactersTab({
           />
         </div>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto">
+        <div className="min-h-0 flex-1 overflow-auto space-y-8 pr-1 pb-8">
           {loading && <Loading message="人物を読み込み中..." />}
           {!loading && characters.length === 0 && (
             <EmptyState
@@ -155,40 +155,48 @@ export function CharactersTab({
           )}
           {!loading &&
             grouped.map(([category, items]) => (
-              <div key={category}>
-                <h3 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                  {category}
-                </h3>
+              <section key={category} className="space-y-3">
+                <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2 dark:border-slate-800">
+                  <span className="inline-block h-3.5 w-1 rounded-full bg-indigo-600 dark:bg-indigo-400" />
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-slate-200">
+                    {category}
+                  </h3>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                    {items.length}件
+                  </span>
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {items.map((character) => (
-                    <Card key={character.id}>
-                      <CardHeader
-                        title={character.name}
-                        action={
-                          <div className="flex gap-1">
-                            <IconButton
-                              label="編集"
-                              onClick={() => setEditing(character)}
-                              icon={<PencilIcon />}
-                            />
-                            <IconButton
-                              label="LLMで編集"
-                              onClick={() => setLlmTarget(character)}
-                              icon={<SparklesIcon />}
-                            />
-                            <IconButton
-                              label="削除"
-                              onClick={() => setDeletingId(character.id)}
-                              icon={<TrashIcon />}
-                            />
-                          </div>
-                        }
-                      />
-                      <MarkdownText
-                        content={character.description || '説明なし'}
-                        className="mb-3 text-sm text-slate-600 dark:text-slate-300"
-                      />
-                      <div className="flex flex-wrap gap-1.5">
+                    <Card key={character.id} className="flex flex-col justify-between">
+                      <div>
+                        <CardHeader
+                          title={character.name}
+                          action={
+                            <div className="flex gap-1">
+                              <IconButton
+                                label="編集"
+                                onClick={() => setEditing(character)}
+                                icon={<PencilIcon />}
+                              />
+                              <IconButton
+                                label="LLMで編集"
+                                onClick={() => setLlmTarget(character)}
+                                icon={<SparklesIcon />}
+                              />
+                              <IconButton
+                                label="削除"
+                                onClick={() => setDeletingId(character.id)}
+                                icon={<TrashIcon />}
+                              />
+                            </div>
+                          }
+                        />
+                        <MarkdownText
+                          content={character.description || '説明なし'}
+                          className="mb-3 text-sm text-slate-600 dark:text-slate-300"
+                        />
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-700/60">
                         {character.traits?.map((t) => (
                           <Tag key={t}>{t}</Tag>
                         ))}
@@ -196,7 +204,7 @@ export function CharactersTab({
                     </Card>
                   ))}
                 </div>
-              </div>
+              </section>
             ))}
         </div>
       )}

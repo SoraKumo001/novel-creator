@@ -5,6 +5,7 @@ import {
   contentGeneration,
   editCharacter,
   editSetting,
+  extractChatEntities,
   extractSettings,
   extractTimeline,
   plotGeneration,
@@ -119,5 +120,15 @@ describe('editSetting', () => {
     );
     expect(prompt).toContain('火魔法');
     expect(prompt).toContain('詳細な歴史背景を追加して');
+  });
+});
+
+describe('extractChatEntities', () => {
+  it('チャットテキストとJSON出力形式が含まれること', () => {
+    const prompt = extractChatEntities('勇者アリスと魔王の剣についての相談');
+    expect(prompt).toContain('勇者アリスと魔王の剣についての相談');
+    expect(prompt).toContain('"characters"');
+    expect(prompt).toContain('"settings"');
+    expect(prompt).toContain('"traits"');
   });
 });

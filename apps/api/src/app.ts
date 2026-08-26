@@ -14,6 +14,7 @@ import novelsRouter from './routes/novels.js';
 import sectionsRouter from './routes/sections.js';
 import settingsRouter from './routes/settings.js';
 import timelinesRouter from './routes/timelines.js';
+import chatRouter from './routes/chat.js';
 
 /**
  * Hono アプリケーションを構築する。
@@ -46,6 +47,7 @@ export function createApp(context: AppContext['Variables']): Hono<AppContext> {
   app.route('/api', generateRouter);
   app.route('/api', llmEditRouter);
   app.route('/api', llmInstructionsRouter);
+  app.route('/api/chat', chatRouter);
 
   // ヘルスチェック
   app.get('/health', (c) => c.json({ status: 'ok' }));

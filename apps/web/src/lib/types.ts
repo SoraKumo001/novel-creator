@@ -242,3 +242,52 @@ export interface SaveCharactersMarkdownResult {
 export interface EditCharacterSectionResult {
   markdown: string;
 }
+
+// ---- チャットセッション ----
+export interface ChatSession {
+  id: string;
+  novelId: string | null;
+  title: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface ChatMessageItem {
+  id: string;
+  sessionId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string | null;
+}
+
+export interface ChatSessionDetail extends ChatSession {
+  messages: ChatMessageItem[];
+}
+
+export interface CreateChatSessionInput {
+  novelId?: string;
+  title?: string;
+}
+
+export interface UpdateChatSessionInput {
+  title: string;
+}
+
+// チャットからのエンティティ抽出型
+export interface ExtractedCharacterItem {
+  name: string;
+  category: string;
+  description: string;
+  traits: string[];
+}
+
+export interface ExtractedSettingItem {
+  name: string;
+  category: string;
+  description: string;
+}
+
+export interface ExtractedChatEntities {
+  characters: ExtractedCharacterItem[];
+  settings: ExtractedSettingItem[];
+}

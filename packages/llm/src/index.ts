@@ -15,4 +15,7 @@ export {
   editCharacterSection,
   editSettingDocument,
   editCharacterDocument,
+  creativeChatSystemPrompt,
+  type CreativeChatContext,
+  extractChatEntities,
 } from './prompts/index.js';

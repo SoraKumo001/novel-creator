@@ -30,9 +30,9 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@storybook/addon-docs": "next",
-    "@storybook/addon-mcp": "next",
-    "@storybook/react-vite": "next",
+    "@storybook/addon-docs": "10.5.10",
+    "@storybook/addon-mcp": "0.7.0",
+    "@storybook/react-vite": "10.5.10",
     "@tailwindcss/postcss": "^4.3.3",
     "@tanstack/router-cli": "^1.167.33",
     "@tanstack/router-plugin": "^1.168.35",
@@ -43,7 +43,7 @@
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^6.1.0",
     "jsdom": "^30.0.1",
-    "storybook": "next",
+    "storybook": "10.5.10",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript7": "npm:typescript@^7.0.2",
     "vite": "^8.2.2",

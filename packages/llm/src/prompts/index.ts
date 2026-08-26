@@ -11,3 +11,6 @@ export { editSettingSection } from './editSettingSection.js';
 export { editCharacterSection } from './editCharacterSection.js';
 export { editSettingDocument } from './editSettingDocument.js';
 export { editCharacterDocument } from './editCharacterDocument.js';
+export { creativeChatSystemPrompt } from './creativeChat.js';
+export type { CreativeChatContext } from './creativeChat.js';
+export { extractChatEntities } from './extractChatEntities.js';

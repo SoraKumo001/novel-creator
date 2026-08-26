@@ -15,6 +15,13 @@
       "when": 1787650837987,
       "tag": "0001_rainy_boomerang",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1787720699746,
+      "tag": "0002_demonic_johnny_storm",
+      "breakpoints": true
     }
   ]
 }

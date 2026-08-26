@@ -26,16 +26,18 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 16,
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 32,
           allowDefaultProject: [
             'vitest.config.ts',
             'vitest.workspace.ts',
             'apps/web/vitest.config.ts',
             'apps/web/test/setup.ts',
             'apps/web/test/hooks.test.tsx',
+            'apps/web/test/chat.test.tsx',
             'apps/web/.storybook/main.ts',
             'apps/web/.storybook/preview.ts',
             'apps/api/test/routes.test.ts',
+            'apps/api/test/chat.test.ts',
             'apps/api/src/worker.ts',
             'packages/llm/test/prompts.test.ts',
             'packages/vector/test/types.test.ts',

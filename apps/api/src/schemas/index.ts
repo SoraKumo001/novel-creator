@@ -161,3 +161,32 @@ export const chapterIdParamSchema = z.object({
 export const sectionIdParamSchema = z.object({
   sectionId: z.uuid(),
 });
+
+// ---- チャット ----
+export const createChatSessionSchema = z.object({
+  novelId: z.string().uuid().optional(),
+  title: z.string().optional(),
+});
+
+export const updateChatSessionSchema = z.object({
+  title: z.string().min(1),
+});
+
+export const chatSessionQuerySchema = z.object({
+  novelId: z.string().uuid().optional(),
+});
+
+export const chatMessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z.string(),
+});
+
+export const chatRequestSchema = z.object({
+  sessionId: z.string().uuid().optional(),
+  novelId: z.string().uuid().optional(),
+  messages: z.array(chatMessageSchema).min(1),
+});
+
+export const extractChatEntitiesSchema = z.object({
+  text: z.string().min(1),
+});
