@@ -14,3 +14,17 @@ export type {
   SettingCategoryNode,
   SettingsDiff,
 } from './settingsMarkdown.js';
+export {
+  serializeCharactersToMarkdown,
+  parseCharactersMarkdown,
+  getCharacterSections,
+  buildCharacterTree,
+  findCharacterAtLine,
+  diffCharacters,
+} from './charactersMarkdown.js';
+export type {
+  ParsedCharacterSection,
+  CharacterSectionRange,
+  CharacterCategoryNode,
+  CharactersDiff,
+} from './charactersMarkdown.js';

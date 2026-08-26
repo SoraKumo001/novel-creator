@@ -30,6 +30,7 @@ llmEditRouter.post(
 
     const prompt = editCharacter(
       {
+        category: character.category ?? undefined,
         name: character.name,
         description: character.description ?? undefined,
         traits: character.traits ?? undefined,
@@ -38,6 +39,7 @@ llmEditRouter.post(
     );
 
     const result = await generateJSON<{
+      category: string;
       name: string;
       description: string;
       traits: string[];
@@ -46,6 +48,7 @@ llmEditRouter.post(
     const [row] = await db
       .update(characters)
       .set({
+        category: result.category,
         name: result.name,
         description: result.description,
         traits: result.traits,
@@ -60,7 +63,7 @@ llmEditRouter.post(
       row.novelId,
       'character',
       row.id,
-      `${row.name}\n${row.description ?? ''}\n特徴: ${row.traits?.join('、') ?? ''}`,
+      `[${row.category ?? '未分類'}] ${row.name}\n${row.description ?? ''}\n特徴: ${row.traits?.join('、') ?? ''}`,
       c.var.env,
     );
 

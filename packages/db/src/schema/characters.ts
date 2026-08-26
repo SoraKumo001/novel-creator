@@ -6,6 +6,7 @@ export const characters = pgTable('characters', {
   novelId: uuid('novel_id')
     .notNull()
     .references(() => novels.id, { onDelete: 'cascade' }),
+  category: text('category').notNull().default('未分類'),
   name: text('name').notNull(),
   description: text('description'),
   traits: jsonb('traits').$type<string[]>(),

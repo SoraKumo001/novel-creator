@@ -11,6 +11,7 @@ import type {
   CreateSectionInput,
   CreateSettingInput,
   CreateTimelineInput,
+  EditCharacterSectionResult,
   EditInstructionInput,
   EditSettingSectionResult,
   ExtractResult,
@@ -25,6 +26,7 @@ import type {
   SettingDraft,
   SettingDraftInput,
   SaveSettingsMarkdownResult,
+  SaveCharactersMarkdownResult,
   Timeline,
   UpdateChapterInput,
   UpdateCharacterInput,
@@ -62,6 +64,28 @@ export type ApiClient = {
             param: { id: string };
             json: CreateCharacterInput;
           }) => Promise<{ json: () => Promise<Character> }>;
+          markdown: {
+            $get: (args: {
+              param: { id: string };
+            }) => Promise<{ json: () => Promise<{ markdown: string }> }>;
+            $put: (args: {
+              param: { id: string };
+              json: { markdown: string };
+            }) => Promise<{ json: () => Promise<SaveCharactersMarkdownResult> }>;
+          };
+          editSection: {
+            $post: (args: {
+              param: { id: string };
+              json: {
+                category: string;
+                name: string;
+                description: string;
+                traits: string[];
+                relationships: string;
+                instruction: string;
+              };
+            }) => Promise<{ json: () => Promise<EditCharacterSectionResult> }>;
+          };
         };
         settings: {
           $get: (args: {
@@ -295,6 +319,33 @@ function createApiClient(): ApiClient['api'] {
             json: async () =>
               requestJson<Character>('POST', `/api/novels/${param.id}/characters`, json),
           }),
+          markdown: {
+            $get: async ({ param }) => ({
+              json: async () =>
+                requestJson<{ markdown: string }>(
+                  'GET',
+                  `/api/novels/${param.id}/characters/markdown`,
+                ),
+            }),
+            $put: async ({ param, json }) => ({
+              json: async () =>
+                requestJson<SaveCharactersMarkdownResult>(
+                  'PUT',
+                  `/api/novels/${param.id}/characters/markdown`,
+                  json,
+                ),
+            }),
+          },
+          editSection: {
+            $post: async ({ param, json }) => ({
+              json: async () =>
+                requestJson<EditCharacterSectionResult>(
+                  'POST',
+                  `/api/novels/${param.id}/characters/edit-section`,
+                  json,
+                ),
+            }),
+          },
         },
         settings: {
           $get: async ({ param, query }) => ({

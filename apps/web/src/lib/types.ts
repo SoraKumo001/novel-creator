@@ -41,6 +41,7 @@ export interface Content {
 export interface Character {
   id: string;
   novelId: string;
+  category: string;
   name: string;
   description: string | null;
   traits: string[] | null;
@@ -126,6 +127,7 @@ export interface UpdateContentInput {
 }
 
 export interface CreateCharacterInput {
+  category?: string;
   name: string;
   description?: string;
   traits?: string[];
@@ -133,6 +135,7 @@ export interface CreateCharacterInput {
 }
 
 export interface UpdateCharacterInput {
+  category?: string;
   name?: string;
   description?: string;
   traits?: string[];
@@ -224,5 +227,18 @@ export interface SaveSettingsMarkdownResult {
 
 // 設定セクションLLM編集レスポンス
 export interface EditSettingSectionResult {
+  markdown: string;
+}
+
+// 人物マークダウン一括保存レスポンス
+export interface SaveCharactersMarkdownResult {
+  created: number;
+  updated: number;
+  deleted: number;
+  duplicateCount: number;
+}
+
+// 人物セクションLLM編集レスポンス
+export interface EditCharacterSectionResult {
   markdown: string;
 }

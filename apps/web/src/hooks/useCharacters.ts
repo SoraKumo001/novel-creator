@@ -1,7 +1,14 @@
+import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
-import type { Character, CreateCharacterInput, UpdateCharacterInput } from '@/lib/types.js';
+import type {
+  Character,
+  CreateCharacterInput,
+  EditCharacterSectionResult,
+  SaveCharactersMarkdownResult,
+  UpdateCharacterInput,
+} from '@/lib/types.js';
 
 interface UseCharactersReturn {
   characters: Character[];
@@ -12,10 +19,22 @@ interface UseCharactersReturn {
   updateCharacter: (id: string, input: UpdateCharacterInput) => Promise<Character>;
   deleteCharacter: (id: string) => Promise<void>;
   llmEditCharacter: (id: string, instruction: string) => Promise<Character>;
+  fetchCharactersMarkdown: () => Promise<string>;
+  saveCharactersMarkdown: (markdown: string) => Promise<SaveCharactersMarkdownResult>;
+  editCharacterSection: (input: {
+    category: string;
+    name: string;
+    description: string;
+    traits: string[];
+    relationships: string;
+    instruction: string;
+  }) => Promise<string>;
   creating: boolean;
   updating: boolean;
   deleting: boolean;
   llmEditing: boolean;
+  savingMarkdown: boolean;
+  editingSection: boolean;
 }
 
 export function useCharacters(novelId: string): UseCharactersReturn {
@@ -61,6 +80,37 @@ export function useCharacters(novelId: string): UseCharactersReturn {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'characters'] }),
   });
 
+  const saveMarkdownMutation = useMutation({
+    mutationFn: (markdown: string) =>
+      api.novels[':id'].characters.markdown
+        .$put({ param: { id: novelId }, json: { markdown } })
+        .then((r) => r.json()),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'characters'] }),
+  });
+
+  const editSectionMutation = useMutation({
+    mutationFn: (input: {
+      category: string;
+      name: string;
+      description: string;
+      traits: string[];
+      relationships: string;
+      instruction: string;
+    }) =>
+      api.novels[':id'].characters.editSection
+        .$post({ param: { id: novelId }, json: input })
+        .then(async (r) => {
+          const data: EditCharacterSectionResult = await r.json();
+          return data.markdown;
+        }),
+  });
+
+  const fetchCharactersMarkdown = useCallback(async (): Promise<string> => {
+    const res = await api.novels[':id'].characters.markdown.$get({ param: { id: novelId } });
+    const data = await res.json();
+    return data.markdown;
+  }, [novelId]);
+
   return {
     characters,
     loading,
@@ -74,9 +124,14 @@ export function useCharacters(novelId: string): UseCharactersReturn {
       await deleteMutation.mutateAsync(id);
     },
     llmEditCharacter: (id, instruction) => llmEditMutation.mutateAsync({ id, instruction }),
+    fetchCharactersMarkdown,
+    saveCharactersMarkdown: saveMarkdownMutation.mutateAsync,
+    editCharacterSection: editSectionMutation.mutateAsync,
     creating: createMutation.isPending,
     updating: updateMutation.isPending,
     deleting: deleteMutation.isPending,
     llmEditing: llmEditMutation.isPending,
+    savingMarkdown: saveMarkdownMutation.isPending,
+    editingSection: editSectionMutation.isPending,
   };
 }
