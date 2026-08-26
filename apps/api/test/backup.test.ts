@@ -129,7 +129,7 @@ describe('backup export/import', () => {
     vectorStore = { deleteByNovel: vi.fn().mockResolvedValue(undefined) };
   });
 
-  it('GET /api/backup/export?novelId=... → 200 でバックアップオブジェクトが返ること', async () => {
+  it('POST /api/backup/export?novelId=... → 200 でバックアップオブジェクトが返ること', async () => {
     const backup = makeBackup();
     const novel = backup.rdb.novel;
 
@@ -189,7 +189,7 @@ describe('backup export/import', () => {
       });
 
     const app = createTestApp(db, vectorStore);
-    const res = await app.request(`/api/backup/export?novelId=${NOVEL_ID}`);
+    const res = await app.request(`/api/backup/export?novelId=${NOVEL_ID}`, { method: 'POST' });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.meta.version).toBe(1);
@@ -199,7 +199,7 @@ describe('backup export/import', () => {
     expect(body.rdb.contents).toHaveLength(1);
   });
 
-  it('GET /api/backup/export?novelId=... → novel 不在で 404 になること', async () => {
+  it('POST /api/backup/export?novelId=... → novel 不在で 404 になること', async () => {
     db.select.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue([]),
@@ -207,7 +207,7 @@ describe('backup export/import', () => {
     });
 
     const app = createTestApp(db, vectorStore);
-    const res = await app.request(`/api/backup/export?novelId=${NOVEL_ID}`);
+    const res = await app.request(`/api/backup/export?novelId=${NOVEL_ID}`, { method: 'POST' });
     expect(res.status).toBe(404);
   });
 

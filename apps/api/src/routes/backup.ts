@@ -56,8 +56,8 @@ interface BackupBody {
   };
 }
 
-// GET /api/backup/export?novelId=...
-backupRouter.get('/export', zValidator('query', exportQuerySchema), async (c) => {
+// POST /api/backup/export?novelId=...
+backupRouter.post('/export', zValidator('query', exportQuerySchema), async (c) => {
   const db = c.var.db;
   const { novelId } = c.req.valid('query');
 
