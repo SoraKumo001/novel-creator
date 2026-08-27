@@ -61,7 +61,17 @@ export class GenerateDomainService {
       { title: chapter.title, order: chapter.order, summary: chapter.summary ?? undefined },
     );
 
-    return generateJSON<{ title: string; order: number; summary: string }>(this.ctx.llm, prompt);
+    const result = await generateJSON<{ title: string; order: number; summary: string }>(
+      this.ctx.llm,
+      prompt,
+    );
+
+    await this.ctx.db
+      .update(chapters)
+      .set({ summary: result.summary, updatedAt: new Date() })
+      .where(eq(chapters.id, chapterId));
+
+    return result;
   }
 
   async generateSectionSummary(sectionId: string) {
@@ -82,7 +92,17 @@ export class GenerateDomainService {
       { title: section.title ?? undefined, order: section.order },
     );
 
-    return generateJSON<{ title: string; order: number; summary: string }>(this.ctx.llm, prompt);
+    const result = await generateJSON<{ title: string; order: number; summary: string }>(
+      this.ctx.llm,
+      prompt,
+    );
+
+    await this.ctx.db
+      .update(sections)
+      .set({ summary: result.summary, updatedAt: new Date() })
+      .where(eq(sections.id, sectionId));
+
+    return result;
   }
 
   async *generateSectionContent(sectionId: string) {

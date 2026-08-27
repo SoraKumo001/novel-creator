@@ -33,10 +33,10 @@ function NovelRouteSync() {
 
 export function Layout({ children }: LayoutProps) {
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
+    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
       <NovelRouteSync />
       <Nav />
-      <main className="flex-1 overflow-hidden p-6 md:p-8">{children}</main>
+      <main className="flex-1 min-w-0 overflow-y-auto p-6 md:p-8">{children}</main>
       <ChatFloatingButton />
       <ChatDrawer />
     </div>

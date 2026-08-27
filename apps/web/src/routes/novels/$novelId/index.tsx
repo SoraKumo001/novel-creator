@@ -78,16 +78,16 @@ function NovelDetailPage() {
   }, [navigate, novelId, tabs, toggleChat]);
 
   return (
-    <div className="flex h-full max-w-6xl flex-col">
+    <div className="flex h-full w-full flex-col min-h-0 overflow-hidden">
       {loading && <Loading message="小説を読み込み中..." />}
       {!loading && error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive shrink-0">
           {error}
         </div>
       )}
       {novel && (
         <>
-          <header className="mb-6 shrink-0">
+          <header className="mb-4 shrink-0">
             <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
               小説ワークスペース
             </div>
@@ -95,11 +95,13 @@ function NovelDetailPage() {
               {novel.title}
             </h1>
             {novel.description && (
-              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{novel.description}</p>
+              <p className="mt-1 max-w-4xl text-sm text-muted-foreground line-clamp-2">
+                {novel.description}
+              </p>
             )}
           </header>
 
-          <nav className="mb-6 shrink-0 border-b border-border">
+          <nav className="mb-4 shrink-0 border-b border-border">
             <div className="flex gap-1 overflow-x-auto">
               {tabs.map((t) => {
                 const isActive = activeTab === t.id;
@@ -113,7 +115,7 @@ function NovelDetailPage() {
                         search: { tab: t.id },
                       })
                     }
-                    className={`group flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition cursor-pointer ${
+                    className={`group flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3.5 py-2 text-sm font-medium transition cursor-pointer ${
                       isActive
                         ? 'border-primary text-primary font-bold bg-primary/5'
                         : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground hover:bg-surface-hover'
@@ -131,13 +133,25 @@ function NovelDetailPage() {
             </div>
           </nav>
 
-          <div className="min-h-0 flex-1 overflow-auto">
-            {activeTab === 'overview' && <OverviewTab novel={novel} onRefresh={refetch} />}
+          <div className="min-h-0 flex-1 overflow-hidden">
+            {activeTab === 'overview' && (
+              <div className="h-full overflow-y-auto pr-1">
+                <OverviewTab novel={novel} onRefresh={refetch} />
+              </div>
+            )}
             {activeTab === 'settings' && <SettingsTab novel={novel} onRefresh={refetch} />}
             {activeTab === 'characters' && <CharactersTab novel={novel} onRefresh={refetch} />}
-            {activeTab === 'plot' && <PlotTab novel={novel} onRefresh={refetch} />}
+            {activeTab === 'plot' && (
+              <div className="h-full overflow-y-auto pr-1">
+                <PlotTab novel={novel} onRefresh={refetch} />
+              </div>
+            )}
             {activeTab === 'editor' && <EditorTab novel={novel} onRefresh={refetch} />}
-            {activeTab === 'timeline' && <TimelineTab novel={novel} onRefresh={refetch} />}
+            {activeTab === 'timeline' && (
+              <div className="h-full overflow-y-auto pr-1">
+                <TimelineTab novel={novel} onRefresh={refetch} />
+              </div>
+            )}
           </div>
         </>
       )}

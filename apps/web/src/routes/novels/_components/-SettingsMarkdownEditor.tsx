@@ -290,7 +290,7 @@ export function SettingsMarkdownEditor({
             tree.map((cat) => (
               <div key={cat.category} className="mb-2">
                 <div className="font-bold text-foreground px-2 py-1 bg-surface-raised rounded">
-                  # {cat.category}
+                  {cat.category}
                 </div>
                 <div className="ml-2 mt-1 space-y-0.5">
                   {cat.children.map((s) => {
@@ -308,7 +308,7 @@ export function SettingsMarkdownEditor({
                         }`}
                         title={s.name}
                       >
-                        ## {s.name}
+                        {s.name}
                       </button>
                     );
                   })}

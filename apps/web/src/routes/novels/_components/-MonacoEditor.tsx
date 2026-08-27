@@ -1,4 +1,5 @@
 import Editor, { type OnMount } from '@monaco-editor/react';
+import { useTheme } from '@/hooks/useTheme.js';
 
 interface MonacoEditorProps {
   value: string;
@@ -7,6 +8,8 @@ interface MonacoEditorProps {
 }
 
 export function MonacoEditor({ value, onChange, onMount }: MonacoEditorProps) {
+  const { resolvedTheme } = useTheme();
+
   return (
     <Editor
       height="100%"
@@ -20,11 +23,11 @@ export function MonacoEditor({ value, onChange, onMount }: MonacoEditorProps) {
         lineNumbers: 'on',
         fontSize: 15,
         fontFamily: '"Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif',
-        padding: { top: 16 },
+        padding: { top: 16, bottom: 240 },
         smoothScrolling: true,
-        scrollBeyondLastLine: false,
+        scrollBeyondLastLine: true,
       }}
-      theme="vs-dark"
+      theme={resolvedTheme === 'dark' ? 'vs-dark' : 'light'}
     />
   );
 }

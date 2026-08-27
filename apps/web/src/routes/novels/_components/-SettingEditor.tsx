@@ -9,6 +9,7 @@ import { Textarea } from '@/components/Textarea.js';
 import { useLlmInstructions } from '@/hooks/useLlmInstructions.js';
 import { useSettings } from '@/hooks/useSettings.js';
 import { fetchSettings } from '@/lib/services/index.js';
+import { MonacoEditor } from './-MonacoEditor.js';
 
 interface SettingEditorProps {
   novelId: string;
@@ -123,104 +124,166 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
   if (loading) return <Loading message="設定を読み込み中..." />;
 
   return (
-    <div className="max-w-3xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <button
+    <div className="flex h-full w-full flex-col space-y-4">
+      {/* ナビゲーション & ヘッダー */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() =>
-              navigate({ to: '/novels/$novelId', params: { novelId }, search: { tab: 'settings' } })
+              navigate({
+                to: '/novels/$novelId',
+                params: { novelId },
+                search: { tab: 'settings' },
+              })
             }
-            className="mb-2 text-sm text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            leftIcon={
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className="h-4 w-4"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"
+                />
+              </svg>
+            }
           >
-            ← 設定一覧に戻る
-          </button>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            {isEdit ? '設定を編集' : '新規設定'}
+            設定一覧に戻る
+          </Button>
+          <div className="h-4 w-px bg-border" />
+          <h1 className="text-xl font-bold tracking-tight text-foreground">
+            {isEdit ? '設定を編集' : '新規設定の作成'}
           </h1>
         </div>
-        <Button onClick={handleSave} isLoading={creating || updating}>
-          保存
-        </Button>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="primary"
+            onClick={handleSave}
+            isLoading={creating || updating}
+            disabled={!name.trim() || !category.trim()}
+          >
+            保存する
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader title="基本情報" />
-        <div className="space-y-4">
-          <Input
-            label="カテゴリー"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            placeholder="world, magic, geography, culture..."
-          />
-          <Input label="名前" value={name} onChange={(e) => setName(e.target.value)} />
-          <Textarea
-            label="説明"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={5}
-          />
-        </div>
-      </Card>
-
-      <Card>
-        <CardHeader title="LLMで作成・編集" />
-        <div className="space-y-4">
-          <Textarea
-            label="指示"
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            placeholder="例: 魔法体系を考えて。代償と制限がある硬い世界観で。"
-            rows={3}
-          />
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={handleGenerate}
-              isLoading={generatingDraft}
-              disabled={!instruction.trim()}
-              leftIcon={<SparklesIcon />}
-            >
-              {isEdit || category || name || description ? '微修正' : 'ドラフト生成'}
-            </Button>
-          </div>
-
-          {instructions.length > 0 && (
-            <div>
-              <h4 className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-                履歴から選択
-              </h4>
-              <ul className="space-y-1.5">
-                {instructions.map((item) => (
-                  <li
-                    key={item.id}
-                    className="flex items-start justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-800/50"
-                  >
-                    <button
-                      onClick={() => applyHistory(item.instruction)}
-                      className="flex-1 text-left text-sm text-slate-700 transition hover:text-indigo-600 dark:text-slate-300 dark:hover:text-indigo-300"
-                    >
-                      {item.instruction}
-                    </button>
-                    <button
-                      onClick={() => setDeleteInstructionId(item.id)}
-                      title="削除"
-                      className="rounded p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:text-slate-500 dark:hover:bg-slate-700 dark:hover:text-slate-200"
-                    >
-                      <TrashIcon />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-      </Card>
-
       {error && (
-        <div className="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900/50 dark:bg-rose-900/20 dark:text-rose-300">
+        <div className="shrink-0 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
           {error}
         </div>
       )}
+
+      {/* 2カラム 画面領域フル活用レイアウト */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-12 overflow-hidden pb-4">
+        {/* 左カラム: 基本情報 + Monaco エディタ (7/12) */}
+        <div className="flex min-h-0 flex-col space-y-4 lg:col-span-7 xl:col-span-8">
+          <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <CardHeader title="基本情報" />
+            <div className="flex min-h-0 flex-1 flex-col space-y-4 p-1">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Input
+                  label="カテゴリー"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  placeholder="例: アイテム, 世界観・現象, 組織・国家, 地理・場所..."
+                />
+                <Input
+                  label="名前"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="例: 制御キー, ヴォルンハイム辺境伯領..."
+                />
+              </div>
+
+              {/* 説明 MonacoEditor */}
+              <div className="flex min-h-0 flex-1 flex-col space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-foreground">
+                    説明（Markdown 対応）
+                  </label>
+                  <span className="text-[11px] text-muted-foreground">
+                    {description.length.toLocaleString()} 文字
+                  </span>
+                </div>
+                <div className="min-h-[300px] flex-1 rounded-xl border border-border bg-surface overflow-hidden shadow-inner">
+                  <MonacoEditor value={description} onChange={setDescription} />
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* 右カラム: LLMで作成・編集 & 履歴 (5/12) */}
+        <div className="flex flex-col space-y-4 lg:col-span-5 xl:col-span-4 overflow-y-auto pr-1">
+          <Card>
+            <CardHeader title="AIで作成・編集" />
+            <div className="space-y-4">
+              <Textarea
+                label="AIへの指示"
+                value={instruction}
+                onChange={(e) => setInstruction(e.target.value)}
+                placeholder="例: 魔法体系を考えて。代償と制限がある硬い世界観で。このアイテムの弱点や副作用を具体化して。"
+                rows={4}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="primary"
+                  onClick={handleGenerate}
+                  isLoading={generatingDraft}
+                  disabled={!instruction.trim()}
+                  leftIcon={<SparklesIcon />}
+                  className="w-full"
+                >
+                  {isEdit || category || name || description
+                    ? 'AIで設定を更新'
+                    : 'AIでドラフト生成'}
+                </Button>
+              </div>
+
+              {instructions.length > 0 && (
+                <div className="pt-2 border-t border-border">
+                  <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    過去のプロンプト履歴
+                  </h4>
+                  <ul className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                    {instructions.map((item) => (
+                      <li
+                        key={item.id}
+                        className="group flex items-start justify-between gap-2 rounded-lg border border-border bg-surface-raised/50 p-2.5 transition hover:border-primary/50 hover:bg-surface-raised"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => applyHistory(item.instruction)}
+                          className="flex-1 text-left text-xs text-foreground transition group-hover:text-primary leading-relaxed"
+                          title="この指示を入力欄に適用"
+                        >
+                          {item.instruction}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteInstructionId(item.id)}
+                          title="履歴から削除"
+                          className="rounded p-1 text-muted-foreground opacity-60 hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition shrink-0"
+                        >
+                          <TrashIcon />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </Card>
+        </div>
+      </div>
 
       <ConfirmDialog
         isOpen={!!deleteInstructionId}

@@ -46,7 +46,6 @@ export function PlotTab({
     generateChapterSummary,
     generateSectionSummary,
     generatingPlot,
-    generatingSummary,
     generatedPlot,
     resetGeneratedPlot,
   } = useGenerate();
@@ -63,6 +62,7 @@ export function PlotTab({
 
   const [plotPreview, setPlotPreview] = useState(generatedPlot);
   const [selectedPlotIndices, setSelectedPlotIndices] = useState<Set<number>>(new Set());
+  const [activeGeneratingId, setActiveGeneratingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (generatedPlot) {
@@ -98,13 +98,13 @@ export function PlotTab({
     }
   };
 
-  const toggleChapterExpand = (id: string) => {
+  const toggleChapterExpand = (chapterId: string) => {
     setExpandedChapterIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
+      if (next.has(chapterId)) {
+        next.delete(chapterId);
       } else {
-        next.add(id);
+        next.add(chapterId);
       }
       return next;
     });
@@ -118,6 +118,7 @@ export function PlotTab({
     }
     setChapterForm(null);
     await refetchChapters();
+    await onRefresh();
   }
 
   async function handleSaveSection(input: { title: string; order: number; summary: string }) {
@@ -129,6 +130,7 @@ export function PlotTab({
     }
     setSectionForm(null);
     await refetchChapters();
+    await onRefresh();
   }
 
   async function handleDelete() {
@@ -140,17 +142,43 @@ export function PlotTab({
     }
     setDeleteTarget(null);
     await refetchChapters();
+    await onRefresh();
+  }
+
+  async function handleGenerateChapterSummaryAction(chapterId: string) {
+    setActiveGeneratingId(chapterId);
+    try {
+      await generateChapterSummary(chapterId);
+      await refetchChapters();
+      await onRefresh();
+    } finally {
+      setActiveGeneratingId(null);
+    }
+  }
+
+  async function handleGenerateSectionSummaryAction(sectionId: string) {
+    setActiveGeneratingId(sectionId);
+    try {
+      await generateSectionSummary(sectionId);
+      await refetchChapters();
+      await onRefresh();
+    } finally {
+      setActiveGeneratingId(null);
+    }
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold text-foreground">章立て・プロット</h2>
           {chapters.length > 0 && (
-            <Button size="sm" variant="ghost" onClick={toggleExpandAll}>
+            <button
+              onClick={toggleExpandAll}
+              className="text-xs text-muted-foreground hover:text-foreground transition cursor-pointer"
+            >
               {expandedChapterIds.size === chapters.length ? 'すべて折りたたむ' : 'すべて展開'}
-            </Button>
+            </button>
           )}
         </div>
         <div className="flex gap-2">
@@ -162,50 +190,30 @@ export function PlotTab({
           >
             プロット生成
           </Button>
-          <Button
-            variant="primary"
-            onClick={() =>
-              setChapterForm({
-                id: '',
-                novelId: novel.id,
-                title: '',
-                order: chapters.length + 1,
-                summary: null,
-                createdAt: null,
-                updatedAt: null,
-              })
-            }
-            leftIcon={<PlusIcon />}
-          >
+          <Button onClick={() => setChapterForm({} as Chapter)} leftIcon={<PlusIcon />}>
             章を追加
           </Button>
         </div>
       </div>
 
       {plotPreview && (
-        <div className="rounded-xl border border-primary/30 bg-primary/5 p-5 dark:bg-primary/10">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="rounded-xl border border-primary/40 bg-surface-raised p-5 shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-border pb-3">
             <div>
-              <h3 className="font-semibold text-primary text-base">AI 生成プロット</h3>
+              <h3 className="font-bold text-foreground text-base">生成されたプロット案</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
-                反映したい章を選択して「反映」をクリックしてください
+                チェックを入れた章を一括で章立て一覧に反映します。
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex gap-2">
               <Button
                 size="sm"
-                variant="ghost"
+                variant="secondary"
                 onClick={() => {
-                  if (selectedPlotIndices.size === plotPreview.chapters.length) {
-                    setSelectedPlotIndices(new Set());
-                  } else {
-                    setSelectedPlotIndices(new Set(plotPreview.chapters.map((_, i) => i)));
-                  }
+                  setPlotPreview(null);
+                  setSelectedPlotIndices(new Set());
                 }}
               >
-                {selectedPlotIndices.size === plotPreview.chapters.length ? '全解除' : '全選択'}
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => setPlotPreview(null)}>
                 破棄
               </Button>
               <Button
@@ -214,29 +222,48 @@ export function PlotTab({
                 onClick={handleApplyPlot}
                 disabled={selectedPlotIndices.size === 0}
               >
-                選択した {selectedPlotIndices.size} 件を反映
+                選択した {selectedPlotIndices.size} 章を適用
               </Button>
             </div>
           </div>
-          <p className="mb-1 text-sm font-semibold text-foreground">{plotPreview.title}</p>
-          {plotPreview.description && (
-            <p className="mb-4 text-xs text-foreground/80">{plotPreview.description}</p>
-          )}
-          <div className="space-y-2">
+
+          <div className="flex items-center justify-between text-xs px-1 text-muted-foreground">
+            <label className="flex items-center gap-2 cursor-pointer font-medium text-foreground">
+              <input
+                type="checkbox"
+                checked={
+                  selectedPlotIndices.size === plotPreview.chapters.length &&
+                  plotPreview.chapters.length > 0
+                }
+                onChange={(e) => {
+                  if (e.target.checked) {
+                    setSelectedPlotIndices(new Set(plotPreview.chapters.map((_, i) => i)));
+                  } else {
+                    setSelectedPlotIndices(new Set());
+                  }
+                }}
+                className="rounded text-primary focus:ring-primary"
+              />
+              すべて選択 / 解除
+            </label>
+            <span>合計 {plotPreview.chapters.length} 章</span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
             {plotPreview.chapters.map((ch, idx) => {
-              const isSelected = selectedPlotIndices.has(idx);
+              const isChecked = selectedPlotIndices.has(idx);
               return (
                 <label
-                  key={ch.order}
+                  key={idx}
                   className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition ${
-                    isSelected
-                      ? 'border-primary/50 bg-surface'
-                      : 'border-border bg-surface/50 opacity-60'
+                    isChecked
+                      ? 'border-primary bg-primary/5 dark:bg-primary/10 shadow-xs'
+                      : 'border-border bg-surface hover:bg-surface-hover/50 opacity-70'
                   }`}
                 >
                   <input
                     type="checkbox"
-                    checked={isSelected}
+                    checked={isChecked}
                     onChange={() => {
                       setSelectedPlotIndices((prev) => {
                         const next = new Set(prev);
@@ -251,7 +278,9 @@ export function PlotTab({
                     <span className="font-semibold text-foreground">
                       第 {ch.order} 章: {ch.title}
                     </span>
-                    <p className="text-xs text-muted-foreground mt-0.5">{ch.summary}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                      {ch.summary}
+                    </p>
                   </div>
                 </label>
               );
@@ -278,18 +307,12 @@ export function PlotTab({
               onToggle={() => toggleChapterExpand(chapter.id)}
               onEditChapter={() => setChapterForm(chapter)}
               onDeleteChapter={() => setDeleteTarget({ type: 'chapter', id: chapter.id })}
-              onGenerateChapterSummary={async () => {
-                await generateChapterSummary(chapter.id);
-                await refetchChapters();
-              }}
+              onGenerateChapterSummary={() => handleGenerateChapterSummaryAction(chapter.id)}
               onAddSection={() => setSectionForm({ chapterId: chapter.id })}
               onEditSection={(s) => setSectionForm({ chapterId: chapter.id, section: s })}
               onDeleteSection={(s) => setDeleteTarget({ type: 'section', id: s.id })}
-              onGenerateSectionSummary={async (s) => {
-                await generateSectionSummary(s.id);
-                await refetchChapters();
-              }}
-              generatingSummary={generatingSummary}
+              onGenerateSectionSummary={(s) => handleGenerateSectionSummaryAction(s.id)}
+              generatingSummaryId={activeGeneratingId}
             />
           ))}
         </div>
@@ -335,7 +358,7 @@ function ChapterTreeItem({
   onEditSection,
   onDeleteSection,
   onGenerateSectionSummary,
-  generatingSummary,
+  generatingSummaryId,
 }: {
   chapter: Chapter & { sections: Section[] };
   isExpanded: boolean;
@@ -347,8 +370,10 @@ function ChapterTreeItem({
   onEditSection: (section: Section) => void;
   onDeleteSection: (section: Section) => void;
   onGenerateSectionSummary: (section: Section) => Promise<void>;
-  generatingSummary: boolean;
+  generatingSummaryId: string | null;
 }) {
+  const isGeneratingChapter = generatingSummaryId === chapter.id;
+
   return (
     <div className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 bg-surface hover:bg-surface-hover/50 transition">
@@ -369,10 +394,16 @@ function ChapterTreeItem({
 
         <div className="flex items-center gap-1 shrink-0">
           <IconButton
-            label="概要生成"
-            icon={<SparklesIcon />}
+            label={isGeneratingChapter ? '概要を生成中...' : 'AIで章の概要を生成'}
+            icon={
+              isGeneratingChapter ? (
+                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent inline-block" />
+              ) : (
+                <SparklesIcon />
+              )
+            }
             onClick={() => void onGenerateChapterSummary()}
-            disabled={generatingSummary}
+            disabled={!!generatingSummaryId}
           />
           <IconButton label="節を追加" icon={<PlusIcon />} onClick={onAddSection} />
           <IconButton label="章を編集" icon={<PencilIcon />} onClick={onEditChapter} />
@@ -381,7 +412,7 @@ function ChapterTreeItem({
       </div>
 
       {chapter.summary && (
-        <div className="px-5 py-2 text-xs text-muted-foreground border-t border-border bg-surface-raised/40">
+        <div className="px-5 py-2.5 text-xs text-muted-foreground border-t border-border bg-surface-raised/40 leading-relaxed">
           {chapter.summary}
         </div>
       )}
@@ -391,41 +422,54 @@ function ChapterTreeItem({
           {chapter.sections.length === 0 ? (
             <p className="p-2 text-xs text-muted-foreground italic">節がまだありません。</p>
           ) : (
-            chapter.sections.map((section) => (
-              <div
-                key={section.id}
-                className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-2.5 shadow-xs"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="font-medium text-foreground text-sm">
-                    節 {section.order}: {section.title || '（無題）'}
-                  </div>
-                  {section.summary && (
-                    <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                      {section.summary}
+            chapter.sections.map((section) => {
+              const isGeneratingSec = generatingSummaryId === section.id;
+              return (
+                <div
+                  key={section.id}
+                  className="flex items-center justify-between rounded-lg border border-border bg-surface px-4 py-2.5 shadow-xs"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium text-foreground text-sm">
+                      節 {section.order}: {section.title || '（無題）'}
                     </div>
-                  )}
+                    {section.summary ? (
+                      <div className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                        {section.summary}
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground/60 mt-0.5 italic">
+                        概要なし（✨ 概要生成ボタンでAIにあらすじを考えてもらえます）
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <IconButton
+                      label={isGeneratingSec ? '概要を生成中...' : 'AIで節の概要を生成'}
+                      icon={
+                        isGeneratingSec ? (
+                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent inline-block" />
+                        ) : (
+                          <SparklesIcon />
+                        )
+                      }
+                      onClick={() => void onGenerateSectionSummary(section)}
+                      disabled={!!generatingSummaryId}
+                    />
+                    <IconButton
+                      label="節を編集"
+                      icon={<PencilIcon />}
+                      onClick={() => onEditSection(section)}
+                    />
+                    <IconButton
+                      label="節を削除"
+                      icon={<TrashIcon />}
+                      onClick={() => onDeleteSection(section)}
+                    />
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 shrink-0 ml-2">
-                  <IconButton
-                    label="概要生成"
-                    icon={<SparklesIcon />}
-                    onClick={() => void onGenerateSectionSummary(section)}
-                    disabled={generatingSummary}
-                  />
-                  <IconButton
-                    label="節を編集"
-                    icon={<PencilIcon />}
-                    onClick={() => onEditSection(section)}
-                  />
-                  <IconButton
-                    label="節を削除"
-                    icon={<TrashIcon />}
-                    onClick={() => onDeleteSection(section)}
-                  />
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
@@ -486,31 +530,25 @@ function ChapterFormModal({
       }
     >
       <div className="space-y-4">
-        <div>
-          <label className="block text-xs font-semibold text-foreground mb-1">章タイトル</label>
-          <Input
-            value={chapterTitle}
-            onChange={(e) => setChapterTitle(e.target.value)}
-            placeholder="例: 第一章 出会い"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-foreground mb-1">順序</label>
-          <Input
-            type="number"
-            value={order}
-            onChange={(e) => setOrder(parseInt(e.target.value, 10))}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-foreground mb-1">概要</label>
-          <Textarea
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-            placeholder="章の大まかなあらすじや要約"
-            rows={3}
-          />
-        </div>
+        <Input
+          label="章タイトル"
+          value={chapterTitle}
+          onChange={(e) => setChapterTitle(e.target.value)}
+          placeholder="第一章 冒険の始まり"
+        />
+        <Input
+          label="順序"
+          type="number"
+          value={String(order)}
+          onChange={(e) => setOrder(parseInt(e.target.value, 10) || 1)}
+        />
+        <Textarea
+          label="章の概要 / あらすじ"
+          value={summary}
+          onChange={(e) => setSummary(e.target.value)}
+          placeholder="この章で何が起きるか、主要な展開など"
+          rows={4}
+        />
       </div>
     </Modal>
   );
@@ -568,33 +606,25 @@ function SectionFormModal({
       }
     >
       <div className="space-y-4">
-        <div>
-          <label className="block text-xs font-semibold text-foreground mb-1">
-            節タイトル（任意）
-          </label>
-          <Input
-            value={sectionTitle}
-            onChange={(e) => setSectionTitle(e.target.value)}
-            placeholder="例: 路地裏での遭遇"
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-foreground mb-1">順序</label>
-          <Input
-            type="number"
-            value={order}
-            onChange={(e) => setOrder(parseInt(e.target.value, 10))}
-          />
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-foreground mb-1">概要（任意）</label>
-          <Textarea
-            value={summary}
-            onChange={(e) => setSummary(e.target.value)}
-            placeholder="節のあらすじや要約"
-            rows={3}
-          />
-        </div>
+        <Input
+          label="節タイトル"
+          value={sectionTitle}
+          onChange={(e) => setSectionTitle(e.target.value)}
+          placeholder="第一節 出会い"
+        />
+        <Input
+          label="順序"
+          type="number"
+          value={String(order)}
+          onChange={(e) => setOrder(parseInt(e.target.value, 10) || 1)}
+        />
+        <Textarea
+          label="節の概要 / あらすじ"
+          value={summary}
+          onChange={(e) => setSummary(e.target.value)}
+          placeholder="この節で描くシーンやキャラクターの行動など"
+          rows={4}
+        />
       </div>
     </Modal>
   );

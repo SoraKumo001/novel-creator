@@ -1,11 +1,19 @@
 import { Link } from '@tanstack/react-router';
 import { useChat } from '@/hooks/useChat.js';
+import { useTheme, type ThemeMode } from '@/hooks/useTheme.js';
 
 export function Nav() {
   const { toggleChat, isOpen } = useChat();
+  const { theme, setTheme } = useTheme();
+
+  const themeOptions: { mode: ThemeMode; label: string; icon: string }[] = [
+    { mode: 'light', label: 'ライト', icon: '☀️' },
+    { mode: 'dark', label: 'ダーク', icon: '🌙' },
+    { mode: 'system', label: '自動', icon: '💻' },
+  ];
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col border-r border-border bg-surface">
+    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-border bg-surface">
       <div className="p-4">
         <Link to="/" className="flex items-center gap-2 px-3">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -27,6 +35,7 @@ export function Nav() {
           <span className="text-lg font-bold tracking-tight text-foreground">Novel Creator</span>
         </Link>
       </div>
+
       <nav className="flex-1 space-y-1 px-3 py-2">
         <Link
           to="/novels"
@@ -104,8 +113,33 @@ export function Nav() {
           AI創作相談
         </button>
       </nav>
-      <div className="border-t border-border-subtle p-4 text-xs text-muted">
-        <p>物語を創り、世界を紡ぐ。</p>
+
+      {/* テーマ切り替え & フッター */}
+      <div className="border-t border-border p-3 space-y-2">
+        <div className="flex items-center justify-between rounded-lg border border-border bg-surface-raised p-1 text-xs">
+          {themeOptions.map((opt) => {
+            const isSelected = theme === opt.mode;
+            return (
+              <button
+                key={opt.mode}
+                type="button"
+                onClick={() => setTheme(opt.mode)}
+                className={`flex flex-1 items-center justify-center gap-1 rounded py-1 transition ${
+                  isSelected
+                    ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title={`${opt.label}モードに切り替え`}
+              >
+                <span>{opt.icon}</span>
+                <span className="text-[11px]">{opt.label}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="px-1 text-[11px] text-muted-foreground">
+          <p>物語を創り、世界を紡ぐ。</p>
+        </div>
       </div>
     </aside>
   );
