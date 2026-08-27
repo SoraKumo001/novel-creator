@@ -33,12 +33,15 @@ export interface UseMarkdownEntityEditorReturn<TTree> {
   hasDraft: boolean;
   isDirty: boolean;
   tree: TTree;
+  sidebarWidth: number;
+  setSidebarWidth: (width: number) => void;
   handleEditorChange: (value: string) => void;
   handleRestoreDraft: () => void;
   handleDiscardDraft: () => void;
   handleDiscard: () => Promise<void>;
   handleEditorMount: (editorInstance: MonacoEditorInstance) => void;
   handleTreeClick: (headingLine: number) => void;
+  handleSplitterMouseDown: (e: React.MouseEvent) => void;
   clearDraft: () => void;
 }
 
@@ -63,8 +66,13 @@ export function useMarkdownEntityEditor<
   } | null>(null);
   const [savedMarkdown, setSavedMarkdown] = useState('');
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem(`${storageKey}:sidebar-width`);
+    return saved ? parseInt(saved, 10) : 256;
+  });
 
   const editorRef = useRef<MonacoEditorInstance | null>(null);
+  const isDraggingRef = useRef(false);
 
   const { hasDraft, draftContent, saveDraft, clearDraft, dismissDraft, checkDraft } =
     useMarkdownDraft({
@@ -150,6 +158,37 @@ export function useMarkdownEntityEditor<
     ed.focus();
   }, []);
 
+  const handleSplitterMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      isDraggingRef.current = true;
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        if (!isDraggingRef.current) return;
+        const newWidth = Math.max(160, Math.min(600, moveEvent.clientX));
+        setSidebarWidth(newWidth);
+      };
+
+      const handleMouseUp = () => {
+        isDraggingRef.current = false;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        setSidebarWidth((current) => {
+          localStorage.setItem(`${storageKey}:sidebar-width`, String(current));
+          return current;
+        });
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    },
+    [storageKey],
+  );
+
   return {
     markdown,
     setMarkdown,
@@ -172,12 +211,15 @@ export function useMarkdownEntityEditor<
     hasDraft,
     isDirty,
     tree,
+    sidebarWidth,
+    setSidebarWidth,
     handleEditorChange,
     handleRestoreDraft,
     handleDiscardDraft,
     handleDiscard,
     handleEditorMount,
     handleTreeClick,
+    handleSplitterMouseDown,
     clearDraft,
   };
 }

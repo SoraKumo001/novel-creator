@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { Loading } from '@/components/Loading.js';
+import { useChat } from '@/hooks/useChat.js';
 import { useNovel } from '@/hooks/useNovel.js';
 import { CharactersTab } from '../_components/-CharactersTab.js';
 import { EditorTab } from '../_components/-EditorTab.js';
@@ -22,60 +24,113 @@ export const Route = createFileRoute('/novels/$novelId/')({
 
 type TabId = 'overview' | 'settings' | 'characters' | 'plot' | 'editor' | 'timeline';
 
+interface TabItem {
+  id: TabId;
+  label: string;
+  icon: string;
+  shortcut: string;
+}
+
 function NovelDetailPage() {
   const { novelId } = Route.useParams();
   const { novel, loading, error, refetch } = useNovel(novelId);
   const { tab } = Route.useSearch();
   const activeTab: TabId = tab ?? 'overview';
   const navigate = useNavigate();
+  const { toggleChat } = useChat();
 
-  const tabs: { id: TabId; label: string }[] = [
-    { id: 'overview', label: '概要' },
-    { id: 'settings', label: '設定' },
-    { id: 'characters', label: '人物' },
-    { id: 'plot', label: 'プロット' },
-    { id: 'editor', label: '本文' },
-    { id: 'timeline', label: 'タイムライン' },
+  const tabs: TabItem[] = [
+    { id: 'overview', label: '概要', icon: '📋', shortcut: '1' },
+    { id: 'settings', label: '設定', icon: '🌍', shortcut: '2' },
+    { id: 'characters', label: '人物', icon: '👥', shortcut: '3' },
+    { id: 'plot', label: 'プロット', icon: '🗺️', shortcut: '4' },
+    { id: 'editor', label: '本文', icon: '✍️', shortcut: '5' },
+    { id: 'timeline', label: 'タイムライン', icon: '⏱️', shortcut: '6' },
   ];
+
+  // グローバルショートカット: Alt+1~6 でタブ切り替え、Ctrl+J でチャット開閉
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+J または Cmd+J でチャット開閉
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
+        e.preventDefault();
+        toggleChat();
+        return;
+      }
+
+      // Alt+1 ~ Alt+6 でタブ切り替え
+      if (e.altKey && !e.ctrlKey && !e.metaKey) {
+        const num = parseInt(e.key, 10);
+        if (num >= 1 && num <= tabs.length) {
+          e.preventDefault();
+          const targetTab = tabs[num - 1].id;
+          void navigate({
+            to: '/novels/$novelId',
+            params: { novelId },
+            search: { tab: targetTab },
+          });
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [navigate, novelId, tabs, toggleChat]);
 
   return (
     <div className="flex h-full max-w-6xl flex-col">
       {loading && <Loading message="小説を読み込み中..." />}
       {!loading && error && (
-        <div className="rounded-lg border border-danger-border bg-danger-subtle p-4 text-sm text-danger-subtle-fg">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
           {error}
         </div>
       )}
       {novel && (
         <>
           <header className="mb-6 shrink-0">
-            <div className="mb-1 text-sm font-medium text-primary">小説詳細</div>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">{novel.title}</h1>
+            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
+              小説ワークスペース
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              {novel.title}
+            </h1>
             {novel.description && (
-              <p className="mt-2 max-w-3xl text-foreground-secondary">{novel.description}</p>
+              <p className="mt-2 max-w-3xl text-sm text-muted-foreground">{novel.description}</p>
             )}
           </header>
+
           <nav className="mb-6 shrink-0 border-b border-border">
             <div className="flex gap-1 overflow-x-auto">
-              {tabs.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() =>
-                    navigate({
-                      to: '/novels/$novelId',
-                      params: { novelId },
-                      search: { tab: t.id },
-                    })
-                  }
-                  className={`whitespace-nowrap border-b-2 px-4 py-2.5 text-sm font-medium transition ${
-                    activeTab === t.id
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
+              {tabs.map((t) => {
+                const isActive = activeTab === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() =>
+                      navigate({
+                        to: '/novels/$novelId',
+                        params: { novelId },
+                        search: { tab: t.id },
+                      })
+                    }
+                    className={`group flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition cursor-pointer ${
+                      isActive
+                        ? 'border-primary text-primary font-bold bg-primary/5'
+                        : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground hover:bg-surface-hover'
+                    }`}
+                    title={`Alt + ${t.shortcut}`}
+                  >
+                    <span>{t.icon}</span>
+                    <span>{t.label}</span>
+                    <span className="hidden sm:inline-block rounded px-1 text-[10px] text-muted-foreground opacity-60 group-hover:opacity-100">
+                      Alt+{t.shortcut}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </nav>
+
           <div className="min-h-0 flex-1 overflow-auto">
             {activeTab === 'overview' && <OverviewTab novel={novel} onRefresh={refetch} />}
             {activeTab === 'settings' && <SettingsTab novel={novel} onRefresh={refetch} />}

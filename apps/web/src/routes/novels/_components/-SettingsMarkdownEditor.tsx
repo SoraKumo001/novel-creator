@@ -58,12 +58,14 @@ export function SettingsMarkdownEditor({
     hasDraft,
     isDirty,
     tree,
+    sidebarWidth,
     handleEditorChange,
     handleRestoreDraft,
     handleDiscardDraft,
     handleDiscard,
     handleEditorMount,
     handleTreeClick,
+    handleSplitterMouseDown,
     clearDraft,
   } = useMarkdownEntityEditor<SettingCategoryNode[]>({
     storageKey: `novel-creator:draft:settings:${novelId}`,
@@ -173,12 +175,12 @@ export function SettingsMarkdownEditor({
       )}
 
       {error && (
-        <div className="bg-red-500/10 border-b border-red-500/30 px-4 py-2 text-sm text-red-900 dark:text-red-300">
+        <div className="bg-destructive/10 border-b border-destructive/30 px-4 py-2 text-sm text-destructive">
           {error}
         </div>
       )}
       {message && (
-        <div className="bg-emerald-500/10 border-b border-emerald-500/30 px-4 py-2 text-sm text-emerald-900 dark:text-emerald-300">
+        <div className="bg-emerald-500/10 border-b border-emerald-500/30 px-4 py-2 text-sm text-emerald-600 dark:text-emerald-400">
           {message}
         </div>
       )}
@@ -274,8 +276,11 @@ export function SettingsMarkdownEditor({
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
-        <aside className="w-64 border-r border-border bg-surface overflow-y-auto p-2 text-xs">
+      <div className="flex flex-1 overflow-hidden relative">
+        <aside
+          style={{ width: `${sidebarWidth}px` }}
+          className="shrink-0 border-r border-border bg-surface overflow-y-auto p-2 text-xs"
+        >
           <div className="font-semibold text-muted-foreground px-2 py-1 mb-1">
             目次 (カテゴリ / 設定)
           </div>
@@ -312,6 +317,13 @@ export function SettingsMarkdownEditor({
             ))
           )}
         </aside>
+
+        {/* リサイザブルスプリッターバー */}
+        <div
+          onMouseDown={handleSplitterMouseDown}
+          className="w-1.5 hover:w-2 -ml-0.5 cursor-col-resize bg-border hover:bg-primary/50 transition-colors shrink-0 select-none z-10"
+          title="ドラッグして幅を調整"
+        />
 
         <main className="flex-1 overflow-hidden relative">
           <MonacoEditor
