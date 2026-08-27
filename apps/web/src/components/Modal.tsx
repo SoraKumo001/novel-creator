@@ -6,13 +6,15 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
 }
 
 const sizeMap = {
   sm: 'max-w-md',
   md: 'max-w-xl',
   lg: 'max-w-3xl',
+  xl: 'max-w-6xl',
+  full: 'max-w-7xl',
 };
 
 export function Modal({ isOpen, onClose, title, children, footer, size = 'md' }: ModalProps) {

@@ -11,6 +11,7 @@ import { Input } from '@/components/Input.js';
 import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
 import { Loading } from '@/components/Loading.js';
 import { useMarkdownEntityEditor } from '@/hooks/useMarkdownEntityEditor.js';
+import { useToast } from '@/hooks/useToast.js';
 import type { SaveCharactersMarkdownResult } from '@/lib/types.js';
 import { MonacoEditor } from './-MonacoEditor.js';
 
@@ -47,10 +48,6 @@ export function CharactersMarkdownEditor({
     setMarkdown,
     setSavedMarkdown,
     loading,
-    error,
-    setError,
-    message,
-    setMessage,
     instruction,
     setInstruction,
     editScope,
@@ -78,12 +75,11 @@ export function CharactersMarkdownEditor({
   });
 
   const [historyOpen, setHistoryOpen] = useState(false);
+  const toast = useToast();
 
   const handleRun = useCallback(async () => {
-    setError(null);
-    setMessage(null);
     if (!instruction.trim()) {
-      setMessage('指示を入力してください');
+      toast.error('指示を入力してください');
       return;
     }
 
@@ -91,12 +87,12 @@ export function CharactersMarkdownEditor({
       if (editScope === 'document') {
         const next = await editCharacterDocument({ markdown, instruction });
         setMarkdown(next);
-        setMessage('全体の編集が完了しました');
+        toast.success('全体のAI編集が完了しました');
         return;
       }
 
       if (!activeSection) {
-        setMessage('カーソルを編集対象の人物セクション（## 見出し配下）に移動してください');
+        toast.error('カーソルを編集対象の人物セクション（## 見出し配下）に移動してください');
         return;
       }
 
@@ -106,7 +102,7 @@ export function CharactersMarkdownEditor({
       );
 
       if (!target) {
-        setMessage(`人物「${activeSection.name}」のセクションが見つかりません`);
+        toast.error(`人物「${activeSection.name}」のセクションが見つかりません`);
         return;
       }
 
@@ -124,9 +120,9 @@ export function CharactersMarkdownEditor({
       const after = lines.slice(target.endLine);
       const replaced = [...before, nextSummary.trim(), ...after].join('\n');
       setMarkdown(replaced);
-      setMessage(`「${activeSection.name}」の編集が完了しました`);
+      toast.success(`「${activeSection.name}」のAI編集が完了しました`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '編集に失敗しました');
+      toast.error(e instanceof Error ? e.message : '編集に失敗しました');
     }
   }, [
     activeSection,
@@ -135,25 +131,22 @@ export function CharactersMarkdownEditor({
     editScope,
     instruction,
     markdown,
-    setError,
-    setMessage,
     setMarkdown,
+    toast,
   ]);
 
   const handleSave = useCallback(async () => {
-    setError(null);
-    setMessage(null);
     try {
       const res = await saveCharactersMarkdown(markdown);
       setSavedMarkdown(markdown);
       clearDraft();
-      setMessage(
+      toast.success(
         `保存しました (作成: ${res.created}件, 更新: ${res.updated}件, 削除: ${res.deleted}件)`,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました');
+      toast.error(e instanceof Error ? e.message : '保存に失敗しました');
     }
-  }, [clearDraft, markdown, saveCharactersMarkdown, setError, setMessage, setSavedMarkdown]);
+  }, [clearDraft, markdown, saveCharactersMarkdown, setSavedMarkdown, toast]);
 
   if (loading) {
     return <Loading message="人物マークダウンを読み込み中..." />;
@@ -178,17 +171,6 @@ export function CharactersMarkdownEditor({
               破棄する
             </Button>
           </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-destructive/10 border-b border-destructive/30 px-4 py-2 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-      {message && (
-        <div className="bg-emerald-500/10 border-b border-emerald-500/30 px-4 py-2 text-sm text-emerald-600 dark:text-emerald-400">
-          {message}
         </div>
       )}
 

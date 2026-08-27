@@ -8,6 +8,7 @@ import { Loading } from '@/components/Loading.js';
 import { Textarea } from '@/components/Textarea.js';
 import { useLlmInstructions } from '@/hooks/useLlmInstructions.js';
 import { useSettings } from '@/hooks/useSettings.js';
+import { useToast } from '@/hooks/useToast.js';
 import { fetchSettings } from '@/lib/services/index.js';
 import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
 import { MonacoEditor } from './-MonacoEditor.js';
@@ -19,6 +20,7 @@ interface SettingEditorProps {
 
 export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
   const navigate = useNavigate();
+  const toast = useToast();
   const { createSetting, updateSetting, generateDraft, creating, updating, generatingDraft } =
     useSettings(novelId);
   const {
@@ -46,18 +48,15 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
     fetchSettings(novelId)
       .then((settings) => {
         if (!active) return;
-        const found = settings.find((s) => s.id === settingId);
-        if (found) {
-          setCategory(found.category);
-          setName(found.name);
-          setDescription(found.description ?? '');
-        } else {
-          setError('設定が見つかりませんでした');
+        const target = settings.find((s) => s.id === settingId);
+        if (target) {
+          setCategory(target.category);
+          setName(target.name);
+          setDescription(target.description ?? '');
         }
       })
       .catch((e) => {
-        if (!active) return;
-        setError(e instanceof Error ? e.message : '読み込みに失敗しました');
+        if (active) setError(e instanceof Error ? e.message : '設定の取得に失敗しました');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -68,32 +67,27 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
   }, [novelId, settingId]);
 
   async function handleGenerate() {
+    if (!instruction.trim()) return;
     setError(null);
-    if (!instruction.trim()) {
-      setError('指示を入力してください');
-      return;
-    }
     try {
-      const currentDraft = isEdit
-        ? { category, name, description }
-        : category || name || description
-          ? { category, name, description }
-          : undefined;
+      const currentDraft =
+        category || name || description ? { category, name, description } : undefined;
       const result = await generateDraft(instruction.trim(), currentDraft);
       setCategory(result.category);
       setName(result.name);
       setDescription(result.description);
       // 履歴に保存（重複時は既存を返す）
       await saveInstruction({ entityType: 'setting', instruction: instruction.trim() });
+      toast.success('設定案を生成しました');
     } catch (e) {
-      setError(e instanceof Error ? e.message : '生成に失敗しました');
+      toast.error(e instanceof Error ? e.message : '生成に失敗しました');
     }
   }
 
   async function handleSave() {
     setError(null);
     if (!category.trim() || !name.trim()) {
-      setError('カテゴリーと名前は必須です');
+      toast.error('カテゴリーと名前は必須です');
       return;
     }
     try {
@@ -107,9 +101,10 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
       } else {
         await createSetting(input);
       }
+      toast.success(isEdit ? '設定を更新しました' : '設定を作成しました');
       navigate({ to: '/novels/$novelId', params: { novelId }, search: { tab: 'settings' } });
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました');
+      toast.error(e instanceof Error ? e.message : '保存に失敗しました');
     }
   }
 

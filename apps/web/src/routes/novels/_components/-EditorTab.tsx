@@ -6,6 +6,7 @@ import { useChapters } from '@/hooks/useChapters.js';
 import { useContent } from '@/hooks/useContent.js';
 import { useGenerate } from '@/hooks/useGenerate.js';
 import { useNovel } from '@/hooks/useNovel.js';
+import { useToast } from '@/hooks/useToast.js';
 import { countWords } from '@/lib/sse.js';
 import type { ExtractResult, Section, Setting, Timeline } from '@/lib/types.js';
 import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
@@ -375,6 +376,7 @@ function SectionEditor({
   const [extractResultOpen, setExtractResultOpen] = useState(false);
   const [extracted, setExtracted] = useState<ExtractResult | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     setTitleInput(section.title || `節 ${section.order}`);
@@ -396,10 +398,15 @@ function SectionEditor({
 
   const handleSave = useCallback(async () => {
     if (!isDirty && !saving) return;
-    await updateContent(localBody);
-    setSavedBody(localBody);
-    await onRefresh();
-  }, [isDirty, localBody, onRefresh, saving, updateContent]);
+    try {
+      await updateContent(localBody);
+      setSavedBody(localBody);
+      await onRefresh();
+      toast.success('本文を保存しました');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '本文の保存に失敗しました');
+    }
+  }, [isDirty, localBody, onRefresh, saving, toast, updateContent]);
 
   // Ctrl+S / Cmd+S ショートカットで保存
   useEffect(() => {
@@ -656,6 +663,7 @@ function SectionEditor({
         onRestoreSuccess={(restored) => {
           setLocalBody(restored);
           setSavedBody(restored);
+          toast.success('過去のバージョンから本文を復元しました');
           void onRefresh();
         }}
       />

@@ -11,6 +11,7 @@ import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
 import { Input } from '@/components/Input.js';
 import { Loading } from '@/components/Loading.js';
 import { useMarkdownEntityEditor } from '@/hooks/useMarkdownEntityEditor.js';
+import { useToast } from '@/hooks/useToast.js';
 import type { SaveSettingsMarkdownResult } from '@/lib/types.js';
 import { MonacoEditor } from './-MonacoEditor.js';
 
@@ -45,10 +46,6 @@ export function SettingsMarkdownEditor({
     setMarkdown,
     setSavedMarkdown,
     loading,
-    error,
-    setError,
-    message,
-    setMessage,
     instruction,
     setInstruction,
     editScope,
@@ -76,12 +73,11 @@ export function SettingsMarkdownEditor({
   });
 
   const [historyOpen, setHistoryOpen] = useState(false);
+  const toast = useToast();
 
   const handleRun = useCallback(async () => {
-    setError(null);
-    setMessage(null);
     if (!instruction.trim()) {
-      setMessage('指示を入力してください');
+      toast.error('指示を入力してください');
       return;
     }
 
@@ -89,12 +85,12 @@ export function SettingsMarkdownEditor({
       if (editScope === 'document') {
         const next = await editSettingDocument({ markdown, instruction });
         setMarkdown(next);
-        setMessage('全体の編集が完了しました');
+        toast.success('全体のAI編集が完了しました');
         return;
       }
 
       if (!activeSection) {
-        setMessage('カーソルを編集対象の設定セクション（## 見出し配下）に移動してください');
+        toast.error('カーソルを編集対象の設定セクション（## 見出し配下）に移動してください');
         return;
       }
 
@@ -104,7 +100,7 @@ export function SettingsMarkdownEditor({
       );
 
       if (!target) {
-        setMessage(`設定「${activeSection.name}」のセクションが見つかりません`);
+        toast.error(`設定「${activeSection.name}」のセクションが見つかりません`);
         return;
       }
 
@@ -120,9 +116,9 @@ export function SettingsMarkdownEditor({
       const after = lines.slice(target.endLine);
       const replaced = [...before, nextSummary.trim(), ...after].join('\n');
       setMarkdown(replaced);
-      setMessage(`「${activeSection.name}」の編集が完了しました`);
+      toast.success(`「${activeSection.name}」のAI編集が完了しました`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : '編集に失敗しました');
+      toast.error(e instanceof Error ? e.message : '編集に失敗しました');
     }
   }, [
     activeSection,
@@ -131,25 +127,22 @@ export function SettingsMarkdownEditor({
     editSettingSection,
     instruction,
     markdown,
-    setError,
-    setMessage,
     setMarkdown,
+    toast,
   ]);
 
   const handleSave = useCallback(async () => {
-    setError(null);
-    setMessage(null);
     try {
       const res = await saveSettingsMarkdown(markdown);
       setSavedMarkdown(markdown);
       clearDraft();
-      setMessage(
+      toast.success(
         `保存しました (作成: ${res.created}件, 更新: ${res.updated}件, 削除: ${res.deleted}件)`,
       );
     } catch (e) {
-      setError(e instanceof Error ? e.message : '保存に失敗しました');
+      toast.error(e instanceof Error ? e.message : '保存に失敗しました');
     }
-  }, [clearDraft, markdown, saveSettingsMarkdown, setError, setMessage, setSavedMarkdown]);
+  }, [clearDraft, markdown, saveSettingsMarkdown, setSavedMarkdown, toast]);
 
   if (loading) {
     return <Loading message="設定マークダウンを読み込み中..." />;
@@ -174,17 +167,6 @@ export function SettingsMarkdownEditor({
               破棄する
             </Button>
           </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="bg-destructive/10 border-b border-destructive/30 px-4 py-2 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-      {message && (
-        <div className="bg-emerald-500/10 border-b border-emerald-500/30 px-4 py-2 text-sm text-emerald-600 dark:text-emerald-400">
-          {message}
         </div>
       )}
 
