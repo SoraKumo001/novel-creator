@@ -1,6 +1,11 @@
 import { useCallback, useState } from 'react';
-import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
+import {
+  extractEntities,
+  generateChapterSummary,
+  generatePlot,
+  generateSectionSummary,
+} from '@/lib/services/index.js';
 import { streamGenerateContent } from '@/lib/sse.js';
 import type { ExtractResult, GeneratedPlot, GeneratedSummary } from '@/lib/types.js';
 
@@ -31,11 +36,10 @@ export function useGenerate(): UseGenerateReturn {
   const [generatedSummary, setGeneratedSummary] = useState<GeneratedSummary | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
 
-  const generatePlot = useCallback(async (novelId: string) => {
+  const handleGeneratePlot = useCallback(async (novelId: string) => {
     setGeneratingPlot(true);
     try {
-      const res = await api.novels[':id'].generate.plot.$post({ param: { id: novelId } });
-      const data = await res.json();
+      const data = await generatePlot(novelId);
       setGeneratedPlot(data);
       return data;
     } finally {
@@ -43,11 +47,10 @@ export function useGenerate(): UseGenerateReturn {
     }
   }, []);
 
-  const generateChapterSummary = useCallback(async (chapterId: string) => {
+  const handleGenerateChapterSummary = useCallback(async (chapterId: string) => {
     setGeneratingSummary(true);
     try {
-      const res = await api.chapters[':id'].generate.summary.$post({ param: { id: chapterId } });
-      const data = await res.json();
+      const data = await generateChapterSummary(chapterId);
       setGeneratedSummary(data);
       return data;
     } finally {
@@ -55,11 +58,10 @@ export function useGenerate(): UseGenerateReturn {
     }
   }, []);
 
-  const generateSectionSummary = useCallback(async (sectionId: string) => {
+  const handleGenerateSectionSummary = useCallback(async (sectionId: string) => {
     setGeneratingSummary(true);
     try {
-      const res = await api.sections[':id'].generate.summary.$post({ param: { id: sectionId } });
-      const data = await res.json();
+      const data = await generateSectionSummary(sectionId);
       setGeneratedSummary(data);
       return data;
     } finally {
@@ -94,9 +96,7 @@ export function useGenerate(): UseGenerateReturn {
   const extract = useCallback(async (sectionId: string) => {
     setExtracting(true);
     try {
-      const res = await api.sections[':id'].generate.extract.$post({ param: { id: sectionId } });
-      const data = await res.json();
-      return data;
+      return await extractEntities(sectionId);
     } finally {
       setExtracting(false);
     }
@@ -110,9 +110,9 @@ export function useGenerate(): UseGenerateReturn {
     generatedPlot,
     generatedSummary,
     streamError,
-    generatePlot,
-    generateChapterSummary,
-    generateSectionSummary,
+    generatePlot: handleGeneratePlot,
+    generateChapterSummary: handleGenerateChapterSummary,
+    generateSectionSummary: handleGenerateSectionSummary,
     generateContent,
     extract,
     resetGeneratedPlot: () => setGeneratedPlot(null),

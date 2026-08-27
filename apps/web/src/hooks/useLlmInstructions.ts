@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
+import {
+  createLlmInstruction,
+  deleteLlmInstruction,
+  fetchLlmInstructions,
+} from '@/lib/services/index.js';
 import type { CreateLlmInstructionInput, LlmInstruction } from '@/lib/types.js';
 
 interface UseLlmInstructionsReturn {
@@ -27,18 +31,12 @@ export function useLlmInstructions(
     refetch,
   } = useQuery({
     queryKey: ['novels', novelId, 'llmInstructions', entityType],
-    queryFn: () =>
-      api.novels[':id'].llmInstructions
-        .$get({ param: { id: novelId }, query: { entityType } })
-        .then((r) => r.json()),
+    queryFn: () => fetchLlmInstructions(novelId, entityType),
     enabled: !!novelId,
   });
 
   const saveMutation = useMutation({
-    mutationFn: (input: CreateLlmInstructionInput) =>
-      api.novels[':id'].llmInstructions
-        .$post({ param: { id: novelId }, json: input })
-        .then((r) => r.json()),
+    mutationFn: (input: CreateLlmInstructionInput) => createLlmInstruction(novelId, input),
     onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: ['novels', novelId, 'llmInstructions', entityType],
@@ -46,8 +44,7 @@ export function useLlmInstructions(
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) =>
-      api.llmInstructions[':id'].$delete({ param: { id } }).then((r) => r.json()),
+    mutationFn: (id: string) => deleteLlmInstruction(id),
     onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: ['novels', novelId, 'llmInstructions', entityType],
@@ -60,7 +57,7 @@ export function useLlmInstructions(
     error: error ? toErrorMessage(error) : null,
     refetch: refetch as unknown as () => Promise<void>,
     saveInstruction: saveMutation.mutateAsync,
-    deleteInstruction: (id) => deleteMutation.mutateAsync(id).then(() => undefined),
+    deleteInstruction: (id) => deleteMutation.mutateAsync(id),
     saving: saveMutation.isPending,
     deleting: deleteMutation.isPending,
   };

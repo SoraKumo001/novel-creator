@@ -1,10 +1,20 @@
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
+import {
+  createSetting,
+  deleteSetting,
+  editSetting,
+  editSettingDocument,
+  editSettingSection,
+  fetchSettings,
+  fetchSettingsMarkdown,
+  generateSettingDraft,
+  saveSettingsMarkdown,
+  updateSetting,
+} from '@/lib/services/index.js';
 import type {
   CreateSettingInput,
-  EditSettingSectionResult,
   SaveSettingsMarkdownResult,
   Setting,
   SettingDraft,
@@ -53,35 +63,28 @@ export function useSettings(novelId: string): UseSettingsReturn {
     refetch,
   } = useQuery({
     queryKey: ['novels', novelId, 'settings'],
-    queryFn: () =>
-      api.novels[':id'].settings.$get({ param: { id: novelId } }).then((r) => r.json()),
+    queryFn: () => fetchSettings(novelId),
   });
 
   const createMutation = useMutation({
-    mutationFn: (input: CreateSettingInput) =>
-      api.novels[':id'].settings
-        .$post({ param: { id: novelId }, json: input })
-        .then((r) => r.json()),
+    mutationFn: (input: CreateSettingInput) => createSetting(novelId, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateSettingInput }) =>
-      api.settings[':id'].$put({ param: { id }, json: input }).then((r) => r.json()),
+      updateSetting(id, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) =>
-      api.settings[':id'].$delete({ param: { id } }).then((r) => r.json()),
+    mutationFn: (id: string) => deleteSetting(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
   });
 
   const llmEditMutation = useMutation({
     mutationFn: ({ id, instruction }: { id: string; instruction: string }) =>
-      api.settings[':id'].edit
-        .$post({ param: { id }, json: { instruction } })
-        .then((r) => r.json()),
+      editSetting(id, { instruction }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
   });
 
@@ -92,17 +95,11 @@ export function useSettings(novelId: string): UseSettingsReturn {
     }: {
       instruction: string;
       currentDraft?: { category: string; name: string; description?: string };
-    }) =>
-      api.novels[':id'].settings.draft
-        .$post({ param: { id: novelId }, json: { instruction, currentDraft } })
-        .then((r) => r.json()),
+    }) => generateSettingDraft(novelId, { instruction, currentDraft }),
   });
 
   const saveMarkdownMutation = useMutation({
-    mutationFn: (markdown: string) =>
-      api.novels[':id'].settings.markdown
-        .$put({ param: { id: novelId }, json: { markdown } })
-        .then((r) => r.json()),
+    mutationFn: (markdown: string) => saveSettingsMarkdown(novelId, markdown),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
   });
 
@@ -112,28 +109,16 @@ export function useSettings(novelId: string): UseSettingsReturn {
       name: string;
       description: string;
       instruction: string;
-    }) =>
-      api.novels[':id'].settings.editSection
-        .$post({ param: { id: novelId }, json: input })
-        .then(async (r) => {
-          const data: EditSettingSectionResult = await r.json();
-          return data.markdown;
-        }),
+    }) => editSettingSection(novelId, input).then((res) => res.markdown),
   });
 
   const editDocumentMutation = useMutation({
     mutationFn: (input: { markdown: string; instruction: string }) =>
-      api.novels[':id'].settings.editDocument
-        .$post({ param: { id: novelId }, json: input })
-        .then(async (r) => {
-          const data: EditSettingSectionResult = await r.json();
-          return data.markdown;
-        }),
+      editSettingDocument(novelId, input.markdown, input.instruction).then((res) => res.markdown),
   });
 
-  const fetchSettingsMarkdown = useCallback(async (): Promise<string> => {
-    const res = await api.novels[':id'].settings.markdown.$get({ param: { id: novelId } });
-    const data = await res.json();
+  const fetchMarkdown = useCallback(async (): Promise<string> => {
+    const data = await fetchSettingsMarkdown(novelId);
     return data.markdown;
   }, [novelId]);
 
@@ -144,11 +129,11 @@ export function useSettings(novelId: string): UseSettingsReturn {
     refetch: refetch as unknown as () => Promise<void>,
     createSetting: createMutation.mutateAsync,
     updateSetting: (id, input) => updateMutation.mutateAsync({ id, input }),
-    deleteSetting: (id: string) => deleteMutation.mutateAsync(id).then(() => undefined),
+    deleteSetting: (id: string) => deleteMutation.mutateAsync(id),
     llmEditSetting: (id, instruction) => llmEditMutation.mutateAsync({ id, instruction }),
     generateDraft: (instruction, currentDraft) =>
       draftMutation.mutateAsync({ instruction, currentDraft }),
-    fetchSettingsMarkdown,
+    fetchSettingsMarkdown: fetchMarkdown,
     saveSettingsMarkdown: saveMarkdownMutation.mutateAsync,
     editSettingSection: editSectionMutation.mutateAsync,
     editSettingDocument: editDocumentMutation.mutateAsync,

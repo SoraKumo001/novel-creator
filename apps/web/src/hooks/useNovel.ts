@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
+import { deleteNovel, fetchNovelDetail, updateNovel } from '@/lib/services/index.js';
 import type { Novel, NovelDetail, UpdateNovelInput } from '@/lib/types.js';
 
 interface UseNovelReturn {
@@ -24,13 +24,12 @@ export function useNovel(novelId: string): UseNovelReturn {
     refetch,
   } = useQuery({
     queryKey: ['novels', novelId],
-    queryFn: () => api.novels[':id'].$get({ param: { id: novelId } }).then((r) => r.json()),
+    queryFn: () => fetchNovelDetail(novelId),
     enabled: !!novelId,
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdateNovelInput }) =>
-      api.novels[':id'].$put({ param: { id }, json: input }).then((r) => r.json()),
+    mutationFn: ({ id, input }: { id: string; input: UpdateNovelInput }) => updateNovel(id, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['novels'] });
       queryClient.invalidateQueries({ queryKey: ['novels', novelId] });
@@ -38,7 +37,7 @@ export function useNovel(novelId: string): UseNovelReturn {
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.novels[':id'].$delete({ param: { id } }).then((r) => r.json()),
+    mutationFn: (id: string) => deleteNovel(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels'] }),
   });
 
@@ -49,7 +48,7 @@ export function useNovel(novelId: string): UseNovelReturn {
     refetch: refetch as unknown as () => Promise<void>,
     updateNovel: (id, input) => updateMutation.mutateAsync({ id, input }),
     updating: updateMutation.isPending,
-    deleteNovel: (id) => deleteMutation.mutateAsync(id).then(() => undefined),
+    deleteNovel: (id) => deleteMutation.mutateAsync(id),
     deleting: deleteMutation.isPending,
   };
 }

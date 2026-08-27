@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
+import { importNovelBackup } from '@/lib/services/index.js';
 import type { ImportResult } from '@/lib/types.js';
 
 interface UseRestoreNovelReturn {
@@ -13,7 +13,7 @@ export function useRestoreNovel(): UseRestoreNovelReturn {
   const queryClient = useQueryClient();
 
   const mutation = useMutation({
-    mutationFn: (data: unknown) => api.backup.$import(data).then((r) => r.json()),
+    mutationFn: (data: unknown) => importNovelBackup(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['novels'] });
     },

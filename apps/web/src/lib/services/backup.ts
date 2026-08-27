@@ -10,16 +10,12 @@ export async function exportNovelBackup(novelId: string): Promise<Response> {
   });
 }
 
-export async function importNovelBackup(
-  data: unknown,
-): Promise<{ json: () => Promise<ImportResult> }> {
+export async function importNovelBackup(data: unknown): Promise<ImportResult> {
   const jsonData = typeof data === 'string' ? data : JSON.stringify(data);
   const res = await backupClient.importNovel({ jsonData });
   return {
-    json: async () => ({
-      success: true as const,
-      novelId: res.novelId,
-      counts: {},
-    }),
+    success: true as const,
+    novelId: res.novelId,
+    counts: {},
   };
 }

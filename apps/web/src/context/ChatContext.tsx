@@ -7,7 +7,13 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { api } from '@/lib/api.js';
+import {
+  createChatSession,
+  deleteChatSession,
+  fetchChatSession,
+  fetchChatSessions,
+  updateChatSession,
+} from '@/lib/services/index.js';
 import { streamChat } from '@/lib/chatApi.js';
 import type { ChatSession } from '@/lib/types.js';
 
@@ -120,10 +126,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const fetchSessions = useCallback(async (novelId: string | null) => {
     setLoadingSessions(true);
     try {
-      const res = await api.chat.sessions.$get({
-        query: novelId ? { novelId } : undefined,
-      });
-      const data = await res.json();
+      const data = await fetchChatSessions(novelId || undefined);
       const list = Array.isArray(data) ? data : [];
       setSessions(list);
       return list;
@@ -140,14 +143,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setLoadingMessages(true);
     setError(null);
     try {
-      const res = await api.chat.sessions[':id'].$get({
-        param: { id: sessionId },
-      });
-      const detail = await res.json();
+      const detail = await fetchChatSession(sessionId);
       if (detail && Array.isArray(detail.messages)) {
         const formatted: ChatMessage[] = detail.messages.map((m) => ({
           id: m.id,
-          role: m.role as 'user' | 'assistant',
+          role: m.role,
           content: m.content,
           createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
         }));
@@ -180,13 +180,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     async (novelId?: string | null, initialTitle?: string): Promise<ChatSession | null> => {
       const targetNovelId = novelId !== undefined ? novelId : selectedNovelIdRef.current;
       try {
-        const res = await api.chat.sessions.$post({
-          json: {
-            novelId: targetNovelId || undefined,
-            title: initialTitle || '新しい相談',
-          },
+        const created = await createChatSession({
+          novelId: targetNovelId || undefined,
+          title: initialTitle || '新しい相談',
         });
-        const created = await res.json();
         setSessions((prev) => [
           created,
           ...(Array.isArray(prev) ? prev.filter((s) => s.id !== created.id) : []),
@@ -225,9 +222,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   // セッション削除
   const deleteSession = useCallback(async (sessionId: string) => {
     try {
-      await api.chat.sessions[':id'].$delete({
-        param: { id: sessionId },
-      });
+      await deleteChatSession(sessionId);
       setSessions((prev) => (Array.isArray(prev) ? prev.filter((s) => s.id !== sessionId) : []));
       if (currentSessionIdRef.current === sessionId) {
         setCurrentSessionId(null);
@@ -244,11 +239,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     const trimmed = newTitle.trim();
     if (!trimmed) return;
     try {
-      const res = await api.chat.sessions[':id'].$put({
-        param: { id: sessionId },
-        json: { title: trimmed },
-      });
-      const updated = await res.json();
+      const updated = await updateChatSession(sessionId, { title: trimmed });
       setSessions((prev) =>
         Array.isArray(prev) ? prev.map((s) => (s.id === sessionId ? updated : s)) : [],
       );

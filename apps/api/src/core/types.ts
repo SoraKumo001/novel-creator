@@ -12,8 +12,8 @@ export interface ServiceContext {
 }
 
 export class NotFoundError extends Error {
-  constructor(message: string = 'Resource not found') {
-    super(message);
+  constructor(entityOrMessage: string = 'Resource not found', id?: string) {
+    super(id ? `${entityOrMessage} ${id} not found` : entityOrMessage);
     this.name = 'NotFoundError';
   }
 }

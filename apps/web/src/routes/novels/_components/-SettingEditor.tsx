@@ -8,8 +8,7 @@ import { Loading } from '@/components/Loading.js';
 import { Textarea } from '@/components/Textarea.js';
 import { useLlmInstructions } from '@/hooks/useLlmInstructions.js';
 import { useSettings } from '@/hooks/useSettings.js';
-import { api } from '@/lib/api.js';
-import type { Setting } from '@/lib/types.js';
+import { fetchSettings } from '@/lib/services/index.js';
 
 interface SettingEditorProps {
   novelId: string;
@@ -41,14 +40,17 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
     if (!settingId) return;
     let active = true;
     setLoading(true);
-    api.settings[':id']
-      .$get({ param: { id: settingId } })
-      .then((res) => res.json())
-      .then((data: Setting) => {
+    fetchSettings(novelId)
+      .then((settings) => {
         if (!active) return;
-        setCategory(data.category);
-        setName(data.name);
-        setDescription(data.description ?? '');
+        const found = settings.find((s) => s.id === settingId);
+        if (found) {
+          setCategory(found.category);
+          setName(found.name);
+          setDescription(found.description ?? '');
+        } else {
+          setError('設定が見つかりませんでした');
+        }
       })
       .catch((e) => {
         if (!active) return;
@@ -60,7 +62,7 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
     return () => {
       active = false;
     };
-  }, [settingId]);
+  }, [novelId, settingId]);
 
   async function handleGenerate() {
     setError(null);

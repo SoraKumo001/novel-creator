@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
+import { createNovel, deleteNovel, fetchNovels, updateNovel } from '@/lib/services/index.js';
 import type { CreateNovelInput, Novel, UpdateNovelInput } from '@/lib/types.js';
 
 interface UseNovelsReturn {
@@ -26,23 +26,21 @@ export function useNovels(): UseNovelsReturn {
     refetch,
   } = useQuery({
     queryKey: ['novels'],
-    queryFn: () => api.novels.$get().then((r) => r.json()),
+    queryFn: () => fetchNovels(),
   });
 
   const createMutation = useMutation({
-    mutationFn: (input: CreateNovelInput) =>
-      api.novels.$post({ json: input }).then((r) => r.json()),
+    mutationFn: (input: CreateNovelInput) => createNovel(input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels'] }),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdateNovelInput }) =>
-      api.novels[':id'].$put({ param: { id }, json: input }).then((r) => r.json()),
+    mutationFn: ({ id, input }: { id: string; input: UpdateNovelInput }) => updateNovel(id, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels'] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.novels[':id'].$delete({ param: { id } }).then((r) => r.json()),
+    mutationFn: (id: string) => deleteNovel(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels'] }),
   });
 
@@ -53,7 +51,7 @@ export function useNovels(): UseNovelsReturn {
     refetch: refetch as unknown as () => Promise<void>,
     createNovel: createMutation.mutateAsync,
     updateNovel: (id, input) => updateMutation.mutateAsync({ id, input }),
-    deleteNovel: (id) => deleteMutation.mutateAsync(id).then(() => undefined),
+    deleteNovel: (id) => deleteMutation.mutateAsync(id),
     creating: createMutation.isPending,
     updating: updateMutation.isPending,
     deleting: deleteMutation.isPending,

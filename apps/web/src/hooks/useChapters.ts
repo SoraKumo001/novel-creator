@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
+import {
+  createChapter,
+  createSection,
+  deleteChapter,
+  deleteSection,
+  fetchChapters,
+  updateChapter,
+  updateSection,
+} from '@/lib/services/index.js';
 import type {
   Chapter,
   ChapterWithSections,
@@ -37,55 +45,40 @@ export function useChapters(novelId: string): UseChaptersReturn {
     refetch,
   } = useQuery({
     queryKey: ['novels', novelId, 'chapters'],
-    queryFn: async () => {
-      const res = await api.novels[':id'].chapters.$get({ param: { id: novelId } });
-      const rows = await res.json();
-      const full: ChapterWithSections[] = [];
-      for (const c of rows) {
-        const detail = await api.chapters[':id'].$get({ param: { id: c.id } });
-        const d = await detail.json();
-        full.push(d);
-      }
-      return full;
-    },
+    queryFn: () => fetchChapters(novelId),
     enabled: !!novelId,
   });
 
   const createMutation = useMutation({
-    mutationFn: (input: CreateChapterInput) =>
-      api.novels[':id'].chapters
-        .$post({ param: { id: novelId }, json: input })
-        .then((r) => r.json()),
+    mutationFn: (input: CreateChapterInput) => createChapter(novelId, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateChapterInput }) =>
-      api.chapters[':id'].$put({ param: { id }, json: input }).then((r) => r.json()),
+      updateChapter(id, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
   });
 
   const deleteMutation = useMutation({
-    mutationFn: (id: string) =>
-      api.chapters[':id'].$delete({ param: { id } }).then((r) => r.json()),
+    mutationFn: (id: string) => deleteChapter(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
   });
 
   const createSectionMutation = useMutation({
     mutationFn: ({ chapterId, input }: { chapterId: string; input: CreateSectionInput }) =>
-      api.chapters[':id'].$post({ param: { id: chapterId }, json: input }).then((r) => r.json()),
+      createSection(chapterId, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
   });
 
   const updateSectionMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateSectionInput }) =>
-      api.sections[':id'].$put({ param: { id }, json: input }).then((r) => r.json()),
+      updateSection(id, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
   });
 
   const deleteSectionMutation = useMutation({
-    mutationFn: (id: string) =>
-      api.sections[':id'].$delete({ param: { id } }).then((r) => r.json()),
+    mutationFn: (id: string) => deleteSection(id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
   });
 

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
-import type { Content, UpdateContentInput } from '@/lib/types.js';
+import { fetchContent, updateContent } from '@/lib/services/index.js';
+import type { Content } from '@/lib/types.js';
 
 interface UseContentReturn {
   content: Content | null;
@@ -22,16 +22,12 @@ export function useContent(sectionId: string): UseContentReturn {
     refetch,
   } = useQuery({
     queryKey: ['sections', sectionId, 'content'],
-    queryFn: () =>
-      api.sections[':id'].content.$get({ param: { id: sectionId } }).then((r) => r.json()),
+    queryFn: () => fetchContent(sectionId),
     enabled: !!sectionId,
   });
 
   const updateMutation = useMutation({
-    mutationFn: (body: string) =>
-      api.sections[':id'].content
-        .$put({ param: { id: sectionId }, json: { body } satisfies UpdateContentInput })
-        .then((r) => r.json()),
+    mutationFn: (body: string) => updateContent(sectionId, { body }),
     onSuccess: () =>
       queryClient.invalidateQueries({ queryKey: ['sections', sectionId, 'content'] }),
   });

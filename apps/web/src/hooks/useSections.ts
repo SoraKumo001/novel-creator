@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api.js';
 import { toErrorMessage } from '@/lib/errors.js';
+import { fetchSection } from '@/lib/services/index.js';
 import type { SectionWithContent } from '@/lib/types.js';
 
 interface UseSectionReturn {
@@ -18,7 +18,7 @@ export function useSection(sectionId: string): UseSectionReturn {
     refetch,
   } = useQuery({
     queryKey: ['sections', sectionId],
-    queryFn: () => api.sections[':id'].$get({ param: { id: sectionId } }).then((r) => r.json()),
+    queryFn: () => fetchSection(sectionId),
     enabled: !!sectionId,
   });
 

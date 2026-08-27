@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/Button.js';
 import { Modal } from '@/components/Modal.js';
-import { api } from '@/lib/api.js';
+import {
+  createCharacter,
+  createSetting,
+  extractChatEntities,
+  fetchCharacters,
+  fetchSettings,
+  updateCharacter,
+  updateSetting,
+} from '@/lib/services/index.js';
 import { useToast } from '@/hooks/useToast.js';
 import type {
   Character,
@@ -83,10 +91,7 @@ export function ChatInsertEntityModal({
 
     let active = true;
     setLoadingExisting(true);
-    Promise.all([
-      api.novels[':id'].characters.$get({ param: { id: targetNovelId } }).then((r) => r.json()),
-      api.novels[':id'].settings.$get({ param: { id: targetNovelId } }).then((r) => r.json()),
-    ])
+    Promise.all([fetchCharacters(targetNovelId), fetchSettings(targetNovelId)])
       .then(([chars, sets]) => {
         if (!active) return;
         setExistingCharacters(chars);
@@ -142,10 +147,7 @@ export function ChatInsertEntityModal({
       setIsExtracting(true);
       setExtractError(null);
       try {
-        const res = await api.chat.extractEntities.$post({
-          json: { text: sourceText },
-        });
-        const data = await res.json();
+        const data = await extractChatEntities(sourceText);
 
         const chars: EditableCharacter[] = (data.characters || []).map((c, i) => {
           const matched = existingCharacters.find(
@@ -328,17 +330,12 @@ export function ChatInsertEntityModal({
 
         if (char.action === 'overwrite' && char.matchedExisting) {
           // 上書き更新
-          await api.characters[':id']
-            .$put({
-              param: { id: char.matchedExisting.id },
-              json: {
-                name: trimmedName,
-                category: trimmedCategory,
-                description: trimmedDesc || undefined,
-                traits: traitsList.length > 0 ? traitsList : undefined,
-              },
-            })
-            .then((r) => r.json());
+          await updateCharacter(char.matchedExisting.id, {
+            name: trimmedName,
+            category: trimmedCategory,
+            description: trimmedDesc || undefined,
+            traits: traitsList.length > 0 ? traitsList : undefined,
+          });
           updatedCount++;
         } else if (char.action === 'merge' && char.matchedExisting) {
           // 追記マージ
@@ -350,31 +347,21 @@ export function ChatInsertEntityModal({
             : [];
           const mergedTraits = Array.from(new Set([...oldTraits, ...traitsList]));
 
-          await api.characters[':id']
-            .$put({
-              param: { id: char.matchedExisting.id },
-              json: {
-                name: trimmedName,
-                category: trimmedCategory,
-                description: mergedDesc || undefined,
-                traits: mergedTraits.length > 0 ? mergedTraits : undefined,
-              },
-            })
-            .then((r) => r.json());
+          await updateCharacter(char.matchedExisting.id, {
+            name: trimmedName,
+            category: trimmedCategory,
+            description: mergedDesc || undefined,
+            traits: mergedTraits.length > 0 ? mergedTraits : undefined,
+          });
           updatedCount++;
         } else {
           // 新規追加 (create)
-          await api.novels[':id'].characters
-            .$post({
-              param: { id: targetNovelId },
-              json: {
-                name: trimmedName,
-                category: trimmedCategory,
-                description: trimmedDesc || undefined,
-                traits: traitsList.length > 0 ? traitsList : undefined,
-              },
-            })
-            .then((r) => r.json());
+          await createCharacter(targetNovelId, {
+            name: trimmedName,
+            category: trimmedCategory,
+            description: trimmedDesc || undefined,
+            traits: traitsList.length > 0 ? traitsList : undefined,
+          });
           createdCount++;
         }
       }
@@ -387,45 +374,30 @@ export function ChatInsertEntityModal({
 
         if (set.action === 'overwrite' && set.matchedExisting) {
           // 上書き更新
-          await api.settings[':id']
-            .$put({
-              param: { id: set.matchedExisting.id },
-              json: {
-                name: trimmedName,
-                category: trimmedCategory,
-                description: trimmedDesc || undefined,
-              },
-            })
-            .then((r) => r.json());
+          await updateSetting(set.matchedExisting.id, {
+            name: trimmedName,
+            category: trimmedCategory,
+            description: trimmedDesc || undefined,
+          });
           updatedCount++;
         } else if (set.action === 'merge' && set.matchedExisting) {
           // 追記マージ
           const oldDesc = (set.matchedExisting.description || '').trim();
           const mergedDesc = oldDesc ? `${oldDesc}\n\n【追記】\n${trimmedDesc}` : trimmedDesc;
 
-          await api.settings[':id']
-            .$put({
-              param: { id: set.matchedExisting.id },
-              json: {
-                name: trimmedName,
-                category: trimmedCategory,
-                description: mergedDesc || undefined,
-              },
-            })
-            .then((r) => r.json());
+          await updateSetting(set.matchedExisting.id, {
+            name: trimmedName,
+            category: trimmedCategory,
+            description: mergedDesc || undefined,
+          });
           updatedCount++;
         } else {
           // 新規追加 (create)
-          await api.novels[':id'].settings
-            .$post({
-              param: { id: targetNovelId },
-              json: {
-                name: trimmedName,
-                category: trimmedCategory,
-                description: trimmedDesc || undefined,
-              },
-            })
-            .then((r) => r.json());
+          await createSetting(targetNovelId, {
+            name: trimmedName,
+            category: trimmedCategory,
+            description: trimmedDesc || undefined,
+          });
           createdCount++;
         }
       }

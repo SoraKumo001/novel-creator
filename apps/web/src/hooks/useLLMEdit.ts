@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { api } from '@/lib/api.js';
+import { editCharacter, editSetting } from '@/lib/services/index.js';
 import type { Character, Setting } from '@/lib/types.js';
 
 interface UseLLMEditReturn {
@@ -12,16 +12,12 @@ interface UseLLMEditReturn {
 export function useLLMEdit(): UseLLMEditReturn {
   const editCharacterMutation = useMutation({
     mutationFn: ({ id, instruction }: { id: string; instruction: string }) =>
-      api.characters[':id'].edit
-        .$post({ param: { id }, json: { instruction } })
-        .then((r) => r.json()),
+      editCharacter(id, { instruction }),
   });
 
   const editSettingMutation = useMutation({
     mutationFn: ({ id, instruction }: { id: string; instruction: string }) =>
-      api.settings[':id'].edit
-        .$post({ param: { id }, json: { instruction } })
-        .then((r) => r.json()),
+      editSetting(id, { instruction }),
   });
 
   return {

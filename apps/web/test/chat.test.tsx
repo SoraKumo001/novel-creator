@@ -136,9 +136,9 @@ describe('streamChat', () => {
   });
 });
 
-describe('api.chat.extractEntities', () => {
-  it('extractEntities が正しくPOSTリクエストを送出すること', async () => {
-    const { api } = await import('../src/lib/api.js');
+describe('extractChatEntities', () => {
+  it('extractChatEntities が正しくPOSTリクエストを送出してエンティティを返すこと', async () => {
+    const { extractChatEntities } = await import('../src/lib/services/chat.js');
     const mockEntities = {
       characters: [
         { name: 'アリス', category: '主人公', description: '勇敢な少女', traits: ['金髪'] },
@@ -148,10 +148,7 @@ describe('api.chat.extractEntities', () => {
 
     mockFetch.mockResolvedValue(jsonResponse(mockEntities));
 
-    const res = await api.chat.extractEntities.$post({
-      json: { text: 'アリスと魔法王国' },
-    });
-    const data = await res.json();
+    const data = await extractChatEntities('アリスと魔法王国');
 
     expect(data.characters).toHaveLength(1);
     expect(data.characters[0].name).toBe('アリス');
