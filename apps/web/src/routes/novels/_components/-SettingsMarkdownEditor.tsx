@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
   buildSettingTree,
   findSectionAtLine,
@@ -7,6 +7,7 @@ import {
 } from '@novel-creator/shared';
 import { Button } from '@/components/Button.js';
 import { ConfirmDialog } from '@/components/ConfirmDialog.js';
+import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
 import { Input } from '@/components/Input.js';
 import { Loading } from '@/components/Loading.js';
 import { useMarkdownEntityEditor } from '@/hooks/useMarkdownEntityEditor.js';
@@ -74,6 +75,8 @@ export function SettingsMarkdownEditor({
     findSectionAtLine: findSectionAtLine,
   });
 
+  const [historyOpen, setHistoryOpen] = useState(false);
+
   const handleRun = useCallback(async () => {
     setError(null);
     setMessage(null);
@@ -123,9 +126,9 @@ export function SettingsMarkdownEditor({
     }
   }, [
     activeSection,
+    editScope,
     editSettingDocument,
     editSettingSection,
-    editScope,
     instruction,
     markdown,
     setError,
@@ -203,6 +206,14 @@ export function SettingsMarkdownEditor({
             disabled={!isDirty || isBusy}
           >
             変更を破棄
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setHistoryOpen(true)}
+            title="マークダウンの編集履歴と差分を確認・復元"
+          >
+            🕒 履歴
           </Button>
           {isDirty && (
             <span className="text-xs text-muted-foreground">（未保存の変更があります）</span>
@@ -342,6 +353,20 @@ export function SettingsMarkdownEditor({
         cancelLabel="キャンセル"
         onConfirm={handleDiscard}
         onClose={() => setDiscardOpen(false)}
+      />
+
+      <HistoryDiffModal
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        novelId={novelId}
+        entityType="settings_markdown"
+        entityId={novelId}
+        currentContent={markdown}
+        title="設定マークダウン全体"
+        onRestoreSuccess={(restored) => {
+          setMarkdown(restored);
+          setSavedMarkdown(restored);
+        }}
       />
     </div>
   );

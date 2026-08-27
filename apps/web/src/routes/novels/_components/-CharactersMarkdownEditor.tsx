@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import {
   buildCharacterTree,
   findCharacterAtLine,
@@ -8,6 +8,7 @@ import {
 import { Button } from '@/components/Button.js';
 import { ConfirmDialog } from '@/components/ConfirmDialog.js';
 import { Input } from '@/components/Input.js';
+import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
 import { Loading } from '@/components/Loading.js';
 import { useMarkdownEntityEditor } from '@/hooks/useMarkdownEntityEditor.js';
 import type { SaveCharactersMarkdownResult } from '@/lib/types.js';
@@ -75,6 +76,8 @@ export function CharactersMarkdownEditor({
     buildTree: buildCharacterTree,
     findSectionAtLine: findCharacterAtLine,
   });
+
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const handleRun = useCallback(async () => {
     setError(null);
@@ -207,6 +210,14 @@ export function CharactersMarkdownEditor({
             disabled={!isDirty || isBusy}
           >
             変更を破棄
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => setHistoryOpen(true)}
+            title="マークダウンの編集履歴と差分を確認・復元"
+          >
+            🕒 履歴
           </Button>
           {isDirty && (
             <span className="text-xs text-muted-foreground">（未保存の変更があります）</span>
@@ -346,6 +357,20 @@ export function CharactersMarkdownEditor({
         cancelLabel="キャンセル"
         onConfirm={handleDiscard}
         onClose={() => setDiscardOpen(false)}
+      />
+
+      <HistoryDiffModal
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        novelId={novelId}
+        entityType="characters_markdown"
+        entityId={novelId}
+        currentContent={markdown}
+        title="人物マークダウン全体"
+        onRestoreSuccess={(restored) => {
+          setMarkdown(restored);
+          setSavedMarkdown(restored);
+        }}
       />
     </div>
   );

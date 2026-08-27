@@ -7,6 +7,7 @@ import {
   ChatService,
   ContentService,
   GenerateService,
+  HistoryService,
   LlmInstructionService,
   NovelService,
   SectionService,
@@ -31,3 +32,4 @@ export const llmInstructionClient = createClient(LlmInstructionService, transpor
 export const generateClient = createClient(GenerateService, transport);
 export const chatClient = createClient(ChatService, transport);
 export const backupClient = createClient(BackupService, transport);
+export const historyClient = createClient(HistoryService, transport);

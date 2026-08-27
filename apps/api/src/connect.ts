@@ -3,6 +3,7 @@ import type { Context, MiddlewareHandler } from 'hono';
 
 import type { AppContext } from './context.js';
 import { registerBackupService } from './services/backup.js';
+import { registerHistoryService } from './services/history.js';
 import { registerChapterService } from './services/chapter.js';
 import { registerCharacterService } from './services/character.js';
 import { registerChatService } from './services/chat.js';
@@ -27,6 +28,7 @@ export function createRpcRouter(getContext: () => AppContext['Variables']) {
   registerGenerateService(router, getContext);
   registerChatService(router, getContext);
   registerBackupService(router, getContext);
+  registerHistoryService(router, getContext);
   return router;
 }
 

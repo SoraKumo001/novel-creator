@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { settings } from '@novel-creator/db';
+import { editHistories, settings } from '@novel-creator/db';
 import {
   createSettingDraft,
   editSetting,
@@ -103,6 +103,23 @@ export class SettingDomainService {
       .returning();
     if (!row) {
       throw new NotFoundError('Setting not found');
+    }
+
+    try {
+      await this.ctx.db.insert(editHistories).values({
+        novelId: row.novelId,
+        entityType: 'setting',
+        entityId: row.id,
+        title: row.name,
+        content: JSON.stringify({
+          category: row.category,
+          name: row.name,
+          description: row.description ?? '',
+        }),
+        description: '設定の更新',
+      });
+    } catch (e) {
+      console.error('[history] failed to record setting history', e);
     }
 
     await upsertEntityEmbedding(
@@ -255,6 +272,20 @@ export class SettingDomainService {
     }
 
     const updated = await this.ctx.db.select().from(settings).where(eq(settings.novelId, novelId));
+
+    try {
+      await this.ctx.db.insert(editHistories).values({
+        novelId,
+        entityType: 'settings_markdown',
+        entityId: novelId,
+        title: '設定マークダウン',
+        content: markdown,
+        description: `マークダウン一括保存 (作成: ${diff.toCreate.length}, 更新: ${diff.toUpdate.length}, 削除: ${diff.toDelete.length})`,
+        wordCount: markdown.length,
+      });
+    } catch (e) {
+      console.error('[history] failed to record settings_markdown history', e);
+    }
 
     return {
       settings: updated,

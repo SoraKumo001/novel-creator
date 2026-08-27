@@ -25,7 +25,6 @@ export function MonacoEditor({ value, onChange, onMount }: MonacoEditorProps) {
         fontFamily: '"Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif',
         padding: { top: 16, bottom: 240 },
         smoothScrolling: true,
-        scrollBeyondLastLine: true,
       }}
       theme={resolvedTheme === 'dark' ? 'vs-dark' : 'light'}
     />

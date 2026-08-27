@@ -9,3 +9,4 @@ export * from './llmInstruction.js';
 export * from './generate.js';
 export * from './chat.js';
 export * from './backup.js';
+export * from './history.js';

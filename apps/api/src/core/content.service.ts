@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { contents } from '@novel-creator/db';
+import { chapters, contents, editHistories, sections } from '@novel-creator/db';
 import { NotFoundError, type ServiceContext } from './types.js';
 
 export function countWords(text: string): number {
@@ -27,7 +27,7 @@ export class ContentDomainService {
     return row;
   }
 
-  async updateContent(sectionId: string, body: string) {
+  async updateContent(sectionId: string, body: string, description: string = '手動保存') {
     const wordCount = countWords(body);
     const [row] = await this.ctx.db
       .insert(contents)
@@ -37,6 +37,31 @@ export class ContentDomainService {
         set: { body, wordCount, updatedAt: new Date() },
       })
       .returning();
+
+    // 履歴を記録
+    try {
+      const [sec] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
+      if (sec) {
+        const [ch] = await this.ctx.db
+          .select()
+          .from(chapters)
+          .where(eq(chapters.id, sec.chapterId));
+        if (ch) {
+          await this.ctx.db.insert(editHistories).values({
+            novelId: ch.novelId,
+            entityType: 'content',
+            entityId: sectionId,
+            title: sec.title || `節 ${sec.order}`,
+            content: body,
+            description,
+            wordCount,
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[history] failed to record content history', e);
+    }
+
     return row;
   }
 }

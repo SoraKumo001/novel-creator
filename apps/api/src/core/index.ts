@@ -10,3 +10,4 @@ export * from './llm-instruction.service.js';
 export * from './generate.service.js';
 export * from './chat.service.js';
 export * from './backup.service.js';
+export * from './history.service.js';

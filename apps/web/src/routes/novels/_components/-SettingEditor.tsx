@@ -9,6 +9,7 @@ import { Textarea } from '@/components/Textarea.js';
 import { useLlmInstructions } from '@/hooks/useLlmInstructions.js';
 import { useSettings } from '@/hooks/useSettings.js';
 import { fetchSettings } from '@/lib/services/index.js';
+import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
 import { MonacoEditor } from './-MonacoEditor.js';
 
 interface SettingEditorProps {
@@ -34,6 +35,7 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deleteInstructionId, setDeleteInstructionId] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const isEdit = !!settingId;
 
@@ -164,6 +166,16 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {isEdit && settingId && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setHistoryOpen(true)}
+              title="編集履歴と差分を確認・復元"
+            >
+              🕒 履歴
+            </Button>
+          )}
           <Button
             variant="primary"
             onClick={handleSave}
@@ -294,6 +306,21 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
         confirmLabel="削除"
         isLoading={deletingInstruction}
       />
+
+      {isEdit && settingId && (
+        <HistoryDiffModal
+          isOpen={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          novelId={novelId}
+          entityType="setting"
+          entityId={settingId}
+          currentContent={description}
+          title={`設定: ${name || '（名称未設定）'}`}
+          onRestoreSuccess={(restored) => {
+            setDescription(restored);
+          }}
+        />
+      )}
     </div>
   );
 }

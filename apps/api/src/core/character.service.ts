@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { characters } from '@novel-creator/db';
+import { characters, editHistories } from '@novel-creator/db';
 import {
   editCharacter,
   editCharacterDocument,
@@ -100,6 +100,25 @@ export class CharacterDomainService {
       .returning();
     if (!row) {
       throw new NotFoundError('Character not found');
+    }
+
+    try {
+      await this.ctx.db.insert(editHistories).values({
+        novelId: row.novelId,
+        entityType: 'character',
+        entityId: row.id,
+        title: row.name,
+        content: JSON.stringify({
+          category: row.category,
+          name: row.name,
+          description: row.description ?? '',
+          traits: row.traits,
+          relationships: row.relationships,
+        }),
+        description: '人物情報の更新',
+      });
+    } catch (e) {
+      console.error('[history] failed to record character history', e);
     }
 
     await upsertEntityEmbedding(
@@ -252,6 +271,20 @@ export class CharacterDomainService {
       .select()
       .from(characters)
       .where(eq(characters.novelId, novelId));
+
+    try {
+      await this.ctx.db.insert(editHistories).values({
+        novelId,
+        entityType: 'characters_markdown',
+        entityId: novelId,
+        title: '人物マークダウン',
+        content: markdown,
+        description: `マークダウン一括保存 (作成: ${diff.toCreate.length}, 更新: ${diff.toUpdate.length}, 削除: ${diff.toDelete.length})`,
+        wordCount: markdown.length,
+      });
+    } catch (e) {
+      console.error('[history] failed to record characters_markdown history', e);
+    }
 
     return {
       characters: updated,

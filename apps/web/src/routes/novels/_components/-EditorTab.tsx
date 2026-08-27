@@ -8,6 +8,7 @@ import { useGenerate } from '@/hooks/useGenerate.js';
 import { useNovel } from '@/hooks/useNovel.js';
 import { countWords } from '@/lib/sse.js';
 import type { ExtractResult, Section, Setting, Timeline } from '@/lib/types.js';
+import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
 import { ChevronDownIcon, ChevronUpIcon, PencilIcon, PlusIcon, SparklesIcon } from './-Icons.js';
 import { MonacoEditor } from './-MonacoEditor.js';
 
@@ -306,6 +307,7 @@ export function EditorTab({
         {selectedSection ? (
           <SectionEditor
             key={editorKey}
+            novelId={novel.id}
             section={selectedSection}
             onRefresh={onRefresh}
             onUpdateTitle={(newTitle) => handleUpdateSectionTitle(selectedSection, newTitle)}
@@ -343,12 +345,14 @@ export function EditorTab({
 }
 
 function SectionEditor({
+  novelId,
   section,
   onRefresh,
   onUpdateTitle,
   isZenMode,
   onToggleZenMode,
 }: {
+  novelId: string;
   section: Section;
   onRefresh: () => Promise<void>;
   onUpdateTitle: (newTitle: string) => Promise<void>;
@@ -370,6 +374,7 @@ function SectionEditor({
   const [titleInput, setTitleInput] = useState(section.title || `節 ${section.order}`);
   const [extractResultOpen, setExtractResultOpen] = useState(false);
   const [extracted, setExtracted] = useState<ExtractResult | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   useEffect(() => {
     setTitleInput(section.title || `節 ${section.order}`);
@@ -562,6 +567,14 @@ function SectionEditor({
           <Button
             size="sm"
             variant="secondary"
+            onClick={() => setHistoryOpen(true)}
+            title="編集履歴と差分を確認・復元"
+          >
+            🕒 履歴
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
             onClick={onToggleZenMode}
             title={isZenMode ? '集中モードを解除 (Esc)' : '全画面集中モード'}
           >
@@ -631,6 +644,20 @@ function SectionEditor({
         isOpen={extractResultOpen}
         onClose={() => setExtractResultOpen(false)}
         result={extracted}
+      />
+      <HistoryDiffModal
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        novelId={novelId}
+        entityType="content"
+        entityId={section.id}
+        currentContent={localBody}
+        title={`${section.title || `節 ${section.order}`} の本文`}
+        onRestoreSuccess={(restored) => {
+          setLocalBody(restored);
+          setSavedBody(restored);
+          void onRefresh();
+        }}
       />
     </div>
   );

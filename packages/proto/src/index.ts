@@ -9,3 +9,4 @@ export * from './gen/novelcreator/v1/llm_instruction_pb.js';
 export * from './gen/novelcreator/v1/generate_pb.js';
 export * from './gen/novelcreator/v1/chat_pb.js';
 export * from './gen/novelcreator/v1/backup_pb.js';
+export * from './gen/novelcreator/v1/history_pb.js';
