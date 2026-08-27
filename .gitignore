@@ -7,7 +7,6 @@ storybook-static
 .turbo
 .cache
 .vite
-.eslintcache
 
 # 環境変数・シークレット
 .env
