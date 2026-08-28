@@ -36,3 +36,11 @@ export type {
   CharacterCategoryNode,
   CharactersDiff,
 } from './charactersMarkdown.js';
+export {
+  formatNovelText,
+  type ExportFormat,
+  type NovelExportData,
+  type NovelExportChapter,
+  type NovelExportSection,
+} from './exportFormatter.js';
+export { generateCharacterMermaidGraph, type CharacterGraphNode } from './characterGraph.js';

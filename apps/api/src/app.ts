@@ -15,6 +15,7 @@ import novelsRouter from './routes/novels.js';
 import sectionsRouter from './routes/sections.js';
 import settingsRouter from './routes/settings.js';
 import timelinesRouter from './routes/timelines.js';
+import foreshadowingsRouter from './routes/foreshadowings.js';
 
 // API ルーター定義
 export const api = new Hono<AppContext>()
@@ -25,6 +26,7 @@ export const api = new Hono<AppContext>()
   .route('/characters', charactersRouter)
   .route('/settings', settingsRouter)
   .route('/timelines', timelinesRouter)
+  .route('/foreshadowings', foreshadowingsRouter)
   .route('/llm-instructions', llmInstructionsRouter)
   .route('/chat', chatRouter)
   .route('/backup', backupRouter)

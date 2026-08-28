@@ -18,4 +18,6 @@ export {
   creativeChatSystemPrompt,
   type CreativeChatContext,
   extractChatEntities,
+  proofreadPrompt,
+  type ProofreadContext,
 } from './prompts/index.js';

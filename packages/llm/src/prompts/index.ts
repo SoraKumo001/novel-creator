@@ -14,3 +14,5 @@ export { editCharacterDocument } from './editCharacterDocument.js';
 export { creativeChatSystemPrompt } from './creativeChat.js';
 export type { CreativeChatContext } from './creativeChat.js';
 export { extractChatEntities } from './extractChatEntities.js';
+export { proofreadPrompt } from './proofread.js';
+export type { ProofreadContext } from './proofread.js';

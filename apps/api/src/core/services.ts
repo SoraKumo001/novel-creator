@@ -11,6 +11,7 @@ import { GenerateDomainService } from './generate.service.js';
 import { ChatDomainService } from './chat.service.js';
 import { BackupDomainService } from './backup.service.js';
 import { HistoryDomainService } from './history.service.js';
+import { ForeshadowingDomainService } from './foreshadowing.service.js';
 
 export interface DomainServices {
   novel: NovelDomainService;
@@ -20,6 +21,7 @@ export interface DomainServices {
   character: CharacterDomainService;
   setting: SettingDomainService;
   timeline: TimelineDomainService;
+  foreshadowing: ForeshadowingDomainService;
   llmInstruction: LlmInstructionDomainService;
   generate: GenerateDomainService;
   chat: ChatDomainService;
@@ -36,6 +38,7 @@ export function createDomainServices(ctx: ServiceContext): DomainServices {
     character: new CharacterDomainService(ctx),
     setting: new SettingDomainService(ctx),
     timeline: new TimelineDomainService(ctx),
+    foreshadowing: new ForeshadowingDomainService(ctx),
     llmInstruction: new LlmInstructionDomainService(ctx),
     generate: new GenerateDomainService(ctx),
     chat: new ChatDomainService(ctx),

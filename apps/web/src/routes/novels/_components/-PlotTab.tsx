@@ -11,6 +11,8 @@ import { useGenerate } from '@/hooks/useGenerate.js';
 import { useNovel } from '@/hooks/useNovel.js';
 import type { Chapter, Section } from '@/lib/types.js';
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   IconButton,
@@ -167,6 +169,64 @@ export function PlotTab({
     }
   }
 
+  async function handleMoveChapter(chapterId: string, direction: 'up' | 'down') {
+    const sorted = [...chapters].sort((a, b) => a.order - b.order);
+    const index = sorted.findIndex((c) => c.id === chapterId);
+    if (index === -1) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sorted.length) return;
+
+    const current = sorted[index];
+    const target = sorted[targetIndex];
+
+    const currentOrder = current.order;
+    const targetOrder = target.order;
+
+    await updateChapter(current.id, {
+      title: current.title,
+      order: targetOrder,
+      summary: current.summary ?? '',
+    });
+    await updateChapter(target.id, {
+      title: target.title,
+      order: currentOrder,
+      summary: target.summary ?? '',
+    });
+
+    await refetchChapters();
+    await onRefresh();
+  }
+
+  async function handleMoveSection(chapterId: string, sectionId: string, direction: 'up' | 'down') {
+    const chapter = chapters.find((c) => c.id === chapterId);
+    if (!chapter) return;
+    const sorted = [...chapter.sections].sort((a, b) => a.order - b.order);
+    const index = sorted.findIndex((s) => s.id === sectionId);
+    if (index === -1) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= sorted.length) return;
+
+    const current = sorted[index];
+    const target = sorted[targetIndex];
+
+    const currentOrder = current.order;
+    const targetOrder = target.order;
+
+    await updateSection(current.id, {
+      title: current.title ?? '',
+      order: targetOrder,
+      summary: current.summary ?? '',
+    });
+    await updateSection(target.id, {
+      title: target.title ?? '',
+      order: currentOrder,
+      summary: target.summary ?? '',
+    });
+
+    await refetchChapters();
+    await onRefresh();
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -299,7 +359,7 @@ export function PlotTab({
 
       {!loading && (
         <div className="space-y-3">
-          {chapters.map((chapter) => (
+          {chapters.map((chapter, chIdx) => (
             <ChapterTreeItem
               key={chapter.id}
               chapter={chapter}
@@ -312,6 +372,12 @@ export function PlotTab({
               onEditSection={(s) => setSectionForm({ chapterId: chapter.id, section: s })}
               onDeleteSection={(s) => setDeleteTarget({ type: 'section', id: s.id })}
               onGenerateSectionSummary={(s) => handleGenerateSectionSummaryAction(s.id)}
+              onMoveChapterUp={() => void handleMoveChapter(chapter.id, 'up')}
+              onMoveChapterDown={() => void handleMoveChapter(chapter.id, 'down')}
+              onMoveSectionUp={(sId) => void handleMoveSection(chapter.id, sId, 'up')}
+              onMoveSectionDown={(sId) => void handleMoveSection(chapter.id, sId, 'down')}
+              canMoveUp={chIdx > 0}
+              canMoveDown={chIdx < chapters.length - 1}
               generatingSummaryId={activeGeneratingId}
             />
           ))}
@@ -358,6 +424,12 @@ function ChapterTreeItem({
   onEditSection,
   onDeleteSection,
   onGenerateSectionSummary,
+  onMoveChapterUp,
+  onMoveChapterDown,
+  onMoveSectionUp,
+  onMoveSectionDown,
+  canMoveUp,
+  canMoveDown,
   generatingSummaryId,
 }: {
   chapter: Chapter & { sections: Section[] };
@@ -370,6 +442,12 @@ function ChapterTreeItem({
   onEditSection: (section: Section) => void;
   onDeleteSection: (section: Section) => void;
   onGenerateSectionSummary: (section: Section) => Promise<void>;
+  onMoveChapterUp: () => void;
+  onMoveChapterDown: () => void;
+  onMoveSectionUp: (sectionId: string) => void;
+  onMoveSectionDown: (sectionId: string) => void;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
   generatingSummaryId: string | null;
 }) {
   const isGeneratingChapter = generatingSummaryId === chapter.id;
@@ -393,6 +471,18 @@ function ChapterTreeItem({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          <IconButton
+            label="章を上に移動"
+            icon={<ArrowUpIcon />}
+            onClick={onMoveChapterUp}
+            disabled={!canMoveUp}
+          />
+          <IconButton
+            label="章を下に移動"
+            icon={<ArrowDownIcon />}
+            onClick={onMoveChapterDown}
+            disabled={!canMoveDown}
+          />
           <IconButton
             label={isGeneratingChapter ? '概要を生成中...' : 'AIで章の概要を生成'}
             icon={
@@ -422,7 +512,7 @@ function ChapterTreeItem({
           {chapter.sections.length === 0 ? (
             <p className="p-2 text-xs text-muted-foreground italic">節がまだありません。</p>
           ) : (
-            chapter.sections.map((section) => {
+            chapter.sections.map((section, secIdx) => {
               const isGeneratingSec = generatingSummaryId === section.id;
               return (
                 <div
@@ -444,6 +534,18 @@ function ChapterTreeItem({
                     )}
                   </div>
                   <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <IconButton
+                      label="節を上に移動"
+                      icon={<ArrowUpIcon />}
+                      onClick={() => onMoveSectionUp(section.id)}
+                      disabled={secIdx === 0}
+                    />
+                    <IconButton
+                      label="節を下に移動"
+                      icon={<ArrowDownIcon />}
+                      onClick={() => onMoveSectionDown(section.id)}
+                      disabled={secIdx === chapter.sections.length - 1}
+                    />
                     <IconButton
                       label={isGeneratingSec ? '概要を生成中...' : 'AIで節の概要を生成'}
                       icon={

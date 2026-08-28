@@ -82,6 +82,23 @@ export const createTimelineSchema = z.object({
   sectionId: z.string().optional(),
 });
 
+// ---- foreshadowings ----
+export const createForeshadowingSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  status: z.enum(['unresolved', 'resolved', 'abandoned']).optional(),
+  placedSectionId: z.string().uuid().optional().nullable(),
+  resolvedSectionId: z.string().uuid().optional().nullable(),
+});
+
+export const updateForeshadowingSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().optional().nullable(),
+  status: z.enum(['unresolved', 'resolved', 'abandoned']).optional(),
+  placedSectionId: z.string().uuid().optional().nullable(),
+  resolvedSectionId: z.string().uuid().optional().nullable(),
+});
+
 // ---- LLM 編集 ----
 export const editInstructionSchema = z.object({
   instruction: z.string().min(1),

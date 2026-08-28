@@ -71,6 +71,36 @@ export interface Timeline {
   createdAt: string | null;
 }
 
+export type ForeshadowingStatus = 'unresolved' | 'resolved' | 'abandoned';
+
+export interface Foreshadowing {
+  id: string;
+  novelId: string;
+  title: string;
+  description: string | null;
+  status: ForeshadowingStatus;
+  placedSectionId: string | null;
+  resolvedSectionId: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export interface CreateForeshadowingInput {
+  title: string;
+  description?: string;
+  status?: ForeshadowingStatus;
+  placedSectionId?: string | null;
+  resolvedSectionId?: string | null;
+}
+
+export interface UpdateForeshadowingInput {
+  title?: string;
+  description?: string | null;
+  status?: ForeshadowingStatus;
+  placedSectionId?: string | null;
+  resolvedSectionId?: string | null;
+}
+
 // 小説詳細（関連データ含む）
 export interface NovelDetail extends Novel {
   chapters: Chapter[];
@@ -317,4 +347,20 @@ export interface ImportResult {
   success: true;
   novelId: string;
   counts: Record<string, number>;
+}
+
+// ---- 校正・推敲 ----
+export interface ProofreadIssue {
+  type: 'viewpoint' | 'typo' | 'grammar' | 'pacing' | 'consistency' | 'other';
+  originalText: string;
+  suggestion: string;
+  reason: string;
+}
+
+export interface ProofreadResult {
+  score: number;
+  critique: string;
+  advice: string;
+  issues: ProofreadIssue[];
+  polishedBody: string;
 }

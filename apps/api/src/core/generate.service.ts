@@ -7,6 +7,7 @@ import {
   extractTimeline,
   generateJSON,
   plotGeneration,
+  proofreadPrompt,
   sectionSummary,
   streamText,
 } from '@novel-creator/llm';
@@ -198,5 +199,64 @@ export class GenerateDomainService {
         order: t.order,
       })),
     };
+  }
+
+  async proofreadContent(sectionId: string, customBody?: string) {
+    const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
+    if (!section) {
+      throw new NotFoundError('Section not found');
+    }
+
+    const [chapter] = await this.ctx.db
+      .select()
+      .from(chapters)
+      .where(eq(chapters.id, section.chapterId));
+    const [novel] = chapter
+      ? await this.ctx.db.select().from(novels).where(eq(novels.id, chapter.novelId))
+      : [null];
+
+    let bodyText = customBody;
+    if (bodyText === undefined) {
+      const [content] = await this.ctx.db
+        .select()
+        .from(contents)
+        .where(eq(contents.sectionId, sectionId));
+      bodyText = content?.body ?? '';
+    }
+
+    const context = novel
+      ? await searchContext(
+          this.ctx.vectorStore,
+          this.ctx.embedding,
+          novel.id,
+          { query: bodyText || section.title || '' },
+          this.ctx.env,
+        )
+      : { characters: [], settings: [] };
+
+    const prompt = proofreadPrompt({
+      novelTitle: novel?.title,
+      chapterTitle: chapter?.title,
+      sectionTitle: section.title ?? undefined,
+      sectionSummary: section.summary ?? undefined,
+      characters: context.characters.join('\n'),
+      settings: context.settings.join('\n'),
+      body: bodyText,
+    });
+
+    const result = await generateJSON<{
+      score: number;
+      critique: string;
+      advice: string;
+      issues: Array<{
+        type: 'viewpoint' | 'typo' | 'grammar' | 'pacing' | 'consistency' | 'other';
+        originalText: string;
+        suggestion: string;
+        reason: string;
+      }>;
+      polishedBody: string;
+    }>(this.ctx.llm, prompt);
+
+    return result;
   }
 }

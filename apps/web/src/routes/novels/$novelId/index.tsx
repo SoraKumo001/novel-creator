@@ -1,28 +1,41 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import type { NovelExportData } from '@novel-creator/shared';
+import { Button } from '@/components/Button.js';
+import { ExportModal } from '@/components/ExportModal.js';
 import { Loading } from '@/components/Loading.js';
 import { useChat } from '@/hooks/useChat.js';
 import { useNovel } from '@/hooks/useNovel.js';
+import { useToast } from '@/hooks/useToast.js';
+import { fetchNovelExportData } from '@/lib/services/index.js';
 import { CharactersTab } from '../_components/-CharactersTab.js';
 import { EditorTab } from '../_components/-EditorTab.js';
 import { OverviewTab } from '../_components/-OverviewTab.js';
 import { PlotTab } from '../_components/-PlotTab.js';
 import { SettingsTab } from '../_components/-SettingsTab.js';
 import { TimelineTab } from '../_components/-TimelineTab.js';
+import { ForeshadowingTab } from '../_components/-ForeshadowingTab.js';
 
 export const Route = createFileRoute('/novels/$novelId/')({
   validateSearch: (search: Record<string, unknown>) =>
     ({
-      tab: (['overview', 'settings', 'characters', 'plot', 'editor', 'timeline'].includes(
-        search.tab as string,
-      )
+      tab: ([
+        'overview',
+        'settings',
+        'characters',
+        'plot',
+        'editor',
+        'timeline',
+        'foreshadowing',
+      ].includes(search.tab as string)
         ? search.tab
         : undefined) as TabId | undefined,
     }) as { tab?: TabId },
   component: NovelDetailPage,
 });
 
-type TabId = 'overview' | 'settings' | 'characters' | 'plot' | 'editor' | 'timeline';
+type TabId =
+  'overview' | 'settings' | 'characters' | 'plot' | 'editor' | 'timeline' | 'foreshadowing';
 
 interface TabItem {
   id: TabId;
@@ -38,6 +51,25 @@ function NovelDetailPage() {
   const activeTab: TabId = tab ?? 'overview';
   const navigate = useNavigate();
   const { toggleChat } = useChat();
+  const toast = useToast();
+
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportData, setExportData] = useState<NovelExportData | null>(null);
+
+  const handleOpenExport = useCallback(async () => {
+    if (!novelId) return;
+    setExportLoading(true);
+    try {
+      const data = await fetchNovelExportData(novelId);
+      setExportData(data);
+      setExportOpen(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'エクスポートデータの取得に失敗しました');
+    } finally {
+      setExportLoading(false);
+    }
+  }, [novelId, toast]);
 
   const tabs: TabItem[] = [
     { id: 'overview', label: '概要', icon: '📋', shortcut: '1' },
@@ -46,6 +78,7 @@ function NovelDetailPage() {
     { id: 'plot', label: 'プロット', icon: '🗺️', shortcut: '4' },
     { id: 'editor', label: '本文', icon: '✍️', shortcut: '5' },
     { id: 'timeline', label: 'タイムライン', icon: '⏱️', shortcut: '6' },
+    { id: 'foreshadowing', label: '伏線', icon: '🚩', shortcut: '7' },
   ];
 
   // グローバルショートカット: Alt+1~6 でタブ切り替え、Ctrl+J でチャット開閉
@@ -87,18 +120,25 @@ function NovelDetailPage() {
       )}
       {novel && (
         <>
-          <header className="mb-4 shrink-0">
-            <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
-              小説ワークスペース
+          <header className="mb-4 shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
+                小説ワークスペース
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                {novel.title}
+              </h1>
+              {novel.description && (
+                <p className="mt-1 max-w-4xl text-sm text-muted-foreground line-clamp-2">
+                  {novel.description}
+                </p>
+              )}
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {novel.title}
-            </h1>
-            {novel.description && (
-              <p className="mt-1 max-w-4xl text-sm text-muted-foreground line-clamp-2">
-                {novel.description}
-              </p>
-            )}
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="secondary" onClick={handleOpenExport} isLoading={exportLoading}>
+                📤 全文エクスポート
+              </Button>
+            </div>
           </header>
 
           <nav className="mb-4 shrink-0 border-b border-border">
@@ -152,8 +192,17 @@ function NovelDetailPage() {
                 <TimelineTab novel={novel} onRefresh={refetch} />
               </div>
             )}
+            {activeTab === 'foreshadowing' && (
+              <div className="h-full overflow-y-auto pr-1">
+                <ForeshadowingTab novel={novel} onRefresh={refetch} />
+              </div>
+            )}
           </div>
         </>
+      )}
+
+      {exportData && (
+        <ExportModal isOpen={exportOpen} onClose={() => setExportOpen(false)} novel={exportData} />
       )}
     </div>
   );

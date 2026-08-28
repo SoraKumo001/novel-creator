@@ -98,3 +98,52 @@ export async function deleteNovel(id: string): Promise<void> {
   const res = await apiClient.novels[':id'].$delete({ param: { id } });
   if (!res.ok) throw new Error('Failed to delete novel');
 }
+
+export async function fetchNovelExportData(id: string) {
+  const [novelRes, chaptersRes] = await Promise.all([
+    apiClient.novels[':id'].$get({ param: { id } }),
+    apiClient.novels[':id'].chapters.$get({ param: { id } }),
+  ]);
+
+  if (!novelRes.ok) throw new Error('Failed to fetch novel data');
+  if (!chaptersRes.ok) throw new Error('Failed to fetch chapters');
+
+  const novel = await novelRes.json();
+  const rawChapters = await chaptersRes.json();
+
+  const chaptersWithSections = await Promise.all(
+    rawChapters.map(async (ch) => {
+      const chDetailRes = await apiClient.chapters[':id'].$get({
+        param: { id: ch.id },
+      });
+      const chDetail = chDetailRes.ok ? await chDetailRes.json() : null;
+      const rawSections = chDetail?.sections ?? [];
+
+      const sectionsWithContent = await Promise.all(
+        rawSections.map(async (sec) => {
+          const contentRes = await apiClient.contents[':id'].$get({
+            param: { id: sec.id },
+          });
+          const contentData = contentRes.ok ? await contentRes.json() : null;
+          return {
+            title: sec.title ?? null,
+            order: sec.order,
+            content: contentData?.body ?? null,
+          };
+        }),
+      );
+
+      return {
+        title: ch.title,
+        order: ch.order,
+        sections: sectionsWithContent,
+      };
+    }),
+  );
+
+  return {
+    title: novel.title,
+    description: novel.description ?? null,
+    chapters: chaptersWithSections,
+  };
+}

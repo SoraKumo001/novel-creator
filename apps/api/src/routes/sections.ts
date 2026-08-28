@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 
 import type { AppContext } from '../context.js';
 import { getServices } from '../core/services.js';
@@ -89,6 +90,18 @@ const sectionsRouter = new Hono<AppContext>()
     const { id } = c.req.valid('param');
     const result = await getServices(c).generate.extractEntities(id);
     return c.json(result);
-  });
+  })
+  // POST /api/sections/:id/generate/proofread - 本文校正・推敲・レビュー
+  .post(
+    '/:id/generate/proofread',
+    zValidator('param', idParamSchema),
+    zValidator('json', z.object({ body: z.string().optional() }).optional()),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      const jsonBody = c.req.valid('json');
+      const result = await getServices(c).generate.proofreadContent(id, jsonBody?.body);
+      return c.json(result);
+    },
+  );
 
 export default sectionsRouter;

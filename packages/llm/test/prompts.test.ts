@@ -9,6 +9,7 @@ import {
   extractSettings,
   extractTimeline,
   plotGeneration,
+  proofreadPrompt,
   sectionSummary,
 } from '../src/prompts/index.js';
 
@@ -130,5 +131,29 @@ describe('extractChatEntities', () => {
     expect(prompt).toContain('"characters"');
     expect(prompt).toContain('"settings"');
     expect(prompt).toContain('"traits"');
+  });
+});
+
+describe('proofreadPrompt', () => {
+  it('本文およびコンテキストが含まれること', () => {
+    const prompt = proofreadPrompt({
+      novelTitle: 'タイトルN',
+      chapterTitle: '第1章',
+      sectionTitle: '第1節',
+      sectionSummary: '概要S',
+      characters: 'アリス',
+      settings: '魔法',
+      body: '本文テキストB',
+    });
+    expect(prompt).toContain('タイトルN');
+    expect(prompt).toContain('第1章');
+    expect(prompt).toContain('第1節');
+    expect(prompt).toContain('概要S');
+    expect(prompt).toContain('アリス');
+    expect(prompt).toContain('魔法');
+    expect(prompt).toContain('本文テキストB');
+    expect(prompt).toContain('"score"');
+    expect(prompt).toContain('"issues"');
+    expect(prompt).toContain('"polishedBody"');
   });
 });

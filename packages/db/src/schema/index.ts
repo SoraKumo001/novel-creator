@@ -8,3 +8,4 @@ export * from './timelines.js';
 export * from './llmInstructions.js';
 export * from './chatSessions.js';
 export * from './editHistories.js';
+export * from './foreshadowings.js';
