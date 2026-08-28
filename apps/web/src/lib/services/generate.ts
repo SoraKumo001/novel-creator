@@ -1,12 +1,17 @@
-import { generateClient } from '../grpc-client.js';
+import { apiClient } from '../api-client.js';
 import type { ExtractResult, GeneratedPlot, GeneratedSummary } from '../types.js';
 
 export async function generatePlot(novelId: string): Promise<GeneratedPlot> {
-  const res = await generateClient.generatePlot({ novelId });
+  const res = await apiClient.novels[':id'].generate.plot.$post({
+    param: { id: novelId },
+  });
+
+  if (!res.ok) throw new Error('Failed to generate plot');
+  const data = await res.json();
   return {
-    title: res.title,
-    description: res.description,
-    chapters: res.chapters.map((ch) => ({
+    title: data.title,
+    description: data.description,
+    chapters: data.chapters.map((ch) => ({
       title: ch.title,
       order: ch.order,
       summary: ch.summary,
@@ -15,50 +20,85 @@ export async function generatePlot(novelId: string): Promise<GeneratedPlot> {
 }
 
 export async function generateChapterSummary(chapterId: string): Promise<GeneratedSummary> {
-  const res = await generateClient.generateChapterSummary({ chapterId });
+  const res = await apiClient.chapters[':id'].generate.summary.$post({
+    param: { id: chapterId },
+  });
+  if (!res.ok) throw new Error('Failed to generate chapter summary');
+  const data = await res.json();
   return {
-    title: res.title,
-    order: res.order,
-    summary: res.summary,
+    title: data.title,
+    order: data.order,
+    summary: data.summary,
   };
 }
 
 export async function generateSectionSummary(sectionId: string): Promise<GeneratedSummary> {
-  const res = await generateClient.generateSectionSummary({ sectionId });
+  const res = await apiClient.sections[':id'].generate.summary.$post({
+    param: { id: sectionId },
+  });
+  if (!res.ok) throw new Error('Failed to generate section summary');
+  const data = await res.json();
   return {
-    title: res.title,
-    order: res.order,
-    summary: res.summary,
+    title: data.title,
+    order: data.order,
+    summary: data.summary,
   };
 }
 
 export async function* generateSectionContent(sectionId: string): AsyncIterable<string> {
-  for await (const res of generateClient.generateSectionContent({ sectionId })) {
-    yield res.chunk;
+  const res = await apiClient.sections[':id'].generate.content.$post({
+    param: { id: sectionId },
+  });
+  if (!res.ok || !res.body) {
+    throw new Error('Failed to generate section content');
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(trimmed.slice(6));
+            if (data.done) return;
+            if (data.text) yield data.text;
+          } catch {
+            // ignore JSON parse error
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
   }
 }
 
 export async function extractEntities(sectionId: string): Promise<ExtractResult> {
-  const res = await generateClient.extractEntities({ sectionId });
+  const res = await apiClient.sections[':id'].generate.extract.$post({
+    param: { id: sectionId },
+  });
+  if (!res.ok) throw new Error('Failed to extract entities');
+  const data = await res.json();
   return {
-    timelines: res.timelines.map((t) => ({
-      id: '',
-      novelId: '',
-      sectionId: null,
+    timelines: data.timelines.map((t) => ({
       event: t.event,
       order: t.order,
-      timestamp: t.timestamp || null,
-      createdAt: null,
+      timestamp: t.timestamp ?? null,
     })),
-    settings: res.settings.map((s) => ({
-      id: '',
-      novelId: '',
+    settings: data.settings.map((s) => ({
       category: s.category,
       name: s.name,
-      description: s.description || null,
-      metadata: {},
-      createdAt: null,
-      updatedAt: null,
+      description: s.description ?? null,
     })),
   };
 }

@@ -1,48 +1,54 @@
-import { sectionClient } from '../grpc-client.js';
+import { apiClient } from '../api-client.js';
 import type { Section, SectionWithContent, UpdateSectionInput } from '../types.js';
 
 export async function fetchSection(id: string): Promise<SectionWithContent> {
-  const res = await sectionClient.getSection({ id });
-  const s = res.section!;
+  const res = await apiClient.sections[':id'].$get({ param: { id } });
+  if (!res.ok) throw new Error('Failed to fetch section');
+  const data = await res.json();
   return {
-    id: s.id,
-    chapterId: s.chapterId,
-    title: s.title ?? null,
-    order: s.order,
-    summary: s.summary ?? null,
-    createdAt: s.createdAt ?? null,
-    updatedAt: s.updatedAt ?? null,
-    content: res.content
+    id: data.id,
+    chapterId: data.chapterId,
+    title: data.title ?? null,
+    order: data.order,
+    summary: data.summary ?? null,
+    createdAt: data.createdAt ?? null,
+    updatedAt: data.updatedAt ?? null,
+    content: data.content
       ? {
-          id: res.content.id,
-          sectionId: res.content.sectionId,
-          body: res.content.body,
-          wordCount: res.content.wordCount ?? null,
-          createdAt: res.content.createdAt ?? null,
-          updatedAt: res.content.updatedAt ?? null,
+          id: data.content.id,
+          sectionId: data.content.sectionId,
+          body: data.content.body,
+          wordCount: data.content.wordCount ?? null,
+          createdAt: data.content.createdAt ?? null,
+          updatedAt: data.content.updatedAt ?? null,
         }
       : null,
   };
 }
 
 export async function updateSection(id: string, input: UpdateSectionInput): Promise<Section> {
-  const res = await sectionClient.updateSection({
-    id,
-    title: input.title,
-    order: input.order,
-    summary: input.summary,
+  const res = await apiClient.sections[':id'].$put({
+    param: { id },
+    json: {
+      title: input.title,
+      order: input.order,
+      summary: input.summary,
+    },
   });
+  if (!res.ok) throw new Error('Failed to update section');
+  const row = await res.json();
   return {
-    id: res.id,
-    chapterId: res.chapterId,
-    title: res.title ?? null,
-    order: res.order,
-    summary: res.summary ?? null,
-    createdAt: res.createdAt ?? null,
-    updatedAt: res.updatedAt ?? null,
+    id: row.id,
+    chapterId: row.chapterId,
+    title: row.title ?? null,
+    order: row.order,
+    summary: row.summary ?? null,
+    createdAt: row.createdAt ?? null,
+    updatedAt: row.updatedAt ?? null,
   };
 }
 
 export async function deleteSection(id: string): Promise<void> {
-  await sectionClient.deleteSection({ id });
+  const res = await apiClient.sections[':id'].$delete({ param: { id } });
+  if (!res.ok) throw new Error('Failed to delete section');
 }

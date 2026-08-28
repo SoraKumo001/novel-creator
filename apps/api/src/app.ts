@@ -1,30 +1,44 @@
 import { cors } from 'hono/cors';
 import { Hono } from 'hono';
 
-import { cors as connectCors } from '@connectrpc/connect';
-
 import type { AppContext } from './context.js';
-import { createConnectMiddleware } from './connect.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { logger } from './middleware/logger.js';
 import backupRouter from './routes/backup.js';
 import chaptersRouter from './routes/chapters.js';
 import charactersRouter from './routes/characters.js';
+import chatRouter from './routes/chat.js';
 import contentsRouter from './routes/contents.js';
-import generateRouter from './routes/generate.js';
-import llmEditRouter from './routes/llm-edit.js';
+import historiesRouter from './routes/histories.js';
 import llmInstructionsRouter from './routes/llm-instructions.js';
 import novelsRouter from './routes/novels.js';
 import sectionsRouter from './routes/sections.js';
 import settingsRouter from './routes/settings.js';
 import timelinesRouter from './routes/timelines.js';
-import chatRouter from './routes/chat.js';
+
+// API ルーター定義
+export const api = new Hono<AppContext>()
+  .route('/novels', novelsRouter)
+  .route('/chapters', chaptersRouter)
+  .route('/sections', sectionsRouter)
+  .route('/contents', contentsRouter)
+  .route('/characters', charactersRouter)
+  .route('/settings', settingsRouter)
+  .route('/timelines', timelinesRouter)
+  .route('/llm-instructions', llmInstructionsRouter)
+  .route('/chat', chatRouter)
+  .route('/backup', backupRouter)
+  .route('/histories', historiesRouter);
+
+// Hono RPC 用のアプリケーション型定義
+export type ApiType = typeof api;
+export type AppType = ApiType;
 
 /**
  * Hono アプリケーションを構築する。
  * Node.js（index.ts）と Cloudflare Workers（worker.ts）の両方から利用する。
  */
-export function createApp(context: AppContext['Variables']): Hono<AppContext> {
+export function createApp(context: AppContext['Variables']) {
   const app = new Hono<AppContext>();
 
   // ミドルウェア
@@ -32,8 +46,8 @@ export function createApp(context: AppContext['Variables']): Hono<AppContext> {
     '*',
     cors({
       origin: (origin) => origin ?? '*',
-      allowHeaders: [...connectCors.allowedHeaders, 'Content-Type', 'Authorization'],
-      exposeHeaders: [...connectCors.exposedHeaders],
+      allowHeaders: ['Content-Type', 'Authorization'],
+      exposeHeaders: ['Content-Type'],
     }),
   );
   app.use('*', logger);
@@ -45,34 +59,11 @@ export function createApp(context: AppContext['Variables']): Hono<AppContext> {
     c.set('vectorStore', context.vectorStore);
     await next();
   });
-  app.use(
-    '*',
-    createConnectMiddleware((c) => ({
-      env: c.var.env,
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-    })),
-  );
   app.onError(errorHandler);
 
   // ルーター登録
-  app.route('/api/novels', novelsRouter);
-  app.route('/api', chaptersRouter);
-  app.route('/api', sectionsRouter);
-  app.route('/api', contentsRouter);
-  app.route('/api', charactersRouter);
-  app.route('/api', settingsRouter);
-  app.route('/api', timelinesRouter);
-  app.route('/api', generateRouter);
-  app.route('/api', llmEditRouter);
-  app.route('/api', llmInstructionsRouter);
-  app.route('/api/chat', chatRouter);
-  app.route('/api/backup', backupRouter);
-
-  // ヘルスチェック
-  app.get('/health', (c) => c.json({ status: 'ok' }));
+  app.route('/api', api);
+  app.get('/health', (c) => c.json({ status: 'ok' as const }));
 
   return app;
 }

@@ -20,11 +20,11 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 ```
 ┌─────────────────────────────────────────────────────┐
 │  apps/web  (React + Vite)                           │
-│  Connect-Web / TanStack Router / Tailwind / Monaco  │
+│  Hono RPC Client / TanStack Router / Tailwind       │
 └──────────────────────┬──────────────────────────────┘
-                       │ gRPC / ConnectRPC (Streaming)
+                       │ Hono RPC (Type-Safe HTTP / SSE)
 ┌──────────────────────▼──────────────────────────────┐
-│  apps/api  (ConnectRPC + Hono)                      │
+│  apps/api  (Hono RPC Server)                        │
 │  Node.js (@hono/node-server) / Workers (wrangler)   │
 ├─────────────┬───────────────┬───────────────────────┤
 │ packages/db │ packages/llm  │ packages/vector       │
@@ -33,34 +33,33 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 │ + Hyperdrive│ Anthropic/    │                       │
 │             │ Ollama/Google │                       │
 ├─────────────┴───────────────┴───────────────────────┤
-│ packages/proto                                      │
-│ Protocol Buffers (.proto) / ConnectRPC Service 定義 │
+│ packages/shared                                     │
+│ Markdown 変換 / 型定義 / ユーティリティ             │
 └─────────────────────────────────────────────────────┘
 ```
 
 ### モノレポ構成
 
-| パッケージ        | 役割                                                                        |
-| ----------------- | --------------------------------------------------------------------------- |
-| `apps/web`        | フロントエンド（React + Vite + Connect-Web + TanStack Router + Tailwind）   |
-| `apps/api`        | バックエンド API（ConnectRPC + Hono、Node.js / Workers 両対応）             |
-| `packages/proto`  | Protocol Buffers 定義（`.proto`）および TypeScript / Connect 自動生成コード |
-| `packages/shared` | 共有ユーティリティ・Markdown 変換・環境変数スキーマ                         |
-| `packages/db`     | Drizzle ORM スキーマ・DB 接続（PostgreSQL / Hyperdrive）                    |
-| `packages/llm`    | LLM ラッパー（AI SDK、プロバイダ切り替え・プロンプトテンプレート）          |
-| `packages/vector` | VectorStore 抽象化（pgvector / Cloudflare Vectorize）                       |
+| パッケージ        | 役割                                                                          |
+| ----------------- | ----------------------------------------------------------------------------- |
+| `apps/web`        | フロントエンド（React + Vite + Hono RPC Client + TanStack Router + Tailwind） |
+| `apps/api`        | バックエンド API（Hono RPC Server、Node.js / Workers 両対応）                 |
+| `packages/shared` | 共有ユーティリティ・Markdown 変換・環境変数スキーマ                           |
+| `packages/db`     | Drizzle ORM スキーマ・DB 接続（PostgreSQL / Hyperdrive）                      |
+| `packages/llm`    | LLM ラッパー（AI SDK、プロバイダ切り替え・プロンプトテンプレート）            |
+| `packages/vector` | VectorStore 抽象化（pgvector / Cloudflare Vectorize）                         |
 
 ## 技術スタック
 
 ### 通信プロトコル
 
-- **ConnectRPC**（gRPC / gRPC-Web / Connect プロトコル対応）
-- Protocol Buffers（`.proto`）によるスキーマファースト型定義
+- **Hono RPC**（`hono/client` の `hc` による End-to-End 完全型安全通信）
+- Server-Sent Events (SSE) によるリアルタイムストリーミング
 
 ### フロントエンド
 
 - React
-- Connect-Web（`@connectrpc/connect-web`）
+- Hono Client（`hono/client`）
 - TanStack Router（ファイルベースルーティング）
 - TanStack Query
 - Tailwind CSS（v4 セマンティックデザイントークン設計、ライト/ダークモード連動）
@@ -70,8 +69,8 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 
 ### バックエンド
 
-- ConnectRPC + Hono による gRPC / RPC API
-- Server Streaming RPC によるリアルタイム本文生成・チャット応答ストリーミング
+- Hono による REST / RPC API
+- Server-Sent Events (SSE) によるリアルタイム本文生成・チャット応答ストリーミング
 - LLM の AI 連携（Vercel AI SDK）
 - LLM と Embedding で別プロバイダを指定可能（例: LLM=Ollama / Embedding=Google）
 - VectorDB による検索機能（pgvector / Vectorize）
@@ -130,7 +129,7 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 cp .env.example .env
 # .env の LLM_API_KEY 等を編集
 
-# 初期セットアップ（依存インストール + protoビルド + shared ビルド + DB 起動 + マイグレーション）
+# 初期セットアップ（依存インストール + shared ビルド + DB 起動 + マイグレーション）
 pnpm setup
 
 # 開発サーバー起動（API: ポート3000 / Web: ポート5173）
@@ -142,18 +141,16 @@ http://localhost:5173 にアクセス。
 
 ## スクリプト
 
-### 初期設定・DB・Proto
+### 初期設定・DB
 
-| コマンド           | 内容                                                                                   |
-| ------------------ | -------------------------------------------------------------------------------------- |
-| `pnpm setup`       | 初期セットアップ（install + protoビルド + shared ビルド + DB 起動 + マイグレーション） |
-| `pnpm build:proto` | Protocol Buffers 定義（`packages/proto`）から TypeScript コードを生成・ビルド          |
-| `pnpm setup:db`    | DB 起動 + マイグレーション                                                             |
-| `pnpm db:up`       | Docker で PostgreSQL 起動                                                              |
-| `pnpm db:down`     | Docker で PostgreSQL 停止                                                              |
-| `pnpm db:push`     | DB スキーマ反映                                                                        |
-| `pnpm db:generate` | マイグレーション生成                                                                   |
-| `pnpm db:studio`   | Drizzle Studio                                                                         |
+| コマンド           | 内容                       |
+| ------------------ | -------------------------- |
+| `pnpm setup:db`    | DB 起動 + マイグレーション |
+| `pnpm db:up`       | Docker で PostgreSQL 起動  |
+| `pnpm db:down`     | Docker で PostgreSQL 停止  |
+| `pnpm db:push`     | DB スキーマ反映            |
+| `pnpm db:generate` | マイグレーション生成       |
+| `pnpm db:studio`   | Drizzle Studio             |
 
 ### 開発・UI確認
 

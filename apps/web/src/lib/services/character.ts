@@ -1,4 +1,4 @@
-import { characterClient } from '../grpc-client.js';
+import { apiClient } from '../api-client.js';
 import type {
   Character,
   CreateCharacterInput,
@@ -8,25 +8,18 @@ import type {
   UpdateCharacterInput,
 } from '../types.js';
 
-function parseJsonSafe<T = unknown>(str?: string, defaultValue: unknown = {}): T {
-  if (!str) return defaultValue as T;
-  try {
-    return JSON.parse(str);
-  } catch {
-    return defaultValue as T;
-  }
-}
-
 export async function fetchCharacters(novelId: string): Promise<Character[]> {
-  const res = await characterClient.listCharacters({ novelId });
-  return res.characters.map((c) => ({
+  const res = await apiClient.novels[':id'].characters.$get({ param: { id: novelId } });
+  if (!res.ok) throw new Error('Failed to fetch characters');
+  const rows = await res.json();
+  return rows.map((c) => ({
     id: c.id,
     novelId: c.novelId,
     category: c.category,
     name: c.name,
     description: c.description ?? null,
-    traits: c.traits,
-    relationships: parseJsonSafe(c.relationshipsJson),
+    traits: (c.traits as string[] | null) ?? null,
+    relationships: (c.relationships as Record<string, unknown>) ?? {},
     createdAt: c.createdAt ?? null,
     updatedAt: c.updatedAt ?? null,
   }));
@@ -36,88 +29,102 @@ export async function createCharacter(
   novelId: string,
   input: CreateCharacterInput,
 ): Promise<Character> {
-  const res = await characterClient.createCharacter({
-    novelId,
-    category: input.category,
-    name: input.name,
-    description: input.description,
-    traits: input.traits,
-    relationshipsJson: JSON.stringify(input.relationships ?? {}),
+  const res = await apiClient.novels[':id'].characters.$post({
+    param: { id: novelId },
+    json: {
+      category: input.category,
+      name: input.name,
+      description: input.description,
+      traits: input.traits,
+      relationships: input.relationships,
+    },
   });
+  if (!res.ok) throw new Error('Failed to create character');
+  const row = await res.json();
   return {
-    id: res.id,
-    novelId: res.novelId,
-    category: res.category,
-    name: res.name,
-    description: res.description ?? null,
-    traits: res.traits,
-    relationships: parseJsonSafe(res.relationshipsJson),
-    createdAt: res.createdAt ?? null,
-    updatedAt: res.updatedAt ?? null,
+    id: row.id,
+    novelId: row.novelId,
+    category: row.category,
+    name: row.name,
+    description: row.description ?? null,
+    traits: (row.traits as string[] | null) ?? null,
+    relationships: (row.relationships as Record<string, unknown>) ?? {},
+    createdAt: row.createdAt ?? null,
+    updatedAt: row.updatedAt ?? null,
   };
 }
 
 export async function updateCharacter(id: string, input: UpdateCharacterInput): Promise<Character> {
-  const res = await characterClient.updateCharacter({
-    id,
-    category: input.category,
-    name: input.name,
-    description: input.description,
-    traits: input.traits,
-    relationshipsJson:
-      input.relationships !== undefined ? JSON.stringify(input.relationships) : undefined,
+  const res = await apiClient.characters[':id'].$put({
+    param: { id },
+    json: {
+      category: input.category,
+      name: input.name,
+      description: input.description,
+      traits: input.traits,
+      relationships: input.relationships,
+    },
   });
+  if (!res.ok) throw new Error('Failed to update character');
+  const row = await res.json();
   return {
-    id: res.id,
-    novelId: res.novelId,
-    category: res.category,
-    name: res.name,
-    description: res.description ?? null,
-    traits: res.traits,
-    relationships: parseJsonSafe(res.relationshipsJson),
-    createdAt: res.createdAt ?? null,
-    updatedAt: res.updatedAt ?? null,
+    id: row.id,
+    novelId: row.novelId,
+    category: row.category,
+    name: row.name,
+    description: row.description ?? null,
+    traits: (row.traits as string[] | null) ?? null,
+    relationships: (row.relationships as Record<string, unknown>) ?? {},
+    createdAt: row.createdAt ?? null,
+    updatedAt: row.updatedAt ?? null,
   };
 }
 
 export async function deleteCharacter(id: string): Promise<void> {
-  await characterClient.deleteCharacter({ id });
+  const res = await apiClient.characters[':id'].$delete({ param: { id } });
+  if (!res.ok) throw new Error('Failed to delete character');
 }
 
 export async function editCharacter(id: string, input: EditInstructionInput): Promise<Character> {
-  const res = await characterClient.editCharacter({
-    id,
-    instruction: input.instruction,
+  const res = await apiClient.characters[':id'].edit.$post({
+    param: { id },
+    json: {
+      instruction: input.instruction,
+    },
   });
+  if (!res.ok) throw new Error('Failed to edit character');
+  const row = await res.json();
   return {
-    id: res.id,
-    novelId: res.novelId,
-    category: res.category,
-    name: res.name,
-    description: res.description ?? null,
-    traits: res.traits,
-    relationships: parseJsonSafe(res.relationshipsJson),
-    createdAt: res.createdAt ?? null,
-    updatedAt: res.updatedAt ?? null,
+    id: row.id,
+    novelId: row.novelId,
+    category: row.category,
+    name: row.name,
+    description: row.description ?? null,
+    traits: (row.traits as string[] | null) ?? null,
+    relationships: (row.relationships as Record<string, unknown>) ?? {},
+    createdAt: row.createdAt ?? null,
+    updatedAt: row.updatedAt ?? null,
   };
 }
 
 export async function fetchCharactersMarkdown(novelId: string): Promise<{ markdown: string }> {
-  const res = await characterClient.getCharactersMarkdown({ novelId });
-  return { markdown: res.markdown };
+  const res = await apiClient.novels[':id'].characters.markdown.$get({
+    param: { id: novelId },
+  });
+  if (!res.ok) throw new Error('Failed to fetch characters markdown');
+  return res.json();
 }
 
 export async function saveCharactersMarkdown(
   novelId: string,
   markdown: string,
 ): Promise<SaveCharactersMarkdownResult> {
-  const res = await characterClient.saveCharactersMarkdown({ novelId, markdown });
-  return {
-    created: res.createdCount,
-    updated: res.updatedCount,
-    deleted: res.deletedCount,
-    duplicateCount: 0,
-  };
+  const res = await apiClient.novels[':id'].characters.markdown.$post({
+    param: { id: novelId },
+    json: { markdown },
+  });
+  if (!res.ok) throw new Error('Failed to save characters markdown');
+  return res.json();
 }
 
 export async function editCharacterSection(
@@ -131,18 +138,12 @@ export async function editCharacterSection(
     instruction: string;
   },
 ): Promise<EditCharacterSectionResult> {
-  const res = await characterClient.editCharacterSection({
-    novelId,
-    category: data.category,
-    name: data.name,
-    description: data.description,
-    traits: data.traits,
-    relationships: data.relationships,
-    instruction: data.instruction,
+  const res = await apiClient.novels[':id'].characters['edit-section'].$post({
+    param: { id: novelId },
+    json: data,
   });
-  return {
-    markdown: res.parsedSummary ?? '',
-  };
+  if (!res.ok) throw new Error('Failed to edit character section');
+  return res.json();
 }
 
 export async function editCharacterDocument(
@@ -150,12 +151,10 @@ export async function editCharacterDocument(
   markdown: string,
   instruction: string,
 ): Promise<EditCharacterSectionResult> {
-  const res = await characterClient.editCharacterDocument({
-    novelId,
-    markdown,
-    instruction,
+  const res = await apiClient.novels[':id'].characters['edit-document'].$post({
+    param: { id: novelId },
+    json: { markdown, instruction },
   });
-  return {
-    markdown: res.parsedSummary ?? '',
-  };
+  if (!res.ok) throw new Error('Failed to edit character document');
+  return res.json();
 }

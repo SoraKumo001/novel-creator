@@ -41,15 +41,6 @@ importers:
 
   apps/api:
     dependencies:
-      '@bufbuild/protobuf':
-        specifier: ^2.7.0
-        version: 2.14.0
-      '@connectrpc/connect':
-        specifier: ^2.1.2
-        version: 2.1.2(@bufbuild/protobuf@2.14.0)
-      '@connectrpc/connect-node':
-        specifier: 2.1.2
-        version: 2.1.2(@bufbuild/protobuf@2.14.0)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.14.0))
       '@hono/node-server':
         specifier: ^2.1.1
         version: 2.1.1(hono@4.13.4)
@@ -62,9 +53,6 @@ importers:
       '@novel-creator/llm':
         specifier: workspace:*
         version: link:../../packages/llm
-      '@novel-creator/proto':
-        specifier: workspace:*
-        version: link:../../packages/proto
       '@novel-creator/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -84,9 +72,6 @@ importers:
       '@cloudflare/workers-types':
         specifier: ^5.20260825.1
         version: 5.20260825.1
-      '@connectrpc/connect-web':
-        specifier: 2.1.2
-        version: 2.1.2(@bufbuild/protobuf@2.14.0)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.14.0))
       '@types/node':
         specifier: ^26.3.0
         version: 26.3.0
@@ -99,21 +84,12 @@ importers:
 
   apps/web:
     dependencies:
-      '@bufbuild/protobuf':
-        specifier: ^2.7.0
-        version: 2.14.0
-      '@connectrpc/connect':
-        specifier: ^2.1.2
-        version: 2.1.2(@bufbuild/protobuf@2.14.0)
-      '@connectrpc/connect-web':
-        specifier: ^2.1.2
-        version: 2.1.2(@bufbuild/protobuf@2.14.0)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.14.0))
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.56.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@novel-creator/proto':
+      '@novel-creator/api':
         specifier: workspace:*
-        version: link:../../packages/proto
+        version: link:../api
       '@novel-creator/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -550,19 +526,6 @@ packages:
 
   '@cloudflare/workers-types@5.20260825.1':
     resolution: {integrity: sha512-/XZntbK+BlJWC5jxkaDNhnDLr2Bf2627sZ6VMrxqKrnc84pc6gNu5NdAyaTkZn1LzQVFIa3SL7V/7veLF59P7w==}
-
-  '@connectrpc/connect-node@2.1.2':
-    resolution: {integrity: sha512-+i/aAOpsI8sIx1mbYp6d99zvxaUSF6t/jP9Ux9maAmjsZPgmIQ3JuIeYi0zJIP9zlCnBlJjkpPosshCgdRuThQ==}
-    engines: {node: '>=20'}
-    peerDependencies:
-      '@bufbuild/protobuf': ^2.7.0
-      '@connectrpc/connect': 2.1.2
-
-  '@connectrpc/connect-web@2.1.2':
-    resolution: {integrity: sha512-1tfaK85MU+gJjwwmL31d2rzdf0XCYX99chZf63uG89SGBUd4XuZ4ZzhGo2u79TPXOE6nLIZQ2okrpyey42PYdg==}
-    peerDependencies:
-      '@bufbuild/protobuf': ^2.7.0
-      '@connectrpc/connect': 2.1.2
 
   '@connectrpc/connect@2.1.2':
     resolution: {integrity: sha512-MXkBijtcX09R10Eb6sFeIetc6w6746eio6xtfuyVOH7oQAacT1X0GzMIQFux6Qy8cq3W/T5qX5Bei8YbFtmRGA==}
@@ -4958,16 +4921,6 @@ snapshots:
     optional: true
 
   '@cloudflare/workers-types@5.20260825.1': {}
-
-  '@connectrpc/connect-node@2.1.2(@bufbuild/protobuf@2.14.0)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.14.0))':
-    dependencies:
-      '@bufbuild/protobuf': 2.14.0
-      '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.14.0)
-
-  '@connectrpc/connect-web@2.1.2(@bufbuild/protobuf@2.14.0)(@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.14.0))':
-    dependencies:
-      '@bufbuild/protobuf': 2.14.0
-      '@connectrpc/connect': 2.1.2(@bufbuild/protobuf@2.14.0)
 
   '@connectrpc/connect@2.1.2(@bufbuild/protobuf@2.14.0)':
     dependencies:

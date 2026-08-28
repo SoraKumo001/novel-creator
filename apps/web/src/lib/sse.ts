@@ -1,4 +1,4 @@
-import { generateClient } from './grpc-client.js';
+import { extractEntities, generateSectionContent } from './services/generate.js';
 
 export interface SSEExtractResult {
   timelines: { event: string; order: number; timestamp: string | null }[];
@@ -6,7 +6,7 @@ export interface SSEExtractResult {
 }
 
 /**
- * 本文生成のストリームを ConnectRPC Server Streaming RPC で受信する。
+ * 本文生成のストリームを受信する。
  * チャンクごとに onChunk コールバックを呼び出す。
  */
 export async function streamGenerateContent(
@@ -14,9 +14,9 @@ export async function streamGenerateContent(
   onChunk: (text: string) => void,
 ): Promise<void> {
   try {
-    for await (const chunk of generateClient.generateSectionContent({ sectionId })) {
-      if (chunk.chunk) {
-        onChunk(chunk.chunk);
+    for await (const chunk of generateSectionContent(sectionId)) {
+      if (chunk) {
+        onChunk(chunk);
       }
     }
   } catch (err) {
@@ -37,7 +37,7 @@ export async function streamGenerateContentAuto(
   await streamGenerateContent(sectionId, onChunk);
 
   // 2. 抽出処理
-  const res = await generateClient.extractEntities({ sectionId });
+  const res = await extractEntities(sectionId);
   return {
     timelines: res.timelines.map((t) => ({
       event: t.event,
@@ -47,7 +47,7 @@ export async function streamGenerateContentAuto(
     settings: res.settings.map((s) => ({
       category: s.category,
       name: s.name,
-      description: s.description,
+      description: s.description ?? '',
     })),
   };
 }

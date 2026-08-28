@@ -8,7 +8,8 @@ import { useGenerate } from '@/hooks/useGenerate.js';
 import { useNovel } from '@/hooks/useNovel.js';
 import { useToast } from '@/hooks/useToast.js';
 import { countWords } from '@/lib/sse.js';
-import type { ExtractResult, Section, Setting, Timeline } from '@/lib/types.js';
+import type { ExtractResult, Section } from '@/lib/types.js';
+
 import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
 import { ChevronDownIcon, ChevronUpIcon, PencilIcon, PlusIcon, SparklesIcon } from './-Icons.js';
 import { MonacoEditor } from './-MonacoEditor.js';
@@ -701,9 +702,9 @@ function ExtractResultModal({
             <p className="text-sm text-muted-foreground">ありません</p>
           ) : (
             <ul className="space-y-1 text-sm text-foreground">
-              {result.timelines.map((timeline: Timeline) => (
+              {result.timelines.map((timeline, idx) => (
                 <li
-                  key={timeline.id}
+                  key={timeline.id ?? idx}
                   className="rounded bg-surface-raised px-3 py-2 border border-border"
                 >
                   {timeline.timestamp && (
@@ -721,9 +722,9 @@ function ExtractResultModal({
             <p className="text-sm text-muted-foreground">ありません</p>
           ) : (
             <ul className="grid gap-2 sm:grid-cols-2">
-              {result.settings.map((setting: Setting) => (
+              {result.settings.map((setting, idx) => (
                 <li
-                  key={setting.id}
+                  key={setting.id ?? idx}
                   className="rounded bg-surface-raised px-3 py-2 border border-border"
                 >
                   <span className="text-xs font-bold uppercase text-primary">

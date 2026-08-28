@@ -208,9 +208,23 @@ export interface GeneratedSummary {
   summary: string;
 }
 
+export interface ExtractedTimelineItem {
+  id?: string;
+  event: string;
+  order: number;
+  timestamp?: string | null;
+}
+
+export interface ExtractedSettingItem {
+  id?: string;
+  name: string;
+  category: string;
+  description?: string | null;
+}
+
 export interface ExtractResult {
-  timelines: Timeline[];
-  settings: Setting[];
+  timelines: ExtractedTimelineItem[];
+  settings: ExtractedSettingItem[];
 }
 
 export interface ApiSuccessResponse {
@@ -279,12 +293,6 @@ export interface ExtractedCharacterItem {
   category: string;
   description: string;
   traits: string[];
-}
-
-export interface ExtractedSettingItem {
-  name: string;
-  category: string;
-  description: string;
 }
 
 export interface ExtractedChatEntities {

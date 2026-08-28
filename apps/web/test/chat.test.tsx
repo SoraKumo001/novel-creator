@@ -25,7 +25,7 @@ beforeEach(() => {
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation(async () => {
-    return jsonResponse({ sessions: [] });
+    return jsonResponse([]);
   });
 });
 
@@ -65,17 +65,18 @@ describe('ChatContext & useChat', () => {
       updatedAt: new Date().toISOString(),
     };
 
-    mockFetch.mockImplementation(async (input: RequestInfo | URL) => {
+    mockFetch.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const urlStr =
         typeof input === 'string'
           ? input
           : input instanceof URL
             ? input.toString()
             : (input as Request).url;
-      if (urlStr.includes('CreateChatSession')) {
-        return jsonResponse(newSession, 200);
+      const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
+      if (urlStr.includes('/chat/sessions') && method === 'POST') {
+        return jsonResponse(newSession, 201);
       }
-      return jsonResponse({ sessions: [] });
+      return jsonResponse([]);
     });
 
     const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });

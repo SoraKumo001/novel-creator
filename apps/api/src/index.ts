@@ -18,7 +18,6 @@ console.log('[api] env loaded:', {
   EMBEDDING_API_KEY_SET: !!env.EMBEDDING_API_KEY,
 });
 const context = createContext(env);
-
 const app = createApp(context);
 
 const port = 3000;
@@ -27,3 +26,6 @@ console.log(`[api] Starting server on http://localhost:${port}`);
 serve({ fetch: app.fetch, port }, (info) => {
   console.log(`[api] Listening on http://localhost:${info.port}`);
 });
+
+export { createApp, api, type ApiType, type AppType } from './app.js';
+export type { BackupBody } from './core/backup.service.js';

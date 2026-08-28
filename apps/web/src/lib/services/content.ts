@@ -1,15 +1,17 @@
-import { contentClient } from '../grpc-client.js';
+import { apiClient } from '../api-client.js';
 import type { Content, UpdateContentInput } from '../types.js';
 
 export async function fetchContent(sectionId: string): Promise<Content> {
-  const res = await contentClient.getContent({ sectionId });
+  const res = await apiClient.contents[':id'].$get({ param: { id: sectionId } });
+  if (!res.ok) throw new Error('Failed to fetch content');
+  const data = await res.json();
   return {
-    id: res.id,
-    sectionId: res.sectionId,
-    body: res.body,
-    wordCount: res.wordCount ?? null,
-    createdAt: res.createdAt ?? null,
-    updatedAt: res.updatedAt ?? null,
+    id: data.id,
+    sectionId: data.sectionId,
+    body: data.body,
+    wordCount: data.wordCount ?? null,
+    createdAt: data.createdAt ?? null,
+    updatedAt: data.updatedAt ?? null,
   };
 }
 
@@ -17,16 +19,20 @@ export async function updateContent(
   sectionId: string,
   input: UpdateContentInput,
 ): Promise<Content> {
-  const res = await contentClient.updateContent({
-    sectionId,
-    body: input.body,
+  const res = await apiClient.contents[':id'].$put({
+    param: { id: sectionId },
+    json: {
+      body: input.body,
+    },
   });
+  if (!res.ok) throw new Error('Failed to update content');
+  const data = await res.json();
   return {
-    id: res.id,
-    sectionId: res.sectionId,
-    body: res.body,
-    wordCount: res.wordCount ?? null,
-    createdAt: res.createdAt ?? null,
-    updatedAt: res.updatedAt ?? null,
+    id: data.id,
+    sectionId: data.sectionId,
+    body: data.body,
+    wordCount: data.wordCount ?? null,
+    createdAt: data.createdAt ?? null,
+    updatedAt: data.updatedAt ?? null,
   };
 }

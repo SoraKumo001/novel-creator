@@ -51,7 +51,7 @@ const sampleNovel: Novel = {
 
 describe('useNovels', () => {
   it('初期ロードで一覧を取得すること', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ novels: [sampleNovel] }));
+    mockFetch.mockResolvedValue(jsonResponse([sampleNovel]));
 
     const { result } = renderHook(() => useNovels(), { wrapper: createWrapper() });
 
@@ -66,7 +66,7 @@ describe('useNovels', () => {
   });
 
   it('作成（createNovel）で一覧に追加されること', async () => {
-    mockFetch.mockResolvedValueOnce(jsonResponse({ novels: [sampleNovel] }));
+    mockFetch.mockResolvedValueOnce(jsonResponse([sampleNovel]));
 
     const { result } = renderHook(() => useNovels(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -81,8 +81,8 @@ describe('useNovels', () => {
     // 1回目: POST (create) のレスポンス
     // 2回目: invalidateQueries で再取得される GET (一覧) のレスポンス
     mockFetch
-      .mockResolvedValueOnce(jsonResponse(newNovel))
-      .mockResolvedValueOnce(jsonResponse({ novels: [sampleNovel, newNovel] }));
+      .mockResolvedValueOnce(jsonResponse(newNovel, 201))
+      .mockResolvedValueOnce(jsonResponse([sampleNovel, newNovel]));
 
     await act(async () => {
       await result.current.createNovel({ title: '新しい小説' });
@@ -93,7 +93,7 @@ describe('useNovels', () => {
   });
 
   it('削除（deleteNovel）で一覧から除外されること', async () => {
-    mockFetch.mockResolvedValueOnce(jsonResponse({ novels: [sampleNovel] }));
+    mockFetch.mockResolvedValueOnce(jsonResponse([sampleNovel]));
 
     const { result } = renderHook(() => useNovels(), { wrapper: createWrapper() });
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -102,7 +102,7 @@ describe('useNovels', () => {
     // 2回目: invalidateQueries で再取得される GET (一覧) のレスポンス
     mockFetch
       .mockResolvedValueOnce(jsonResponse({ success: true }))
-      .mockResolvedValueOnce(jsonResponse({ novels: [] }));
+      .mockResolvedValueOnce(jsonResponse([]));
 
     await act(async () => {
       await result.current.deleteNovel(sampleNovel.id);
@@ -112,12 +112,12 @@ describe('useNovels', () => {
   });
 
   it('API エラー時に error が設定されること', async () => {
-    mockFetch.mockResolvedValue(jsonResponse({ code: 'internal', message: 'サーバーエラー' }, 500));
+    mockFetch.mockResolvedValue(jsonResponse({ error: 'サーバーエラー' }, 500));
 
     const { result } = renderHook(() => useNovels(), { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(result.current.error).toContain('サーバーエラー');
+    expect(result.current.error).toContain('Failed to fetch novels');
   });
 });

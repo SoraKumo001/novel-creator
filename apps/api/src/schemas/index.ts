@@ -190,3 +190,11 @@ export const chatRequestSchema = z.object({
 export const extractChatEntitiesSchema = z.object({
   text: z.string().min(1),
 });
+
+// ---- 履歴 ----
+export const listHistoriesQuerySchema = z.object({
+  novelId: z.string().uuid(),
+  entityType: z.string().optional(),
+  entityId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().positive().optional(),
+});

@@ -1,4 +1,4 @@
-import { settingClient } from '../grpc-client.js';
+import { apiClient } from '../api-client.js';
 import type {
   CreateSettingInput,
   EditInstructionInput,
@@ -10,87 +10,96 @@ import type {
   UpdateSettingInput,
 } from '../types.js';
 
-function parseJsonSafe<T = unknown>(str?: string, defaultValue: unknown = {}): T {
-  if (!str) return defaultValue as T;
-  try {
-    return JSON.parse(str);
-  } catch {
-    return defaultValue as T;
-  }
-}
-
 export async function fetchSettings(novelId: string, category?: string): Promise<Setting[]> {
-  const res = await settingClient.listSettings({ novelId, category });
-  return res.settings.map((s) => ({
+  const res = await apiClient.novels[':id'].settings.$get({
+    param: { id: novelId },
+    query: { category },
+  });
+  if (!res.ok) throw new Error('Failed to fetch settings');
+  const rows = await res.json();
+  return rows.map((s) => ({
     id: s.id,
     novelId: s.novelId,
     category: s.category,
     name: s.name,
     description: s.description ?? null,
-    metadata: parseJsonSafe(s.metadataJson),
+    metadata: (s.metadata as Record<string, unknown>) ?? {},
     createdAt: s.createdAt ?? null,
     updatedAt: s.updatedAt ?? null,
   }));
 }
 
 export async function createSetting(novelId: string, input: CreateSettingInput): Promise<Setting> {
-  const res = await settingClient.createSetting({
-    novelId,
-    category: input.category,
-    name: input.name,
-    description: input.description,
-    metadataJson: JSON.stringify(input.metadata ?? {}),
+  const res = await apiClient.novels[':id'].settings.$post({
+    param: { id: novelId },
+    json: {
+      category: input.category,
+      name: input.name,
+      description: input.description,
+      metadata: input.metadata,
+    },
   });
+  if (!res.ok) throw new Error('Failed to create setting');
+  const row = await res.json();
   return {
-    id: res.id,
-    novelId: res.novelId,
-    category: res.category,
-    name: res.name,
-    description: res.description ?? null,
-    metadata: parseJsonSafe(res.metadataJson),
-    createdAt: res.createdAt ?? null,
-    updatedAt: res.updatedAt ?? null,
+    id: row.id,
+    novelId: row.novelId,
+    category: row.category,
+    name: row.name,
+    description: row.description ?? null,
+    metadata: (row.metadata as Record<string, unknown>) ?? {},
+    createdAt: row.createdAt ?? null,
+    updatedAt: row.updatedAt ?? null,
   };
 }
 
 export async function updateSetting(id: string, input: UpdateSettingInput): Promise<Setting> {
-  const res = await settingClient.updateSetting({
-    id,
-    category: input.category,
-    name: input.name,
-    description: input.description,
-    metadataJson: input.metadata !== undefined ? JSON.stringify(input.metadata) : undefined,
+  const res = await apiClient.settings[':id'].$put({
+    param: { id },
+    json: {
+      category: input.category,
+      name: input.name,
+      description: input.description,
+      metadata: input.metadata,
+    },
   });
+  if (!res.ok) throw new Error('Failed to update setting');
+  const row = await res.json();
   return {
-    id: res.id,
-    novelId: res.novelId,
-    category: res.category,
-    name: res.name,
-    description: res.description ?? null,
-    metadata: parseJsonSafe(res.metadataJson),
-    createdAt: res.createdAt ?? null,
-    updatedAt: res.updatedAt ?? null,
+    id: row.id,
+    novelId: row.novelId,
+    category: row.category,
+    name: row.name,
+    description: row.description ?? null,
+    metadata: (row.metadata as Record<string, unknown>) ?? {},
+    createdAt: row.createdAt ?? null,
+    updatedAt: row.updatedAt ?? null,
   };
 }
 
 export async function deleteSetting(id: string): Promise<void> {
-  await settingClient.deleteSetting({ id });
+  const res = await apiClient.settings[':id'].$delete({ param: { id } });
+  if (!res.ok) throw new Error('Failed to delete setting');
 }
 
 export async function editSetting(id: string, input: EditInstructionInput): Promise<Setting> {
-  const res = await settingClient.editSetting({
-    id,
-    instruction: input.instruction,
+  const res = await apiClient.settings[':id'].edit.$post({
+    param: { id },
+    json: {
+      instruction: input.instruction,
+    },
   });
+  if (!res.ok) throw new Error('Failed to edit setting');
+  const row = await res.json();
   return {
-    id: res.id,
-    novelId: res.novelId,
-    category: res.category,
-    name: res.name,
-    description: res.description ?? null,
-    metadata: parseJsonSafe(res.metadataJson),
-    createdAt: res.createdAt ?? null,
-    updatedAt: res.updatedAt ?? null,
+    id: row.id,
+    novelId: row.novelId,
+    category: row.category,
+    name: row.name,
+    description: row.description ?? null,
+    metadata: (row.metadata as Record<string, unknown>) ?? {},
+    createdAt: row.createdAt ?? null,
+    updatedAt: row.updatedAt ?? null,
   };
 }
 
@@ -98,50 +107,47 @@ export async function generateSettingDraft(
   novelId: string,
   input: SettingDraftInput,
 ): Promise<SettingDraft> {
-  const res = await settingClient.generateDraft({
-    novelId,
-    category: input.currentDraft?.category ?? '',
-    query: input.instruction,
+  const res = await apiClient.novels[':id'].settings.draft.$post({
+    param: { id: novelId },
+    json: {
+      instruction: input.instruction,
+      currentDraft: input.currentDraft,
+    },
   });
-  return {
-    category: res.category,
-    name: res.name,
-    description: res.description,
-  };
+  if (!res.ok) throw new Error('Failed to generate setting draft');
+  return res.json();
 }
 
 export async function fetchSettingsMarkdown(novelId: string): Promise<{ markdown: string }> {
-  const res = await settingClient.getSettingsMarkdown({ novelId });
-  return { markdown: res.markdown };
+  const res = await apiClient.novels[':id'].settings.markdown.$get({
+    param: { id: novelId },
+  });
+  if (!res.ok) throw new Error('Failed to fetch settings markdown');
+  return res.json();
 }
 
 export async function saveSettingsMarkdown(
   novelId: string,
   markdown: string,
 ): Promise<SaveSettingsMarkdownResult> {
-  const res = await settingClient.saveSettingsMarkdown({ novelId, markdown });
-  return {
-    created: res.createdCount,
-    updated: res.updatedCount,
-    deleted: res.deletedCount,
-    duplicateCount: 0,
-  };
+  const res = await apiClient.novels[':id'].settings.markdown.$post({
+    param: { id: novelId },
+    json: { markdown },
+  });
+  if (!res.ok) throw new Error('Failed to save settings markdown');
+  return res.json();
 }
 
 export async function editSettingSection(
   novelId: string,
   data: { category: string; name: string; description: string; instruction: string },
 ): Promise<EditSettingSectionResult> {
-  const res = await settingClient.editSettingSection({
-    novelId,
-    category: data.category,
-    name: data.name,
-    description: data.description,
-    instruction: data.instruction,
+  const res = await apiClient.novels[':id'].settings['edit-section'].$post({
+    param: { id: novelId },
+    json: data,
   });
-  return {
-    markdown: res.parsedSummary ?? '',
-  };
+  if (!res.ok) throw new Error('Failed to edit setting section');
+  return res.json();
 }
 
 export async function editSettingDocument(
@@ -149,12 +155,10 @@ export async function editSettingDocument(
   markdown: string,
   instruction: string,
 ): Promise<EditSettingSectionResult> {
-  const res = await settingClient.editSettingDocument({
-    novelId,
-    markdown,
-    instruction,
+  const res = await apiClient.novels[':id'].settings['edit-document'].$post({
+    param: { id: novelId },
+    json: { markdown, instruction },
   });
-  return {
-    markdown: res.parsedSummary ?? '',
-  };
+  if (!res.ok) throw new Error('Failed to edit setting document');
+  return res.json();
 }

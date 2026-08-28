@@ -1,18 +1,11 @@
-import { novelClient } from '../grpc-client.js';
+import { apiClient } from '../api-client.js';
 import type { CreateNovelInput, Novel, NovelDetail, UpdateNovelInput } from '../types.js';
 
-function parseJsonSafe<T = unknown>(str?: string, defaultValue: unknown = {}): T {
-  if (!str) return defaultValue as T;
-  try {
-    return JSON.parse(str);
-  } catch {
-    return defaultValue as T;
-  }
-}
-
 export async function fetchNovels(): Promise<Novel[]> {
-  const res = await novelClient.listNovels({});
-  return res.novels.map((n) => ({
+  const res = await apiClient.novels.$get();
+  if (!res.ok) throw new Error('Failed to fetch novels');
+  const rows = await res.json();
+  return rows.map((n) => ({
     id: n.id,
     title: n.title,
     description: n.description ?? null,
@@ -22,15 +15,16 @@ export async function fetchNovels(): Promise<Novel[]> {
 }
 
 export async function fetchNovelDetail(id: string): Promise<NovelDetail> {
-  const res = await novelClient.getNovelDetail({ id });
-  const n = res.novel!;
+  const res = await apiClient.novels[':id'].$get({ param: { id } });
+  if (!res.ok) throw new Error('Failed to fetch novel detail');
+  const n = await res.json();
   return {
     id: n.id,
     title: n.title,
     description: n.description ?? null,
     createdAt: n.createdAt ?? null,
     updatedAt: n.updatedAt ?? null,
-    chapters: res.chapters.map((ch) => ({
+    chapters: n.chapters.map((ch) => ({
       id: ch.id,
       novelId: ch.novelId,
       title: ch.title,
@@ -39,24 +33,24 @@ export async function fetchNovelDetail(id: string): Promise<NovelDetail> {
       createdAt: ch.createdAt ?? null,
       updatedAt: ch.updatedAt ?? null,
     })),
-    characters: res.characters.map((c) => ({
+    characters: n.characters.map((c) => ({
       id: c.id,
       novelId: c.novelId,
       category: c.category,
       name: c.name,
       description: c.description ?? null,
-      traits: c.traits,
-      relationships: parseJsonSafe(c.relationshipsJson),
+      traits: (c.traits as string[] | null) ?? null,
+      relationships: (c.relationships as Record<string, unknown>) ?? {},
       createdAt: c.createdAt ?? null,
       updatedAt: c.updatedAt ?? null,
     })),
-    settings: res.settings.map((s) => ({
+    settings: n.settings.map((s) => ({
       id: s.id,
       novelId: s.novelId,
       category: s.category,
       name: s.name,
       description: s.description ?? null,
-      metadata: parseJsonSafe(s.metadataJson),
+      metadata: (s.metadata as Record<string, unknown>) ?? {},
       createdAt: s.createdAt ?? null,
       updatedAt: s.updatedAt ?? null,
     })),
@@ -64,34 +58,43 @@ export async function fetchNovelDetail(id: string): Promise<NovelDetail> {
 }
 
 export async function createNovel(input: CreateNovelInput): Promise<Novel> {
-  const res = await novelClient.createNovel({
-    title: input.title,
-    description: input.description,
+  const res = await apiClient.novels.$post({
+    json: {
+      title: input.title,
+      description: input.description,
+    },
   });
+  if (!res.ok) throw new Error('Failed to create novel');
+  const row = await res.json();
   return {
-    id: res.id,
-    title: res.title,
-    description: res.description ?? null,
-    createdAt: res.createdAt ?? null,
-    updatedAt: res.updatedAt ?? null,
+    id: row.id,
+    title: row.title,
+    description: row.description ?? null,
+    createdAt: row.createdAt ?? null,
+    updatedAt: row.updatedAt ?? null,
   };
 }
 
 export async function updateNovel(id: string, input: UpdateNovelInput): Promise<Novel> {
-  const res = await novelClient.updateNovel({
-    id,
-    title: input.title,
-    description: input.description,
+  const res = await apiClient.novels[':id'].$put({
+    param: { id },
+    json: {
+      title: input.title,
+      description: input.description,
+    },
   });
+  if (!res.ok) throw new Error('Failed to update novel');
+  const row = await res.json();
   return {
-    id: res.id,
-    title: res.title,
-    description: res.description ?? null,
-    createdAt: res.createdAt ?? null,
-    updatedAt: res.updatedAt ?? null,
+    id: row.id,
+    title: row.title,
+    description: row.description ?? null,
+    createdAt: row.createdAt ?? null,
+    updatedAt: row.updatedAt ?? null,
   };
 }
 
 export async function deleteNovel(id: string): Promise<void> {
-  await novelClient.deleteNovel({ id });
+  const res = await apiClient.novels[':id'].$delete({ param: { id } });
+  if (!res.ok) throw new Error('Failed to delete novel');
 }
