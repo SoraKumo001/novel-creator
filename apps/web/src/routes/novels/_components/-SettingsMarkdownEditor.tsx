@@ -62,7 +62,7 @@ export function SettingsMarkdownEditor({
 
       const lines = markdown.split('\n');
       const before = lines.slice(0, target.startLine);
-      const after = lines.slice(target.endLine);
+      const after = lines.slice(target.endLine + 1);
       return [...before, nextSummary.trim(), ...after].join('\n');
     },
     [editSettingSection],

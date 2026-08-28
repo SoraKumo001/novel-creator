@@ -76,6 +76,10 @@ export function useMarkdownEntityEditor<
 
   const editorRef = useRef<MonacoEditorInstance | null>(null);
   const isDraggingRef = useRef(false);
+  const markdownRef = useRef(markdown);
+  markdownRef.current = markdown;
+  const findSectionAtLineRef = useRef(findSectionAtLine);
+  findSectionAtLineRef.current = findSectionAtLine;
 
   const { hasDraft, draftContent, saveDraft, clearDraft, dismissDraft, checkDraft } =
     useMarkdownDraft({
@@ -85,16 +89,38 @@ export function useMarkdownEntityEditor<
   const tree = useMemo(() => buildTree(markdown), [buildTree, markdown]);
   const isDirty = markdown !== savedMarkdown;
 
+  const updateActiveSection = useCallback((currentMarkdown?: string, lineNumber?: number) => {
+    const ed = editorRef.current;
+    const text = currentMarkdown ?? markdownRef.current;
+    const line =
+      lineNumber !== undefined ? lineNumber : ed ? ed.getPosition()?.lineNumber : undefined;
+    if (line === undefined || !text) {
+      setActiveSection(null);
+      return;
+    }
+    // Monaco の lineNumber は 1-indexed、findSectionAtLine は 0-indexed 行番号を受け取るため - 1 する
+    const zeroIndexedLine = Math.max(0, line - 1);
+    const section = findSectionAtLineRef.current(text, zeroIndexedLine);
+    setActiveSection(section);
+  }, []);
+
+  const fetchMarkdownRef = useRef(fetchMarkdown);
+  fetchMarkdownRef.current = fetchMarkdown;
+  const checkDraftRef = useRef(checkDraft);
+  checkDraftRef.current = checkDraft;
+
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError(null);
-    fetchMarkdown()
+    fetchMarkdownRef
+      .current()
       .then((md) => {
         if (!active) return;
         setMarkdown(md);
         setSavedMarkdown(md);
-        checkDraft();
+        checkDraftRef.current();
+        updateActiveSection(md);
       })
       .catch((e) => {
         if (!active) return;
@@ -106,14 +132,15 @@ export function useMarkdownEntityEditor<
     return () => {
       active = false;
     };
-  }, [fetchMarkdown, checkDraft]);
+  }, [storageKey, updateActiveSection]);
 
   const handleEditorChange = useCallback(
     (value: string) => {
       setMarkdown(value);
       saveDraft(value);
+      updateActiveSection(value);
     },
-    [saveDraft],
+    [saveDraft, updateActiveSection],
   );
 
   const handleRestoreDraft = useCallback(() => {
@@ -121,7 +148,8 @@ export function useMarkdownEntityEditor<
     setMarkdown(draftContent);
     saveDraft(draftContent);
     dismissDraft();
-  }, [draftContent, saveDraft, dismissDraft]);
+    updateActiveSection(draftContent);
+  }, [draftContent, saveDraft, dismissDraft, updateActiveSection]);
 
   const handleDiscardDraft = useCallback(() => {
     clearDraft();
@@ -136,30 +164,38 @@ export function useMarkdownEntityEditor<
       const md = await fetchMarkdown();
       setMarkdown(md);
       setSavedMarkdown(md);
+      updateActiveSection(md);
     } catch (e) {
       setError(e instanceof Error ? e.message : '破棄に失敗しました');
     }
-  }, [clearDraft, fetchMarkdown]);
+  }, [clearDraft, fetchMarkdown, updateActiveSection]);
 
   const handleEditorMount = useCallback(
     (editorInstance: MonacoEditorInstance) => {
       editorRef.current = editorInstance;
       editorInstance.onDidChangeCursorPosition((e) => {
-        const section = findSectionAtLine(markdown, e.position.lineNumber);
-        setActiveSection(section);
+        updateActiveSection(markdownRef.current, e.position.lineNumber);
       });
+      const pos = editorInstance.getPosition();
+      if (pos) {
+        updateActiveSection(markdownRef.current, pos.lineNumber);
+      }
     },
-    [findSectionAtLine, markdown],
+    [updateActiveSection],
   );
 
-  const handleTreeClick = useCallback((headingLine: number) => {
-    const ed = editorRef.current;
-    if (!ed) return;
-    const lineNumber = headingLine + 1;
-    ed.revealLineInCenter(lineNumber);
-    ed.setPosition({ lineNumber, column: 1 });
-    ed.focus();
-  }, []);
+  const handleTreeClick = useCallback(
+    (headingLine: number) => {
+      const ed = editorRef.current;
+      if (!ed) return;
+      const lineNumber = headingLine + 1;
+      ed.revealLineInCenter(lineNumber);
+      ed.setPosition({ lineNumber, column: 1 });
+      ed.focus();
+      updateActiveSection(markdownRef.current, lineNumber);
+    },
+    [updateActiveSection],
+  );
 
   const handleSplitterMouseDown = useCallback(
     (e: React.MouseEvent) => {

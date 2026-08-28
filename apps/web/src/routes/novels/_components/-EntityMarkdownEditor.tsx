@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { MarkdownCategoryNode } from '@novel-creator/shared';
 import { Button } from '@/components/Button.js';
 import { ConfirmDialog } from '@/components/ConfirmDialog.js';
@@ -141,11 +141,25 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
     }
   }, [clearDraft, markdown, saveMarkdown, setSavedMarkdown, toast]);
 
+  const isBusy = savingMarkdown || editingSection || editingDocument;
+
+  // Ctrl+S / Cmd+S ショートカットで保存
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (isDirty && !isBusy) {
+          void handleSave();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleSave, isBusy, isDirty]);
+
   if (loading) {
     return <Loading message={`${entityTitle}マークダウンを読み込み中...`} />;
   }
-
-  const isBusy = savingMarkdown || editingSection || editingDocument;
 
   return (
     <div className="flex h-full flex-col">
@@ -175,6 +189,7 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
             onClick={handleSave}
             disabled={!isDirty || isBusy}
             isLoading={savingMarkdown}
+            title="保存 (Ctrl+S)"
           >
             保存
           </Button>
