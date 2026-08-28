@@ -122,4 +122,20 @@
       'Noto Sans JP',
       sans-serif;
   }
+
+  button,
+  [role='button'],
+  [type='button'],
+  [type='reset'],
+  [type='submit'] {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [role='button'][aria-disabled='true'],
+  [type='button']:disabled,
+  [type='reset']:disabled,
+  [type='submit']:disabled {
+    cursor: not-allowed;
+  }
 }
