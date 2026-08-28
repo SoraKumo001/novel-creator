@@ -1,19 +1,17 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { Button } from '@/components/Button.js';
 import { Card, CardHeader } from '@/components/Card.js';
 import { ConfirmDialog } from '@/components/ConfirmDialog.js';
 import { EmptyState } from '@/components/EmptyState.js';
-import { Input } from '@/components/Input.js';
 import { Loading } from '@/components/Loading.js';
 import { MarkdownText } from '@/components/MarkdownText.js';
-import { Modal } from '@/components/Modal.js';
 import { Tag } from '@/components/Tag.js';
-import { Textarea } from '@/components/Textarea.js';
 import { useCharacters } from '@/hooks/useCharacters.js';
 import { useNovel } from '@/hooks/useNovel.js';
 import type { Character } from '@/lib/types.js';
 import { CharactersMarkdownEditor } from './-CharactersMarkdownEditor.js';
-import { IconButton, PencilIcon, PlusIcon, SparklesIcon, TrashIcon } from './-Icons.js';
+import { IconButton, PencilIcon, PlusIcon, TrashIcon } from './-Icons.js';
 
 export function CharactersTab({
   novel,
@@ -25,28 +23,19 @@ export function CharactersTab({
   const {
     characters,
     loading,
-    createCharacter,
-    updateCharacter,
     deleteCharacter,
-    llmEditCharacter,
     fetchCharactersMarkdown,
     saveCharactersMarkdown,
     editCharacterSection,
     editCharacterDocument,
-    creating,
-    updating,
     deleting,
-    llmEditing,
     savingMarkdown,
     editingSection,
     editingDocument,
   } = useCharacters(novel.id);
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'cards' | 'markdown'>('cards');
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editing, setEditing] = useState<Character | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [llmTarget, setLlmTarget] = useState<Character | null>(null);
-  const [llmInstruction, setLlmInstruction] = useState('');
   const [sidebarWidth, setSidebarWidth] = useState(256);
 
   const isDraggingRef = useRef(false);
@@ -93,41 +82,10 @@ export function CharactersTab({
     }
   };
 
-  async function handleCreate(input: {
-    category: string;
-    name: string;
-    description: string;
-    traits: string[];
-  }) {
-    await createCharacter(input);
-    setIsCreateOpen(false);
-    await onRefresh();
-  }
-
-  async function handleUpdate(input: {
-    category: string;
-    name: string;
-    description: string;
-    traits: string[];
-  }) {
-    if (!editing) return;
-    await updateCharacter(editing.id, input);
-    setEditing(null);
-    await onRefresh();
-  }
-
   async function handleDelete() {
     if (!deletingId) return;
     await deleteCharacter(deletingId);
     setDeletingId(null);
-    await onRefresh();
-  }
-
-  async function handleLlmEdit() {
-    if (!llmTarget) return;
-    await llmEditCharacter(llmTarget.id, llmInstruction);
-    setLlmTarget(null);
-    setLlmInstruction('');
     await onRefresh();
   }
 
@@ -137,7 +95,12 @@ export function CharactersTab({
         <h2 className="text-xl font-bold text-foreground">人物一覧</h2>
         <div className="flex items-center gap-2">
           {viewMode === 'cards' && (
-            <Button onClick={() => setIsCreateOpen(true)} leftIcon={<PlusIcon />}>
+            <Button
+              onClick={() =>
+                navigate({ to: '/novels/$novelId/characters/new', params: { novelId: novel.id } })
+              }
+              leftIcon={<PlusIcon />}
+            >
               新規作成
             </Button>
           )}
@@ -258,13 +221,16 @@ export function CharactersTab({
                                   <div className="flex gap-1">
                                     <IconButton
                                       label="編集"
-                                      onClick={() => setEditing(character)}
+                                      onClick={() =>
+                                        navigate({
+                                          to: '/novels/$novelId/characters/$characterId',
+                                          params: {
+                                            novelId: novel.id,
+                                            characterId: character.id,
+                                          },
+                                        })
+                                      }
                                       icon={<PencilIcon />}
-                                    />
-                                    <IconButton
-                                      label="LLMで編集"
-                                      onClick={() => setLlmTarget(character)}
-                                      icon={<SparklesIcon />}
                                     />
                                     <IconButton
                                       label="削除"
@@ -301,45 +267,6 @@ export function CharactersTab({
         </div>
       )}
 
-      <CharacterFormModal
-        isOpen={isCreateOpen}
-        onClose={() => setIsCreateOpen(false)}
-        onSubmit={handleCreate}
-        isLoading={creating}
-        title="人物を新規作成"
-      />
-      <CharacterFormModal
-        isOpen={!!editing}
-        onClose={() => setEditing(null)}
-        onSubmit={handleUpdate}
-        isLoading={updating}
-        title="人物を編集"
-        defaultValues={editing ?? undefined}
-      />
-      <Modal
-        isOpen={!!llmTarget}
-        onClose={() => setLlmTarget(null)}
-        title={`${llmTarget?.name ?? ''} をLLMで編集`}
-        size="md"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setLlmTarget(null)} disabled={llmEditing}>
-              キャンセル
-            </Button>
-            <Button onClick={handleLlmEdit} isLoading={llmEditing}>
-              適用
-            </Button>
-          </>
-        }
-      >
-        <Textarea
-          label="指示"
-          value={llmInstruction}
-          onChange={(e) => setLlmInstruction(e.target.value)}
-          placeholder="例: もっと大胆な性格にして"
-          rows={4}
-        />
-      </Modal>
       <ConfirmDialog
         isOpen={!!deletingId}
         onClose={() => setDeletingId(null)}
@@ -350,103 +277,5 @@ export function CharactersTab({
         isLoading={deleting}
       />
     </div>
-  );
-}
-
-function CharacterFormModal({
-  isOpen,
-  onClose,
-  onSubmit,
-  isLoading,
-  title,
-  defaultValues,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (input: {
-    category: string;
-    name: string;
-    description: string;
-    traits: string[];
-  }) => Promise<void>;
-  isLoading: boolean;
-  title: string;
-  defaultValues?: Character;
-}) {
-  const [category, setCategory] = useState(defaultValues?.category ?? '');
-  const [name, setName] = useState(defaultValues?.name ?? '');
-  const [description, setDescription] = useState(defaultValues?.description ?? '');
-  const [traitsText, setTraitsText] = useState(defaultValues?.traits?.join(', ') ?? '');
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (isOpen) {
-      setCategory(defaultValues?.category ?? '');
-      setName(defaultValues?.name ?? '');
-      setDescription(defaultValues?.description ?? '');
-      setTraitsText(defaultValues?.traits?.join(', ') ?? '');
-      setError(null);
-    }
-  }, [isOpen, defaultValues]);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!name.trim()) {
-      setError('名前を入力してください');
-      return;
-    }
-    const traits = traitsText
-      .split(/[,、，]/)
-      .map((t) => t.trim())
-      .filter(Boolean);
-    await onSubmit({
-      category: category.trim() || '未分類',
-      name: name.trim(),
-      description: description.trim(),
-      traits,
-    });
-  }
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={title}
-      size="md"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={isLoading}>
-            キャンセル
-          </Button>
-          <Button onClick={handleSubmit} isLoading={isLoading}>
-            保存
-          </Button>
-        </>
-      }
-    >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Input
-          label="カテゴリー"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          placeholder="主人公, 脇役, 敵役..."
-        />
-        <Input label="名前" value={name} onChange={(e) => setName(e.target.value)} />
-        <Textarea
-          label="説明"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={4}
-        />
-        <Input
-          label="特徴（カンマ区切り）"
-          value={traitsText}
-          onChange={(e) => setTraitsText(e.target.value)}
-          placeholder="勇敢, 好奇心旺盛, 一匹狼"
-        />
-        {error && <p className="text-sm text-rose-500">{error}</p>}
-      </form>
-    </Modal>
   );
 }
