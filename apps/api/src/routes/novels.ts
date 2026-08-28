@@ -3,17 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 
 import type { AppContext } from '../context.js';
-import {
-  ChapterDomainService,
-  CharacterDomainService,
-  GenerateDomainService,
-  LlmInstructionDomainService,
-  NotFoundError,
-  NovelDomainService,
-  SettingDomainService,
-  TimelineDomainService,
-  ValidationError,
-} from '../core/index.js';
+import { getServices } from '../core/services.js';
 import {
   createChapterSchema,
   createCharacterSchema,
@@ -35,27 +25,13 @@ import {
 const novelsRouter = new Hono<AppContext>()
   // GET /api/novels - 一覧取得
   .get('/', async (c) => {
-    const service = new NovelDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
-    const rows = await service.listNovels();
+    const rows = await getServices(c).novel.listNovels();
     return c.json(rows);
   })
   // POST /api/novels - 作成
   .post('/', zValidator('json', createNovelSchema), async (c) => {
-    const service = new NovelDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const body = c.req.valid('json');
-    const row = await service.createNovel({
+    const row = await getServices(c).novel.createNovel({
       title: body.title,
       description: body.description ?? null,
     });
@@ -63,28 +39,14 @@ const novelsRouter = new Hono<AppContext>()
   })
   // GET /api/novels/:id - 個別取得（関連データ含む）
   .get('/:id', zValidator('param', idParamSchema), async (c) => {
-    const service = new NovelDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const { id } = c.req.valid('param');
-    try {
-      const detail = await service.getNovelDetail(id);
-      return c.json({
-        ...detail.novel,
-        chapters: detail.chapters,
-        characters: detail.characters,
-        settings: detail.settings,
-      });
-    } catch (err) {
-      if (err instanceof NotFoundError) {
-        return c.json({ error: 'Novel not found' }, 404);
-      }
-      throw err;
-    }
+    const detail = await getServices(c).novel.getNovelDetail(id);
+    return c.json({
+      ...detail.novel,
+      chapters: detail.chapters,
+      characters: detail.characters,
+      settings: detail.settings,
+    });
   })
   // PUT /api/novels/:id - 更新
   .put(
@@ -92,57 +54,22 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', updateNovelSchema),
     async (c) => {
-      const service = new NovelDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id } = c.req.valid('param');
       const body = c.req.valid('json');
-      try {
-        const row = await service.updateNovel(id, body);
-        return c.json(row);
-      } catch (err) {
-        if (err instanceof NotFoundError) {
-          return c.json({ error: 'Novel not found' }, 404);
-        }
-        throw err;
-      }
+      const row = await getServices(c).novel.updateNovel(id, body);
+      return c.json(row);
     },
   )
   // DELETE /api/novels/:id - 削除
   .delete('/:id', zValidator('param', idParamSchema), async (c) => {
-    const service = new NovelDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const { id } = c.req.valid('param');
-    try {
-      await service.deleteNovel(id);
-      return c.json({ success: true });
-    } catch (err) {
-      if (err instanceof NotFoundError) {
-        return c.json({ error: 'Novel not found' }, 404);
-      }
-      throw err;
-    }
+    await getServices(c).novel.deleteNovel(id);
+    return c.json({ success: true });
   })
   // GET /api/novels/:id/chapters - 章一覧
   .get('/:id/chapters', zValidator('param', idParamSchema), async (c) => {
-    const service = new ChapterDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const { id } = c.req.valid('param');
-    const rows = await service.listChapters(id);
+    const rows = await getServices(c).chapter.listChapters(id);
     return c.json(rows);
   })
   // POST /api/novels/:id/chapters - 章作成
@@ -151,16 +78,9 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', createChapterSchema),
     async (c) => {
-      const service = new ChapterDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id: novelId } = c.req.valid('param');
       const body = c.req.valid('json');
-      const row = await service.createChapter({
+      const row = await getServices(c).chapter.createChapter({
         novelId,
         title: body.title,
         order: body.order,
@@ -171,15 +91,8 @@ const novelsRouter = new Hono<AppContext>()
   )
   // GET /api/novels/:id/characters - 人物一覧
   .get('/:id/characters', zValidator('param', idParamSchema), async (c) => {
-    const service = new CharacterDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const { id } = c.req.valid('param');
-    const rows = await service.listCharacters(id);
+    const rows = await getServices(c).character.listCharacters(id);
     return c.json(rows);
   })
   // POST /api/novels/:id/characters - 人物作成
@@ -188,44 +101,23 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', createCharacterSchema),
     async (c) => {
-      const service = new CharacterDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id: novelId } = c.req.valid('param');
       const body = c.req.valid('json');
-      try {
-        const row = await service.createCharacter({
-          novelId,
-          category: body.category ?? '主要人物',
-          name: body.name,
-          description: body.description ?? null,
-          traits: body.traits ?? [],
-          relationships: (body.relationships as Record<string, unknown>) ?? {},
-        });
-        return c.json(row, 201);
-      } catch (err) {
-        if (err instanceof ValidationError) {
-          return c.json({ error: err.message }, 400);
-        }
-        throw err;
-      }
+      const row = await getServices(c).character.createCharacter({
+        novelId,
+        category: body.category ?? '主要人物',
+        name: body.name,
+        description: body.description ?? null,
+        traits: body.traits ?? [],
+        relationships: (body.relationships as Record<string, unknown>) ?? {},
+      });
+      return c.json(row, 201);
     },
   )
   // GET /api/novels/:id/characters/markdown - 人物マークダウン取得
   .get('/:id/characters/markdown', zValidator('param', idParamSchema), async (c) => {
-    const service = new CharacterDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const { id } = c.req.valid('param');
-    const markdown = await service.getMarkdown(id);
+    const markdown = await getServices(c).character.getMarkdown(id);
     return c.json({ markdown });
   })
   // POST /api/novels/:id/characters/markdown - 人物マークダウン一括保存
@@ -234,16 +126,9 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', saveCharactersMarkdownSchema),
     async (c) => {
-      const service = new CharacterDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id } = c.req.valid('param');
       const { markdown } = c.req.valid('json');
-      const result = await service.saveMarkdown(id, markdown);
+      const result = await getServices(c).character.saveMarkdown(id, markdown);
       return c.json({
         created: result.createdCount,
         updated: result.updatedCount,
@@ -258,16 +143,9 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', editCharacterSectionSchema),
     async (c) => {
-      const service = new CharacterDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id } = c.req.valid('param');
       const body = c.req.valid('json');
-      const parsedSummary = await service.editCharacterSection({
+      const parsedSummary = await getServices(c).character.editCharacterSection({
         novelId: id,
         category: body.category,
         name: body.name,
@@ -285,16 +163,13 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', editCharacterDocumentSchema),
     async (c) => {
-      const service = new CharacterDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id } = c.req.valid('param');
       const { markdown, instruction } = c.req.valid('json');
-      const parsedSummary = await service.editCharacterDocument(id, markdown, instruction);
+      const parsedSummary = await getServices(c).character.editCharacterDocument(
+        id,
+        markdown,
+        instruction,
+      );
       return c.json({ markdown: parsedSummary ?? '' });
     },
   )
@@ -304,16 +179,9 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('query', z.object({ category: z.string().optional() })),
     async (c) => {
-      const service = new SettingDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id } = c.req.valid('param');
       const { category } = c.req.valid('query');
-      const rows = await service.listSettings(id, category);
+      const rows = await getServices(c).setting.listSettings(id, category);
       return c.json(rows);
     },
   )
@@ -323,30 +191,16 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', createSettingSchema),
     async (c) => {
-      const service = new SettingDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id: novelId } = c.req.valid('param');
       const body = c.req.valid('json');
-      try {
-        const row = await service.createSetting({
-          novelId,
-          category: body.category,
-          name: body.name,
-          description: body.description ?? null,
-          metadata: (body.metadata as Record<string, unknown>) ?? {},
-        });
-        return c.json(row, 201);
-      } catch (err) {
-        if (err instanceof ValidationError) {
-          return c.json({ error: err.message }, 400);
-        }
-        throw err;
-      }
+      const row = await getServices(c).setting.createSetting({
+        novelId,
+        category: body.category,
+        name: body.name,
+        description: body.description ?? null,
+        metadata: (body.metadata as Record<string, unknown>) ?? {},
+      });
+      return c.json(row, 201);
     },
   )
   // POST /api/novels/:id/settings/draft - 設定ドラフト生成
@@ -355,30 +209,16 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', settingDraftSchema),
     async (c) => {
-      const service = new SettingDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { instruction, currentDraft } = c.req.valid('json');
       const category = currentDraft?.category ?? '';
-      const result = await service.generateDraft(instruction, category);
+      const result = await getServices(c).setting.generateDraft(instruction, category);
       return c.json(result);
     },
   )
   // GET /api/novels/:id/settings/markdown - 設定マークダウン取得
   .get('/:id/settings/markdown', zValidator('param', idParamSchema), async (c) => {
-    const service = new SettingDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const { id } = c.req.valid('param');
-    const markdown = await service.getMarkdown(id);
+    const markdown = await getServices(c).setting.getMarkdown(id);
     return c.json({ markdown });
   })
   // POST /api/novels/:id/settings/markdown - 設定マークダウン一括保存
@@ -387,16 +227,9 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', saveSettingsMarkdownSchema),
     async (c) => {
-      const service = new SettingDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id } = c.req.valid('param');
       const { markdown } = c.req.valid('json');
-      const result = await service.saveMarkdown(id, markdown);
+      const result = await getServices(c).setting.saveMarkdown(id, markdown);
       return c.json({
         created: result.createdCount,
         updated: result.updatedCount,
@@ -411,16 +244,9 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', editSettingSectionSchema),
     async (c) => {
-      const service = new SettingDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id } = c.req.valid('param');
       const body = c.req.valid('json');
-      const parsedSummary = await service.editSettingSection({
+      const parsedSummary = await getServices(c).setting.editSettingSection({
         novelId: id,
         category: body.category,
         name: body.name,
@@ -436,30 +262,20 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', editSettingDocumentSchema),
     async (c) => {
-      const service = new SettingDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id } = c.req.valid('param');
       const { markdown, instruction } = c.req.valid('json');
-      const parsedSummary = await service.editSettingDocument(id, markdown, instruction);
+      const parsedSummary = await getServices(c).setting.editSettingDocument(
+        id,
+        markdown,
+        instruction,
+      );
       return c.json({ markdown: parsedSummary ?? '' });
     },
   )
   // GET /api/novels/:id/timelines - 時系列一覧
   .get('/:id/timelines', zValidator('param', idParamSchema), async (c) => {
-    const service = new TimelineDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const { id } = c.req.valid('param');
-    const rows = await service.listTimelines(id);
+    const rows = await getServices(c).timeline.listTimelines(id);
     return c.json(rows);
   })
   // POST /api/novels/:id/timelines - 時系列作成
@@ -468,30 +284,16 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', createTimelineSchema),
     async (c) => {
-      const service = new TimelineDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id: novelId } = c.req.valid('param');
       const body = c.req.valid('json');
-      try {
-        const row = await service.createTimeline({
-          novelId,
-          sectionId: body.sectionId || null,
-          event: body.event,
-          order: body.order,
-          timestamp: body.timestamp || null,
-        });
-        return c.json(row, 201);
-      } catch (err) {
-        if (err instanceof ValidationError) {
-          return c.json({ error: err.message }, 400);
-        }
-        throw err;
-      }
+      const row = await getServices(c).timeline.createTimeline({
+        novelId,
+        sectionId: body.sectionId || null,
+        event: body.event,
+        order: body.order,
+        timestamp: body.timestamp || null,
+      });
+      return c.json(row, 201);
     },
   )
   // GET /api/novels/:id/llm-instructions - 指示履歴一覧
@@ -500,16 +302,9 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('query', z.object({ entityType: z.string().optional() })),
     async (c) => {
-      const service = new LlmInstructionDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id } = c.req.valid('param');
       const { entityType } = c.req.valid('query');
-      const rows = await service.listInstructions(id, entityType);
+      const rows = await getServices(c).llmInstruction.listInstructions(id, entityType);
       return c.json(rows);
     },
   )
@@ -519,49 +314,21 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', createLlmInstructionSchema),
     async (c) => {
-      const service = new LlmInstructionDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id: novelId } = c.req.valid('param');
       const body = c.req.valid('json');
-      try {
-        const row = await service.createInstruction({
-          novelId,
-          entityType: body.entityType,
-          instruction: body.instruction,
-        });
-        return c.json(row, 201);
-      } catch (err) {
-        if (err instanceof ValidationError) {
-          return c.json({ error: err.message }, 400);
-        }
-        throw err;
-      }
+      const row = await getServices(c).llmInstruction.createInstruction({
+        novelId,
+        entityType: body.entityType,
+        instruction: body.instruction,
+      });
+      return c.json(row, 201);
     },
   )
   // POST /api/novels/:id/generate/plot - プロット生成
   .post('/:id/generate/plot', zValidator('param', idParamSchema), async (c) => {
-    const service = new GenerateDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const { id: novelId } = c.req.valid('param');
-    try {
-      const result = await service.generatePlot(novelId);
-      return c.json(result);
-    } catch (err) {
-      if (err instanceof NotFoundError) {
-        return c.json({ error: 'Novel not found' }, 404);
-      }
-      throw err;
-    }
+    const result = await getServices(c).generate.generatePlot(novelId);
+    return c.json(result);
   });
 
 export default novelsRouter;

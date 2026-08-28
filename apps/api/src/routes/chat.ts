@@ -5,7 +5,7 @@ import { zValidator } from '@hono/zod-validator';
 import { creativeChatSystemPrompt, streamText } from '@novel-creator/llm';
 
 import type { AppContext } from '../context.js';
-import { ChatDomainService, NotFoundError, NovelDomainService } from '../core/index.js';
+import { getServices } from '../core/services.js';
 import { searchContext } from '../rag.js';
 import {
   chatRequestSchema,
@@ -26,14 +26,7 @@ const chatRouter = new Hono<AppContext>()
 
     if (novelId) {
       try {
-        const novelService = new NovelDomainService({
-          db: c.var.db,
-          llm: c.var.llm,
-          embedding: c.var.embedding,
-          vectorStore: c.var.vectorStore,
-          env: c.var.env,
-        });
-        const novelDetail = await novelService.getNovelDetail(novelId);
+        const novelDetail = await getServices(c).novel.getNovelDetail(novelId);
         novelInfo = {
           title: novelDetail.novel.title,
           description: novelDetail.novel.description,
@@ -80,41 +73,20 @@ const chatRouter = new Hono<AppContext>()
   })
   // POST /api/chat/extract-entities - チャットテキストから人物・設定を抽出
   .post('/extract-entities', zValidator('json', extractChatEntitiesSchema), async (c) => {
-    const service = new ChatDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const { text } = c.req.valid('json');
-    const result = await service.extractEntities(text);
+    const result = await getServices(c).chat.extractEntities(text);
     return c.json(result);
   })
   // GET /api/chat/sessions - セッション一覧取得
   .get('/sessions', async (c) => {
-    const service = new ChatDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const novelId = c.req.query('novelId');
-    const rows = await service.listChatSessions(novelId || undefined);
+    const rows = await getServices(c).chat.listChatSessions(novelId || undefined);
     return c.json(rows);
   })
   // POST /api/chat/sessions - セッション新規作成
   .post('/sessions', zValidator('json', createChatSessionSchema), async (c) => {
-    const service = new ChatDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const body = c.req.valid('json');
-    const session = await service.createChatSession({
+    const session = await getServices(c).chat.createChatSession({
       novelId: body.novelId || null,
       title: body.title,
     });
@@ -122,26 +94,12 @@ const chatRouter = new Hono<AppContext>()
   })
   // GET /api/chat/sessions/:id - セッション詳細取得
   .get('/sessions/:id', zValidator('param', idParamSchema), async (c) => {
-    const service = new ChatDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const { id } = c.req.valid('param');
-    try {
-      const result = await service.getChatSessionWithMessages(id);
-      return c.json({
-        ...result.session,
-        messages: result.messages,
-      });
-    } catch (err) {
-      if (err instanceof NotFoundError) {
-        return c.json({ error: 'Chat session not found' }, 404);
-      }
-      throw err;
-    }
+    const result = await getServices(c).chat.getChatSessionWithMessages(id);
+    return c.json({
+      ...result.session,
+      messages: result.messages,
+    });
   })
   // PUT /api/chat/sessions/:id - セッション更新
   .put(
@@ -149,45 +107,17 @@ const chatRouter = new Hono<AppContext>()
     zValidator('param', idParamSchema),
     zValidator('json', updateChatSessionSchema),
     async (c) => {
-      const service = new ChatDomainService({
-        db: c.var.db,
-        llm: c.var.llm,
-        embedding: c.var.embedding,
-        vectorStore: c.var.vectorStore,
-        env: c.var.env,
-      });
       const { id } = c.req.valid('param');
       const body = c.req.valid('json');
-      try {
-        const updated = await service.updateChatSession(id, body);
-        return c.json(updated);
-      } catch (err) {
-        if (err instanceof NotFoundError) {
-          return c.json({ error: 'Chat session not found' }, 404);
-        }
-        throw err;
-      }
+      const updated = await getServices(c).chat.updateChatSession(id, body);
+      return c.json(updated);
     },
   )
   // DELETE /api/chat/sessions/:id - セッション削除
   .delete('/sessions/:id', zValidator('param', idParamSchema), async (c) => {
-    const service = new ChatDomainService({
-      db: c.var.db,
-      llm: c.var.llm,
-      embedding: c.var.embedding,
-      vectorStore: c.var.vectorStore,
-      env: c.var.env,
-    });
     const { id } = c.req.valid('param');
-    try {
-      await service.deleteChatSession(id);
-      return c.json({ success: true });
-    } catch (err) {
-      if (err instanceof NotFoundError) {
-        return c.json({ error: 'Chat session not found' }, 404);
-      }
-      throw err;
-    }
+    await getServices(c).chat.deleteChatSession(id);
+    return c.json({ success: true });
   });
 
 export default chatRouter;

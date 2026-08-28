@@ -4,6 +4,7 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status';
 import { ZodError } from 'zod';
 
 import type { AppContext } from '../context.js';
+import { NotFoundError, ValidationError } from '../core/types.js';
 
 /**
  * エラーレスポンスの共通形式。
@@ -88,6 +89,20 @@ function classifyValidationError(err: ZodError): ClassifiedError {
  * エラーを分類して適切な HTTP ステータスコードとメッセージを返す。
  */
 function classifyError(err: unknown): ClassifiedError {
+  if (err instanceof NotFoundError) {
+    return {
+      status: 404,
+      code: 'NOT_FOUND',
+      message: err.message,
+    };
+  }
+  if (err instanceof ValidationError) {
+    return {
+      status: 400,
+      code: 'VALIDATION_ERROR',
+      message: err.message,
+    };
+  }
   if (APICallError.isInstance(err)) {
     return classifyLLMError(err);
   }

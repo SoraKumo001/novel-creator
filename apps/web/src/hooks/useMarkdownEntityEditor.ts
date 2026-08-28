@@ -11,7 +11,10 @@ export interface UseMarkdownEntityEditorOptions<TTree, TSection> {
   findSectionAtLine: (markdown: string, lineNumber: number) => TSection | null;
 }
 
-export interface UseMarkdownEntityEditorReturn<TTree> {
+export interface UseMarkdownEntityEditorReturn<
+  TTree,
+  TSection = { category: string; name: string },
+> {
   markdown: string;
   setMarkdown: (value: string) => void;
   savedMarkdown: string;
@@ -25,8 +28,8 @@ export interface UseMarkdownEntityEditorReturn<TTree> {
   setInstruction: (ins: string) => void;
   editScope: 'section' | 'document';
   setEditScope: (scope: 'section' | 'document') => void;
-  activeSection: { category: string; name: string } | null;
-  setActiveSection: (sec: { category: string; name: string } | null) => void;
+  activeSection: TSection | null;
+  setActiveSection: (sec: TSection | null) => void;
   discardOpen: boolean;
   setDiscardOpen: (open: boolean) => void;
   editorRef: MutableRefObject<MonacoEditorInstance | null>;
@@ -53,17 +56,17 @@ export function useMarkdownEntityEditor<
   fetchMarkdown,
   buildTree,
   findSectionAtLine,
-}: UseMarkdownEntityEditorOptions<TTree, TSection>): UseMarkdownEntityEditorReturn<TTree> {
+}: UseMarkdownEntityEditorOptions<TTree, TSection>): UseMarkdownEntityEditorReturn<
+  TTree,
+  TSection
+> {
   const [markdown, setMarkdown] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [instruction, setInstruction] = useState('');
   const [editScope, setEditScope] = useState<'section' | 'document'>('section');
-  const [activeSection, setActiveSection] = useState<{
-    category: string;
-    name: string;
-  } | null>(null);
+  const [activeSection, setActiveSection] = useState<TSection | null>(null);
   const [savedMarkdown, setSavedMarkdown] = useState('');
   const [discardOpen, setDiscardOpen] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(() => {
@@ -143,7 +146,7 @@ export function useMarkdownEntityEditor<
       editorRef.current = editorInstance;
       editorInstance.onDidChangeCursorPosition((e) => {
         const section = findSectionAtLine(markdown, e.position.lineNumber);
-        setActiveSection(section ? { category: section.category, name: section.name } : null);
+        setActiveSection(section);
       });
     },
     [findSectionAtLine, markdown],
