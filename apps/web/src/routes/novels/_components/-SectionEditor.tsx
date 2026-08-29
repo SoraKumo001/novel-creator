@@ -1,12 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loading } from '@/components/Loading.js';
 import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
+import { ProofreadModal } from '@/components/ProofreadModal.js';
+import { VerticalPreviewModal } from '@/components/VerticalPreviewModal.js';
+import { CharacterVoiceCheckerModal } from '@/components/CharacterVoiceCheckerModal.js';
+import { MultiPersonaReviewModal } from '@/components/MultiPersonaReviewModal.js';
+import { InlineAIAssistant } from '@/components/InlineAIAssistant.js';
 import { useContent } from '@/hooks/useContent.js';
 import { useGenerate } from '@/hooks/useGenerate.js';
 import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import { countWords } from '@/lib/sse.js';
-import type { ExtractResult, Section } from '@/lib/types.js';
+import { proofreadSectionContent } from '@/lib/services/index.js';
+import type {
+  CharacterVoiceCheckResult,
+  ExtractResult,
+  InlineAssistAction,
+  MultiPersonaReviewResult,
+  ProofreadResult,
+  Section,
+} from '@/lib/types.js';
 import { MonacoEditor } from './-MonacoEditor.js';
 import { EditorToolbar } from './-EditorToolbar.js';
 import { GenerateContentPanel } from './-GenerateContentPanel.js';
@@ -30,8 +43,21 @@ export function SectionEditor({
   onToggleZenMode,
 }: SectionEditorProps) {
   const { content, loading, saving, updateContent } = useContent(section.id);
-  const { generateContent, generatingContent, extract, extracting, streamError, resetStreamError } =
-    useGenerate();
+  const {
+    generateContent,
+    generatingContent,
+    inlineAssist,
+    inlineAssisting,
+    checkVoice,
+    checkingVoice,
+    reviewPersona,
+    reviewingPersona,
+    extract,
+    extracting,
+    streamError,
+    resetStreamError,
+  } = useGenerate();
+
   const [localBody, setLocalBody] = useState('');
   const [savedBody, setSavedBody] = useState('');
   const [wordCount, setWordCount] = useState(0);
@@ -39,9 +65,29 @@ export function SectionEditor({
     const saved = localStorage.getItem(`novel-creator:target-words:${section.id}`);
     return saved ? parseInt(saved, 10) : 2000;
   });
+
+  // モーダル用ステート
   const [extractResultOpen, setExtractResultOpen] = useState(false);
   const [extracted, setExtracted] = useState<ExtractResult | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  const [verticalPreviewOpen, setVerticalPreviewOpen] = useState(false);
+
+  const [proofreadOpen, setProofreadOpen] = useState(false);
+  const [proofreadResult, setProofreadResult] = useState<ProofreadResult | null>(null);
+  const [proofreading, setProofreading] = useState(false);
+
+  const [voiceCheckerOpen, setVoiceCheckerOpen] = useState(false);
+  const [voiceResult, setVoiceResult] = useState<CharacterVoiceCheckResult | null>(null);
+
+  const [personaReviewOpen, setPersonaReviewOpen] = useState(false);
+  const [personaResult, setPersonaResult] = useState<MultiPersonaReviewResult | null>(null);
+
+  // インラインAI支援用ステート
+  const [selectedText, setSelectedText] = useState('');
+  const [inlineGeneratedText, setInlineGeneratedText] = useState('');
+  const [isInlineActive, setIsInlineActive] = useState(false);
+
   const toast = useToast();
 
   useEffect(() => {
@@ -123,6 +169,133 @@ export function SectionEditor({
     setExtractResultOpen(true);
   }
 
+  // 校正モーダル
+  const handleOpenProofread = async () => {
+    if (!localBody.trim()) {
+      toast.error('校正する本文がありません');
+      return;
+    }
+    setProofreadOpen(true);
+    setProofreading(true);
+    try {
+      const res = await proofreadSectionContent(section.id, localBody, selectedModelConfigId);
+      setProofreadResult(res);
+    } catch (e) {
+      toast.error(toErrorMessage(e));
+      setProofreadOpen(false);
+    } finally {
+      setProofreading(false);
+    }
+  };
+
+  // 口調チェッカーモーダル
+  const handleOpenVoiceChecker = async () => {
+    if (!localBody.trim()) {
+      toast.error('チェックする本文がありません');
+      return;
+    }
+    setVoiceCheckerOpen(true);
+    try {
+      const res = await checkVoice(novelId, localBody, selectedModelConfigId);
+      setVoiceResult(res);
+    } catch (e) {
+      toast.error(toErrorMessage(e));
+      setVoiceCheckerOpen(false);
+    }
+  };
+
+  // 模擬読者レビューモーダル
+  const handleOpenPersonaReview = async () => {
+    if (!localBody.trim()) {
+      toast.error('レビュー対象の本文がありません');
+      return;
+    }
+    setPersonaReviewOpen(true);
+    try {
+      const res = await reviewPersona(novelId, {
+        sectionId: section.id,
+        body: localBody,
+        modelConfigId: selectedModelConfigId,
+      });
+      setPersonaResult(res);
+    } catch (e) {
+      toast.error(toErrorMessage(e));
+      setPersonaReviewOpen(false);
+    }
+  };
+
+  // 選択テキスト変更
+  const handleSelectionChange = (text: string) => {
+    const trimmed = text.trim();
+    if (trimmed.length > 0) {
+      setSelectedText(trimmed);
+    }
+  };
+
+  // インラインAIアシスト実行
+  const handleExecuteInlineAssist = async (
+    action: InlineAssistAction,
+    customInstruction?: string,
+  ) => {
+    if (!selectedText) return;
+    setInlineGeneratedText('');
+    let acc = '';
+    try {
+      await inlineAssist(
+        section.id,
+        {
+          selectedText,
+          action,
+          customInstruction,
+          modelConfigId: selectedModelConfigId,
+        },
+        (chunk) => {
+          acc += chunk;
+          setInlineGeneratedText(acc);
+        },
+      );
+    } catch (e) {
+      toast.error(toErrorMessage(e));
+    }
+  };
+
+  // インラインAI置換
+  const handleApplyInlineReplace = (generated: string) => {
+    if (!selectedText || !generated) return;
+    const newBody = localBody.replace(selectedText, generated);
+    setLocalBody(newBody);
+    setIsInlineActive(false);
+    setSelectedText('');
+    setInlineGeneratedText('');
+    toast.success('選択範囲を書き換えました');
+  };
+
+  // インラインAI挿入
+  const handleApplyInlineInsertAfter = (generated: string) => {
+    if (!selectedText || !generated) return;
+    const idx = localBody.indexOf(selectedText);
+    if (idx !== -1) {
+      const insertPos = idx + selectedText.length;
+      const newBody = localBody.slice(0, insertPos) + '\n' + generated + localBody.slice(insertPos);
+      setLocalBody(newBody);
+      setIsInlineActive(false);
+      setSelectedText('');
+      setInlineGeneratedText('');
+      toast.success('直後にテキストを挿入しました');
+    }
+  };
+
+  // 口調修正反映
+  const handleApplyVoiceFix = (orig: string, sugg: string) => {
+    if (localBody.includes(orig)) {
+      const updated = localBody.replace(orig, sugg);
+      setLocalBody(updated);
+      toast.success('セリフを修正しました');
+    } else {
+      toast.error('本文中に該当箇所が見つかりませんでした');
+    }
+  };
+
   // 進捗率
   const progressPercent = Math.min(100, Math.round((wordCount / targetWords) * 100));
 
@@ -146,6 +319,10 @@ export function SectionEditor({
         isZenMode={isZenMode}
         onToggleZenMode={onToggleZenMode}
         onOpenHistory={() => setHistoryOpen(true)}
+        onOpenVerticalPreview={() => setVerticalPreviewOpen(true)}
+        onOpenVoiceChecker={() => void handleOpenVoiceChecker()}
+        onOpenPersonaReview={() => void handleOpenPersonaReview()}
+        onOpenProofread={() => void handleOpenProofread()}
         onSave={() => void handleSave()}
       />
 
@@ -159,11 +336,48 @@ export function SectionEditor({
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden relative">
+      <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
         {loading ? (
           <Loading message="本文を読み込み中..." />
         ) : (
-          <MonacoEditor value={localBody} onChange={setLocalBody} />
+          <div className="flex-1 min-h-0 overflow-hidden relative">
+            <MonacoEditor
+              value={localBody}
+              onChange={setLocalBody}
+              onSelectionChange={handleSelectionChange}
+            />
+
+            {/* 選択テキストがある場合のインラインAIトリガーバー */}
+            {selectedText && !isInlineActive && (
+              <div className="absolute top-4 right-8 z-30 animate-in fade-in slide-in-from-top-1 duration-150">
+                <button
+                  type="button"
+                  onClick={() => setIsInlineActive(true)}
+                  className="flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-lg hover:brightness-110 transition cursor-pointer border border-primary/20"
+                >
+                  <span>✨ 選択範囲をAI推敲 ({selectedText.length}文字)</span>
+                </button>
+              </div>
+            )}
+
+            {/* インラインAIアシスタントパネル */}
+            {isInlineActive && (
+              <div className="absolute top-4 right-8 z-40 w-96 max-w-[calc(100%-4rem)]">
+                <InlineAIAssistant
+                  selectedText={selectedText}
+                  onApplyReplace={handleApplyInlineReplace}
+                  onApplyInsertAfter={handleApplyInlineInsertAfter}
+                  onCancel={() => {
+                    setIsInlineActive(false);
+                    setInlineGeneratedText('');
+                  }}
+                  onExecuteAssist={handleExecuteInlineAssist}
+                  isLoading={inlineAssisting}
+                  generatedText={inlineGeneratedText}
+                />
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -188,6 +402,35 @@ export function SectionEditor({
           toast.success('過去のバージョンから本文を復元しました');
           void onRefresh();
         }}
+      />
+      <VerticalPreviewModal
+        isOpen={verticalPreviewOpen}
+        onClose={() => setVerticalPreviewOpen(false)}
+        title={section.title || `節 ${section.order}`}
+        body={localBody}
+      />
+      <ProofreadModal
+        isOpen={proofreadOpen}
+        onClose={() => setProofreadOpen(false)}
+        result={proofreadResult}
+        isLoading={proofreading}
+        onApplyPolishedBody={(polished) => {
+          setLocalBody(polished);
+          toast.success('推敲後の文章を本文に反映しました');
+        }}
+      />
+      <CharacterVoiceCheckerModal
+        isOpen={voiceCheckerOpen}
+        onClose={() => setVoiceCheckerOpen(false)}
+        result={voiceResult}
+        isLoading={checkingVoice}
+        onApplyFix={handleApplyVoiceFix}
+      />
+      <MultiPersonaReviewModal
+        isOpen={personaReviewOpen}
+        onClose={() => setPersonaReviewOpen(false)}
+        result={personaResult}
+        isLoading={reviewingPersona}
       />
     </div>
   );

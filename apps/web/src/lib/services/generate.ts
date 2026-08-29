@@ -123,3 +123,126 @@ export async function extractEntities(sectionId: string): Promise<ExtractResult>
     })),
   };
 }
+
+export async function* inlineAssistSectionContent(
+  sectionId: string,
+  input: {
+    selectedText: string;
+    action: 'expand' | 'shorten' | 'emotional' | 'dialogue' | 'paraphrase' | 'custom';
+    customInstruction?: string;
+    surroundingText?: string;
+    modelConfigId?: string | null;
+  },
+): AsyncIterable<string> {
+  const res = await apiClient.sections[':id'].generate['inline-assist'].$post({
+    param: { id: sectionId },
+    json: {
+      selectedText: input.selectedText,
+      action: input.action,
+      customInstruction: input.customInstruction,
+      surroundingText: input.surroundingText,
+      modelConfigId: input.modelConfigId || null,
+    },
+  });
+
+  if (!res.ok || !res.body) {
+    throw new Error('Failed to generate inline assist content');
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n\n');
+      buffer = lines.pop() ?? '';
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(trimmed.slice(6));
+            if (data.done) return;
+            if (data.text) yield data.text;
+          } catch {
+            // ignore JSON parse error
+          }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+export async function checkCharacterVoice(
+  novelId: string,
+  body?: string,
+  modelConfigId?: string | null,
+) {
+  const res = await apiClient.novels[':id'].generate['check-voice'].$post({
+    param: { id: novelId },
+    json: { body, modelConfigId: modelConfigId || null },
+  });
+  if (!res.ok) throw new Error('Failed to check character voice');
+  return res.json();
+}
+
+export async function analyzeSettingImpact(
+  novelId: string,
+  input: {
+    changeTarget: 'character' | 'setting';
+    targetName: string;
+    beforeValue: string;
+    afterValue: string;
+    modelConfigId?: string | null;
+  },
+) {
+  const res = await apiClient.novels[':id'].generate.impact.$post({
+    param: { id: novelId },
+    json: {
+      changeTarget: input.changeTarget,
+      targetName: input.targetName,
+      beforeValue: input.beforeValue,
+      afterValue: input.afterValue,
+      modelConfigId: input.modelConfigId || null,
+    },
+  });
+  if (!res.ok) throw new Error('Failed to analyze setting impact');
+  return res.json();
+}
+
+export async function analyzeStoryArc(novelId: string, modelConfigId?: string | null) {
+  const res = await apiClient.novels[':id'].generate['story-arc'].$post({
+    param: { id: novelId },
+    json: { modelConfigId: modelConfigId || null },
+  });
+  if (!res.ok) throw new Error('Failed to analyze story arc');
+  return res.json();
+}
+
+export async function multiPersonaReview(
+  novelId: string,
+  input: {
+    sectionId?: string;
+    chapterId?: string;
+    body?: string;
+    modelConfigId?: string | null;
+  },
+) {
+  const res = await apiClient.novels[':id'].generate['persona-review'].$post({
+    param: { id: novelId },
+    json: {
+      sectionId: input.sectionId,
+      chapterId: input.chapterId,
+      body: input.body,
+      modelConfigId: input.modelConfigId || null,
+    },
+  });
+  if (!res.ok) throw new Error('Failed to generate multi-persona review');
+  return res.json();
+}

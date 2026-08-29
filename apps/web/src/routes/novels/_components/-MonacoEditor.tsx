@@ -5,10 +5,29 @@ interface MonacoEditorProps {
   value: string;
   onChange: (value: string) => void;
   onMount?: OnMount;
+  onSelectionChange?: (selectedText: string) => void;
 }
 
-export function MonacoEditor({ value, onChange, onMount }: MonacoEditorProps) {
+export function MonacoEditor({ value, onChange, onMount, onSelectionChange }: MonacoEditorProps) {
   const { resolvedTheme } = useTheme();
+
+  const handleMount: OnMount = (editor, monaco) => {
+    if (onSelectionChange) {
+      editor.onDidChangeCursorSelection((e) => {
+        const model = editor.getModel();
+        if (model && !e.selection.isEmpty()) {
+          const selected = model.getValueInRange(e.selection);
+          onSelectionChange(selected);
+        } else if (e.selection.isEmpty()) {
+          onSelectionChange('');
+        }
+      });
+    }
+
+    if (onMount) {
+      onMount(editor, monaco);
+    }
+  };
 
   return (
     <Editor
@@ -16,7 +35,7 @@ export function MonacoEditor({ value, onChange, onMount }: MonacoEditorProps) {
       defaultLanguage="markdown"
       value={value}
       onChange={(v) => onChange(v ?? '')}
-      onMount={onMount}
+      onMount={handleMount}
       options={{
         wordWrap: 'on',
         minimap: { enabled: false },

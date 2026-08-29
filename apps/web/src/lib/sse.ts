@@ -1,4 +1,9 @@
-import { extractEntities, generateSectionContent } from './services/generate.js';
+import {
+  extractEntities,
+  generateSectionContent,
+  inlineAssistSectionContent,
+} from './services/generate.js';
+import type { InlineAssistInput } from './types.js';
 
 export interface SSEExtractResult {
   timelines: { event: string; order: number; timestamp: string | null }[];
@@ -22,6 +27,26 @@ export async function streamGenerateContent(
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to generate content';
+    throw new Error(message, { cause: err });
+  }
+}
+
+/**
+ * インラインAI支援のストリームを受信する。
+ */
+export async function streamInlineAssist(
+  sectionId: string,
+  input: InlineAssistInput,
+  onChunk: (text: string) => void,
+): Promise<void> {
+  try {
+    for await (const chunk of inlineAssistSectionContent(sectionId, input)) {
+      if (chunk) {
+        onChunk(chunk);
+      }
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to inline assist';
     throw new Error(message, { cause: err });
   }
 }

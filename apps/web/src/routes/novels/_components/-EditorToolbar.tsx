@@ -22,6 +22,10 @@ interface EditorToolbarProps {
   isZenMode: boolean;
   onToggleZenMode: () => void;
   onOpenHistory: () => void;
+  onOpenVerticalPreview: () => void;
+  onOpenVoiceChecker: () => void;
+  onOpenPersonaReview: () => void;
+  onOpenProofread: () => void;
   onSave: () => void;
 }
 
@@ -43,6 +47,10 @@ export function EditorToolbar({
   isZenMode,
   onToggleZenMode,
   onOpenHistory,
+  onOpenVerticalPreview,
+  onOpenVoiceChecker,
+  onOpenPersonaReview,
+  onOpenProofread,
   onSave,
 }: EditorToolbarProps) {
   const [isEditingTarget, setIsEditingTarget] = useState(false);
@@ -174,6 +182,38 @@ export function EditorToolbar({
       </div>
 
       <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={onOpenVerticalPreview}
+          title="文庫本風の縦書きでプレビュー"
+        >
+          📖 縦書き
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={onOpenProofread}
+          title="誤字脱字・文体リズム・視点ブレをAI校正"
+        >
+          ✨ 校正
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={onOpenVoiceChecker}
+          title="キャラクター設定と口調の一貫性をチェック"
+        >
+          🎭 口調
+        </Button>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={onOpenPersonaReview}
+          title="4名の模擬読者・編集者による査読フィードバック"
+        >
+          👥 模擬査読
+        </Button>
         <Button
           size="sm"
           variant="secondary"

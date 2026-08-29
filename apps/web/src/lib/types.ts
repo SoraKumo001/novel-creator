@@ -342,3 +342,80 @@ export interface TestConnectionResult {
   message: string;
   error?: string;
 }
+
+// ---- インラインAIアシスト ----
+export type InlineAssistAction =
+  'expand' | 'shorten' | 'emotional' | 'dialogue' | 'paraphrase' | 'custom';
+
+export interface InlineAssistInput {
+  selectedText: string;
+  action: InlineAssistAction;
+  customInstruction?: string;
+  surroundingText?: string;
+  modelConfigId?: string | null;
+}
+
+// ---- 口調・一貫性チェック ----
+export interface CharacterVoiceIssue {
+  characterName: string;
+  dialogue: string;
+  issueType: 'firstPerson' | 'secondPerson' | 'speechPattern' | 'toneShift' | 'outOfCharacter';
+  reason: string;
+  suggestion: string;
+}
+
+export interface CharacterVoiceCheckResult {
+  summary: string;
+  issues: CharacterVoiceIssue[];
+}
+
+// ---- 設定変更影響分析 ----
+export interface SettingImpactItem {
+  targetType: 'plot' | 'section' | 'timeline' | 'foreshadowing';
+  targetTitle: string;
+  issue: string;
+  suggestedFix: string;
+}
+
+export interface SettingImpactResult {
+  summary: string;
+  impactLevel: 'low' | 'medium' | 'high';
+  affectedItems: SettingImpactItem[];
+}
+
+// ---- ストーリーアーク・テンション分析 ----
+export interface StoryArcDataPoint {
+  chapterId: string;
+  chapterTitle: string;
+  sectionId: string;
+  sectionTitle: string;
+  tension: number;
+  valence: number;
+  pacing: number;
+  keyEvent: string;
+  advice: string;
+}
+
+export interface StoryArcResult {
+  summary: string;
+  pacingCritique: string;
+  dataPoints: StoryArcDataPoint[];
+}
+
+// ---- 複数ペルソナ模擬読者レビュー ----
+export type ReaderPersonaType = 'editor' | 'casual' | 'lore' | 'critic';
+
+export interface ReaderPersonaReview {
+  persona: ReaderPersonaType;
+  personaName: string;
+  rating: number;
+  catchphrase: string;
+  praise: string;
+  criticism: string;
+  advice: string;
+}
+
+export interface MultiPersonaReviewResult {
+  overallImpression: string;
+  reviews: ReaderPersonaReview[];
+}

@@ -286,6 +286,38 @@ export const generatePlotBodySchema = z.object({
   modelConfigId: z.string().uuid().optional().nullable(),
 });
 
+export const inlineAssistBodySchema = z.object({
+  selectedText: z.string().min(1),
+  action: z.enum(['expand', 'shorten', 'emotional', 'dialogue', 'paraphrase', 'custom']),
+  customInstruction: z.string().optional(),
+  surroundingText: z.string().optional(),
+  modelConfigId: z.string().uuid().optional().nullable(),
+});
+
+export const checkCharacterVoiceBodySchema = z.object({
+  body: z.string().optional(),
+  modelConfigId: z.string().uuid().optional().nullable(),
+});
+
+export const analyzeSettingImpactBodySchema = z.object({
+  changeTarget: z.enum(['character', 'setting']),
+  targetName: z.string().min(1),
+  beforeValue: z.string(),
+  afterValue: z.string(),
+  modelConfigId: z.string().uuid().optional().nullable(),
+});
+
+export const analyzeStoryArcBodySchema = z.object({
+  modelConfigId: z.string().uuid().optional().nullable(),
+});
+
+export const multiPersonaReviewBodySchema = z.object({
+  sectionId: z.string().uuid().optional(),
+  chapterId: z.string().uuid().optional(),
+  body: z.string().optional(),
+  modelConfigId: z.string().uuid().optional().nullable(),
+});
+
 // ---- 履歴 ----
 export const listHistoriesQuerySchema = z.object({
   novelId: z.string().uuid(),

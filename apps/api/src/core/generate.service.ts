@@ -1,17 +1,33 @@
 import { eq } from 'drizzle-orm';
 import type { LanguageModel } from 'ai';
-import { chapters, contents, llmConfigs, novels, sections } from '@novel-creator/db';
 import {
+  chapters,
+  characters,
+  contents,
+  foreshadowings,
+  llmConfigs,
+  novels,
+  sections,
+  timelines,
+} from '@novel-creator/db';
+import {
+  analyzeSettingImpactPrompt,
+  analyzeStoryArcPrompt,
   chapterSummary,
+  checkCharacterVoicePrompt,
   contentGeneration,
   createLanguageModelFromConfig,
   extractSettings,
   extractTimeline,
   generateJSON,
+  inlineAssistPrompt,
+  multiPersonaReviewPrompt,
   plotGeneration,
   proofreadPrompt,
   sectionSummary,
   streamText,
+  type InlineAssistAction,
+  type ReaderPersonaType,
 } from '@novel-creator/llm';
 import { searchContext } from '../rag.js';
 import { assertFound, type ServiceContext } from './types.js';
@@ -266,5 +282,344 @@ export class GenerateDomainService {
     }>(llm, prompt);
 
     return result;
+  }
+
+  async *inlineAssist(
+    sectionId: string,
+    input: {
+      selectedText: string;
+      action: InlineAssistAction;
+      customInstruction?: string;
+      surroundingText?: string;
+      modelConfigId?: string | null;
+    },
+  ) {
+    const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
+    assertFound(section, 'Section not found');
+    const [chapter] = await this.ctx.db
+      .select()
+      .from(chapters)
+      .where(eq(chapters.id, section.chapterId));
+    const [novel] = chapter
+      ? await this.ctx.db.select().from(novels).where(eq(novels.id, chapter.novelId))
+      : [null];
+
+    const context = novel
+      ? await searchContext(
+          this.ctx.vectorStore,
+          this.ctx.embedding,
+          novel.id,
+          { query: input.selectedText },
+          this.ctx.env,
+        )
+      : { characters: [] };
+
+    const prompt = inlineAssistPrompt({
+      novelTitle: novel?.title,
+      characters: context.characters.join('\n'),
+      surroundingText: input.surroundingText,
+      selectedText: input.selectedText,
+      action: input.action,
+      customInstruction: input.customInstruction,
+    });
+
+    const llm = await this.resolveModel(input.modelConfigId);
+    for await (const chunk of streamText(llm, prompt)) {
+      yield chunk;
+    }
+  }
+
+  async checkCharacterVoice(
+    novelId: string,
+    sectionId?: string,
+    customBody?: string,
+    modelConfigId?: string | null,
+  ) {
+    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
+    assertFound(novel, 'Novel not found');
+
+    const characterRows = await this.ctx.db
+      .select()
+      .from(characters)
+      .where(eq(characters.novelId, novelId));
+
+    let bodyText = customBody;
+    if (bodyText === undefined && sectionId) {
+      const [content] = await this.ctx.db
+        .select()
+        .from(contents)
+        .where(eq(contents.sectionId, sectionId));
+      bodyText = content?.body ?? '';
+    }
+
+    const charactersFormatted = characterRows.map((char) => {
+      let firstPerson: string | null = null;
+      let secondPerson: string | null = null;
+      let speechPattern: string | null = null;
+
+      if (Array.isArray(char.traits)) {
+        for (const trait of char.traits as string[]) {
+          if (trait.includes('一人称')) firstPerson = trait;
+          else if (trait.includes('二人称')) secondPerson = trait;
+          else if (trait.includes('口調') || trait.includes('語尾')) speechPattern = trait;
+        }
+      }
+
+      return {
+        name: char.name,
+        category: char.category,
+        firstPerson,
+        secondPerson,
+        speechPattern,
+        description: char.description,
+      };
+    });
+
+    const prompt = checkCharacterVoicePrompt({
+      novelTitle: novel.title,
+      characters: charactersFormatted,
+      body: bodyText ?? '',
+    });
+
+    const llm = await this.resolveModel(modelConfigId);
+    return generateJSON<{
+      summary: string;
+      issues: Array<{
+        characterName: string;
+        dialogue: string;
+        issueType:
+          'firstPerson' | 'secondPerson' | 'speechPattern' | 'toneShift' | 'outOfCharacter';
+        reason: string;
+        suggestion: string;
+      }>;
+    }>(llm, prompt);
+  }
+
+  async analyzeSettingImpact(
+    novelId: string,
+    input: {
+      changeTarget: 'character' | 'setting';
+      targetName: string;
+      beforeValue: string;
+      afterValue: string;
+      modelConfigId?: string | null;
+    },
+  ) {
+    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
+    assertFound(novel, 'Novel not found');
+
+    const chapterRows = await this.ctx.db
+      .select()
+      .from(chapters)
+      .where(eq(chapters.novelId, novelId))
+      .orderBy(chapters.order);
+
+    const chaptersWithSections = await Promise.all(
+      chapterRows.map(async (ch) => {
+        const secRows = await this.ctx.db
+          .select()
+          .from(sections)
+          .where(eq(sections.chapterId, ch.id))
+          .orderBy(sections.order);
+        return {
+          title: ch.title,
+          sections: secRows.map((s) => ({
+            title: s.title ?? `節 ${s.order}`,
+            summary: s.summary,
+          })),
+        };
+      }),
+    );
+
+    const timelineRows = await this.ctx.db
+      .select()
+      .from(timelines)
+      .where(eq(timelines.novelId, novelId))
+      .orderBy(timelines.order);
+
+    const foreshadowingRows = await this.ctx.db
+      .select()
+      .from(foreshadowings)
+      .where(eq(foreshadowings.novelId, novelId));
+
+    const prompt = analyzeSettingImpactPrompt({
+      novelTitle: novel.title,
+      changeTarget: input.changeTarget,
+      targetName: input.targetName,
+      beforeValue: input.beforeValue,
+      afterValue: input.afterValue,
+      plots: novel.description ?? undefined,
+      chapters: chaptersWithSections,
+      timelines: timelineRows.map((t) => ({
+        title: t.event,
+        era: t.timestamp,
+        description: t.event,
+      })),
+      foreshadowings: foreshadowingRows.map((f) => ({
+        title: f.title,
+        description: f.description,
+      })),
+    });
+
+    const llm = await this.resolveModel(input.modelConfigId);
+    return generateJSON<{
+      summary: string;
+      impactLevel: 'low' | 'medium' | 'high';
+      affectedItems: Array<{
+        targetType: 'plot' | 'section' | 'timeline' | 'foreshadowing';
+        targetTitle: string;
+        issue: string;
+        suggestedFix: string;
+      }>;
+    }>(llm, prompt);
+  }
+
+  async analyzeStoryArc(novelId: string, modelConfigId?: string | null) {
+    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
+    assertFound(novel, 'Novel not found');
+
+    const chapterRows = await this.ctx.db
+      .select()
+      .from(chapters)
+      .where(eq(chapters.novelId, novelId))
+      .orderBy(chapters.order);
+
+    const chaptersWithSections = await Promise.all(
+      chapterRows.map(async (ch) => {
+        const secRows = await this.ctx.db
+          .select()
+          .from(sections)
+          .where(eq(sections.chapterId, ch.id))
+          .orderBy(sections.order);
+
+        const sectionsData = await Promise.all(
+          secRows.map(async (s) => {
+            const [content] = await this.ctx.db
+              .select()
+              .from(contents)
+              .where(eq(contents.sectionId, s.id));
+            const snippet = content?.body ? content.body.slice(0, 300) : undefined;
+            return {
+              id: s.id,
+              title: s.title ?? `節 ${s.order}`,
+              summary: s.summary,
+              contentSnippet: snippet,
+            };
+          }),
+        );
+
+        return {
+          id: ch.id,
+          title: ch.title,
+          sections: sectionsData,
+        };
+      }),
+    );
+
+    const prompt = analyzeStoryArcPrompt({
+      novelTitle: novel.title,
+      chapters: chaptersWithSections,
+    });
+
+    const llm = await this.resolveModel(modelConfigId);
+    return generateJSON<{
+      summary: string;
+      pacingCritique: string;
+      dataPoints: Array<{
+        chapterId: string;
+        chapterTitle: string;
+        sectionId: string;
+        sectionTitle: string;
+        tension: number;
+        valence: number;
+        pacing: number;
+        keyEvent: string;
+        advice: string;
+      }>;
+    }>(llm, prompt);
+  }
+
+  async multiPersonaReview(
+    novelId: string,
+    input: {
+      sectionId?: string;
+      chapterId?: string;
+      customBody?: string;
+      modelConfigId?: string | null;
+    },
+  ) {
+    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
+    assertFound(novel, 'Novel not found');
+
+    let bodyText = input.customBody ?? '';
+    let chapterTitle: string | undefined;
+    let sectionTitle: string | undefined;
+
+    if (input.sectionId) {
+      const [sec] = await this.ctx.db
+        .select()
+        .from(sections)
+        .where(eq(sections.id, input.sectionId));
+      if (sec) {
+        sectionTitle = sec.title ?? `節 ${sec.order}`;
+        if (!bodyText) {
+          const [content] = await this.ctx.db
+            .select()
+            .from(contents)
+            .where(eq(contents.sectionId, sec.id));
+          bodyText = content?.body ?? '';
+        }
+        const [ch] = await this.ctx.db
+          .select()
+          .from(chapters)
+          .where(eq(chapters.id, sec.chapterId));
+        if (ch) chapterTitle = ch.title;
+      }
+    } else if (input.chapterId) {
+      const [ch] = await this.ctx.db
+        .select()
+        .from(chapters)
+        .where(eq(chapters.id, input.chapterId));
+      if (ch) {
+        chapterTitle = ch.title;
+        if (!bodyText) {
+          const secRows = await this.ctx.db
+            .select()
+            .from(sections)
+            .where(eq(sections.chapterId, ch.id))
+            .orderBy(sections.order);
+          const bodies: string[] = [];
+          for (const s of secRows) {
+            const [c] = await this.ctx.db
+              .select()
+              .from(contents)
+              .where(eq(contents.sectionId, s.id));
+            if (c?.body) bodies.push(`【${s.title ?? `節 ${s.order}`}】\n${c.body}`);
+          }
+          bodyText = bodies.join('\n\n');
+        }
+      }
+    }
+
+    const prompt = multiPersonaReviewPrompt({
+      novelTitle: novel.title,
+      chapterTitle,
+      sectionTitle,
+      text: bodyText,
+    });
+
+    const llm = await this.resolveModel(input.modelConfigId);
+    return generateJSON<{
+      overallImpression: string;
+      reviews: Array<{
+        persona: ReaderPersonaType;
+        personaName: string;
+        rating: number;
+        catchphrase: string;
+        praise: string;
+        criticism: string;
+        advice: string;
+      }>;
+    }>(llm, prompt);
   }
 }

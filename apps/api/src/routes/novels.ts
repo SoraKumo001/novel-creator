@@ -5,6 +5,9 @@ import { z } from 'zod';
 import type { AppContext } from '../context.js';
 import { getServices } from '../core/services.js';
 import {
+  analyzeSettingImpactBodySchema,
+  analyzeStoryArcBodySchema,
+  checkCharacterVoiceBodySchema,
   createChapterSchema,
   createCharacterSchema,
   createLlmInstructionSchema,
@@ -16,6 +19,7 @@ import {
   editSettingDocumentSchema,
   editSettingSectionSchema,
   idParamSchema,
+  multiPersonaReviewBodySchema,
   saveCharactersMarkdownSchema,
   saveSettingsMarkdownSchema,
   settingDraftSchema,
@@ -336,6 +340,73 @@ const novelsRouter = new Hono<AppContext>()
       const { id: novelId } = c.req.valid('param');
       const jsonBody = c.req.valid('json');
       const result = await getServices(c).generate.generatePlot(novelId, jsonBody?.modelConfigId);
+      return c.json(result);
+    },
+  )
+  // POST /api/novels/:id/generate/check-voice - キャラクター口調・一貫性チェック
+  .post(
+    '/:id/generate/check-voice',
+    zValidator('param', idParamSchema),
+    zValidator('json', checkCharacterVoiceBodySchema.optional()),
+    async (c) => {
+      const { id: novelId } = c.req.valid('param');
+      const jsonBody = c.req.valid('json');
+      const result = await getServices(c).generate.checkCharacterVoice(
+        novelId,
+        undefined,
+        jsonBody?.body,
+        jsonBody?.modelConfigId,
+      );
+      return c.json(result);
+    },
+  )
+  // POST /api/novels/:id/generate/impact - 設定変更の影響範囲分析
+  .post(
+    '/:id/generate/impact',
+    zValidator('param', idParamSchema),
+    zValidator('json', analyzeSettingImpactBodySchema),
+    async (c) => {
+      const { id: novelId } = c.req.valid('param');
+      const body = c.req.valid('json');
+      const result = await getServices(c).generate.analyzeSettingImpact(novelId, {
+        changeTarget: body.changeTarget,
+        targetName: body.targetName,
+        beforeValue: body.beforeValue,
+        afterValue: body.afterValue,
+        modelConfigId: body.modelConfigId,
+      });
+      return c.json(result);
+    },
+  )
+  // POST /api/novels/:id/generate/story-arc - ストーリーアーク・テンション分析
+  .post(
+    '/:id/generate/story-arc',
+    zValidator('param', idParamSchema),
+    zValidator('json', analyzeStoryArcBodySchema.optional()),
+    async (c) => {
+      const { id: novelId } = c.req.valid('param');
+      const jsonBody = c.req.valid('json');
+      const result = await getServices(c).generate.analyzeStoryArc(
+        novelId,
+        jsonBody?.modelConfigId,
+      );
+      return c.json(result);
+    },
+  )
+  // POST /api/novels/:id/generate/persona-review - 複数ペルソナによる模擬読者レビュー
+  .post(
+    '/:id/generate/persona-review',
+    zValidator('param', idParamSchema),
+    zValidator('json', multiPersonaReviewBodySchema.optional()),
+    async (c) => {
+      const { id: novelId } = c.req.valid('param');
+      const jsonBody = c.req.valid('json');
+      const result = await getServices(c).generate.multiPersonaReview(novelId, {
+        sectionId: jsonBody?.sectionId,
+        chapterId: jsonBody?.chapterId,
+        customBody: jsonBody?.body,
+        modelConfigId: jsonBody?.modelConfigId,
+      });
       return c.json(result);
     },
   );

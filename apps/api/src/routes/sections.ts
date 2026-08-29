@@ -7,6 +7,7 @@ import { getServices } from '../core/services.js';
 import {
   generateContentBodySchema,
   idParamSchema,
+  inlineAssistBodySchema,
   proofreadBodySchema,
   updateContentSchema,
   updateSectionSchema,
@@ -99,6 +100,26 @@ const sectionsRouter = new Hono<AppContext>()
         jsonBody?.modelConfigId,
       );
       return c.json(result);
+    },
+  )
+  // POST /api/sections/:id/generate/inline-assist - 選択範囲のインラインAI支援（ストリーミング）
+  .post(
+    '/:id/generate/inline-assist',
+    zValidator('param', idParamSchema),
+    zValidator('json', inlineAssistBodySchema),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      const body = c.req.valid('json');
+      return sseStream(
+        c,
+        getServices(c).generate.inlineAssist(id, {
+          selectedText: body.selectedText,
+          action: body.action,
+          customInstruction: body.customInstruction,
+          surroundingText: body.surroundingText,
+          modelConfigId: body.modelConfigId,
+        }),
+      );
     },
   );
 

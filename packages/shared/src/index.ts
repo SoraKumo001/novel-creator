@@ -50,3 +50,4 @@ export {
   type NovelExportSection,
 } from './exportFormatter.js';
 export { generateCharacterMermaidGraph, type CharacterGraphNode } from './characterGraph.js';
+export { parseRubyToHtml, stripRuby } from './ruby.js';
