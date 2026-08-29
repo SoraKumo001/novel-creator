@@ -339,6 +339,13 @@ export function OverviewTab({
         onClose={() => setHeatmapModalOpen(false)}
         characters={novel.characters}
         chapters={chapters}
+        onSelectSection={() => {
+          void navigate({
+            to: '/novels/$novelId',
+            params: { novelId: novel.id },
+            search: { tab: 'editor' },
+          });
+        }}
       />
     </div>
   );

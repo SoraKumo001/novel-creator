@@ -2,10 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import type { NovelExportData } from '@novel-creator/shared';
 import { Button } from '@/components/Button.js';
+import { CommandPaletteModal } from '@/components/CommandPaletteModal.js';
 import { ExportModal } from '@/components/ExportModal.js';
+import { KeyboardShortcutsModal } from '@/components/KeyboardShortcutsModal.js';
 import { Loading } from '@/components/Loading.js';
+import { useChapters } from '@/hooks/useChapters.js';
+import { useCharacters } from '@/hooks/useCharacters.js';
 import { useChat } from '@/hooks/useChat.js';
+import { useForeshadowings } from '@/hooks/useForeshadowings.js';
 import { useNovel } from '@/hooks/useNovel.js';
+import { useSettings } from '@/hooks/useSettings.js';
 import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import { fetchNovelExportData } from '@/lib/services/index.js';
@@ -48,6 +54,11 @@ interface TabItem {
 function NovelDetailPage() {
   const { novelId } = Route.useParams();
   const { novel, loading, error, refetch } = useNovel(novelId);
+  const { chapters = [] } = useChapters(novelId);
+  const { characters = [] } = useCharacters(novelId);
+  const { settings = [] } = useSettings(novelId);
+  const { foreshadowings = [] } = useForeshadowings(novelId);
+
   const { tab } = Route.useSearch();
   const activeTab: TabId = tab ?? 'overview';
   const navigate = useNavigate();
@@ -57,6 +68,9 @@ function NovelDetailPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [exportData, setExportData] = useState<NovelExportData | null>(null);
+
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [shortcutsModalOpen, setShortcutsModalOpen] = useState(false);
 
   const handleOpenExport = useCallback(async () => {
     if (!novelId) return;
@@ -82,9 +96,24 @@ function NovelDetailPage() {
     { id: 'foreshadowing', label: '伏線', icon: '🚩', shortcut: '7' },
   ];
 
-  // グローバルショートカット: Alt+1~6 でタブ切り替え、Ctrl+J でチャット開閉
+  // グローバルショートカット: Alt+1~7 でタブ切り替え、Ctrl+K でコマンドパレット、Ctrl+J でチャット開閉、? でヘルプ
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 入力要素にフォーカスがある場合は一部ショートカットを除外
+      const target = e.target as HTMLElement;
+      const isInput =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        target.closest('.monaco-editor');
+
+      // Ctrl+K または Cmd+K でコマンドパレット
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+        return;
+      }
+
       // Ctrl+J または Cmd+J でチャット開閉
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
         e.preventDefault();
@@ -92,7 +121,14 @@ function NovelDetailPage() {
         return;
       }
 
-      // Alt+1 ~ Alt+6 でタブ切り替え
+      // 入力中でない場合の ? キーでショートカットヘルプ
+      if (!isInput && (e.key === '?' || (e.shiftKey && e.key === '/'))) {
+        e.preventDefault();
+        setShortcutsModalOpen(true);
+        return;
+      }
+
+      // Alt+1 ~ Alt+7 でタブ切り替え
       if (e.altKey && !e.ctrlKey && !e.metaKey) {
         const num = parseInt(e.key, 10);
         if (num >= 1 && num <= tabs.length) {
@@ -136,7 +172,28 @@ function NovelDetailPage() {
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <Button variant="secondary" onClick={handleOpenExport} isLoading={exportLoading}>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCommandPaletteOpen(true)}
+                title="Ctrl + K でどこからでも起動"
+              >
+                🔍 検索 (Ctrl+K)
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setShortcutsModalOpen(true)}
+                title="? キーで起動"
+              >
+                ⌨️
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleOpenExport}
+                isLoading={exportLoading}
+              >
                 📤 全文エクスポート
               </Button>
             </div>
@@ -205,6 +262,30 @@ function NovelDetailPage() {
       {exportData && (
         <ExportModal isOpen={exportOpen} onClose={() => setExportOpen(false)} novel={exportData} />
       )}
+
+      <CommandPaletteModal
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        novelId={novelId}
+        chapters={chapters}
+        characters={characters}
+        settings={settings}
+        foreshadowings={foreshadowings}
+        onNavigateTab={(targetTab) => {
+          void navigate({
+            to: '/novels/$novelId',
+            params: { novelId },
+            search: { tab: targetTab as TabId },
+          });
+        }}
+        onOpenExport={handleOpenExport}
+        onToggleChat={toggleChat}
+      />
+
+      <KeyboardShortcutsModal
+        isOpen={shortcutsModalOpen}
+        onClose={() => setShortcutsModalOpen(false)}
+      />
     </div>
   );
 }

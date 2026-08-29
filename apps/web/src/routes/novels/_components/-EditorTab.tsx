@@ -215,6 +215,7 @@ export function EditorTab({
             key={editorKey}
             novelId={novel.id}
             section={selectedSection}
+            chapter={selectedChapter}
             onRefresh={onRefresh}
             onUpdateTitle={(newTitle) => handleUpdateSectionTitle(selectedSection, newTitle)}
             isZenMode={isZenMode}

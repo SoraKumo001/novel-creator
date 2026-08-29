@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/Button.js';
 import { LLMModelSelector } from '@/components/LLMModelSelector.js';
 import type { Section } from '@/lib/types.js';
@@ -27,6 +27,8 @@ interface EditorToolbarProps {
   onOpenPersonaReview: () => void;
   onOpenProofread: () => void;
   onSave: () => void;
+  isReferencePanelOpen?: boolean;
+  onToggleReferencePanel?: () => void;
 }
 
 export function EditorToolbar({
@@ -52,14 +54,36 @@ export function EditorToolbar({
   onOpenPersonaReview,
   onOpenProofread,
   onSave,
+  isReferencePanelOpen,
+  onToggleReferencePanel,
 }: EditorToolbarProps) {
   const [isEditingTarget, setIsEditingTarget] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(section.title || `節 ${section.order}`);
 
+  // ドロップダウン開閉ステート
+  const [aiMenuOpen, setAiMenuOpen] = useState(false);
+  const [viewMenuOpen, setViewMenuOpen] = useState(false);
+  const aiMenuRef = useRef<HTMLDivElement>(null);
+  const viewMenuRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     setTitleInput(section.title || `節 ${section.order}`);
   }, [section.title, section.order]);
+
+  // 外側クリックでメニューを閉じる
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (aiMenuRef.current && !aiMenuRef.current.contains(e.target as Node)) {
+        setAiMenuOpen(false);
+      }
+      if (viewMenuRef.current && !viewMenuRef.current.contains(e.target as Node)) {
+        setViewMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSaveTitle = async () => {
     if (!titleInput.trim()) return;
@@ -182,66 +206,173 @@ export function EditorToolbar({
       </div>
 
       <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={onOpenVerticalPreview}
-          title="文庫本風の縦書きでプレビュー"
-        >
-          📖 縦書き
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={onOpenProofread}
-          title="誤字脱字・文体リズム・視点ブレをAI校正"
-        >
-          ✨ 校正
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={onOpenVoiceChecker}
-          title="キャラクター設定と口調の一貫性をチェック"
-        >
-          🎭 口調
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={onOpenPersonaReview}
-          title="4名の模擬読者・編集者による査読フィードバック"
-        >
-          👥 模擬査読
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={onOpenHistory}
-          title="編集履歴と差分を確認・復元"
-        >
-          🕒 履歴
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={onToggleZenMode}
-          title={isZenMode ? '集中モードを解除 (Esc)' : '全画面集中モード'}
-        >
-          {isZenMode ? '✕ 集中モード解除' : '⛶ 集中モード'}
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={onExtract}
-          isLoading={extracting}
-          disabled={!canExtract}
-        >
-          整合性更新
-        </Button>
+        {/* ✨ AI推敲・分析 ドロップダウン */}
+        <div className="relative" ref={aiMenuRef}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setAiMenuOpen(!aiMenuOpen);
+              setViewMenuOpen(false);
+            }}
+            rightIcon={<span className="text-[10px]">▼</span>}
+          >
+            ✨ AI推敲・分析
+          </Button>
+
+          {aiMenuOpen && (
+            <div className="absolute right-0 mt-1 w-56 rounded-xl border border-border bg-surface shadow-xl py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100 divide-y divide-border/40">
+              <div className="py-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAiMenuOpen(false);
+                    onOpenProofread();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-foreground hover:bg-surface-raised transition cursor-pointer text-left"
+                >
+                  <span className="text-base">✨</span>
+                  <div>
+                    <div className="font-semibold">本文校正・推敲</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      誤字・文体・視点ブレを点検
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAiMenuOpen(false);
+                    onOpenVoiceChecker();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-foreground hover:bg-surface-raised transition cursor-pointer text-left"
+                >
+                  <span className="text-base">🎭</span>
+                  <div>
+                    <div className="font-semibold">口調・一貫性チェック</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      人物設定とセリフのズレを検出
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAiMenuOpen(false);
+                    onOpenPersonaReview();
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-foreground hover:bg-surface-raised transition cursor-pointer text-left"
+                >
+                  <span className="text-base">👥</span>
+                  <div>
+                    <div className="font-semibold">4ペルソナ模擬査読</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      編集者・読者・評論家レビュー
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              <div className="py-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAiMenuOpen(false);
+                    onExtract();
+                  }}
+                  disabled={!canExtract || extracting}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-foreground hover:bg-surface-raised transition cursor-pointer text-left disabled:opacity-50"
+                >
+                  <span className="text-base">⚡</span>
+                  <div>
+                    <div className="font-semibold">
+                      {extracting ? '抽出中...' : '整合性更新（設定抽出）'}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">
+                      本文から新設定・年表を抽出
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 👁️ 表示・履歴 ドロップダウン */}
+        <div className="relative" ref={viewMenuRef}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => {
+              setViewMenuOpen(!viewMenuOpen);
+              setAiMenuOpen(false);
+            }}
+            rightIcon={<span className="text-[10px]">▼</span>}
+          >
+            👁️ 表示
+          </Button>
+
+          {viewMenuOpen && (
+            <div className="absolute right-0 mt-1 w-48 rounded-xl border border-border bg-surface shadow-xl py-1.5 z-30 animate-in fade-in zoom-in-95 duration-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMenuOpen(false);
+                  onOpenVerticalPreview();
+                }}
+                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs text-foreground hover:bg-surface-raised transition cursor-pointer text-left"
+              >
+                <span>📖</span>
+                <span>縦書きプレビュー</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMenuOpen(false);
+                  onOpenHistory();
+                }}
+                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs text-foreground hover:bg-surface-raised transition cursor-pointer text-left"
+              >
+                <span>🕒</span>
+                <span>編集履歴・差分比較</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMenuOpen(false);
+                  onToggleZenMode();
+                }}
+                className="w-full flex items-center gap-2 px-3.5 py-2 text-xs text-foreground hover:bg-surface-raised transition cursor-pointer text-left"
+              >
+                <span>{isZenMode ? '✕' : '⛶'}</span>
+                <span>{isZenMode ? '集中モード解除 (Esc)' : '全画面集中モード'}</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 📑 参考資料ペイン開閉トグル */}
+        {onToggleReferencePanel && (
+          <Button
+            size="sm"
+            variant={isReferencePanelOpen ? 'primary' : 'secondary'}
+            onClick={onToggleReferencePanel}
+            title="エディタ横にプロット・人物・設定を常時表示"
+          >
+            📑 参考資料
+          </Button>
+        )}
+
+        {/* モデル選択 */}
         {onModelConfigIdChange && (
           <LLMModelSelector value={modelConfigId} onChange={onModelConfigIdChange} size="sm" />
         )}
+
+        {/* 本文生成 */}
         <Button
           size="sm"
           variant="secondary"
@@ -252,6 +383,7 @@ export function EditorToolbar({
           本文生成
         </Button>
 
+        {/* 保存ボタン */}
         <Button
           size="sm"
           variant="primary"

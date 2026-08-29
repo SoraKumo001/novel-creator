@@ -8,6 +8,7 @@ interface CharacterHeatmapModalProps {
   onClose: () => void;
   characters: Character[];
   chapters: ChapterWithSections[];
+  onSelectSection?: (sectionId: string) => void;
 }
 
 export function CharacterHeatmapModal({
@@ -15,6 +16,7 @@ export function CharacterHeatmapModal({
   onClose,
   characters,
   chapters,
+  onSelectSection,
 }: CharacterHeatmapModalProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
@@ -136,8 +138,16 @@ export function CharacterHeatmapModal({
                   {allSections.map((sec, idx) => (
                     <th
                       key={sec.sectionId}
-                      className="p-2 font-medium text-muted-foreground text-center min-w-16 border-r border-border/50 truncate max-w-24"
-                      title={`${sec.chapterTitle} - ${sec.sectionTitle}`}
+                      onClick={() => {
+                        if (onSelectSection) {
+                          onClose();
+                          onSelectSection(sec.sectionId);
+                        }
+                      }}
+                      className={`p-2 font-medium text-center min-w-16 border-r border-border/50 truncate max-w-24 ${
+                        onSelectSection ? 'cursor-pointer hover:bg-primary/20 transition' : ''
+                      }`}
+                      title={`${sec.chapterTitle} - ${sec.sectionTitle} (クリックで執筆画面へ移動)`}
                     >
                       <div className="text-[10px] text-muted-foreground truncate">S{idx + 1}</div>
                       <div className="text-[11px] truncate font-normal text-foreground">
@@ -174,17 +184,28 @@ export function CharacterHeatmapModal({
 
                     {row.scores.map((score, sIdx) => {
                       const hasAppearance = score > 0;
+                      const sec = allSections[sIdx];
                       return (
                         <td
                           key={sIdx}
+                          onClick={() => {
+                            if (onSelectSection) {
+                              onClose();
+                              onSelectSection(sec.sectionId);
+                            }
+                          }}
                           className={`p-2 text-center border-r border-border/50 transition ${
+                            onSelectSection
+                              ? 'cursor-pointer hover:ring-2 hover:ring-primary hover:z-20'
+                              : ''
+                          } ${
                             hasAppearance
                               ? score >= 4
                                 ? 'bg-primary/40 font-bold text-primary-foreground'
                                 : 'bg-primary/15 font-semibold text-primary'
                               : 'text-muted-foreground/30'
                           }`}
-                          title={`${row.character.name} in ${allSections[sIdx].sectionTitle} (スコア: ${score})`}
+                          title={`${row.character.name} in ${sec.sectionTitle} (スコア: ${score} - クリックで本文へジャンプ)`}
                         >
                           {hasAppearance ? (score >= 4 ? '🔥' : '●') : '-'}
                         </td>

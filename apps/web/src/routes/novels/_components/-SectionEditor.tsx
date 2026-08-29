@@ -12,6 +12,10 @@ import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import { countWords } from '@/lib/sse.js';
 import { proofreadSectionContent } from '@/lib/services/index.js';
+import { ReferenceSidePanel } from '@/components/ReferenceSidePanel.js';
+import { useCharacters } from '@/hooks/useCharacters.js';
+import { useSettings } from '@/hooks/useSettings.js';
+import { useForeshadowings } from '@/hooks/useForeshadowings.js';
 import type {
   CharacterVoiceCheckResult,
   ExtractResult,
@@ -19,6 +23,7 @@ import type {
   MultiPersonaReviewResult,
   ProofreadResult,
   Section,
+  ChapterWithSections,
 } from '@/lib/types.js';
 import { MonacoEditor } from './-MonacoEditor.js';
 import { EditorToolbar } from './-EditorToolbar.js';
@@ -28,6 +33,7 @@ import { ExtractResultModal } from './-ExtractResultModal.js';
 interface SectionEditorProps {
   novelId: string;
   section: Section;
+  chapter?: ChapterWithSections;
   onRefresh: () => Promise<void>;
   onUpdateTitle: (newTitle: string) => Promise<void>;
   isZenMode: boolean;
@@ -37,11 +43,27 @@ interface SectionEditorProps {
 export function SectionEditor({
   novelId,
   section,
+  chapter,
   onRefresh,
   onUpdateTitle,
   isZenMode,
   onToggleZenMode,
 }: SectionEditorProps) {
+  const { characters = [] } = useCharacters(novelId);
+  const { settings = [] } = useSettings(novelId);
+  const { foreshadowings = [] } = useForeshadowings(novelId);
+
+  const [referencePanelOpen, setReferencePanelOpen] = useState(() => {
+    return localStorage.getItem('novel-creator:reference-panel-open') === 'true';
+  });
+
+  const handleToggleReferencePanel = () => {
+    setReferencePanelOpen((prev) => {
+      const next = !prev;
+      localStorage.setItem('novel-creator:reference-panel-open', String(next));
+      return next;
+    });
+  };
   const { content, loading, saving, updateContent } = useContent(section.id);
   const {
     generateContent,
@@ -324,6 +346,8 @@ export function SectionEditor({
         onOpenPersonaReview={() => void handleOpenPersonaReview()}
         onOpenProofread={() => void handleOpenProofread()}
         onSave={() => void handleSave()}
+        isReferencePanelOpen={referencePanelOpen}
+        onToggleReferencePanel={handleToggleReferencePanel}
       />
 
       {/* 目標達成度プログレスバー */}
@@ -336,49 +360,62 @@ export function SectionEditor({
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
-        {loading ? (
-          <Loading message="本文を読み込み中..." />
-        ) : (
-          <div className="flex-1 min-h-0 overflow-hidden relative">
-            <MonacoEditor
-              value={localBody}
-              onChange={setLocalBody}
-              onSelectionChange={handleSelectionChange}
-            />
+      <div className="flex-1 min-h-0 overflow-hidden relative flex flex-row">
+        <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
+          {loading ? (
+            <Loading message="本文を読み込み中..." />
+          ) : (
+            <div className="flex-1 min-h-0 overflow-hidden relative">
+              <MonacoEditor
+                value={localBody}
+                onChange={setLocalBody}
+                onSelectionChange={handleSelectionChange}
+              />
 
-            {/* 選択テキストがある場合のインラインAIトリガーバー */}
-            {selectedText && !isInlineActive && (
-              <div className="absolute top-4 right-8 z-30 animate-in fade-in slide-in-from-top-1 duration-150">
-                <button
-                  type="button"
-                  onClick={() => setIsInlineActive(true)}
-                  className="flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-lg hover:brightness-110 transition cursor-pointer border border-primary/20"
-                >
-                  <span>✨ 選択範囲をAI推敲 ({selectedText.length}文字)</span>
-                </button>
-              </div>
-            )}
+              {/* 選択テキストがある場合のインラインAIトリガーバー */}
+              {selectedText && !isInlineActive && (
+                <div className="absolute top-4 right-8 z-30 animate-in fade-in slide-in-from-top-1 duration-150">
+                  <button
+                    type="button"
+                    onClick={() => setIsInlineActive(true)}
+                    className="flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-lg hover:brightness-110 transition cursor-pointer border border-primary/20"
+                  >
+                    <span>✨ 選択範囲をAI推敲 ({selectedText.length}文字)</span>
+                  </button>
+                </div>
+              )}
 
-            {/* インラインAIアシスタントパネル */}
-            {isInlineActive && (
-              <div className="absolute top-4 right-8 z-40 w-96 max-w-[calc(100%-4rem)]">
-                <InlineAIAssistant
-                  selectedText={selectedText}
-                  onApplyReplace={handleApplyInlineReplace}
-                  onApplyInsertAfter={handleApplyInlineInsertAfter}
-                  onCancel={() => {
-                    setIsInlineActive(false);
-                    setInlineGeneratedText('');
-                  }}
-                  onExecuteAssist={handleExecuteInlineAssist}
-                  isLoading={inlineAssisting}
-                  generatedText={inlineGeneratedText}
-                />
-              </div>
-            )}
-          </div>
-        )}
+              {/* インラインAIアシスタントパネル */}
+              {isInlineActive && (
+                <div className="absolute top-4 right-8 z-40 w-96 max-w-[calc(100%-4rem)]">
+                  <InlineAIAssistant
+                    selectedText={selectedText}
+                    onApplyReplace={handleApplyInlineReplace}
+                    onApplyInsertAfter={handleApplyInlineInsertAfter}
+                    onCancel={() => {
+                      setIsInlineActive(false);
+                      setInlineGeneratedText('');
+                    }}
+                    onExecuteAssist={handleExecuteInlineAssist}
+                    isLoading={inlineAssisting}
+                    generatedText={inlineGeneratedText}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* 📑 参考資料サイドパネル */}
+        <ReferenceSidePanel
+          isOpen={referencePanelOpen}
+          onClose={() => handleToggleReferencePanel()}
+          section={section}
+          chapter={chapter}
+          characters={characters}
+          settings={settings}
+          foreshadowings={foreshadowings}
+        />
       </div>
 
       <GenerateContentPanel generatingContent={generatingContent} streamError={streamError} />
