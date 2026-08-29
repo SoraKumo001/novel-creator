@@ -16,6 +16,7 @@
     "db:down": "docker compose down",
     "db:push": "pnpm --filter @novel-creator/db db:push",
     "db:generate": "pnpm --filter @novel-creator/db db:generate",
+    "db:migrate": "pnpm --filter @novel-creator/db db:migrate",
     "db:studio": "pnpm --filter @novel-creator/db db:studio",
     "dev:api": "pnpm --filter @novel-creator/api dev",
     "dev:web": "pnpm --filter @novel-creator/web dev",

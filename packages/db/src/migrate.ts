@@ -1,6 +1,11 @@
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { drizzle } from 'drizzle-orm/node-postgres';
-import { sql } from 'drizzle-orm';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 async function runMigrate() {
   const connectionString =
@@ -11,36 +16,10 @@ async function runMigrate() {
   const db = drizzle(pool);
 
   try {
-    console.log('[db:migrate] Ensuring edit_histories table exists...');
-    await db.execute(sql`
-      CREATE TABLE IF NOT EXISTS "edit_histories" (
-        "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-        "novel_id" uuid NOT NULL,
-        "entity_type" text NOT NULL,
-        "entity_id" text NOT NULL,
-        "title" text DEFAULT '' NOT NULL,
-        "content" text NOT NULL,
-        "description" text DEFAULT '手動保存' NOT NULL,
-        "word_count" integer,
-        "created_at" timestamp DEFAULT now() NOT NULL
-      );
-    `);
-
-    // 外部キー制約の追加（存在しない場合のみ）
-    await db.execute(sql`
-      DO $$
-      BEGIN
-        IF NOT EXISTS (
-          SELECT 1 FROM pg_constraint WHERE conname = 'edit_histories_novel_id_novels_id_fk'
-        ) THEN
-          ALTER TABLE "edit_histories" 
-          ADD CONSTRAINT "edit_histories_novel_id_novels_id_fk" 
-          FOREIGN KEY ("novel_id") REFERENCES "public"."novels"("id") ON DELETE cascade ON UPDATE no action;
-        END IF;
-      END $$;
-    `);
-
-    console.log('[db:migrate] Table edit_histories is ready.');
+    const migrationsFolder = path.resolve(__dirname, '../drizzle');
+    console.log(`[db:migrate] Applying migrations from ${migrationsFolder}...`);
+    await migrate(db, { migrationsFolder });
+    console.log('[db:migrate] Migrations completed successfully.');
   } catch (err) {
     console.error('[db:migrate] Migration failed:', err);
     process.exit(1);

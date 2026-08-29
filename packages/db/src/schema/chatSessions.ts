@@ -1,5 +1,5 @@
 import { pgTable, text, timestamp, uuid, jsonb } from 'drizzle-orm/pg-core';
-import { novels } from './novels.js';
+import { novels } from './novels';
 
 /**
  * 相談セッションの権限モード。

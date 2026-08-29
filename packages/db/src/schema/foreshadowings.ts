@@ -1,7 +1,7 @@
 import { pgTable, uuid, text, timestamp } from 'drizzle-orm/pg-core';
 import { foreshadowingStatuses } from '@novel-creator/shared';
-import { novels } from './novels.js';
-import { sections } from './sections.js';
+import { novels } from './novels';
+import { sections } from './sections';
 
 export const foreshadowings = pgTable('foreshadowings', {
   id: uuid('id').primaryKey().defaultRandom(),
