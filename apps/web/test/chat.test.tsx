@@ -3,7 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatProvider, useChat } from '../src/context/ChatContext.js';
-import { streamChat } from '../src/lib/chatApi.js';
+import { rowToUIMessage } from '../src/hooks/useChatStreaming.js';
 
 const mockFetch = vi.fn();
 
@@ -28,6 +28,24 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+/** AI SDK UI Message Stream（text パーツのみ）の SSE バイト列を組み立てる */
+function uiMessageStreamBody(text: string, textPartId = 't1'): ReadableStream<Uint8Array> {
+  const events = [
+    { type: 'text-start', id: textPartId },
+    { type: 'text-delta', id: textPartId, delta: text },
+    { type: 'text-end', id: textPartId },
+    { type: 'finish', finishReason: 'stop' },
+  ];
+  const sse = events.map((e) => `data: ${JSON.stringify(e)}\n\n`).join('');
+  const encoder = new TextEncoder();
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode(sse));
+      controller.close();
+    },
+  });
+}
+
 beforeEach(() => {
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
@@ -36,12 +54,8 @@ beforeEach(() => {
   });
   queryClient = new QueryClient({
     defaultOptions: {
-      queries: {
-        retry: false,
-      },
-      mutations: {
-        retry: false,
-      },
+      queries: { retry: false },
+      mutations: { retry: false },
     },
   });
 });
@@ -87,7 +101,6 @@ describe('ChatContext & useChat', () => {
 
     const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
 
-    // 初回の一覧取得が完了するのを待つ
     await waitFor(() => expect(result.current.loadingSessions).toBe(false));
 
     // 2回目: POST (create) のレスポンス
@@ -116,39 +129,95 @@ describe('ChatContext & useChat', () => {
     expect(result.current.messages).toEqual([]);
     expect(result.current.error).toBeNull();
   });
+
+  it('sendMessage がセッション自動作成後に /api/chat へ sessionId を含めて送信し、応答を messages に反映すること', async () => {
+    const createdSession = {
+      id: 'sess-abc',
+      novelId: 'novel-123',
+      title: 'テストの質問',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // 1: マウント時一覧取得（空）
+    // 2: openChat による novelId 変更で sessions クエリキーが変わり再取得（空）
+    // 3: 送信時にセッション作成 POST /api/chat/sessions
+    // 4: 作成後 refreshSessions → GET 一覧
+    // 以降: POST /api/chat（UI Message Stream）
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(createdSession, 201))
+      .mockResolvedValueOnce(jsonResponse([createdSession]))
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/api/chat')) {
+          return new Response(uiMessageStreamBody('こんにちは、AIです'), {
+            status: 200,
+            headers: { 'Content-Type': 'text/event-stream' },
+          });
+        }
+        // タイトル自動更新 PUT と 一覧 GET はセッション一覧を返す
+        if (url.includes('/api/chat/sessions')) {
+          return jsonResponse([createdSession]);
+        }
+        return jsonResponse([]);
+      });
+
+    const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
+
+    await waitFor(() => expect(result.current.loadingSessions).toBe(false));
+
+    await act(async () => {
+      await result.current.openChat('novel-123');
+    });
+
+    await act(async () => {
+      await result.current.sendMessage('テストの質問');
+    });
+
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(2);
+    });
+
+    expect(result.current.messages[0]).toMatchObject({
+      role: 'user',
+      content: 'テストの質問',
+    });
+    expect(result.current.messages[1]).toMatchObject({
+      role: 'assistant',
+      content: 'こんにちは、AIです',
+    });
+    expect(result.current.currentSessionId).toBe('sess-abc');
+
+    // /api/chat への送信ボディに sessionId / novelId が含まれることを検証する
+    const chatCall = mockFetch.mock.calls.find((c) => String(c[0]).endsWith('/api/chat'));
+    expect(chatCall).toBeDefined();
+    const body = JSON.parse(String(chatCall![1]?.body));
+    expect(body.sessionId).toBe('sess-abc');
+    expect(body.novelId).toBe('novel-123');
+    expect(Array.isArray(body.messages)).toBe(true);
+  });
 });
 
-describe('streamChat', () => {
-  it('SSEチャンクを正しくパースしてコールバックを実行すること', async () => {
-    const sseData = [
-      'data: {"text":"こんにちは"}\n\n',
-      'data: {"text":"、AIです"}\n\n',
-      'data: {"done":true}\n\n',
-    ].join('');
-
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode(sseData));
-        controller.close();
-      },
+describe('rowToUIMessage', () => {
+  it('parts があればそれをそのまま使い、無ければ text パーツを合成すること', () => {
+    const withParts = rowToUIMessage({
+      id: 'm1',
+      role: 'assistant',
+      content: '古い内容',
+      parts: [{ type: 'text', text: '新しい内容', state: 'done' }],
     });
+    expect(withParts.parts).toEqual([{ type: 'text', text: '新しい内容', state: 'done' }]);
 
-    mockFetch.mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'Content-Type': 'text/event-stream' }),
-      body: stream,
+    const withoutParts = rowToUIMessage({
+      id: 'm2',
+      role: 'user',
+      content: 'こんにちは',
     });
-
-    const chunks: string[] = [];
-    await streamChat({
-      sessionId: 'sess-123',
-      novelId: 'novel-123',
-      messages: [{ role: 'user', content: 'テスト' }],
-      onChunk: (chunk) => chunks.push(chunk),
-    });
-
-    expect(chunks).toEqual(['こんにちは', '、AIです']);
+    expect(withoutParts.role).toBe('user');
+    expect(withoutParts.id).toBe('m2');
+    expect(withoutParts.parts).toEqual([{ type: 'text', text: 'こんにちは', state: 'done' }]);
   });
 });
 

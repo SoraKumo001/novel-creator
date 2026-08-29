@@ -38,6 +38,8 @@ export async function fetchChatSession(id: string): Promise<ChatSessionDetail> {
       role: m.role as 'user' | 'assistant',
       content: m.content,
       createdAt: m.createdAt ? new Date(m.createdAt).toISOString() : null,
+      // parts は並行レーン実装の DB jsonb 列。型クライアントが未反映でも許容する
+      parts: (m as { parts?: unknown[] | null }).parts ?? null,
     })),
   };
 }

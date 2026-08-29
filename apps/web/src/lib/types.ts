@@ -226,8 +226,15 @@ export interface EditCharacterSectionResult {
 }
 
 // ---- チャットセッション ----
+/** セッション詳細に含まれるメッセージ行。
+ * バックエンドが返す UI Message パーツ（jsonb）を保持する（無ければ null）。
+ */
+export interface ChatDetailMessage extends ChatMessageItem {
+  parts?: unknown[] | null;
+}
+
 export interface ChatSessionDetail extends ChatSession {
-  messages: ChatMessageItem[];
+  messages: ChatDetailMessage[];
 }
 
 export interface CreateChatSessionInput {

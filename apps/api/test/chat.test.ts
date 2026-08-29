@@ -1,11 +1,14 @@
 import { Hono } from 'hono';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { chatMessages, chatSessions, novels } from '@novel-creator/db';
+import { streamTextResult } from '@novel-creator/llm';
 
 import type { AppContext } from '../src/context.js';
 import { errorHandler } from '../src/middleware/error-handler.js';
 import chatRouter from '../src/routes/chat.js';
 
-// @novel-creator/llm の streamText と generateText をモック
+// @novel-creator/llm の streamTextResult と generateText をモック
 vi.mock('@novel-creator/llm', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@novel-creator/llm')>();
   return {
@@ -24,12 +27,92 @@ vi.mock('@novel-creator/llm', async (importOriginal) => {
         settings: [{ name: '魔法王国', category: '世界観', description: '魔法が発達した国' }],
       }),
     ),
-    streamText: vi.fn().mockImplementation(async function* () {
-      yield 'こんにちは！';
-      yield '設定の相談ですね。';
-    }),
+    streamTextResult: vi.fn(),
   };
 });
+
+const mockStreamTextResult = vi.mocked(streamTextResult);
+
+const SESSION_ID = '11111111-1111-4111-8111-111111111111';
+
+/**
+ * テキストを stream する偽の StreamTextResult を構築する。
+ * toUIMessageStream が消費できる TextStreamPart の ReadableStream を返す。
+ */
+function createFakeStreamResult(text: string) {
+  const id = 'text-1';
+  const parts = [
+    { type: 'start' },
+    { type: 'text-start', id },
+    { type: 'text-delta', id, text },
+    { type: 'text-end', id },
+    {
+      type: 'finish',
+      finishReason: 'stop',
+      rawFinishReason: 'stop',
+      totalUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    },
+  ];
+  const stream = new ReadableStream({
+    start(controller) {
+      for (const p of parts) controller.enqueue(p);
+      controller.close();
+    },
+  });
+  return { stream };
+}
+
+/**
+ * chat.service が使う DB チェーンをテーブル参照で振り分けるモック DB を構築する。
+ * insert / update の呼び出しを記録する。
+ */
+function createMockDb(options: {
+  session?: Record<string, unknown> | null;
+  history?: Record<string, unknown>[];
+  novel?: Record<string, unknown> | null;
+}) {
+  const insertCalls: { table: unknown; values: unknown }[] = [];
+  const updateCalls: { table: unknown; values: unknown }[] = [];
+
+  const db = {
+    insert: vi.fn().mockImplementation((table: unknown) => ({
+      values: vi.fn().mockImplementation((values: unknown) => {
+        insertCalls.push({ table, values });
+        return { returning: vi.fn().mockResolvedValue([]) };
+      }),
+    })),
+    update: vi.fn().mockImplementation((table: unknown) => ({
+      set: vi.fn().mockImplementation((values: unknown) => {
+        updateCalls.push({ table, values });
+        return { where: vi.fn().mockResolvedValue([]) };
+      }),
+    })),
+    select: vi.fn().mockImplementation(() => ({
+      from: vi.fn().mockImplementation((table: unknown) => {
+        if (table === chatSessions) {
+          return {
+            where: vi.fn().mockResolvedValue(options.session ? [options.session] : []),
+          };
+        }
+        if (table === chatMessages) {
+          return {
+            where: vi.fn().mockReturnValue({
+              orderBy: vi.fn().mockResolvedValue(options.history ?? []),
+            }),
+          };
+        }
+        if (table === novels) {
+          return {
+            where: vi.fn().mockResolvedValue(options.novel ? [options.novel] : []),
+          };
+        }
+        return { where: vi.fn().mockResolvedValue([]) };
+      }),
+    })),
+  };
+
+  return { db, insertCalls, updateCalls };
+}
 
 function createTestChatApp(mockDb: unknown) {
   const app = new Hono<AppContext>();
@@ -46,25 +129,128 @@ function createTestChatApp(mockDb: unknown) {
   return app;
 }
 
+function userMessage(text: string) {
+  return {
+    id: 'user-1',
+    role: 'user',
+    parts: [{ type: 'text', text }],
+  };
+}
+
 describe('Chat API', () => {
-  it('POST /api/chat - 小説指定なしでストリーミングレスポンスが返ること', async () => {
-    const app = createTestChatApp({});
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('POST /api/chat - ユーザーメッセージがストリーム前に保存され、完了後に assistant が保存されること', async () => {
+    const { db, insertCalls, updateCalls } = createMockDb({
+      session: { id: SESSION_ID, novelId: null, title: '相談' },
+      history: [],
+    });
+    mockStreamTextResult.mockResolvedValue(createFakeStreamResult('こんにちは！') as never);
+
+    const app = createTestChatApp(db);
 
     const res = await app.request('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        messages: [{ role: 'user', content: '世界観のアイデアをください' }],
+        sessionId: SESSION_ID,
+        messages: [userMessage('世界観のアイデアをください')],
       }),
     });
 
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('text/event-stream');
+    expect(res.headers.get('x-vercel-ai-ui-message-stream')).toBe('v1');
 
+    // ストリームを最後まで消費して onEnd（assistant 保存）を完了させる
     const text = await res.text();
+    expect(text).toContain('"type":"text-delta"');
     expect(text).toContain('こんにちは！');
-    expect(text).toContain('設定の相談ですね。');
-    expect(text).toContain('"done":true');
+
+    // ユーザーメッセージが先に保存される
+    const userInsert = insertCalls.find((c) => c.table === chatMessages);
+    expect(userInsert).toBeDefined();
+    const userValues = userInsert!.values as {
+      sessionId: string;
+      role: string;
+      content: string;
+      parts: unknown;
+    };
+    expect(userValues.sessionId).toBe(SESSION_ID);
+    expect(userValues.role).toBe('user');
+    expect(userValues.content).toBe('世界観のアイデアをください');
+    expect(userValues.parts).toEqual([{ type: 'text', text: '世界観のアイデアをください' }]);
+
+    // assistant メッセージが完了後に保存される
+    const assistantInsert = insertCalls.filter((c) => c.table === chatMessages)[1];
+    expect(assistantInsert).toBeDefined();
+    const assistantValues = assistantInsert!.values as {
+      role: string;
+      content: string;
+      parts: unknown;
+    };
+    expect(assistantValues.role).toBe('assistant');
+    expect(assistantValues.content).toBe('こんにちは！');
+    expect(assistantValues.parts).toEqual([{ type: 'text', text: 'こんにちは！' }]);
+
+    // updatedAt が更新される
+    expect(updateCalls.length).toBeGreaterThan(0);
+    const sessionUpdate = updateCalls.find((c) => c.table === chatSessions);
+    expect(sessionUpdate).toBeDefined();
+  });
+
+  it('POST /api/chat - プロンプトが DB 履歴から構築されること', async () => {
+    const { db } = createMockDb({
+      session: { id: SESSION_ID, novelId: null, title: '相談' },
+      history: [
+        { id: 'm1', sessionId: SESSION_ID, role: 'user', content: '前回の質問', parts: null },
+        { id: 'm2', sessionId: SESSION_ID, role: 'assistant', content: '前回の回答', parts: null },
+        // 今回挿入されたユーザーメッセージ（DB 正史の履歴再取得に含まれる）
+        { id: 'm3', sessionId: SESSION_ID, role: 'user', content: '今回の質問', parts: null },
+      ],
+    });
+    mockStreamTextResult.mockResolvedValue(createFakeStreamResult('回答') as never);
+
+    const app = createTestChatApp(db);
+
+    const res = await app.request('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: SESSION_ID,
+        messages: [userMessage('今回の質問')],
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    await res.text();
+
+    // streamTextResult に渡されたプロンプトが DB 履歴 + 今回のユーザーメッセージから構築される
+    const prompt = mockStreamTextResult.mock.calls[0][1];
+    expect(prompt).toContain('mock prompt');
+    expect(prompt).toContain('ユーザー: 前回の質問');
+    expect(prompt).toContain('アシスタント: 前回の回答');
+    expect(prompt).toContain('ユーザー: 今回の質問');
+  });
+
+  it('POST /api/chat - 未知の sessionId で 404 になること', async () => {
+    const { db } = createMockDb({ session: null, history: [] });
+
+    const app = createTestChatApp(db);
+
+    const res = await app.request('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: SESSION_ID,
+        messages: [userMessage('質問')],
+      }),
+    });
+
+    expect(res.status).toBe(404);
+    expect(mockStreamTextResult).not.toHaveBeenCalled();
   });
 
   it('POST /api/chat - 不正なリクエストボディで 400 エラーになること', async () => {
@@ -81,9 +267,24 @@ describe('Chat API', () => {
     expect(res.status).toBe(400);
   });
 
+  it('POST /api/chat - sessionId が uuid でない場合 400 エラーになること', async () => {
+    const app = createTestChatApp({});
+
+    const res = await app.request('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'not-a-uuid',
+        messages: [userMessage('質問')],
+      }),
+    });
+
+    expect(res.status).toBe(400);
+  });
+
   it('POST /api/chat/sessions - 新規セッションが作成できること', async () => {
     const sampleSession = {
-      id: '11111111-1111-1111-1111-111111111111',
+      id: SESSION_ID,
       novelId: null,
       title: '世界観の相談',
       createdAt: new Date(),
@@ -116,7 +317,7 @@ describe('Chat API', () => {
   it('GET /api/chat/sessions - セッション一覧が取得できること', async () => {
     const sampleSessions = [
       {
-        id: '11111111-1111-1111-1111-111111111111',
+        id: SESSION_ID,
         novelId: null,
         title: '相談1',
         createdAt: new Date(),

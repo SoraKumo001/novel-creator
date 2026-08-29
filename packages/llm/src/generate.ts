@@ -4,7 +4,7 @@ import {
   generateText as aiGenerateText,
   streamText as aiStreamText,
 } from 'ai';
-import type { EmbeddingModel, LanguageModel } from 'ai';
+import type { EmbeddingModel, LanguageModel, OutputInterface, StreamTextResult } from 'ai';
 
 /**
  * リトライ設定。
@@ -93,6 +93,20 @@ export async function* streamText(
   for await (const chunk of result.textStream) {
     yield chunk;
   }
+}
+
+/**
+ * AI SDK の streamText ラッパー。生の StreamTextResult をそのまま返す。
+ * ストリーム開始後はリトライできないため、接続時（ストリーム開始前）のみリトライする。
+ * 呼び出し側で result.stream / result.toUIMessageStream() などを利用して
+ * UI Message Stream への変換や onFinish での永続化を行う。
+ */
+export async function streamTextResult(
+  model: LanguageModel,
+  prompt: string,
+  options: RetryOptions = {},
+): Promise<StreamTextResult<Record<string, never>, Record<string, unknown>, OutputInterface>> {
+  return withRetry(async () => aiStreamText({ model, prompt }), options);
 }
 
 /**

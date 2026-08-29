@@ -1,15 +1,16 @@
 import type { z } from 'zod';
 import { desc, eq, isNull } from 'drizzle-orm';
+import { createUIMessageStreamResponse, toUIMessageStream } from 'ai';
 import { chatMessages, chatSessions, novels } from '@novel-creator/db';
 import {
   creativeChatSystemPrompt,
   extractChatEntities,
   generateText,
-  streamText,
+  streamTextResult,
 } from '@novel-creator/llm';
 import { searchContext } from '../rag.js';
 import { chatRequestSchema } from '../schemas/index.js';
-import { NotFoundError, type ServiceContext } from './types.js';
+import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
 
 export class ChatDomainService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -140,25 +141,68 @@ export class ChatDomainService {
   }
 
   /**
-   * 創作相談チャットを SSE 形式でストリーミング生成する。
-   * RAG 検索・小説取得失敗時は空コンテキストで継続する。
+   * 創作相談チャットを AI SDK の UI Message Stream 形式でストリーミング生成する。
+   * - リクエストの messages から最後の role='user' メッセージのみを採用し、DB に永続化する。
+   * - 会話履歴はサーバー DB を正史とし、DB 履歴（ユーザーメッセージ挿入後）からプロンプトを構築する。
+   * - RAG 検索・小説取得失敗時は空コンテキストで継続する。
    */
-  async *streamCreativeChat(input: {
+  async streamCreativeChat(input: {
+    sessionId: string;
     novelId?: string | null;
     messages: z.infer<typeof chatRequestSchema>['messages'];
-  }): AsyncGenerator<string> {
-    const { novelId, messages } = input;
+  }): Promise<Response> {
+    const { sessionId, novelId, messages } = input;
 
+    // セッション存在確認（404）
+    const [session] = await this.ctx.db
+      .select()
+      .from(chatSessions)
+      .where(eq(chatSessions.id, sessionId));
+    if (!session) {
+      throw new NotFoundError('Chat session not found');
+    }
+
+    // リクエストの messages から最後の role='user' メッセージのみを採用
+    const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
+    if (!lastUserMessage) {
+      throw new ValidationError('No user message provided');
+    }
+    const userText = lastUserMessage.parts
+      .filter((p) => p.type === 'text')
+      .map((p) => (p as { text?: string }).text ?? '')
+      .join('');
+
+    // ストリーム開始前: ユーザーメッセージを永続化
+    await this.ctx.db.insert(chatMessages).values({
+      sessionId,
+      role: 'user',
+      content: userText,
+      parts: lastUserMessage.parts as unknown,
+    });
+    await this.ctx.db
+      .update(chatSessions)
+      .set({ updatedAt: new Date() })
+      .where(eq(chatSessions.id, sessionId));
+
+    // 会話履歴はサーバー DB 正史（ユーザーメッセージ挿入後）
+    const history = await this.ctx.db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.sessionId, sessionId))
+      .orderBy(chatMessages.createdAt);
+
+    // RAG コンテキスト構築（現状維持）
     let contextSettings: string[] = [];
     let contextCharacters: string[] = [];
     let novelInfo: { title: string; description?: string | null } | undefined;
 
-    if (novelId) {
+    const effectiveNovelId = novelId ?? session.novelId;
+    if (effectiveNovelId) {
       try {
         const [novel] = await this.ctx.db
           .select({ title: novels.title, description: novels.description })
           .from(novels)
-          .where(eq(novels.id, novelId));
+          .where(eq(novels.id, effectiveNovelId));
         if (novel) {
           novelInfo = {
             title: novel.title,
@@ -166,18 +210,15 @@ export class ChatDomainService {
           };
         }
 
-        const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
-        if (lastUserMessage) {
-          const ragContext = await searchContext(
-            this.ctx.vectorStore,
-            this.ctx.embedding,
-            novelId,
-            { query: lastUserMessage.content },
-            this.ctx.env,
-          );
-          contextSettings = ragContext.settings;
-          contextCharacters = ragContext.characters;
-        }
+        const ragContext = await searchContext(
+          this.ctx.vectorStore,
+          this.ctx.embedding,
+          effectiveNovelId,
+          { query: userText },
+          this.ctx.env,
+        );
+        contextSettings = ragContext.settings;
+        contextCharacters = ragContext.characters;
       } catch {
         // RAG 検索・小説取得失敗時は空コンテキストで継続
       }
@@ -191,9 +232,43 @@ export class ChatDomainService {
 
     const prompt = [
       systemPrompt,
-      ...messages.map((m) => `${m.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${m.content}`),
+      ...history
+        .filter((m) => m.role === 'user' || m.role === 'assistant')
+        .map((m) => `${m.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${m.content}`),
     ].join('\n\n');
 
-    yield* streamText(this.ctx.llm, prompt);
+    // 生の StreamTextResult を取得（接続時リトライ付き）
+    const result = await streamTextResult(this.ctx.llm, prompt);
+
+    // 完了時（正常終了・クライアント中断の両方）に assistant メッセージを永続化する。
+    // onEnd は flush / cancel のいずれかで必ず一度だけ呼ばれるため、二重保存防止フラグで保護する。
+    let assistantSaved = false;
+    const uiStream = toUIMessageStream({
+      stream: result.stream,
+      onEnd: async ({ responseMessage }) => {
+        if (assistantSaved) return;
+        assistantSaved = true;
+        const fullText = responseMessage.parts
+          .filter((p) => p.type === 'text')
+          .map((p) => (p as { text?: string }).text ?? '')
+          .join('');
+        try {
+          await this.ctx.db.insert(chatMessages).values({
+            sessionId,
+            role: 'assistant',
+            content: fullText,
+            parts: [{ type: 'text', text: fullText }] as unknown,
+          });
+          await this.ctx.db
+            .update(chatSessions)
+            .set({ updatedAt: new Date() })
+            .where(eq(chatSessions.id, sessionId));
+        } catch {
+          // ベストエフォート保存: 永続化失敗はストリームを中断しない
+        }
+      },
+    });
+
+    return createUIMessageStreamResponse({ stream: uiStream });
   }
 }

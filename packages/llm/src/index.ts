@@ -1,6 +1,12 @@
 // Phase 1B: LLM ラッパー
 export { createLLMProvider, createEmbeddingProvider } from './provider.js';
-export { generateText, streamText, generateJSON, generateEmbedding } from './generate.js';
+export {
+  generateText,
+  streamText,
+  streamTextResult,
+  generateJSON,
+  generateEmbedding,
+} from './generate.js';
 export {
   plotGeneration,
   chapterSummary,

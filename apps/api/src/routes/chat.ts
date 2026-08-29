@@ -10,13 +10,12 @@ import {
   idParamSchema,
   updateChatSessionSchema,
 } from '../schemas/index.js';
-import { sseStream } from '../sse.js';
 
 const chatRouter = new Hono<AppContext>()
-  // POST /api/chat - 創作相談チャットストリーミング
+  // POST /api/chat - 創作相談チャットストリーミング（AI SDK UI Message Stream）
   .post('/', zValidator('json', chatRequestSchema), async (c) => {
-    const { novelId, messages } = c.req.valid('json');
-    return sseStream(c, getServices(c).chat.streamCreativeChat({ novelId, messages }));
+    const { sessionId, novelId, messages } = c.req.valid('json');
+    return getServices(c).chat.streamCreativeChat({ sessionId, novelId, messages });
   })
   // POST /api/chat/extract-entities - チャットテキストから人物・設定を抽出
   .post('/extract-entities', zValidator('json', extractChatEntitiesSchema), async (c) => {

@@ -223,10 +223,21 @@ export const chatMessageSchema = z.object({
   content: z.string(),
 });
 
+/**
+ * AI SDK UIMessage の疎な zod スキーマ。
+ * parts は { type: string } を最低限検証し、それ以外のフィールドは passthrough で許容する。
+ * id は省略可能（サーバーは DB 履歴を正史とするため、クライアントの id は信用しない）。
+ */
+export const uiMessageSchema = z.object({
+  id: z.string().optional(),
+  role: z.enum(['user', 'assistant', 'system']),
+  parts: z.array(z.object({ type: z.string() }).passthrough()),
+});
+
 export const chatRequestSchema = z.object({
-  sessionId: z.string().uuid().optional(),
-  novelId: z.string().uuid().optional(),
-  messages: z.array(chatMessageSchema).min(1),
+  sessionId: z.string().uuid(),
+  novelId: z.string().uuid().optional().nullable(),
+  messages: z.array(uiMessageSchema).min(1),
 });
 
 export const extractChatEntitiesSchema = z.object({

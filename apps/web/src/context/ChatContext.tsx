@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { UIMessage } from 'ai';
 import { fetchChatSession, fetchChatSessions, updateChatSession } from '@/lib/services/index.js';
 import { chatKeys } from '@/lib/queryKeys.js';
-import { useChatStreaming, type ChatMessage } from '@/hooks/useChatStreaming.js';
+import { rowToUIMessage, useChatStreaming, type ChatMessage } from '@/hooks/useChatStreaming.js';
 import type { ChatSession } from '@/lib/types.js';
 
 export type { ChatMessage } from '@/hooks/useChatStreaming.js';
@@ -135,13 +136,16 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       try {
         const detail = await fetchChatSession(sessionId);
         if (detail && Array.isArray(detail.messages)) {
-          const formatted: ChatMessage[] = detail.messages.map((m) => ({
-            id: m.id,
-            role: m.role,
-            content: m.content,
-            createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
-          }));
-          setMessages(formatted);
+          // DB の行を UI Message に変換して useChat に seed する
+          const seeded: UIMessage[] = detail.messages.map((m) =>
+            rowToUIMessage({
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              parts: m.parts,
+            }),
+          );
+          setMessages(seeded);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'メッセージの取得に失敗しました';

@@ -8,15 +8,18 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
     },
     "./schemas": {
       "types": "./dist/schemas/entities.d.ts",
-      "import": "./dist/schemas/entities.js"
+      "import": "./dist/schemas/entities.js",
+      "require": "./dist/schemas/entities.js"
     },
     "./env": {
       "types": "./dist/env.d.ts",
-      "import": "./dist/env.js"
+      "import": "./dist/env.js",
+      "require": "./dist/env.js"
     }
   },
   "scripts": {
