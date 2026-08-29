@@ -121,15 +121,20 @@ export async function upsertEntityEmbedding(
 
 `packages/llm/src/prompts` に各創作フェーズに特化したプロンプトテンプレートが集約されています。
 
-| プロンプトモジュール                                          | 役割と入力                                                                    | 出力フォーマット                      |
-| :------------------------------------------------------------ | :---------------------------------------------------------------------------- | :------------------------------------ |
-| **`plotGenerationPrompt`**                                    | タイトル、説明、RAGコンテキスト（設定・人物）からプロット全体の起承転結を生成 | Markdown 形式のプロット構想案         |
-| **`chapterSummaryPrompt`**                                    | 小説全体のプロットから、各章（第1章〜最終章）のタイトルと概要一覧を生成       | JSON 配列 (`[{ title, summary }]`)    |
-| **`sectionSummaryPrompt`**                                    | 特定の章の概要から、章を構成する節（シーン）のタイトルと詳細概要を生成        | JSON 配列 (`[{ title, summary }]`)    |
-| **`contentGenerationPrompt`**                                 | 前節の末尾本文、当該節の概要、関連設定・人物テキストを注入して本文を生成      | ストリーミング小説本文                |
-| **`proofreadPrompt`**                                         | 執筆済み本文の誤字脱字、表現の重複、表記揺れ、地の文と台詞のバランスを校正    | 校正指摘・修正案一覧                  |
-| **`creativeChatPrompt`**                                      | 小説の基本情報をシステムプロンプトに持ち、自律ツール呼び出しを案内して対話    | チャット応答（ツール呼出/テキスト）   |
-| **`extractChatEntitiesPrompt`**                               | チャットログから新しく合意された人物や世界観設定を自動抽出                    | JSON 構造化データ（人物・設定リスト） |
-| **`extractSettingsPrompt` / `extractTimelinePrompt`**         | 執筆された本文を解析し、登場した新情報や時系列イベントを抽出                  | JSON 構造化データ（整合性同期用）     |
-| **`editCharacterSectionPrompt` / `editSettingSectionPrompt`** | Markdown の特定セクションに対して自然言語指示で部分修正                       | 修正後のセクション Markdown           |
-| **`createCharacterDraftPrompt` / `createSettingDraftPrompt`** | 名前や簡単な要望から、人物や設定の詳細な初期ドラフトを自動生成                | 生成された人物・設定詳細データ        |
+| プロンプトモジュール                                          | 役割と入力                                                                     | 出力フォーマット                      |
+| :------------------------------------------------------------ | :----------------------------------------------------------------------------- | :------------------------------------ |
+| **`plotGenerationPrompt`**                                    | タイトル、説明、RAGコンテキスト（設定・人物）からプロット全体の起承転結を生成  | Markdown 形式のプロット構想案         |
+| **`chapterSummaryPrompt`**                                    | 小説全体のプロットから、各章（第1章〜最終章）のタイトルと概要一覧を生成        | JSON 配列 (`[{ title, summary }]`)    |
+| **`sectionSummaryPrompt`**                                    | 特定の章の概要から、章を構成する節（シーン）のタイトルと詳細概要を生成         | JSON 配列 (`[{ title, summary }]`)    |
+| **`contentGenerationPrompt`**                                 | 前節の末尾本文、当該節の概要、関連設定・人物テキストを注入して本文を生成       | ストリーミング小説本文                |
+| **`proofreadPrompt`**                                         | 執筆済み本文の誤字脱字、表現の重複、表記揺れ、地の文と台詞のバランスを校正     | 校正指摘・推敲後全文案・スコア        |
+| **`inlineAssistPrompt`**                                      | 選択範囲に対するピンポイント加筆・心理強化・会話改善・簡潔化・言い回し提案     | ストリーミング推敲本文テキスト        |
+| **`checkCharacterVoicePrompt`**                               | 人物設定（一人称・二人称・口調・性格）と本文を照合しキャラ崩壊・口調ブレを検出 | JSON 形式の指摘・理由・改善セリフ案   |
+| **`analyzeSettingImpactPrompt`**                              | 設定や人物設定の変更に伴う既存プロット・章節・年表・伏線への影響を予測         | JSON 形式の影響度・矛盾点・修正案     |
+| **`analyzeStoryArcPrompt`**                                   | 全章節の緊張感（Tension: 0〜100）と感情価（Valence: -100〜+100）をスコアリング | JSON 形式のアークデータ・助言         |
+| **`multiPersonaReviewPrompt`**                                | 商業編集者、一般読者、設定考察派、辛口評論家の4視点による多角査読              | JSON 形式の星評価・講評・リライト助言 |
+| **`creativeChatPrompt`**                                      | 小説の基本情報をシステムプロンプトに持ち、自律ツール呼び出しを案内して対話     | チャット応答（ツール呼出/テキスト）   |
+| **`extractChatEntitiesPrompt`**                               | チャットログから新しく合意された人物や世界観設定を自動抽出                     | JSON 構造化データ（人物・設定リスト） |
+| **`extractSettingsPrompt` / `extractTimelinePrompt`**         | 執筆された本文を解析し、登場した新情報や時系列イベントを抽出                   | JSON 構造化データ（整合性同期用）     |
+| **`editCharacterSectionPrompt` / `editSettingSectionPrompt`** | Markdown の特定セクションに対して自然言語指示で部分修正                        | 修正後のセクション Markdown           |
+| **`createCharacterDraftPrompt` / `createSettingDraftPrompt`** | 名前や簡単な要望から、人物や設定の詳細な初期ドラフトを自動生成                 | 生成された人物・設定詳細データ        |

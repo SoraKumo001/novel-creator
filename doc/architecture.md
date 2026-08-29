@@ -92,14 +92,14 @@ novel-creator/
 
 ### パッケージごとの責務
 
-| パッケージ / アプリ   | 主な技術スタック                                                      | 責務と特徴                                                                                                                                        |
-| :-------------------- | :-------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **`apps/web`**        | React 19, Vite, TanStack Router/Query, Tailwind CSS v4, Monaco Editor | ユーザーインターフェース。ファイルベースルーティングによる画面遷移、MarkdownエディタとカードUIのシームレスな切り替え、SSEストリーミング受信処理。 |
-| **`apps/api`**        | Hono, `@hono/node-server`, Cloudflare Workers (`wrangler`)            | API サーバー。Hono RPC による型安全なエンドポイント提供、SSE ストリーミング生成配信、DB / VectorStore / LLM サービスの結合。                      |
-| **`packages/shared`** | TypeScript, Marked, DOMPurify, Mermaid.js                             | フロント・バックエンド間で共有する純粋関数・型定義。設定・人物 Markdown の双方向パーサー、AST ベースのセクション差分計算、相関図生成ロジック。    |
-| **`packages/db`**     | Drizzle ORM, `postgres`, `pgvector`                                   | DB スキーマ定義、マイグレーション管理、リレーショナルデータアクセス。                                                                             |
-| **`packages/llm`**    | Vercel AI SDK (`ai`), OpenAI, Anthropic, Google, Ollama               | LLM プロバイダの動的切り替え、テキスト生成・ストリーミング制御、Embedding ベクトル生成、構造化プロンプトテンプレート。                            |
-| **`packages/vector`** | `pgvector`, Cloudflare Vectorize SDK                                  | ベクトルデータベースの抽象化（`VectorStore` インターフェース）。ローカル環境と Cloudflare 環境を同一コードで切り替え可能。                        |
+| パッケージ / アプリ   | 主な技術スタック                                                      | 責務と特徴                                                                                                                                                         |
+| :-------------------- | :-------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`apps/web`**        | React 19, Vite, TanStack Router/Query, Tailwind CSS v4, Monaco Editor | ユーザーインターフェース。ファイルベースルーティングによる画面遷移、MarkdownエディタとカードUIのシームレスな切り替え、SSEストリーミング受信処理。                  |
+| **`apps/api`**        | Hono, `@hono/node-server`, Cloudflare Workers (`wrangler`)            | API サーバー。Hono RPC による型安全なエンドポイント提供、SSE ストリーミング生成配信、DB / VectorStore / LLM サービスの結合。                                       |
+| **`packages/shared`** | TypeScript, Marked, DOMPurify, Mermaid.js                             | フロント・バックエンド間で共有する純粋関数・型定義。設定・人物 Markdown の双方向パーサー、ルビ・傍点パーサー、AST ベースのセクション差分計算、相関図生成ロジック。 |
+| **`packages/db`**     | Drizzle ORM, `postgres`, `pgvector`                                   | DB スキーマ定義、マイグレーション管理、リレーショナルデータアクセス。                                                                                              |
+| **`packages/llm`**    | Vercel AI SDK (`ai`), OpenAI, Anthropic, Google, Ollama               | LLM プロバイダの動的切り替え、テキスト生成・ストリーミング制御、Embedding ベクトル生成、構造化プロンプトテンプレート。                                             |
+| **`packages/vector`** | `pgvector`, Cloudflare Vectorize SDK                                  | ベクトルデータベースの抽象化（`VectorStore` インターフェース）。ローカル環境と Cloudflare 環境を同一コードで切り替え可能。                                         |
 
 ---
 
