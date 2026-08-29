@@ -103,7 +103,7 @@ novel-creator/
 
 ---
 
-## 3. 通信設計: Hono RPC & SSE ストリーミング
+## 3. 通信設計: Hono RPC, SSE, & AI SDK UI Message Stream
 
 ### 3.1 End-to-End 完全型安全通信 (Hono RPC)
 
@@ -122,14 +122,50 @@ import type { AppType } from '@novel-creator/api';
 export const api = hc<AppType>('/');
 ```
 
-### 3.2 リアルタイム SSE (Server-Sent Events) ストリーミング
+### 3.2 リアルタイム SSE (Server-Sent Events) ストリーミング (本文生成)
 
-長文の小説執筆やチャット対話において、LLM のレスポンスを待つストレスを解消するため、Server-Sent Events を採用しています。
+長文の小説執筆において、LLM のレスポンスを待つストレスを解消するため、本文生成には Server-Sent Events を採用しています。
 
 - **バックエンド側**:
   Hono の `streamSSE` ヘルパーを使用し、AI SDK の `streamText` から chunk を受け取りながらクライアントに順次プッシュします。
 - **クライアント側**:
-  `fetch` API と `ReadableStreamDefaultReader`、あるいは EventSource を用いてチャンクを順次デコードし、Monaco Editor やチャット画面に逐次反映します。
+  `fetch` API と `ReadableStreamDefaultReader` を用いてチャンクを順次デコードし、Monaco Editor にリアルタイムで逐次反映します。
+
+### 3.3 AI SDK UI Message Stream & Agentic Tool Calling (チャット)
+
+創作相談チャット（Creative Chat）では、AI SDK 4.x の標準 **Data Stream Protocol (`toDataStreamResponse`)** を採用しています。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Web as Web (useChat / ToolActivity)
+    participant API as API (/chat/sessions/:id/messages/stream)
+    participant LLM as LLM (streamText)
+    participant Tools as Read Tools (Domain Services)
+
+    Web->>API: POST メッセージ (JSON)
+    API->>API: ユーザー発言を DB 永続化
+    API->>LLM: streamText(messages, tools: createReadTools)
+    loop Tool Invocation
+        LLM->>API: tool-call (例: getCharacters, searchNovelKnowledge)
+        API-->>Web: Data Stream (tool-call event)
+        Web-->>Web: ToolActivity UI に実行中バッジを表示
+        API->>Tools: execute(params)
+        Tools-->>API: 取得結果 (JSON)
+        API->>LLM: tool-result をフィードバック
+        API-->>Web: Data Stream (tool-result event)
+        Web-->>Web: ToolActivity UI に完了・結果詳細を表示
+    end
+    LLM-->>API: テキスト回答ストリーム
+    API-->>Web: Data Stream (text-delta)
+    Web-->>Web: チャット画面に逐次描画
+    API->>API: onFinish: アシスタント応答 + ツール実行履歴を DB 永続化
+```
+
+- **サーバーサイド永続化**:
+  ユーザー送信時および LLM 応答完了時（`onFinish`）に、ツール呼び出し引数・結果を含む全対話履歴を `chat_sessions` テーブルに自動永続化します。
+- **ツール実行の視覚化 (`ToolActivity`)**:
+  AI が小説のプロット、設定、人物、本文、伏線、年表、ベクトルナレッジを自律的に検索・参照している様子が `ToolActivity` コンポーネントを通じてリアルタイムにユーザーに可視化されます。
 
 ---
 

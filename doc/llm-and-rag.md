@@ -93,7 +93,31 @@ export async function upsertEntityEmbedding(
 
 ---
 
-## 3. プロンプト設計と生成タスク
+## 3. Agentic ツール実行システム (`createReadTools`)
+
+創作相談チャット（Creative Chat）では、静的な RAG 注入だけでなく、LLM が自律的に必要な小説データを参照できるように AI SDK の **Tool Calling 機能** を活用した 8 つの読み取り専用ツール（`readTools`）を提供しています。
+
+### 3.1 提供ツール一覧
+
+| ツール名                   | 引数 (Zod Schema)                                       | 役割と戻り値                                                                 |
+| :------------------------- | :------------------------------------------------------ | :--------------------------------------------------------------------------- |
+| **`getNovelInfo`**         | `novelId?`                                              | 小説のタイトル、あらすじ、各エンティティの登録件数を取得                     |
+| **`getCharacters`**        | `novelId?`, `name?` (部分一致), `category?`             | 登場人物一覧、または名前・カテゴリで絞り込んだ人物詳細（特徴・関係性）を取得 |
+| **`getSettings`**          | `novelId?`, `name?` (部分一致), `category?`             | 世界観・設定（用語、地理、魔法等）の一覧または特定設定を取得                 |
+| **`getPlotAndChapters`**   | `novelId?`                                              | 全章（Chapter）と各節（Section）のタイトル・順序・プロット概要を取得         |
+| **`getSectionContent`**    | `sectionId`                                             | 特定の節の執筆済み本文テキストを取得                                         |
+| **`getForeshadowings`**    | `novelId?`, `status?` (`unresolved/resolved/abandoned`) | 伏線一覧、回収状況、設置節・回収節の紐付け情報を取得                         |
+| **`getTimelines`**         | `novelId?`                                              | 作中の時系列・年表イベント一覧を取得                                         |
+| **`searchNovelKnowledge`** | `query`, `novelId?`                                     | 質問・キーワードに関する人物・設定を VectorStore からセマンティック検索      |
+
+### 3.2 ツール呼び出しとクライアント連携
+
+- **自律的探索**: LLM はユーザーの質問（例:「第2章の伏線と主人公の関係性は？」）に応じて、`getForeshadowings` や `getCharacters`、`getPlotAndChapters` を連鎖的に呼び出して文脈を把握します。
+- **UI 表示 (`ToolActivity`)**: AI SDK UI の Data Stream 経由でツール呼び出し（`tool-call`）と実行結果（`tool-result`）がクライアントにリアルタイム配信され、チャット画面上に「設定を検索中」「登場人物を取得完了」といったカードが展開されます。
+
+---
+
+## 4. プロンプト設計と生成タスク
 
 `packages/llm/src/prompts` に各創作フェーズに特化したプロンプトテンプレートが集約されています。
 
@@ -104,7 +128,8 @@ export async function upsertEntityEmbedding(
 | **`sectionSummaryPrompt`**                                    | 特定の章の概要から、章を構成する節（シーン）のタイトルと詳細概要を生成        | JSON 配列 (`[{ title, summary }]`)    |
 | **`contentGenerationPrompt`**                                 | 前節の末尾本文、当該節の概要、関連設定・人物テキストを注入して本文を生成      | ストリーミング小説本文                |
 | **`proofreadPrompt`**                                         | 執筆済み本文の誤字脱字、表現の重複、表記揺れ、地の文と台詞のバランスを校正    | 校正指摘・修正案一覧                  |
-| **`creativeChatPrompt`**                                      | 小説の基本情報・現在の設定・人物を背景知識として持ち、作家と対話              | チャット応答ストリーム                |
+| **`creativeChatPrompt`**                                      | 小説の基本情報をシステムプロンプトに持ち、自律ツール呼び出しを案内して対話    | チャット応答（ツール呼出/テキスト）   |
 | **`extractChatEntitiesPrompt`**                               | チャットログから新しく合意された人物や世界観設定を自動抽出                    | JSON 構造化データ（人物・設定リスト） |
 | **`extractSettingsPrompt` / `extractTimelinePrompt`**         | 執筆された本文を解析し、登場した新情報や時系列イベントを抽出                  | JSON 構造化データ（整合性同期用）     |
 | **`editCharacterSectionPrompt` / `editSettingSectionPrompt`** | Markdown の特定セクションに対して自然言語指示で部分修正                       | 修正後のセクション Markdown           |
+| **`createCharacterDraftPrompt` / `createSettingDraftPrompt`** | 名前や簡単な要望から、人物や設定の詳細な初期ドラフトを自動生成                | 生成された人物・設定詳細データ        |

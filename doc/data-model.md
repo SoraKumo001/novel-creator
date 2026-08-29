@@ -157,15 +157,15 @@ erDiagram
 | **`characters`**     | 登場人物データ               | `id` (PK), `novel_id`, `category`, `name`, `description`, `traits`, `relationships`                 | `traits` は配列 JSONB、`relationships` はターゲット人物名や関係性の JSONB 構造。Markdown との双方向同期に対応。 |
 | **`settings`**       | 世界観・魔法・地理などの設定 | `id` (PK), `novel_id`, `category`, `name`, `description`, `metadata`                                | カテゴリ単位（例: 地理/国家、魔法体系）でツリー構造化して管理。                                                 |
 | **`timelines`**      | 作中の時系列・年表           | `id` (PK), `novel_id`, `section_id`, `event`, `in_universe_time`, `sort_order`                      | 作中時間（例:「帝国歴120年 春」）と節の紐付けを管理。                                                           |
-| **`foreshadowings`** | 伏線の設置と回収管理         | `id` (PK), `novel_id`, `title`, `description`, `status`, `placed_section_id`, `resolved_section_id` | 未回収・回収済み・破棄のステータス管理、設置節・回収節へのリレーション。                                        |
+| **`foreshadowings`** | 伏線の設置と回収管理         | `id` (PK), `novel_id`, `title`, `description`, `status`, `placed_section_id`, `resolved_section_id` | 未回収（unresolved）・回収済み（resolved）・破棄（abandoned）のステータス管理、設置節・回収節へのリレーション。 |
 
 ### 2.3 対話・AI・履歴系
 
-| テーブル名             | 説明                        | 主要カラム                                                                               | 特徴                                                                                                       |
-| :--------------------- | :-------------------------- | :--------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------- |
-| **`chat_sessions`**    | AI 創作相談チャット履歴     | `id` (PK), `novel_id`, `title`, `messages`                                               | チャットのやり取り（ユーザープロンプト & AI応答）を JSONB 配列で永続化。                                   |
-| **`llm_instructions`** | LLM 指示の実行履歴          | `id` (PK), `novel_id`, `instruction_type`, `prompt`, `target_type`, `target_id`          | 過去に実行したプロンプトを記録し、再利用や分析に活用。                                                     |
-| **`edit_histories`**   | 編集差分履歴（Undo/Diff用） | `id` (PK), `novel_id`, `target_type`, `target_id`, `before_text`, `after_text`, `prompt` | AI による一括変更や執筆の変更前・変更後を保存し、HistoryDiffModal で視覚的な差分確認・ロールバックを提供。 |
+| テーブル名             | 説明                        | 主要カラム                                                                               | 特徴                                                                                                             |
+| :--------------------- | :-------------------------- | :--------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------- |
+| **`chat_sessions`**    | AI 創作相談チャット履歴     | `id` (PK), `novel_id`, `title`, `messages`                                               | チャットのやり取り（ユーザー発言・AI応答・ツール呼び出し引数/結果）を AI SDK Message 形式の JSONB 配列で永続化。 |
+| **`llm_instructions`** | LLM 指示の実行履歴          | `id` (PK), `novel_id`, `instruction_type`, `prompt`, `target_type`, `target_id`          | 過去に実行したプロンプトを記録し、UI 上（`PromptHistoryList`）での再利用や確認に活用。                           |
+| **`edit_histories`**   | 編集差分履歴（Undo/Diff用） | `id` (PK), `novel_id`, `target_type`, `target_id`, `before_text`, `after_text`, `prompt` | AI による一括変更や執筆の変更前・変更後を保存し、`HistoryDiffModal` で視覚的な差分確認・ロールバックを提供。     |
 
 ---
 
