@@ -1,5 +1,4 @@
 import { createRootRouteWithContext, Outlet } from '@tanstack/react-router';
-import { TanStackRouterDevtools } from '@tanstack/router-devtools';
 import type { QueryClient } from '@tanstack/react-query';
 import { Layout } from '@/components/Layout.js';
 import { ToastProvider } from '@/components/Toast.js';
@@ -22,7 +21,6 @@ function RootComponent() {
           <Layout>
             <Outlet />
           </Layout>
-          <TanStackRouterDevtools />
         </ChatProvider>
       </ToastProvider>
     </ThemeProvider>
