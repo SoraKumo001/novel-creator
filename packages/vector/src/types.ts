@@ -31,4 +31,6 @@ export interface VectorStore {
   delete(id: string): Promise<void>;
   deleteByEntity(entityType: string, entityId: string): Promise<void>;
   deleteByNovel(novelId: string): Promise<void>;
+  recreateSchema?(dimensions: number): Promise<void>;
+  clearAll?(): Promise<void>;
 }

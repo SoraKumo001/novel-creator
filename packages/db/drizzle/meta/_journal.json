@@ -43,6 +43,13 @@
       "when": 1787988145398,
       "tag": "0005_condemned_killraven",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787992103423,
+      "tag": "0006_dear_polaris",
+      "breakpoints": true
     }
   ]
 }

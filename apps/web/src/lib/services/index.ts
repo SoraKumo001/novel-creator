@@ -12,3 +12,5 @@ export * from './backup.js';
 export * from './history.js';
 export * from './foreshadowing.js';
 export * from './llmConfig.js';
+export * from './embeddingConfig.js';
+export * from './vector.js';

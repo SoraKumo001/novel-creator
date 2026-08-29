@@ -273,6 +273,41 @@ export const testLlmConfigSchema = z.object({
   apiKey: z.string().optional().nullable(),
 });
 
+// ---- Embedding 設定 ----
+export const createEmbeddingConfigSchema = z.object({
+  name: z.string().min(1),
+  provider: z.enum(['openai', 'anthropic', 'google', 'ollama', 'custom_openai']),
+  modelId: z.string().min(1),
+  dimensions: z.coerce.number().int().positive().default(1536),
+  baseUrl: z.string().optional().nullable(),
+  apiKey: z.string().optional().nullable(),
+  isDefault: z.boolean().optional(),
+  description: z.string().optional().nullable(),
+});
+
+export const updateEmbeddingConfigSchema = z.object({
+  name: z.string().min(1).optional(),
+  provider: z.enum(['openai', 'anthropic', 'google', 'ollama', 'custom_openai']).optional(),
+  modelId: z.string().min(1).optional(),
+  dimensions: z.coerce.number().int().positive().optional(),
+  baseUrl: z.string().optional().nullable(),
+  apiKey: z.string().optional().nullable(),
+  isDefault: z.boolean().optional(),
+  description: z.string().optional().nullable(),
+});
+
+export const testEmbeddingConfigSchema = z.object({
+  provider: z.enum(['openai', 'anthropic', 'google', 'ollama', 'custom_openai']),
+  modelId: z.string().min(1),
+  dimensions: z.coerce.number().int().positive().optional(),
+  baseUrl: z.string().optional().nullable(),
+  apiKey: z.string().optional().nullable(),
+});
+
+export const reindexBodySchema = z.object({
+  embeddingConfigId: z.string().uuid().optional().nullable(),
+});
+
 export const generateContentBodySchema = z.object({
   modelConfigId: z.string().uuid().optional().nullable(),
 });

@@ -343,6 +343,61 @@ export interface TestConnectionResult {
   error?: string;
 }
 
+// ---- Embedding 設定 ----
+export interface EmbeddingConfig {
+  id: string;
+  name: string;
+  provider: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  modelId: string;
+  dimensions: number;
+  baseUrl: string | null;
+  apiKeyMasked: string | null;
+  hasApiKey: boolean;
+  isDefault: boolean;
+  description: string | null;
+  createdAt: string | Date | null;
+  updatedAt: string | Date | null;
+}
+
+export interface CreateEmbeddingConfigInput {
+  name: string;
+  provider: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  modelId: string;
+  dimensions?: number;
+  baseUrl?: string | null;
+  apiKey?: string | null;
+  isDefault?: boolean;
+  description?: string | null;
+}
+
+export interface UpdateEmbeddingConfigInput {
+  name?: string;
+  provider?: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  modelId?: string;
+  dimensions?: number;
+  baseUrl?: string | null;
+  apiKey?: string | null;
+  isDefault?: boolean;
+  description?: string | null;
+}
+
+export interface TestEmbeddingConnectionInput {
+  provider: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  modelId: string;
+  dimensions?: number;
+  baseUrl?: string | null;
+  apiKey?: string | null;
+}
+
+export interface ReindexProgressEvent {
+  current: number;
+  total: number;
+  percent: number;
+  stage: string;
+  itemTitle?: string;
+  error?: string;
+}
+
 // ---- インラインAIアシスト ----
 export type InlineAssistAction =
   'expand' | 'shorten' | 'emotional' | 'dialogue' | 'paraphrase' | 'custom';

@@ -6,22 +6,28 @@ Novel Creator では、**Vercel AI SDK (`ai`)** を基盤とし、複数の LLM 
 
 ## 1. LLM / Embedding プロバイダの抽象化
 
-### 1.1 マルチプロバイダ対応
+### 1.1 マルチプロバイダ対応 & 動的設定管理
 
 小説執筆用 LLM と、検索用 Embedding でそれぞれ異なるプロバイダやモデルを独立して設定可能です。
+環境変数（`.env`）によるシステムデフォルト設定に加え、**Web UI（`/settings`）から動的に LLM / 埋め込みモデルを追加・切り替え可能**です。
 
 ```
-[環境設定]
+[環境設定 / UI設定]
 LLM_PROVIDER       = "anthropic"  (例: Claude 3.5 Sonnet / 3.7 Sonnet)
-EMBEDDING_PROVIDER = "google"     (例: text-embedding-004)
+EMBEDDING_PROVIDER = "google"     (例: gemini-embedding-001 / text-embedding-3-small)
+EMBEDDING_DIMENSIONS = 768 / 1536 / 3072
 ```
 
 | プロバイダ        | 対応機能        | 特記事項                                                                                                   |
 | :---------------- | :-------------- | :--------------------------------------------------------------------------------------------------------- |
-| **OpenAI**        | LLM / Embedding | GPT-4o, GPT-4o-mini, text-embedding-3-small 等                                                             |
+| **OpenAI**        | LLM / Embedding | GPT-4o, GPT-4o-mini, text-embedding-3-small (1536d), text-embedding-3-large (3072d) 等                     |
 | **Anthropic**     | LLM             | Claude 3.5 Sonnet, Claude 3.7 Sonnet 等（Embedding 非対応のため自動的に OpenAI/Google 等にフォールバック） |
-| **Google Gemini** | LLM / Embedding | Gemini 2.5 Flash, Gemini 1.5 Pro, text-embedding-004（`outputDimensionality` による次元数指定対応）        |
-| **Ollama**        | LLM / Embedding | ローカル LLM（Llama 3, Qwen 2.5, DeepSeek R1 等）のオフライン動作・無料運用                                |
+| **Google Gemini** | LLM / Embedding | Gemini 2.5 Flash, Gemini 1.5 Pro, gemini-embedding-001（768次元 / 1536次元指定対応）                       |
+| **Ollama**        | LLM / Embedding | ローカル LLM（Llama 3.2, Qwen 2.5）および埋め込みモデル（nomic-embed-text 768d, bge-m3 1024d）             |
+
+### 1.2 ベクトルインデックスの全自動再構築 (Re-indexing)
+
+埋め込みモデルや次元数を変更した際、RDBに保存された全小説の原本データ（登場人物、世界観設定、各節の本文）からベクトルを自動バッチ生成し、インデックスを再作成（DROP & CREATE）するエンドポイント（`POST /api/vector/reindex`）およびプログレスモーダルを提供しています。
 
 ### 1.2 堅牢なエラーハンドリング & リトライ機構
 

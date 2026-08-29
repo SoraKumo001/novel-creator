@@ -5,8 +5,11 @@ export {
   createLanguageModel,
   createEmbeddingModel,
   createLanguageModelFromConfig,
+  createEmbeddingModelFromConfig,
   testLLMConnection,
+  testEmbeddingConnection,
   type LLMConfigInput,
+  type EmbeddingConfigInput,
   type TestConnectionResult,
   type ProviderSettings,
 } from './provider.js';

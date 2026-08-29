@@ -17,6 +17,8 @@ import sectionsRouter from './routes/sections.js';
 import settingsRouter from './routes/settings.js';
 import timelinesRouter from './routes/timelines.js';
 import foreshadowingsRouter from './routes/foreshadowings.js';
+import embeddingConfigsRouter from './routes/embedding-configs.js';
+import vectorRouter from './routes/vector.js';
 
 // API ルーター定義
 export const api = new Hono<AppContext>()
@@ -30,6 +32,8 @@ export const api = new Hono<AppContext>()
   .route('/foreshadowings', foreshadowingsRouter)
   .route('/llm-instructions', llmInstructionsRouter)
   .route('/llm-configs', llmConfigsRouter)
+  .route('/embedding-configs', embeddingConfigsRouter)
+  .route('/vector', vectorRouter)
   .route('/chat', chatRouter)
   .route('/backup', backupRouter)
   .route('/histories', historiesRouter);

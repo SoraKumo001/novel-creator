@@ -1,4 +1,4 @@
-import { generateText as aiGenerateText } from 'ai';
+import { embed as aiEmbed, generateText as aiGenerateText } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { createOpenAI } from '@ai-sdk/openai';
@@ -13,6 +13,14 @@ export interface ProviderSettings {
 export interface LLMConfigInput {
   provider: LLMProviderType;
   modelId: string;
+  baseUrl?: string | null;
+  apiKey?: string | null;
+}
+
+export interface EmbeddingConfigInput {
+  provider: LLMProviderType;
+  modelId: string;
+  dimensions?: number | null;
   baseUrl?: string | null;
   apiKey?: string | null;
 }
@@ -173,6 +181,75 @@ export async function testLLMConnection(
       success: true,
       latencyMs,
       message: res.text ? `接続成功: ${res.text.slice(0, 30)}` : '接続成功',
+    };
+  } catch (err) {
+    const latencyMs = Date.now() - startTime;
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      latencyMs,
+      message: `接続失敗: ${errorMessage}`,
+      error: errorMessage,
+    };
+  }
+}
+
+/**
+ * EmbeddingConfigInput から EmbeddingModel を生成する。
+ */
+export function createEmbeddingModelFromConfig(
+  config: EmbeddingConfigInput,
+  fallbackEnv?: Env,
+): EmbeddingModel {
+  let apiKey = config.apiKey ?? undefined;
+  let baseURL = config.baseUrl ?? undefined;
+
+  if (!apiKey && fallbackEnv) {
+    if (fallbackEnv.EMBEDDING_PROVIDER === config.provider && fallbackEnv.EMBEDDING_API_KEY) {
+      apiKey = fallbackEnv.EMBEDDING_API_KEY;
+    } else if (fallbackEnv.LLM_PROVIDER === config.provider && fallbackEnv.LLM_API_KEY) {
+      apiKey = fallbackEnv.LLM_API_KEY;
+    }
+  }
+
+  if (!baseURL && fallbackEnv) {
+    if (fallbackEnv.EMBEDDING_PROVIDER === config.provider && fallbackEnv.EMBEDDING_BASE_URL) {
+      baseURL = fallbackEnv.EMBEDDING_BASE_URL;
+    } else if (fallbackEnv.LLM_PROVIDER === config.provider && fallbackEnv.LLM_BASE_URL) {
+      baseURL = fallbackEnv.LLM_BASE_URL;
+    }
+  }
+
+  return createEmbeddingModel(config.provider, config.modelId, buildSettings(baseURL, apiKey));
+}
+
+/**
+ * Embedding への接続をテストし、成否とレイテンシ、次元数を返す。
+ */
+export async function testEmbeddingConnection(
+  modelOrConfig: EmbeddingModel | EmbeddingConfigInput,
+  fallbackEnv?: Env,
+): Promise<TestConnectionResult> {
+  const startTime = Date.now();
+  try {
+    let model: EmbeddingModel;
+    if (typeof modelOrConfig === 'object' && 'modelId' in modelOrConfig) {
+      model = createEmbeddingModelFromConfig(modelOrConfig as EmbeddingConfigInput, fallbackEnv);
+    } else {
+      model = modelOrConfig as EmbeddingModel;
+    }
+
+    const res = await aiEmbed({
+      model,
+      value: 'ping test for embedding dimension and connection',
+    });
+
+    const latencyMs = Date.now() - startTime;
+    const dimensions = res.embedding.length;
+    return {
+      success: true,
+      latencyMs,
+      message: `接続成功 (検出次元数: ${dimensions})`,
     };
   } catch (err) {
     const latencyMs = Date.now() - startTime;

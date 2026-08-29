@@ -159,6 +159,37 @@ export function createPgVectorStore(connectionString: string, dimensions = 3072)
       await ensureSchema();
       await db.delete(vectorEmbeddings).where(eq(vectorEmbeddings.novelId, novelId));
     },
+
+    async clearAll(): Promise<void> {
+      await ensureSchema();
+      await db.delete(vectorEmbeddings);
+    },
+
+    async recreateSchema(newDimensions: number): Promise<void> {
+      const indexType = newDimensions > 2000 ? 'hnsw' : 'ivfflat';
+      const indexOptions =
+        indexType === 'hnsw' ? 'WITH (m = 16, ef_construction = 64)' : 'WITH (lists = 100)';
+      await db.execute(
+        sql.raw(`
+        DROP TABLE IF EXISTS vector_embeddings CASCADE;
+        CREATE TABLE vector_embeddings (
+          id uuid PRIMARY KEY,
+          novel_id uuid NOT NULL,
+          entity_type text NOT NULL,
+          entity_id uuid NOT NULL,
+          content text NOT NULL,
+          metadata jsonb,
+          embedding vector(${newDimensions}) NOT NULL,
+          created_at timestamp DEFAULT now()
+        );
+        CREATE INDEX vector_embeddings_novel_entity_idx
+          ON vector_embeddings (novel_id, entity_type);
+        CREATE INDEX vector_embeddings_embedding_idx
+          ON vector_embeddings USING ${indexType} (embedding vector_cosine_ops) ${indexOptions};
+      `),
+      );
+      schemaReady = Promise.resolve();
+    },
   };
 }
 

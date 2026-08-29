@@ -43,3 +43,8 @@ export const llmConfigKeys = {
   all: ['llmConfigs'] as const,
   detail: (id: string) => ['llmConfigs', id] as const,
 };
+
+export const embeddingConfigKeys = {
+  all: ['embeddingConfigs'] as const,
+  detail: (id: string) => ['embeddingConfigs', id] as const,
+};
