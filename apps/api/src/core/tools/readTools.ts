@@ -17,11 +17,11 @@ const createTool = tool as any;
  * 創作相談チャット用の小説データ読み取りツール群を作成する。
  * 各ツールは AI SDK の tool() 形式で定義され、LLM による自律的な小説情報参照を可能にする。
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 export function createReadTools(
   ctx: ServiceContext,
   defaultNovelId?: string | null,
-): Record<string, any> {
+): Record<string, unknown> {
   const novelService = new NovelDomainService(ctx);
   const characterService = new CharacterDomainService(ctx);
   const settingService = new SettingDomainService(ctx);
