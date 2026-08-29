@@ -120,12 +120,13 @@ export function ChatDrawer() {
   };
 
   const handleSaveTitle = async (id: string, newTitle: string) => {
-    try {
-      await updateSessionTitle(id, newTitle);
+    const ok = await updateSessionTitle(id, newTitle);
+    if (ok) {
       toast.success('タイトルを変更しました');
-    } catch {
+    } else {
       toast.error('タイトルの変更に失敗しました');
     }
+    return ok;
   };
 
   const handleDeleteSession = async (id: string) => {

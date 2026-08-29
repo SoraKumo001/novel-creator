@@ -1,8 +1,9 @@
 // エンティティの wire 形式（HTTP 経由の JSON）を定義する単一情報源。日付は ISO 文字列。relationships/metadata は多形（文字列/オブジェクト）のため unknown のまま。
 import { z } from 'zod';
+import { foreshadowingStatuses } from '../constants.js';
 
-/** 伏線の進行状態（unresolved=未回収, resolved=回収済み, abandoned=断念） */
-export const foreshadowingStatuses = ['unresolved', 'resolved', 'abandoned'] as const;
+export { foreshadowingStatuses };
+export type { ForeshadowingStatusValue } from '../constants.js';
 export const foreshadowingStatusSchema = z.enum(foreshadowingStatuses);
 export type ForeshadowingStatus = z.infer<typeof foreshadowingStatusSchema>;
 

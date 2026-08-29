@@ -102,7 +102,10 @@ export function useSettings(novelId: string): UseSettingsReturn {
 
   const saveMarkdownMutation = useMutation({
     mutationFn: (markdown: string) => saveSettingsMarkdown(novelId, markdown),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) });
+      void queryClient.invalidateQueries({ queryKey: novelKeys.settingsMarkdown(novelId) });
+    },
   });
 
   const editSectionMutation = useMutation({
@@ -120,9 +123,11 @@ export function useSettings(novelId: string): UseSettingsReturn {
   });
 
   const fetchMarkdown = useCallback(async (): Promise<string> => {
-    const data = await fetchSettingsMarkdown(novelId);
-    return data.markdown;
-  }, [novelId]);
+    return queryClient.ensureQueryData({
+      queryKey: novelKeys.settingsMarkdown(novelId),
+      queryFn: async () => (await fetchSettingsMarkdown(novelId)).markdown,
+    });
+  }, [queryClient, novelId]);
 
   return {
     settings,

@@ -87,7 +87,10 @@ export function useCharacters(novelId: string): UseCharactersReturn {
 
   const saveMarkdownMutation = useMutation({
     mutationFn: (markdown: string) => saveCharactersMarkdown(novelId, markdown),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.characters(novelId) }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: novelKeys.characters(novelId) });
+      void queryClient.invalidateQueries({ queryKey: novelKeys.charactersMarkdown(novelId) });
+    },
   });
 
   const editSectionMutation = useMutation({
@@ -107,9 +110,11 @@ export function useCharacters(novelId: string): UseCharactersReturn {
   });
 
   const fetchMarkdown = useCallback(async (): Promise<string> => {
-    const data = await fetchCharactersMarkdown(novelId);
-    return data.markdown;
-  }, [novelId]);
+    return queryClient.ensureQueryData({
+      queryKey: novelKeys.charactersMarkdown(novelId),
+      queryFn: async () => (await fetchCharactersMarkdown(novelId)).markdown,
+    });
+  }, [queryClient, novelId]);
 
   return {
     characters,

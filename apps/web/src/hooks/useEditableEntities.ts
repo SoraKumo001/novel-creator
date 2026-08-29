@@ -53,6 +53,7 @@ export function useEditableEntities<T extends EditableEntity>(initial: T[] = [])
   }, []);
 
   // 初期状態へ戻す。
+  // 注意: reset は初回レンダー時の initial に戻す。initial に変更可能な非空配列を渡す場合は初期値の最新化に注意すること。
   const reset = useCallback(() => {
     setItems(initial);
   }, [initial]);

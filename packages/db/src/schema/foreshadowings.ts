@@ -1,4 +1,5 @@
 import { pgTable, uuid, text, timestamp } from 'drizzle-orm/pg-core';
+import { foreshadowingStatuses } from '@novel-creator/shared';
 import { novels } from './novels.js';
 import { sections } from './sections.js';
 
@@ -9,7 +10,7 @@ export const foreshadowings = pgTable('foreshadowings', {
     .references(() => novels.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
   description: text('description'),
-  status: text('status', { enum: ['unresolved', 'resolved', 'abandoned'] })
+  status: text('status', { enum: [...foreshadowingStatuses] })
     .notNull()
     .default('unresolved'),
   placedSectionId: uuid('placed_section_id').references(() => sections.id, {

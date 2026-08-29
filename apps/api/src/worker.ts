@@ -1,4 +1,4 @@
-import { parseEnv } from '@novel-creator/shared';
+import { parseEnv } from '@novel-creator/shared/env';
 
 import { createApp } from './app.js';
 import { createContextForWorkers } from './context.js';

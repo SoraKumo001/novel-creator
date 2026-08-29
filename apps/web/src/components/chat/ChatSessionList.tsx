@@ -9,7 +9,7 @@ interface ChatSessionListProps {
   pinnedIds: Set<string>;
   onTogglePin: (id: string) => void;
   onSelectSession: (id: string) => void;
-  onSaveTitle: (id: string, newTitle: string) => Promise<void>;
+  onSaveTitle: (id: string, newTitle: string) => Promise<boolean>;
   onDeleteSession: (id: string) => Promise<void>;
   onStartNewChat: () => void;
 }
@@ -33,8 +33,8 @@ export function ChatSessionList({
 
   const handleSaveTitle = async (id: string) => {
     if (!editTitleInput.trim()) return;
-    await onSaveTitle(id, editTitleInput.trim());
-    setEditingSessionId(null);
+    const ok = await onSaveTitle(id, editTitleInput.trim());
+    if (ok) setEditingSessionId(null);
   };
 
   const handleDeleteSession = async (id: string) => {

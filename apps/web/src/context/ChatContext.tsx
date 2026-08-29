@@ -1,22 +1,11 @@
 import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  createChatSession,
-  deleteChatSession,
-  fetchChatSession,
-  fetchChatSessions,
-  updateChatSession,
-} from '@/lib/services/index.js';
+import { fetchChatSession, fetchChatSessions, updateChatSession } from '@/lib/services/index.js';
 import { chatKeys } from '@/lib/queryKeys.js';
-import { streamChat } from '@/lib/chatApi.js';
+import { useChatStreaming, type ChatMessage } from '@/hooks/useChatStreaming.js';
 import type { ChatSession } from '@/lib/types.js';
 
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  createdAt: number;
-}
+export type { ChatMessage } from '@/hooks/useChatStreaming.js';
 
 export interface QuickPrompt {
   id: string;
@@ -79,7 +68,7 @@ export interface ChatContextValue {
   createSession: (novelId?: string | null, initialTitle?: string) => Promise<ChatSession | null>;
   selectSession: (sessionId: string) => Promise<void>;
   deleteSession: (sessionId: string) => Promise<void>;
-  updateSessionTitle: (sessionId: string, newTitle: string) => Promise<void>;
+  updateSessionTitle: (sessionId: string, newTitle: string) => Promise<boolean>;
   refreshSessions: () => Promise<void>;
 
   // メッセージ・ストリーミング関連
@@ -97,11 +86,12 @@ export const ChatContext = createContext<ChatContextValue | null>(null);
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedNovelId, setSelectedNovelIdState] = useState<string | null>(null);
-
-  // セッション状態
-  const queryClient = useQueryClient();
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
+
+  const queryClient = useQueryClient();
+
+  const selectedNovelIdRef = useRef<string | null>(selectedNovelId);
+  selectedNovelIdRef.current = selectedNovelId;
 
   // セッション一覧の取得（小説ID変更時はクエリキー変更により自動再取得される）
   const sessionsQuery = useQuery({
@@ -111,46 +101,58 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const sessions = sessionsQuery.data ?? [];
   const loadingSessions = sessionsQuery.isLoading;
 
-  // メッセージ・対話状態
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingContent, setStreamingContent] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const selectedNovelIdRef = useRef<string | null>(selectedNovelId);
-  selectedNovelIdRef.current = selectedNovelId;
-  const currentSessionIdRef = useRef<string | null>(currentSessionId);
-  currentSessionIdRef.current = currentSessionId;
-
   // セッション一覧のリフレッシュ
   const refreshSessions = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: chatKeys.all });
   }, [queryClient]);
 
+  // メッセージ・ストリーミング状態機械（セッション自動作成・削除を含む）
+  const {
+    currentSessionId,
+    setCurrentSessionId,
+    currentSessionIdRef,
+    messages,
+    setMessages,
+    isStreaming,
+    setIsStreaming,
+    streamingContent,
+    setStreamingContent,
+    error,
+    setError,
+    abortControllerRef,
+    createSession,
+    deleteSession,
+    sendMessage,
+    abortStream,
+    clearMessages,
+  } = useChatStreaming({ selectedNovelIdRef, refreshSessions });
+
   // 特定セッションのメッセージ読み込み
-  const loadSessionMessages = useCallback(async (sessionId: string) => {
-    setLoadingMessages(true);
-    setError(null);
-    try {
-      const detail = await fetchChatSession(sessionId);
-      if (detail && Array.isArray(detail.messages)) {
-        const formatted: ChatMessage[] = detail.messages.map((m) => ({
-          id: m.id,
-          role: m.role,
-          content: m.content,
-          createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
-        }));
-        setMessages(formatted);
+  const loadSessionMessages = useCallback(
+    async (sessionId: string) => {
+      setLoadingMessages(true);
+      setError(null);
+      try {
+        const detail = await fetchChatSession(sessionId);
+        if (detail && Array.isArray(detail.messages)) {
+          const formatted: ChatMessage[] = detail.messages.map((m) => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            createdAt: m.createdAt ? new Date(m.createdAt).getTime() : Date.now(),
+          }));
+          setMessages(formatted);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'メッセージの取得に失敗しました';
+        setError(msg);
+        setMessages([]);
+      } finally {
+        setLoadingMessages(false);
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'メッセージの取得に失敗しました';
-      setError(msg);
-      setMessages([]);
-    } finally {
-      setLoadingMessages(false);
-    }
-  }, []);
+    },
+    [setError, setMessages],
+  );
 
   // 新しい相談を開始（画面をクリアして新規作成待ち状態にする）
   const startNewChat = useCallback(() => {
@@ -163,31 +165,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setCurrentSessionId(null);
     setMessages([]);
     setError(null);
-  }, []);
-
-  // 新規セッション作成
-  const createSession = useCallback(
-    async (novelId?: string | null, initialTitle?: string): Promise<ChatSession | null> => {
-      const targetNovelId = novelId !== undefined ? novelId : selectedNovelIdRef.current;
-      try {
-        const created = await createChatSession({
-          novelId: targetNovelId || undefined,
-          title: initialTitle || '新しい相談',
-        });
-        setCurrentSessionId(created.id);
-        setMessages([]);
-        setError(null);
-        // セッション一覧を再取得して新規セッションを反映する
-        await queryClient.invalidateQueries({ queryKey: chatKeys.all });
-        return created;
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'セッションの作成に失敗しました';
-        setError(msg);
-        return null;
-      }
-    },
-    [queryClient],
-  );
+  }, [
+    abortControllerRef,
+    setCurrentSessionId,
+    setError,
+    setIsStreaming,
+    setMessages,
+    setStreamingContent,
+  ]);
 
   // セッション切り替え
   const selectSession = useCallback(
@@ -204,51 +189,46 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setCurrentSessionId(sessionId);
       await loadSessionMessages(sessionId);
     },
-    [isStreaming, loadSessionMessages],
+    [
+      abortControllerRef,
+      currentSessionIdRef,
+      isStreaming,
+      loadSessionMessages,
+      setCurrentSessionId,
+      setIsStreaming,
+      setStreamingContent,
+    ],
   );
 
-  // セッション削除
-  const deleteSession = useCallback(
-    async (sessionId: string) => {
-      try {
-        await deleteChatSession(sessionId);
-        await queryClient.invalidateQueries({ queryKey: chatKeys.all });
-        if (currentSessionIdRef.current === sessionId) {
-          setCurrentSessionId(null);
-          setMessages([]);
-        }
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'セッションの削除に失敗しました';
-        setError(msg);
-      }
-    },
-    [queryClient],
-  );
-
-  // セッションタイトル更新
+  // セッションタイトル更新（成否を呼び出し元が判定できるよう結果を返す）
   const updateSessionTitle = useCallback(
-    async (sessionId: string, newTitle: string) => {
+    async (sessionId: string, newTitle: string): Promise<boolean> => {
       const trimmed = newTitle.trim();
-      if (!trimmed) return;
+      if (!trimmed) return false;
       try {
         await updateChatSession(sessionId, { title: trimmed });
         await queryClient.invalidateQueries({ queryKey: chatKeys.all });
+        return true;
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'タイトルの更新に失敗しました';
         setError(msg);
+        return false;
       }
     },
-    [queryClient],
+    [queryClient, setError],
   );
 
   // 小説変更ハンドラ
   // クエリキーに小説IDを含めているため、ID変更時は useQuery が自動で再取得する
-  const setSelectedNovelId = useCallback((id: string | null) => {
-    setSelectedNovelIdState(id);
-    setCurrentSessionId(null);
-    setMessages([]);
-    setError(null);
-  }, []);
+  const setSelectedNovelId = useCallback(
+    (id: string | null) => {
+      setSelectedNovelIdState(id);
+      setCurrentSessionId(null);
+      setMessages([]);
+      setError(null);
+    },
+    [setCurrentSessionId, setError, setMessages],
+  );
 
   const openChat = useCallback(
     (targetNovelId?: string | null) => {
@@ -267,114 +247,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const toggleChat = useCallback(() => {
     setIsOpen((prev) => !prev);
   }, []);
-
-  const abortStream = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setIsStreaming(false);
-    if (streamingContent) {
-      const partialMsg: ChatMessage = {
-        id: `msg-${Date.now()}-assistant`,
-        role: 'assistant',
-        content: streamingContent + '\n\n*(中断されました)*',
-        createdAt: Date.now(),
-      };
-      setMessages((prev) => [...prev, partialMsg]);
-      setStreamingContent('');
-    }
-  }, [streamingContent]);
-
-  const clearMessages = useCallback(() => {
-    abortStream();
-    if (currentSessionId) {
-      void deleteSession(currentSessionId);
-    } else {
-      setMessages([]);
-      setError(null);
-    }
-  }, [abortStream, currentSessionId, deleteSession]);
-
-  const sendMessage = useCallback(
-    async (content: string) => {
-      const text = content.trim();
-      if (!text || isStreaming) return;
-
-      setError(null);
-
-      let activeSessionId = currentSessionIdRef.current;
-
-      // まだセッションがない場合は新規セッションを作成
-      if (!activeSessionId) {
-        const titleProposal = text.slice(0, 30).trim().replace(/\n+/g, ' ') || '新しい相談';
-        const newSession = await createSession(selectedNovelIdRef.current, titleProposal);
-        if (newSession) {
-          activeSessionId = newSession.id;
-        }
-      }
-
-      const userMsg: ChatMessage = {
-        id: `msg-${Date.now()}-user`,
-        role: 'user',
-        content: text,
-        createdAt: Date.now(),
-      };
-
-      const updatedMessages = [...messages, userMsg];
-      setMessages(updatedMessages);
-
-      setIsStreaming(true);
-      setStreamingContent('');
-
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-
-      let accumulated = '';
-
-      try {
-        await streamChat({
-          sessionId: activeSessionId,
-          novelId: selectedNovelIdRef.current,
-          messages: updatedMessages.map((m) => ({
-            role: m.role,
-            content: m.content,
-          })),
-          signal: controller.signal,
-          onChunk: (chunk) => {
-            accumulated += chunk;
-            setStreamingContent(accumulated);
-          },
-          onError: (err) => {
-            setError(err.message);
-          },
-        });
-
-        if (!controller.signal.aborted && accumulated.trim()) {
-          const assistantMsg: ChatMessage = {
-            id: `msg-${Date.now()}-assistant`,
-            role: 'assistant',
-            content: accumulated,
-            createdAt: Date.now(),
-          };
-          setMessages((prev) => [...prev, assistantMsg]);
-          // セッション一覧を再取得（自動タイトル更新や更新日時の反映）
-          void refreshSessions();
-        }
-      } catch (err: unknown) {
-        if (err instanceof Error && err.name === 'AbortError') {
-          return;
-        }
-        const errorMsg = err instanceof Error ? err.message : 'チャットエラーが発生しました';
-        setError(errorMsg);
-      } finally {
-        setIsStreaming(false);
-        setStreamingContent('');
-        abortControllerRef.current = null;
-      }
-    },
-    [createSession, isStreaming, messages, refreshSessions],
-  );
 
   const currentSession = sessions.find((s) => s.id === currentSessionId) ?? null;
 
