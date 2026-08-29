@@ -462,20 +462,7 @@ export function SettingsPage() {
             執筆やチャットで使う生成LLMと、RAG検索で使う埋め込み（Embedding）モデルを管理します。
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {activeTab === 'embedding' && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setReindexProgress(null);
-                setReindexDone(false);
-                setReindexError(null);
-                setReindexModalOpen(true);
-              }}
-            >
-              ⚡ インデックス全再構築
-            </Button>
-          )}
+        <div>
           <Button
             onClick={activeTab === 'llm' ? openCreateLlmModal : openCreateEmbeddingModal}
             leftIcon={<span>＋</span>}
@@ -489,7 +476,6 @@ export function SettingsPage() {
       <div className="border-b border-border flex gap-2">
         <button
           type="button"
-          onClick={() => setActiveTab('llm')}
           className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold border-b-2 transition cursor-pointer ${
             activeTab === 'llm'
               ? 'border-primary text-primary bg-primary/5'
