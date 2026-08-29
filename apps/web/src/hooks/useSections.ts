@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { toErrorMessage } from '@/lib/errors.js';
+import { sectionKeys } from '@/lib/queryKeys.js';
 import { fetchSection } from '@/lib/services/index.js';
 import type { SectionWithContent } from '@/lib/types.js';
 
@@ -17,7 +18,7 @@ export function useSection(sectionId: string): UseSectionReturn {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['sections', sectionId],
+    queryKey: sectionKeys.detail(sectionId),
     queryFn: () => fetchSection(sectionId),
     enabled: !!sectionId,
   });

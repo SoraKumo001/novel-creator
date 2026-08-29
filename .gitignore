@@ -23,6 +23,7 @@ storybook-static
 .playwright-mcp
 .tanstack
 .DS_Store
+.slim/deepwork/
 
 # 自動生成コード（再生成可能なもの）
 apps/web/src/routeTree.gen.ts

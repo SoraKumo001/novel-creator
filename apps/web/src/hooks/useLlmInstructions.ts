@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toErrorMessage } from '@/lib/errors.js';
+import { novelKeys } from '@/lib/queryKeys.js';
 import {
   createLlmInstruction,
   deleteLlmInstruction,
@@ -30,7 +31,7 @@ export function useLlmInstructions(
     error,
     refetch,
   } = useQuery({
-    queryKey: ['novels', novelId, 'llmInstructions', entityType],
+    queryKey: novelKeys.llmInstructions(novelId, entityType),
     queryFn: () => fetchLlmInstructions(novelId, entityType),
     enabled: !!novelId,
   });
@@ -39,7 +40,7 @@ export function useLlmInstructions(
     mutationFn: (input: CreateLlmInstructionInput) => createLlmInstruction(novelId, input),
     onSuccess: () =>
       queryClient.invalidateQueries({
-        queryKey: ['novels', novelId, 'llmInstructions', entityType],
+        queryKey: novelKeys.llmInstructions(novelId, entityType),
       }),
   });
 
@@ -47,7 +48,7 @@ export function useLlmInstructions(
     mutationFn: (id: string) => deleteLlmInstruction(id),
     onSuccess: () =>
       queryClient.invalidateQueries({
-        queryKey: ['novels', novelId, 'llmInstructions', entityType],
+        queryKey: novelKeys.llmInstructions(novelId, entityType),
       }),
   });
 
@@ -55,7 +56,9 @@ export function useLlmInstructions(
     instructions,
     loading,
     error: error ? toErrorMessage(error) : null,
-    refetch: refetch as unknown as () => Promise<void>,
+    refetch: async () => {
+      await refetch();
+    },
     saveInstruction: saveMutation.mutateAsync,
     deleteInstruction: (id) => deleteMutation.mutateAsync(id),
     saving: saveMutation.isPending,

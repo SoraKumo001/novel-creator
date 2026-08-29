@@ -24,3 +24,17 @@ export class ValidationError extends Error {
     this.name = 'ValidationError';
   }
 }
+
+/**
+ * 行が取得できなかった場合に NotFoundError を投げる。
+ * NotFoundError と同じ引数形式でエラーメッセージを構築する。
+ */
+export function assertFound<T>(
+  row: T | undefined,
+  entityOrMessage: string,
+  id?: string,
+): asserts row is T {
+  if (!row) {
+    throw new NotFoundError(entityOrMessage, id);
+  }
+}

@@ -1,89 +1,35 @@
 // フロント用の型定義。
-// バックエンド（packages/db）との結合度を下げるため、ここで再定義する。
+// エンティティ型は @novel-creator/shared/schemas を単一情報源とし、
+// ここではビューモデルと入力型のみを定義する。
+import type {
+  Novel,
+  Chapter,
+  Section,
+  Content,
+  Character,
+  Setting,
+  Timeline,
+  Foreshadowing,
+  ForeshadowingStatus,
+  LlmInstruction,
+  ChatSession,
+  ChatMessageItem,
+} from '@novel-creator/shared/schemas';
 
-export interface Novel {
-  id: string;
-  title: string;
-  description: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-export interface Chapter {
-  id: string;
-  novelId: string;
-  title: string;
-  order: number;
-  summary: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-export interface Section {
-  id: string;
-  chapterId: string;
-  title: string | null;
-  order: number;
-  summary: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-export interface Content {
-  id: string;
-  sectionId: string;
-  body: string;
-  wordCount: number | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-export interface Character {
-  id: string;
-  novelId: string;
-  category: string;
-  name: string;
-  description: string | null;
-  traits: string[] | null;
-  relationships: unknown;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-export interface Setting {
-  id: string;
-  novelId: string;
-  category: string;
-  name: string;
-  description: string | null;
-  metadata: unknown;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-export interface Timeline {
-  id: string;
-  novelId: string;
-  sectionId: string | null;
-  event: string;
-  order: number;
-  timestamp: string | null;
-  createdAt: string | null;
-}
-
-export type ForeshadowingStatus = 'unresolved' | 'resolved' | 'abandoned';
-
-export interface Foreshadowing {
-  id: string;
-  novelId: string;
-  title: string;
-  description: string | null;
-  status: ForeshadowingStatus;
-  placedSectionId: string | null;
-  resolvedSectionId: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
+export type {
+  Novel,
+  Chapter,
+  Section,
+  Content,
+  Character,
+  Setting,
+  Timeline,
+  Foreshadowing,
+  ForeshadowingStatus,
+  LlmInstruction,
+  ChatSession,
+  ChatMessageItem,
+};
 
 export interface CreateForeshadowingInput {
   title: string;
@@ -208,14 +154,6 @@ export interface SettingDraftInput {
   currentDraft?: { category: string; name: string; description?: string };
 }
 
-export interface LlmInstruction {
-  id: string;
-  novelId: string;
-  entityType: string;
-  instruction: string;
-  createdAt: string | null;
-}
-
 export interface CreateLlmInstructionInput {
   entityType: string;
   instruction: string;
@@ -288,22 +226,6 @@ export interface EditCharacterSectionResult {
 }
 
 // ---- チャットセッション ----
-export interface ChatSession {
-  id: string;
-  novelId: string | null;
-  title: string;
-  createdAt: string | null;
-  updatedAt: string | null;
-}
-
-export interface ChatMessageItem {
-  id: string;
-  sessionId: string;
-  role: 'user' | 'assistant';
-  content: string;
-  createdAt: string | null;
-}
-
 export interface ChatSessionDetail extends ChatSession {
   messages: ChatMessageItem[];
 }

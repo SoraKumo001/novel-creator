@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toErrorMessage } from '@/lib/errors.js';
+import { novelKeys } from '@/lib/queryKeys.js';
 import {
   createForeshadowing,
   deleteForeshadowing,
@@ -11,92 +13,63 @@ import type {
   UpdateForeshadowingInput,
 } from '@/lib/types.js';
 
-export function useForeshadowings(novelId: string) {
-  const [foreshadowings, setForeshadowings] = useState<Foreshadowing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [updating, setUpdating] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+interface UseForeshadowingsReturn {
+  foreshadowings: Foreshadowing[];
+  loading: boolean;
+  error: string | null;
+  refetch: () => Promise<void>;
+  createForeshadowing: (input: CreateForeshadowingInput) => Promise<Foreshadowing>;
+  updateForeshadowing: (id: string, input: UpdateForeshadowingInput) => Promise<Foreshadowing>;
+  deleteForeshadowing: (id: string) => Promise<void>;
+  creating: boolean;
+  updating: boolean;
+  deleting: boolean;
+}
 
-  const refetch = useCallback(async () => {
-    if (!novelId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const list = await fetchForeshadowings(novelId);
-      setForeshadowings(list);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '伏線一覧の取得に失敗しました');
-    } finally {
-      setLoading(false);
-    }
-  }, [novelId]);
+export function useForeshadowings(novelId: string): UseForeshadowingsReturn {
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    void refetch();
-  }, [refetch]);
+  const {
+    data: foreshadowings = [],
+    isLoading: loading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: novelKeys.foreshadowings(novelId),
+    queryFn: () => fetchForeshadowings(novelId),
+    enabled: !!novelId,
+  });
 
-  const handleCreate = useCallback(
-    async (input: CreateForeshadowingInput) => {
-      setCreating(true);
-      setError(null);
-      try {
-        const item = await createForeshadowing(novelId, input);
-        setForeshadowings((prev) => [...prev, item]);
-        return item;
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : '伏線の作成に失敗しました';
-        setError(msg);
-        throw e;
-      } finally {
-        setCreating(false);
-      }
-    },
-    [novelId],
-  );
+  const createMutation = useMutation({
+    mutationFn: (input: CreateForeshadowingInput) => createForeshadowing(novelId, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.foreshadowings(novelId) }),
+  });
 
-  const handleUpdate = useCallback(async (id: string, input: UpdateForeshadowingInput) => {
-    setUpdating(true);
-    setError(null);
-    try {
-      const item = await updateForeshadowing(id, input);
-      setForeshadowings((prev) => prev.map((f) => (f.id === id ? item : f)));
-      return item;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : '伏線の更新に失敗しました';
-      setError(msg);
-      throw e;
-    } finally {
-      setUpdating(false);
-    }
-  }, []);
+  const updateMutation = useMutation({
+    mutationFn: ({ id, input }: { id: string; input: UpdateForeshadowingInput }) =>
+      updateForeshadowing(id, input),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.foreshadowings(novelId) }),
+  });
 
-  const handleDelete = useCallback(async (id: string) => {
-    setDeleting(true);
-    setError(null);
-    try {
-      await deleteForeshadowing(id);
-      setForeshadowings((prev) => prev.filter((f) => f.id !== id));
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : '伏線の削除に失敗しました';
-      setError(msg);
-      throw e;
-    } finally {
-      setDeleting(false);
-    }
-  }, []);
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => deleteForeshadowing(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.foreshadowings(novelId) }),
+  });
 
   return {
     foreshadowings,
     loading,
-    error,
-    refetch,
-    createForeshadowing: handleCreate,
-    updateForeshadowing: handleUpdate,
-    deleteForeshadowing: handleDelete,
-    creating,
-    updating,
-    deleting,
+    error: error ? toErrorMessage(error) : null,
+    refetch: async () => {
+      await refetch();
+    },
+    createForeshadowing: createMutation.mutateAsync,
+    updateForeshadowing: (id, input) => updateMutation.mutateAsync({ id, input }),
+    deleteForeshadowing: async (id) => {
+      await deleteMutation.mutateAsync(id);
+    },
+    creating: createMutation.isPending,
+    updating: updateMutation.isPending,
+    deleting: deleteMutation.isPending,
   };
 }

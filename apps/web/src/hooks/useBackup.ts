@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toErrorMessage } from '@/lib/errors.js';
+import { novelKeys } from '@/lib/queryKeys.js';
 import { exportNovelBackup } from '@/lib/services/index.js';
 
 interface UseExportNovelReturn {
@@ -13,7 +14,7 @@ export function useExportNovel(): UseExportNovelReturn {
 
   const mutation = useMutation({
     mutationFn: (novelId: string) => exportNovelBackup(novelId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.all }),
   });
 
   return {

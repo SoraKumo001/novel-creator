@@ -21,7 +21,7 @@ import {
   type NewSetting,
   type NewTimeline,
 } from '@novel-creator/db';
-import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
+import { assertFound, ValidationError, type ServiceContext } from './types.js';
 
 export interface BackupBody {
   meta: {
@@ -49,9 +49,7 @@ export class BackupDomainService {
 
   async exportNovel(novelId: string) {
     const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
-    if (!novel) {
-      throw new NotFoundError('Novel not found');
-    }
+    assertFound(novel, 'Novel not found');
 
     const chapterRows = await this.ctx.db
       .select()

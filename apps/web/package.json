@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
+    "@novel-creator/api": "workspace:*",
     "@novel-creator/shared": "workspace:*",
     "@tailwindcss/typography": "0.5.20",
     "@tanstack/react-query": "5.102.4",
@@ -25,6 +26,7 @@
     "hono": "^4.13.4",
     "marked": "18.0.11",
     "mermaid": "11.17.2",
+    "monaco-editor": "^0.56.0",
     "postcss": "^8.5.26",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

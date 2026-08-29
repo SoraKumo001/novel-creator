@@ -1,5 +1,6 @@
 import { apiClient } from '../api-client.js';
 import type { ImportResult } from '../types.js';
+import type { BackupBody } from '@novel-creator/api';
 
 export async function exportNovelBackup(novelId: string): Promise<Response> {
   const res = await apiClient.backup.export.$post({
@@ -17,8 +18,8 @@ export async function exportNovelBackup(novelId: string): Promise<Response> {
 export async function importNovelBackup(data: unknown): Promise<ImportResult> {
   const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
   const res = await apiClient.backup.import.$post({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    json: parsedData as any,
+    // API 側（backupBodySchema）が検証の権威。web 側は構造を緩く扱うため unknown 経由でブリッジする。
+    json: parsedData as unknown as BackupBody,
   });
   if (!res.ok) throw new Error('Failed to import novel backup');
   const result = await res.json();

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { foreshadowingStatusSchema } from '@novel-creator/shared/schemas';
 
 // ---- novels ----
 export const createNovelSchema = z.object({
@@ -86,7 +87,7 @@ export const createTimelineSchema = z.object({
 export const createForeshadowingSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
-  status: z.enum(['unresolved', 'resolved', 'abandoned']).optional(),
+  status: foreshadowingStatusSchema.optional(),
   placedSectionId: z.string().uuid().optional().nullable(),
   resolvedSectionId: z.string().uuid().optional().nullable(),
 });
@@ -94,9 +95,33 @@ export const createForeshadowingSchema = z.object({
 export const updateForeshadowingSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional().nullable(),
-  status: z.enum(['unresolved', 'resolved', 'abandoned']).optional(),
+  status: foreshadowingStatusSchema.optional(),
   placedSectionId: z.string().uuid().optional().nullable(),
   resolvedSectionId: z.string().uuid().optional().nullable(),
+});
+
+// ---- バックアップ ----
+// バックアップの構造を緩く検証する。行レベルの厳密な検証は importNovel が行うため、
+// ここでは rdb.novel の存在と各テーブルの配列形状のみを保証する。
+export const backupBodySchema = z.object({
+  meta: z.object({
+    version: z.number(),
+    novelId: z.string(),
+    novelTitle: z.string().optional(),
+    exportedAt: z.string().optional(),
+  }),
+  rdb: z.object({
+    novel: z.record(z.string(), z.unknown()),
+    chapters: z.array(z.record(z.string(), z.unknown())).optional(),
+    sections: z.array(z.record(z.string(), z.unknown())).optional(),
+    contents: z.array(z.record(z.string(), z.unknown())).optional(),
+    characters: z.array(z.record(z.string(), z.unknown())).optional(),
+    settings: z.array(z.record(z.string(), z.unknown())).optional(),
+    timelines: z.array(z.record(z.string(), z.unknown())).optional(),
+    llmInstructions: z.array(z.record(z.string(), z.unknown())).optional(),
+    chatSessions: z.array(z.record(z.string(), z.unknown())).optional(),
+    chatMessages: z.array(z.record(z.string(), z.unknown())).optional(),
+  }),
 });
 
 // ---- LLM 編集 ----

@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toErrorMessage } from '@/lib/errors.js';
+import { novelKeys } from '@/lib/queryKeys.js';
 import {
   createSetting,
   deleteSetting,
@@ -62,30 +63,31 @@ export function useSettings(novelId: string): UseSettingsReturn {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['novels', novelId, 'settings'],
+    queryKey: novelKeys.settings(novelId),
     queryFn: () => fetchSettings(novelId),
+    enabled: !!novelId,
   });
 
   const createMutation = useMutation({
     mutationFn: (input: CreateSettingInput) => createSetting(novelId, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateSettingInput }) =>
       updateSetting(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteSetting(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
   });
 
   const llmEditMutation = useMutation({
     mutationFn: ({ id, instruction }: { id: string; instruction: string }) =>
       editSetting(id, { instruction }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
   });
 
   const draftMutation = useMutation({
@@ -100,7 +102,7 @@ export function useSettings(novelId: string): UseSettingsReturn {
 
   const saveMarkdownMutation = useMutation({
     mutationFn: (markdown: string) => saveSettingsMarkdown(novelId, markdown),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'settings'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
   });
 
   const editSectionMutation = useMutation({
@@ -126,7 +128,9 @@ export function useSettings(novelId: string): UseSettingsReturn {
     settings,
     loading,
     error: error ? toErrorMessage(error) : null,
-    refetch: refetch as unknown as () => Promise<void>,
+    refetch: async () => {
+      await refetch();
+    },
     createSetting: createMutation.mutateAsync,
     updateSetting: (id, input) => updateMutation.mutateAsync({ id, input }),
     deleteSetting: (id: string) => deleteMutation.mutateAsync(id),

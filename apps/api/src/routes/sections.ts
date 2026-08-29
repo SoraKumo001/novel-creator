@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { AppContext } from '../context.js';
 import { getServices } from '../core/services.js';
 import { idParamSchema, updateContentSchema, updateSectionSchema } from '../schemas/index.js';
+import { sseStream } from '../sse.js';
 
 const sectionsRouter = new Hono<AppContext>()
   // GET /api/sections/:id - 節個別取得（本文含む）
@@ -61,29 +62,7 @@ const sectionsRouter = new Hono<AppContext>()
   // POST /api/sections/:id/generate/content - 本文ストリーミング生成
   .post('/:id/generate/content', zValidator('param', idParamSchema), async (c) => {
     const { id } = c.req.valid('param');
-    const stream = getServices(c).generate.generateSectionContent(id);
-    const encoder = new TextEncoder();
-    const readable = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const chunk of stream) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
-          }
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true })}\n\n`));
-          controller.close();
-        } catch (err) {
-          controller.error(err);
-        }
-      },
-    });
-
-    return new Response(readable, {
-      headers: {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-        Connection: 'keep-alive',
-      },
-    });
+    return sseStream(c, getServices(c).generate.generateSectionContent(id));
   })
   // POST /api/sections/:id/generate/extract - 本文から設定・時系列を抽出
   .post('/:id/generate/extract', zValidator('param', idParamSchema), async (c) => {

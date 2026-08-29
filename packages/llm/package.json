@@ -23,5 +23,8 @@
   },
   "peerDependencies": {
     "@novel-creator/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.3.0"
   }
 }

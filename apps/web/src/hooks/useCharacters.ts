@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toErrorMessage } from '@/lib/errors.js';
+import { novelKeys } from '@/lib/queryKeys.js';
 import {
   createCharacter,
   deleteCharacter,
@@ -57,36 +58,36 @@ export function useCharacters(novelId: string): UseCharactersReturn {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['novels', novelId, 'characters'],
+    queryKey: novelKeys.characters(novelId),
     queryFn: () => fetchCharacters(novelId),
     enabled: !!novelId,
   });
 
   const createMutation = useMutation({
     mutationFn: (input: CreateCharacterInput) => createCharacter(novelId, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'characters'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.characters(novelId) }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateCharacterInput }) =>
       updateCharacter(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'characters'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.characters(novelId) }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteCharacter(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'characters'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.characters(novelId) }),
   });
 
   const llmEditMutation = useMutation({
     mutationFn: ({ id, instruction }: { id: string; instruction: string }) =>
       editCharacter(id, { instruction }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'characters'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.characters(novelId) }),
   });
 
   const saveMarkdownMutation = useMutation({
     mutationFn: (markdown: string) => saveCharactersMarkdown(novelId, markdown),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'characters'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.characters(novelId) }),
   });
 
   const editSectionMutation = useMutation({

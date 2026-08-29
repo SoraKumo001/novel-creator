@@ -1,12 +1,5 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createChatSession,
   deleteChatSession,
@@ -14,6 +7,7 @@ import {
   fetchChatSessions,
   updateChatSession,
 } from '@/lib/services/index.js';
+import { chatKeys } from '@/lib/queryKeys.js';
 import { streamChat } from '@/lib/chatApi.js';
 import type { ChatSession } from '@/lib/types.js';
 
@@ -105,10 +99,17 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [selectedNovelId, setSelectedNovelIdState] = useState<string | null>(null);
 
   // セッション状態
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const queryClient = useQueryClient();
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-  const [loadingSessions, setLoadingSessions] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
+
+  // セッション一覧の取得（小説ID変更時はクエリキー変更により自動再取得される）
+  const sessionsQuery = useQuery({
+    queryKey: chatKeys.sessions(selectedNovelId ?? undefined),
+    queryFn: () => fetchChatSessions(selectedNovelId ?? undefined),
+  });
+  const sessions = sessionsQuery.data ?? [];
+  const loadingSessions = sessionsQuery.isLoading;
 
   // メッセージ・対話状態
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -122,21 +123,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const currentSessionIdRef = useRef<string | null>(currentSessionId);
   currentSessionIdRef.current = currentSessionId;
 
-  // セッション一覧の取得
-  const fetchSessions = useCallback(async (novelId: string | null) => {
-    setLoadingSessions(true);
-    try {
-      const data = await fetchChatSessions(novelId || undefined);
-      const list = Array.isArray(data) ? data : [];
-      setSessions(list);
-      return list;
-    } catch {
-      setSessions([]);
-      return [];
-    } finally {
-      setLoadingSessions(false);
-    }
-  }, []);
+  // セッション一覧のリフレッシュ
+  const refreshSessions = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: chatKeys.all });
+  }, [queryClient]);
 
   // 特定セッションのメッセージ読み込み
   const loadSessionMessages = useCallback(async (sessionId: string) => {
@@ -184,13 +174,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
           novelId: targetNovelId || undefined,
           title: initialTitle || '新しい相談',
         });
-        setSessions((prev) => [
-          created,
-          ...(Array.isArray(prev) ? prev.filter((s) => s.id !== created.id) : []),
-        ]);
         setCurrentSessionId(created.id);
         setMessages([]);
         setError(null);
+        // セッション一覧を再取得して新規セッションを反映する
+        await queryClient.invalidateQueries({ queryKey: chatKeys.all });
         return created;
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'セッションの作成に失敗しました';
@@ -198,7 +186,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    [],
+    [queryClient],
   );
 
   // セッション切り替え
@@ -220,56 +208,47 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   );
 
   // セッション削除
-  const deleteSession = useCallback(async (sessionId: string) => {
-    try {
-      await deleteChatSession(sessionId);
-      setSessions((prev) => (Array.isArray(prev) ? prev.filter((s) => s.id !== sessionId) : []));
-      if (currentSessionIdRef.current === sessionId) {
-        setCurrentSessionId(null);
-        setMessages([]);
+  const deleteSession = useCallback(
+    async (sessionId: string) => {
+      try {
+        await deleteChatSession(sessionId);
+        await queryClient.invalidateQueries({ queryKey: chatKeys.all });
+        if (currentSessionIdRef.current === sessionId) {
+          setCurrentSessionId(null);
+          setMessages([]);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'セッションの削除に失敗しました';
+        setError(msg);
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'セッションの削除に失敗しました';
-      setError(msg);
-    }
-  }, []);
-
-  // セッションタイトル更新
-  const updateSessionTitle = useCallback(async (sessionId: string, newTitle: string) => {
-    const trimmed = newTitle.trim();
-    if (!trimmed) return;
-    try {
-      const updated = await updateChatSession(sessionId, { title: trimmed });
-      setSessions((prev) =>
-        Array.isArray(prev) ? prev.map((s) => (s.id === sessionId ? updated : s)) : [],
-      );
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'タイトルの更新に失敗しました';
-      setError(msg);
-    }
-  }, []);
-
-  // セッション一覧のリフレッシュ
-  const refreshSessions = useCallback(async () => {
-    await fetchSessions(selectedNovelIdRef.current);
-  }, [fetchSessions]);
-
-  // 小説変更ハンドラ
-  const setSelectedNovelId = useCallback(
-    (id: string | null) => {
-      setSelectedNovelIdState(id);
-      setCurrentSessionId(null);
-      setMessages([]);
-      setError(null);
-      void fetchSessions(id);
     },
-    [fetchSessions],
+    [queryClient],
   );
 
-  // 初回ロードまたは小説ID変更時にセッション一覧を取得
-  useEffect(() => {
-    void fetchSessions(selectedNovelId);
-  }, [selectedNovelId, fetchSessions]);
+  // セッションタイトル更新
+  const updateSessionTitle = useCallback(
+    async (sessionId: string, newTitle: string) => {
+      const trimmed = newTitle.trim();
+      if (!trimmed) return;
+      try {
+        await updateChatSession(sessionId, { title: trimmed });
+        await queryClient.invalidateQueries({ queryKey: chatKeys.all });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'タイトルの更新に失敗しました';
+        setError(msg);
+      }
+    },
+    [queryClient],
+  );
+
+  // 小説変更ハンドラ
+  // クエリキーに小説IDを含めているため、ID変更時は useQuery が自動で再取得する
+  const setSelectedNovelId = useCallback((id: string | null) => {
+    setSelectedNovelIdState(id);
+    setCurrentSessionId(null);
+    setMessages([]);
+    setError(null);
+  }, []);
 
   const openChat = useCallback(
     (targetNovelId?: string | null) => {

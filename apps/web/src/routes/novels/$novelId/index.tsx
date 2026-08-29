@@ -7,6 +7,7 @@ import { Loading } from '@/components/Loading.js';
 import { useChat } from '@/hooks/useChat.js';
 import { useNovel } from '@/hooks/useNovel.js';
 import { useToast } from '@/hooks/useToast.js';
+import { toErrorMessage } from '@/lib/errors.js';
 import { fetchNovelExportData } from '@/lib/services/index.js';
 import { CharactersTab } from '../_components/-CharactersTab.js';
 import { EditorTab } from '../_components/-EditorTab.js';
@@ -65,7 +66,7 @@ function NovelDetailPage() {
       setExportData(data);
       setExportOpen(true);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'エクスポートデータの取得に失敗しました');
+      toast.error(toErrorMessage(e));
     } finally {
       setExportLoading(false);
     }

@@ -3,8 +3,10 @@ import { Button } from '@/components/Button.js';
 import { MarkdownText } from '@/components/MarkdownText.js';
 import { QUICK_PROMPTS, useChat, type QuickPrompt } from '@/hooks/useChat.js';
 import { useNovels } from '@/hooks/useNovels.js';
+import { usePinnedSessions } from '@/hooks/usePinnedSessions.js';
 import { useToast } from '@/hooks/useToast.js';
 import { ChatInsertEntityModal } from './ChatInsertEntityModal.js';
+import { ChatSessionList } from './ChatSessionList.js';
 
 type DrawerWidth = 'normal' | 'wide' | 'full';
 
@@ -36,22 +38,11 @@ export function ChatDrawer() {
   const [drawerWidth, setDrawerWidth] = useState<DrawerWidth>(() => {
     return (localStorage.getItem('novel-creator:chat-width') as DrawerWidth) || 'normal';
   });
-  const [pinnedSessionIds, setPinnedSessionIds] = useState<Set<string>>(() => {
-    try {
-      const saved = localStorage.getItem('novel-creator:pinned-sessions');
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch {
-      return new Set();
-    }
-  });
-  const [searchQuery, setSearchQuery] = useState('');
+  const { pinnedIds, togglePin } = usePinnedSessions();
 
   const [input, setInput] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showHistoryView, setShowHistoryView] = useState(false);
-  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
-  const [editTitleInput, setEditTitleInput] = useState('');
-  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [insertModalSource, setInsertModalSource] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -60,20 +51,6 @@ export function ChatDrawer() {
   const handleWidthChange = (width: DrawerWidth) => {
     setDrawerWidth(width);
     localStorage.setItem('novel-creator:chat-width', width);
-  };
-
-  const togglePinSession = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setPinnedSessionIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      localStorage.setItem('novel-creator:pinned-sessions', JSON.stringify(Array.from(next)));
-      return next;
-    });
   };
 
   // メッセージやストリーミング更新時に最下部にスクロール
@@ -142,11 +119,9 @@ export function ChatDrawer() {
     setShowHistoryView(false);
   };
 
-  const handleSaveTitle = async (id: string) => {
-    if (!editTitleInput.trim()) return;
+  const handleSaveTitle = async (id: string, newTitle: string) => {
     try {
-      await updateSessionTitle(id, editTitleInput.trim());
-      setEditingSessionId(null);
+      await updateSessionTitle(id, newTitle);
       toast.success('タイトルを変更しました');
     } catch {
       toast.error('タイトルの変更に失敗しました');
@@ -156,7 +131,6 @@ export function ChatDrawer() {
   const handleDeleteSession = async (id: string) => {
     try {
       await deleteSession(id);
-      setDeletingSessionId(null);
       toast.success('相談履歴を削除しました');
     } catch {
       toast.error('削除に失敗しました');
@@ -173,19 +147,6 @@ export function ChatDrawer() {
     wide: 'sm:w-[680px] md:w-[760px]',
     full: 'w-full',
   }[drawerWidth];
-
-  // 検索・ピン留めソート済みセッション
-  const filteredSessions = sessions
-    .filter((s) => {
-      if (!searchQuery.trim()) return true;
-      return s.title.toLowerCase().includes(searchQuery.toLowerCase());
-    })
-    .sort((a, b) => {
-      const aPinned = pinnedSessionIds.has(a.id) ? 1 : 0;
-      const bPinned = pinnedSessionIds.has(b.id) ? 1 : 0;
-      if (aPinned !== bPinned) return bPinned - aPinned;
-      return 0;
-    });
 
   return (
     <aside
@@ -336,198 +297,17 @@ export function ChatDrawer() {
 
       {/* 履歴一覧ビュー */}
       {showHistoryView ? (
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          <div className="flex items-center justify-between pb-2 border-b border-border">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              {currentNovel ? `「${currentNovel.title}」の相談履歴` : '全般の相談履歴'}
-            </h3>
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={handleStartNewChat}
-              className="!py-1 !text-xs"
-            >
-              ＋ 新規相談
-            </Button>
-          </div>
-
-          {/* 検索入力 */}
-          {sessions.length > 0 && (
-            <div className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="履歴を検索..."
-                className="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-1.5 text-muted-foreground hover:text-foreground text-xs"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-          )}
-
-          {filteredSessions.length === 0 ? (
-            <div className="py-12 text-center text-xs text-muted-foreground">
-              {searchQuery
-                ? '検索条件に一致する相談履歴はありません。'
-                : 'まだ相談履歴はありません。'}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {filteredSessions.map((sess) => {
-                const isSelected = sess.id === currentSessionId;
-                const isEditing = sess.id === editingSessionId;
-                const isDeleting = sess.id === deletingSessionId;
-                const isPinned = pinnedSessionIds.has(sess.id);
-                const dateStr = sess.updatedAt
-                  ? new Date(sess.updatedAt).toLocaleString('ja-JP', {
-                      month: 'numeric',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                  : '';
-
-                return (
-                  <div
-                    key={sess.id}
-                    className={`group relative rounded-xl border p-3 transition ${
-                      isSelected
-                        ? 'border-primary bg-primary/10'
-                        : 'border-border bg-surface hover:border-primary/50 hover:bg-surface-hover'
-                    }`}
-                  >
-                    {isEditing ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={editTitleInput}
-                          onChange={(e) => setEditTitleInput(e.target.value)}
-                          className="flex-1 rounded border border-primary px-2 py-1 text-xs text-foreground bg-surface focus:outline-none"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') void handleSaveTitle(sess.id);
-                            if (e.key === 'Escape') setEditingSessionId(null);
-                          }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleSaveTitle(sess.id)}
-                          className="rounded bg-primary px-2 py-1 text-[11px] text-primary-foreground hover:bg-primary-hover"
-                        >
-                          保存
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setEditingSessionId(null)}
-                          className="rounded bg-surface-raised px-2 py-1 text-[11px] text-foreground hover:bg-surface-hover"
-                        >
-                          取消
-                        </button>
-                      </div>
-                    ) : (
-                      <div>
-                        <div
-                          className="cursor-pointer"
-                          onClick={() => handleSelectSession(sess.id)}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <h4
-                              className={`text-sm font-medium leading-snug line-clamp-2 ${
-                                isSelected ? 'text-primary font-bold' : 'text-foreground'
-                              }`}
-                            >
-                              {isPinned && <span className="text-amber-500 mr-1">★</span>}
-                              {sess.title}
-                            </h4>
-                          </div>
-                          <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                            <span>{dateStr}</span>
-                            {isSelected && (
-                              <span className="text-primary font-medium">開いています</span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* アクションボタン */}
-                        <div className="mt-2 flex items-center justify-end gap-1 border-t border-border/50 pt-2 opacity-80 group-hover:opacity-100 transition">
-                          <button
-                            type="button"
-                            onClick={(e) => togglePinSession(e, sess.id)}
-                            className={`rounded p-1 text-xs transition ${
-                              isPinned
-                                ? 'text-amber-500 hover:text-amber-600'
-                                : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                            title={isPinned ? 'ピン留め解除' : '上部にピン留め'}
-                          >
-                            {isPinned ? '★ 固定中' : '☆ ピン留め'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditingSessionId(sess.id);
-                              setEditTitleInput(sess.title);
-                            }}
-                            className="rounded p-1 text-xs text-muted-foreground hover:text-foreground"
-                            title="タイトル変更"
-                          >
-                            ✏️ 編集
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDeletingSessionId(sess.id);
-                            }}
-                            className="rounded p-1 text-xs text-destructive hover:bg-destructive/10"
-                            title="削除"
-                          >
-                            🗑️ 削除
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 削除確認モーダル風インライン表示 */}
-                    {isDeleting && (
-                      <div className="mt-2 rounded-lg bg-destructive/10 p-2 text-xs border border-destructive/20">
-                        <p className="font-semibold text-destructive mb-1">
-                          この相談履歴を削除しますか？
-                        </p>
-                        <div className="flex gap-2 justify-end">
-                          <button
-                            type="button"
-                            onClick={() => setDeletingSessionId(null)}
-                            className="rounded px-2 py-1 bg-surface text-foreground"
-                          >
-                            キャンセル
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteSession(sess.id)}
-                            className="rounded px-2 py-1 bg-destructive text-white"
-                          >
-                            削除する
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        <ChatSessionList
+          sessions={sessions}
+          currentSessionId={currentSessionId}
+          currentNovelTitle={currentNovel ? currentNovel.title : null}
+          pinnedIds={pinnedIds}
+          onTogglePin={togglePin}
+          onSelectSession={handleSelectSession}
+          onSaveTitle={handleSaveTitle}
+          onDeleteSession={handleDeleteSession}
+          onStartNewChat={handleStartNewChat}
+        />
       ) : (
         /* メッセージチャットビュー */
         <>

@@ -5,11 +5,12 @@ import {
   editHistories,
   sections,
   settings,
+  type Database,
   type NewEditHistory,
 } from '@novel-creator/db';
 import { parseCharactersMarkdown, parseSettingsMarkdown } from '@novel-creator/shared';
 import { upsertEntityEmbedding } from '../rag.js';
-import { NotFoundError, type ServiceContext } from './types.js';
+import { assertFound, type ServiceContext } from './types.js';
 
 export interface RecordHistoryInput {
   novelId: string;
@@ -21,23 +22,28 @@ export interface RecordHistoryInput {
   wordCount?: number;
 }
 
+/** insert に必要な最小限の構造を持つ db またはトランザクション */
+type EditHistoryDb = Pick<Database, 'insert'>;
+
+export async function insertEditHistory(db: EditHistoryDb, input: RecordHistoryInput) {
+  const newEntry: NewEditHistory = {
+    novelId: input.novelId,
+    entityType: input.entityType,
+    entityId: input.entityId,
+    title: input.title,
+    content: input.content,
+    description: input.description,
+    wordCount: input.wordCount,
+  };
+  const [created] = await db.insert(editHistories).values(newEntry).returning();
+  return created;
+}
+
 export class HistoryDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
   async recordHistory(input: RecordHistoryInput) {
-    const newEntry: NewEditHistory = {
-      novelId: input.novelId,
-      entityType: input.entityType,
-      entityId: input.entityId,
-      title: input.title,
-      content: input.content,
-      description: input.description,
-      wordCount: input.wordCount,
-    };
-
-    const [created] = await this.ctx.db.insert(editHistories).values(newEntry).returning();
-
-    return created;
+    return insertEditHistory(this.ctx.db, input);
   }
 
   async listHistories(
@@ -73,9 +79,7 @@ export class HistoryDomainService {
       .from(editHistories)
       .where(eq(editHistories.id, id));
 
-    if (!history) {
-      throw new NotFoundError('History', id);
-    }
+    assertFound(history, 'History', id);
 
     return history;
   }
@@ -86,9 +90,7 @@ export class HistoryDomainService {
     if (history.entityType === 'content') {
       const sectionId = history.entityId;
       const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
-      if (!section) {
-        throw new NotFoundError('Section', sectionId);
-      }
+      assertFound(section, 'Section', sectionId);
 
       const wordCount = history.wordCount ?? history.content.length;
       await this.ctx.db

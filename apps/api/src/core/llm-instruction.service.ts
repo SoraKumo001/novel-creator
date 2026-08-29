@@ -1,6 +1,6 @@
 import { and, desc, eq } from 'drizzle-orm';
 import { llmInstructions } from '@novel-creator/db';
-import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
+import { assertFound, ValidationError, type ServiceContext } from './types.js';
 
 export class LlmInstructionDomainService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -52,9 +52,7 @@ export class LlmInstructionDomainService {
       .delete(llmInstructions)
       .where(eq(llmInstructions.id, id))
       .returning();
-    if (!row) {
-      throw new NotFoundError('Instruction not found');
-    }
+    assertFound(row, 'Instruction not found');
     return row;
   }
 }

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import type { AppContext } from '../context.js';
 import { getServices } from '../core/services.js';
 import type { BackupBody } from '../core/index.js';
+import { backupBodySchema } from '../schemas/index.js';
 
 const backupRouter = new Hono<AppContext>()
   // POST /api/backup/export?novelId=... - 小説データの JSON エクスポート
@@ -14,8 +15,10 @@ const backupRouter = new Hono<AppContext>()
     return c.json(exportData);
   })
   // POST /api/backup/import - JSON バックアップからのインポート・復元
-  .post('/import', zValidator('json', z.custom<BackupBody>()), async (c) => {
-    const body = c.req.valid('json');
+  .post('/import', zValidator('json', backupBodySchema), async (c) => {
+    // backupBodySchema は構造のみを検証するため、行レベルの厳密な検証は importNovel が行う。
+    // 型は緩い record 形状のため、境界で BackupBody へキャストする。
+    const body = c.req.valid('json') as unknown as BackupBody;
     const result = await getServices(c).backup.importNovel(body);
     return c.json({
       success: true,

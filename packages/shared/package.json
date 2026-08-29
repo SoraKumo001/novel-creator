@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./schemas": {
+      "types": "./dist/schemas/entities.d.ts",
+      "import": "./dist/schemas/entities.js"
     }
   },
   "scripts": {

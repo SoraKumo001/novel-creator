@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { novelKeys } from '@/lib/queryKeys.js';
 import { Button } from '@/components/Button.js';
 import { Modal } from '@/components/Modal.js';
 import {
@@ -12,6 +13,7 @@ import {
   updateSetting,
 } from '@/lib/services/index.js';
 import { useToast } from '@/hooks/useToast.js';
+import { useEditableEntities } from '@/hooks/useEditableEntities.js';
 import type {
   Character,
   ExtractedCharacterItem,
@@ -65,8 +67,23 @@ export function ChatInsertEntityModal({
   const [existingSettings, setExistingSettings] = useState<Setting[]>([]);
   const [loadingExisting, setLoadingExisting] = useState(false);
 
-  const [extractedCharacters, setExtractedCharacters] = useState<EditableCharacter[]>([]);
-  const [extractedSettings, setExtractedSettings] = useState<EditableSetting[]>([]);
+  const {
+    items: extractedCharacters,
+    setItems: setExtractedCharacters,
+    toggleItem: toggleCharacter,
+    updateItem: updateCharacterItem,
+    removeItem: removeCharacter,
+    addEmptyItem: addEmptyCharacter,
+  } = useEditableEntities<EditableCharacter>([]);
+
+  const {
+    items: extractedSettings,
+    setItems: setExtractedSettings,
+    toggleItem: toggleSetting,
+    updateItem: updateSettingItem,
+    removeItem: removeSetting,
+    addEmptyItem: addEmptySetting,
+  } = useEditableEntities<EditableSetting>([]);
 
   // 初期化・小説選択
   useEffect(() => {
@@ -81,7 +98,20 @@ export function ChatInsertEntityModal({
     }
   }, [isOpen, defaultNovelId, novels]);
 
-  // 選択中小説の既存データを取得
+  // 選択中小説の既存データを取得（共有キャッシュ経由）
+  const charactersQuery = useQuery({
+    queryKey: novelKeys.characters(targetNovelId),
+    queryFn: () => fetchCharacters(targetNovelId),
+    enabled: !!isOpen && !!targetNovelId,
+  });
+
+  const settingsQuery = useQuery({
+    queryKey: novelKeys.settings(targetNovelId),
+    queryFn: () => fetchSettings(targetNovelId),
+    enabled: !!isOpen && !!targetNovelId,
+  });
+
+  // 取得データをローカル状態へ反映
   useEffect(() => {
     if (!isOpen || !targetNovelId) {
       setExistingCharacters([]);
@@ -89,55 +119,51 @@ export function ChatInsertEntityModal({
       return;
     }
 
-    let active = true;
-    setLoadingExisting(true);
-    Promise.all([fetchCharacters(targetNovelId), fetchSettings(targetNovelId)])
-      .then(([chars, sets]) => {
-        if (!active) return;
-        setExistingCharacters(chars);
-        setExistingSettings(sets);
+    if (charactersQuery.isLoading || settingsQuery.isLoading) {
+      setLoadingExisting(true);
+      return;
+    }
 
-        // 既存データに基づいてマッチングを更新
-        setExtractedCharacters((prev) =>
-          prev.map((c) => {
-            const matched = chars.find(
-              (ex) => ex.name.trim().toLowerCase() === c.name.trim().toLowerCase(),
-            );
-            return {
-              ...c,
-              matchedExisting: matched,
-              action: matched ? c.action || 'overwrite' : 'create',
-            };
-          }),
+    const chars = charactersQuery.data ?? [];
+    const sets = settingsQuery.data ?? [];
+    setExistingCharacters(chars);
+    setExistingSettings(sets);
+    setLoadingExisting(false);
+
+    // 既存データに基づいてマッチングを更新
+    setExtractedCharacters((prev) =>
+      prev.map((c) => {
+        const matched = chars.find(
+          (ex) => ex.name.trim().toLowerCase() === c.name.trim().toLowerCase(),
         );
+        return {
+          ...c,
+          matchedExisting: matched,
+          action: matched ? c.action || 'overwrite' : 'create',
+        };
+      }),
+    );
 
-        setExtractedSettings((prev) =>
-          prev.map((s) => {
-            const matched = sets.find(
-              (ex) => ex.name.trim().toLowerCase() === s.name.trim().toLowerCase(),
-            );
-            return {
-              ...s,
-              matchedExisting: matched,
-              action: matched ? s.action || 'overwrite' : 'create',
-            };
-          }),
+    setExtractedSettings((prev) =>
+      prev.map((s) => {
+        const matched = sets.find(
+          (ex) => ex.name.trim().toLowerCase() === s.name.trim().toLowerCase(),
         );
-      })
-      .catch(() => {
-        if (active) {
-          setExistingCharacters([]);
-          setExistingSettings([]);
-        }
-      })
-      .finally(() => {
-        if (active) setLoadingExisting(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [isOpen, targetNovelId]);
+        return {
+          ...s,
+          matchedExisting: matched,
+          action: matched ? s.action || 'overwrite' : 'create',
+        };
+      }),
+    );
+  }, [
+    isOpen,
+    targetNovelId,
+    charactersQuery.data,
+    settingsQuery.data,
+    charactersQuery.isLoading,
+    settingsQuery.isLoading,
+  ]);
 
   // LLM抽出処理
   useEffect(() => {
@@ -195,102 +221,82 @@ export function ChatInsertEntityModal({
     void runExtract();
   }, [isOpen, sourceText]);
 
-  // 人物の操作ハンドラ
-  const handleToggleCharacter = (id: string) => {
-    setExtractedCharacters((prev) =>
-      prev.map((c) => (c._id === id ? { ...c, _selected: !c._selected } : c)),
-    );
-  };
-
-  const handleUpdateCharacter = (id: string, field: keyof EditableCharacter, value: unknown) => {
-    setExtractedCharacters((prev) =>
-      prev.map((c) => {
-        if (c._id !== id) return c;
-        if (field === 'name') {
-          const newName = String(value);
-          const matched = existingCharacters.find(
-            (ex) => ex.name.trim().toLowerCase() === newName.trim().toLowerCase(),
-          );
-          return {
-            ...c,
-            name: newName,
-            matchedExisting: matched,
-            action: matched ? c.action : 'create',
-          };
-        }
-        if (field === 'traitsString') {
-          const str = String(value);
-          const traits = str
-            .split(/[,、]/)
-            .map((t) => t.trim())
-            .filter(Boolean);
-          return { ...c, traitsString: str, traits };
-        }
-        return { ...c, [field]: value };
-      }),
-    );
-  };
-
-  const handleRemoveCharacter = (id: string) => {
-    setExtractedCharacters((prev) => prev.filter((c) => c._id !== id));
-  };
-
+  // 人物の操作ハンドラ（トグル・削除・追加は汎用フックをそのまま利用）
+  const handleToggleCharacter = toggleCharacter;
+  const handleRemoveCharacter = removeCharacter;
   const handleAddEmptyCharacter = () => {
-    const newChar: EditableCharacter = {
-      _id: `char-${Date.now()}`,
-      _selected: true,
-      name: '新しい登場人物',
-      category: '未分類',
-      description: '',
-      traits: [],
-      traitsString: '',
-      action: 'create',
-    };
-    setExtractedCharacters((prev) => [...prev, newChar]);
-  };
-
-  // 設定の操作ハンドラ
-  const handleToggleSetting = (id: string) => {
-    setExtractedSettings((prev) =>
-      prev.map((s) => (s._id === id ? { ...s, _selected: !s._selected } : s)),
+    addEmptyCharacter(
+      {
+        name: '新しい登場人物',
+        category: '未分類',
+        description: '',
+        traits: [],
+        traitsString: '',
+        action: 'create',
+      },
+      'char-',
     );
   };
 
-  const handleUpdateSetting = (id: string, field: keyof EditableSetting, value: unknown) => {
-    setExtractedSettings((prev) =>
-      prev.map((s) => {
-        if (s._id !== id) return s;
-        if (field === 'name') {
-          const newName = String(value);
-          const matched = existingSettings.find(
-            (ex) => ex.name.trim().toLowerCase() === newName.trim().toLowerCase(),
-          );
-          return {
-            ...s,
-            name: newName,
-            matchedExisting: matched,
-            action: matched ? s.action : 'create',
-          };
-        }
-        return { ...s, [field]: value };
-      }),
-    );
+  // 人物の更新（名前マッチング・traits 分割はエンティティ固有ロジック）
+  const handleUpdateCharacter = (id: string, field: keyof EditableCharacter, value: unknown) => {
+    updateCharacterItem(id, (c) => {
+      if (field === 'name') {
+        const newName = String(value);
+        const matched = existingCharacters.find(
+          (ex) => ex.name.trim().toLowerCase() === newName.trim().toLowerCase(),
+        );
+        return {
+          ...c,
+          name: newName,
+          matchedExisting: matched,
+          action: matched ? c.action : 'create',
+        };
+      }
+      if (field === 'traitsString') {
+        const str = String(value);
+        const traits = str
+          .split(/[,、]/)
+          .map((t) => t.trim())
+          .filter(Boolean);
+        return { ...c, traitsString: str, traits };
+      }
+      return { ...c, [field]: value };
+    });
   };
 
-  const handleRemoveSetting = (id: string) => {
-    setExtractedSettings((prev) => prev.filter((s) => s._id !== id));
-  };
-
+  // 設定の操作ハンドラ（トグル・削除・追加は汎用フックをそのまま利用）
+  const handleToggleSetting = toggleSetting;
+  const handleRemoveSetting = removeSetting;
   const handleAddEmptySetting = () => {
-    const newSetting: EditableSetting = {
-      _id: `set-${Date.now()}`,
-      _selected: true,
-      name: '新しい設定',
-      category: '世界観',
-      description: '',
-      action: 'create',
-    };
-    setExtractedSettings((prev) => [...prev, newSetting]);
+    addEmptySetting(
+      {
+        name: '新しい設定',
+        category: '世界観',
+        description: '',
+        action: 'create',
+      },
+      'set-',
+    );
+  };
+
+  // 設定の更新（名前マッチングはエンティティ固有ロジック）
+  const handleUpdateSetting = (id: string, field: keyof EditableSetting, value: unknown) => {
+    updateSettingItem(id, (s) => {
+      if (field === 'name') {
+        const newName = String(value);
+        const matched = existingSettings.find(
+          (ex) => ex.name.trim().toLowerCase() === newName.trim().toLowerCase(),
+        );
+        return {
+          ...s,
+          name: newName,
+          matchedExisting: matched,
+          action: matched ? s.action : 'create',
+        };
+      }
+      return { ...s, [field]: value };
+    });
   };
 
   // 選択件数の集計
@@ -402,15 +408,10 @@ export function ChatInsertEntityModal({
         }
       }
 
-      // キャッシュの完全無効化
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['novels'] }),
-        queryClient.invalidateQueries({ queryKey: ['novels', targetNovelId] }),
-        queryClient.invalidateQueries({ queryKey: ['novels', targetNovelId, 'characters'] }),
-        queryClient.invalidateQueries({ queryKey: ['novels', targetNovelId, 'settings'] }),
-        queryClient.invalidateQueries({ queryKey: ['characters'] }),
-        queryClient.invalidateQueries({ queryKey: ['settings'] }),
-      ]);
+      // キャッシュの無効化（小説配下の全データを一括無効化）
+      await queryClient.invalidateQueries({
+        queryKey: novelKeys.detail(targetNovelId),
+      });
 
       const parts: string[] = [];
       if (createdCount > 0) parts.push(`新規追加: ${createdCount}件`);

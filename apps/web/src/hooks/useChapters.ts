@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toErrorMessage } from '@/lib/errors.js';
+import { novelKeys } from '@/lib/queryKeys.js';
 import {
   createChapter,
   createSection,
@@ -44,42 +45,42 @@ export function useChapters(novelId: string): UseChaptersReturn {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['novels', novelId, 'chapters'],
+    queryKey: novelKeys.chapters(novelId),
     queryFn: () => fetchChapters(novelId),
     enabled: !!novelId,
   });
 
   const createMutation = useMutation({
     mutationFn: (input: CreateChapterInput) => createChapter(novelId, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.chapters(novelId) }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateChapterInput }) =>
       updateChapter(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.chapters(novelId) }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteChapter(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.chapters(novelId) }),
   });
 
   const createSectionMutation = useMutation({
     mutationFn: ({ chapterId, input }: { chapterId: string; input: CreateSectionInput }) =>
       createSection(chapterId, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.chapters(novelId) }),
   });
 
   const updateSectionMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateSectionInput }) =>
       updateSection(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.chapters(novelId) }),
   });
 
   const deleteSectionMutation = useMutation({
     mutationFn: (id: string) => deleteSection(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'chapters'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.chapters(novelId) }),
   });
 
   return {

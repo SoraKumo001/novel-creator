@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { characters, editHistories } from '@novel-creator/db';
+import { characters } from '@novel-creator/db';
 import {
   editCharacter,
   editCharacterDocument,
@@ -13,7 +13,8 @@ import {
   serializeCharactersToMarkdown,
 } from '@novel-creator/shared';
 import { searchContext, upsertEntityEmbedding } from '../rag.js';
-import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
+import { insertEditHistory } from './history.service.js';
+import { assertFound, ValidationError, type ServiceContext } from './types.js';
 
 export function characterToText(ch: {
   category?: string;
@@ -33,9 +34,7 @@ export class CharacterDomainService {
 
   async getCharacter(id: string) {
     const [character] = await this.ctx.db.select().from(characters).where(eq(characters.id, id));
-    if (!character) {
-      throw new NotFoundError('Character not found');
-    }
+    assertFound(character, 'Character not found');
     return character;
   }
 
@@ -98,12 +97,10 @@ export class CharacterDomainService {
       })
       .where(eq(characters.id, id))
       .returning();
-    if (!row) {
-      throw new NotFoundError('Character not found');
-    }
+    assertFound(row, 'Character not found');
 
     try {
-      await this.ctx.db.insert(editHistories).values({
+      await insertEditHistory(this.ctx.db, {
         novelId: row.novelId,
         entityType: 'character',
         entityId: row.id,
@@ -136,9 +133,7 @@ export class CharacterDomainService {
 
   async deleteCharacter(id: string) {
     const [row] = await this.ctx.db.delete(characters).where(eq(characters.id, id)).returning();
-    if (!row) {
-      throw new NotFoundError('Character not found');
-    }
+    assertFound(row, 'Character not found');
     try {
       await this.ctx.vectorStore.deleteByEntity('character', id);
     } catch (err) {
@@ -273,7 +268,7 @@ export class CharacterDomainService {
       .where(eq(characters.novelId, novelId));
 
     try {
-      await this.ctx.db.insert(editHistories).values({
+      await insertEditHistory(this.ctx.db, {
         novelId,
         entityType: 'characters_markdown',
         entityId: novelId,

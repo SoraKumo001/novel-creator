@@ -7,6 +7,7 @@ import { useContent } from '@/hooks/useContent.js';
 import { useGenerate } from '@/hooks/useGenerate.js';
 import { useNovel } from '@/hooks/useNovel.js';
 import { useToast } from '@/hooks/useToast.js';
+import { toErrorMessage } from '@/lib/errors.js';
 import { countWords } from '@/lib/sse.js';
 import type { ExtractResult, Section } from '@/lib/types.js';
 
@@ -405,7 +406,7 @@ function SectionEditor({
       await onRefresh();
       toast.success('本文を保存しました');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '本文の保存に失敗しました');
+      toast.error(toErrorMessage(e));
     }
   }, [isDirty, localBody, onRefresh, saving, toast, updateContent]);
 

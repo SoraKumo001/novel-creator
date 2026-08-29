@@ -1,4 +1,5 @@
-import { act, renderHook } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatProvider, useChat } from '../src/context/ChatContext.js';
@@ -6,9 +7,15 @@ import { streamChat } from '../src/lib/chatApi.js';
 
 const mockFetch = vi.fn();
 
+let queryClient: QueryClient;
+
 function createChatWrapper() {
   return function Wrapper({ children }: { children: ReactNode }) {
-    return <ChatProvider>{children}</ChatProvider>;
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ChatProvider>{children}</ChatProvider>
+      </QueryClientProvider>
+    );
   };
 }
 
@@ -26,6 +33,16 @@ beforeEach(() => {
   globalThis.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation(async () => {
     return jsonResponse([]);
+  });
+  queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+      mutations: {
+        retry: false,
+      },
+    },
   });
 });
 
@@ -65,27 +82,25 @@ describe('ChatContext & useChat', () => {
       updatedAt: new Date().toISOString(),
     };
 
-    mockFetch.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const urlStr =
-        typeof input === 'string'
-          ? input
-          : input instanceof URL
-            ? input.toString()
-            : (input as Request).url;
-      const method = init?.method ?? (input instanceof Request ? input.method : 'GET');
-      if (urlStr.includes('/chat/sessions') && method === 'POST') {
-        return jsonResponse(newSession, 201);
-      }
-      return jsonResponse([]);
-    });
+    // 1回目: マウント時の一覧取得（空）
+    mockFetch.mockResolvedValueOnce(jsonResponse([]));
 
     const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
+
+    // 初回の一覧取得が完了するのを待つ
+    await waitFor(() => expect(result.current.loadingSessions).toBe(false));
+
+    // 2回目: POST (create) のレスポンス
+    // 3回目: invalidateQueries で再取得される GET (一覧) のレスポンス
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse(newSession, 201))
+      .mockResolvedValueOnce(jsonResponse([newSession]));
 
     await act(async () => {
       await result.current.createSession('novel-123', 'プロット相談');
     });
 
-    expect(result.current.sessions).toHaveLength(1);
+    await waitFor(() => expect(result.current.sessions).toHaveLength(1));
     expect(result.current.sessions[0].title).toBe('プロット相談');
     expect(result.current.currentSessionId).toBe('sess-123');
   });

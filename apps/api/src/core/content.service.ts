@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
-import { chapters, contents, editHistories, sections } from '@novel-creator/db';
-import { NotFoundError, type ServiceContext } from './types.js';
+import { chapters, contents, sections } from '@novel-creator/db';
+import { insertEditHistory } from './history.service.js';
+import { assertFound, type ServiceContext } from './types.js';
 
 export function countWords(text: string): number {
   const trimmed = text.trim();
@@ -21,9 +22,7 @@ export class ContentDomainService {
       .select()
       .from(contents)
       .where(eq(contents.sectionId, sectionId));
-    if (!row) {
-      throw new NotFoundError('Content not found');
-    }
+    assertFound(row, 'Content not found');
     return row;
   }
 
@@ -47,7 +46,7 @@ export class ContentDomainService {
           .from(chapters)
           .where(eq(chapters.id, sec.chapterId));
         if (ch) {
-          await this.ctx.db.insert(editHistories).values({
+          await insertEditHistory(this.ctx.db, {
             novelId: ch.novelId,
             entityType: 'content',
             entityId: sectionId,

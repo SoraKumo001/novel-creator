@@ -1,6 +1,14 @@
+import type { z } from 'zod';
 import { desc, eq, isNull } from 'drizzle-orm';
-import { chatMessages, chatSessions } from '@novel-creator/db';
-import { extractChatEntities, generateText } from '@novel-creator/llm';
+import { chatMessages, chatSessions, novels } from '@novel-creator/db';
+import {
+  creativeChatSystemPrompt,
+  extractChatEntities,
+  generateText,
+  streamText,
+} from '@novel-creator/llm';
+import { searchContext } from '../rag.js';
+import { chatRequestSchema } from '../schemas/index.js';
 import { NotFoundError, type ServiceContext } from './types.js';
 
 export class ChatDomainService {
@@ -129,5 +137,63 @@ export class ChatDomainService {
         description: s.description ?? '',
       })),
     };
+  }
+
+  /**
+   * 創作相談チャットを SSE 形式でストリーミング生成する。
+   * RAG 検索・小説取得失敗時は空コンテキストで継続する。
+   */
+  async *streamCreativeChat(input: {
+    novelId?: string | null;
+    messages: z.infer<typeof chatRequestSchema>['messages'];
+  }): AsyncGenerator<string> {
+    const { novelId, messages } = input;
+
+    let contextSettings: string[] = [];
+    let contextCharacters: string[] = [];
+    let novelInfo: { title: string; description?: string | null } | undefined;
+
+    if (novelId) {
+      try {
+        const [novel] = await this.ctx.db
+          .select({ title: novels.title, description: novels.description })
+          .from(novels)
+          .where(eq(novels.id, novelId));
+        if (novel) {
+          novelInfo = {
+            title: novel.title,
+            description: novel.description,
+          };
+        }
+
+        const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
+        if (lastUserMessage) {
+          const ragContext = await searchContext(
+            this.ctx.vectorStore,
+            this.ctx.embedding,
+            novelId,
+            { query: lastUserMessage.content },
+            this.ctx.env,
+          );
+          contextSettings = ragContext.settings;
+          contextCharacters = ragContext.characters;
+        }
+      } catch {
+        // RAG 検索・小説取得失敗時は空コンテキストで継続
+      }
+    }
+
+    const systemPrompt = creativeChatSystemPrompt({
+      novel: novelInfo,
+      settings: contextSettings,
+      characters: contextCharacters,
+    });
+
+    const prompt = [
+      systemPrompt,
+      ...messages.map((m) => `${m.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${m.content}`),
+    ].join('\n\n');
+
+    yield* streamText(this.ctx.llm, prompt);
   }
 }

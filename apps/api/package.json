@@ -29,7 +29,9 @@
     "@novel-creator/llm": "workspace:*",
     "@novel-creator/shared": "workspace:*",
     "@novel-creator/vector": "workspace:*",
+    "ai": "^7.0.79",
     "dotenv": "17.4.2",
+    "drizzle-orm": "^0.45.2",
     "hono": "^4.6.0",
     "zod": "^4.4.3"
   },

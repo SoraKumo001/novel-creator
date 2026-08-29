@@ -1,12 +1,8 @@
 import { Hono } from 'hono';
-import { stream } from 'hono/streaming';
-import type { StreamingApi } from 'hono/utils/stream';
 import { zValidator } from '@hono/zod-validator';
-import { creativeChatSystemPrompt, streamText } from '@novel-creator/llm';
 
 import type { AppContext } from '../context.js';
 import { getServices } from '../core/services.js';
-import { searchContext } from '../rag.js';
 import {
   chatRequestSchema,
   createChatSessionSchema,
@@ -14,62 +10,13 @@ import {
   idParamSchema,
   updateChatSessionSchema,
 } from '../schemas/index.js';
+import { sseStream } from '../sse.js';
 
 const chatRouter = new Hono<AppContext>()
   // POST /api/chat - 創作相談チャットストリーミング
   .post('/', zValidator('json', chatRequestSchema), async (c) => {
     const { novelId, messages } = c.req.valid('json');
-
-    let contextSettings: string[] = [];
-    let contextCharacters: string[] = [];
-    let novelInfo: { title: string; description?: string | null } | undefined;
-
-    if (novelId) {
-      try {
-        const novelDetail = await getServices(c).novel.getNovelDetail(novelId);
-        novelInfo = {
-          title: novelDetail.novel.title,
-          description: novelDetail.novel.description,
-        };
-
-        const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
-        if (lastUserMessage) {
-          const ragContext = await searchContext(
-            c.var.vectorStore,
-            c.var.embedding,
-            novelId,
-            { query: lastUserMessage.content },
-            c.var.env,
-          );
-          contextSettings = ragContext.settings;
-          contextCharacters = ragContext.characters;
-        }
-      } catch {
-        // RAG 検索・小説取得失敗時は空コンテキストで継続
-      }
-    }
-
-    const systemPrompt = creativeChatSystemPrompt({
-      novel: novelInfo,
-      settings: contextSettings,
-      characters: contextCharacters,
-    });
-
-    const prompt = [
-      systemPrompt,
-      ...messages.map((m) => `${m.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${m.content}`),
-    ].join('\n\n');
-
-    c.header('Content-Type', 'text/event-stream');
-    c.header('Cache-Control', 'no-cache');
-    c.header('Connection', 'keep-alive');
-
-    return stream(c, async (s: StreamingApi) => {
-      for await (const chunk of streamText(c.var.llm, prompt)) {
-        await s.write(`data: ${JSON.stringify({ text: chunk })}\n\n`);
-      }
-      await s.write(`data: ${JSON.stringify({ done: true })}\n\n`);
-    });
+    return sseStream(c, getServices(c).chat.streamCreativeChat({ novelId, messages }));
   })
   // POST /api/chat/extract-entities - チャットテキストから人物・設定を抽出
   .post('/extract-entities', zValidator('json', extractChatEntitiesSchema), async (c) => {

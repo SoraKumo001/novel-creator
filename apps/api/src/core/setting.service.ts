@@ -1,5 +1,5 @@
 import { and, eq } from 'drizzle-orm';
-import { editHistories, settings } from '@novel-creator/db';
+import { settings } from '@novel-creator/db';
 import {
   createSettingDraft,
   editSetting,
@@ -14,7 +14,8 @@ import {
   serializeSettingsToMarkdown,
 } from '@novel-creator/shared';
 import { searchContext, upsertEntityEmbedding } from '../rag.js';
-import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
+import { insertEditHistory } from './history.service.js';
+import { assertFound, ValidationError, type ServiceContext } from './types.js';
 
 export function settingToText(s: {
   category: string;
@@ -40,9 +41,7 @@ export class SettingDomainService {
 
   async getSetting(id: string) {
     const [setting] = await this.ctx.db.select().from(settings).where(eq(settings.id, id));
-    if (!setting) {
-      throw new NotFoundError('Setting not found');
-    }
+    assertFound(setting, 'Setting not found');
     return setting;
   }
 
@@ -101,12 +100,10 @@ export class SettingDomainService {
       })
       .where(eq(settings.id, id))
       .returning();
-    if (!row) {
-      throw new NotFoundError('Setting not found');
-    }
+    assertFound(row, 'Setting not found');
 
     try {
-      await this.ctx.db.insert(editHistories).values({
+      await insertEditHistory(this.ctx.db, {
         novelId: row.novelId,
         entityType: 'setting',
         entityId: row.id,
@@ -137,9 +134,7 @@ export class SettingDomainService {
 
   async deleteSetting(id: string) {
     const [row] = await this.ctx.db.delete(settings).where(eq(settings.id, id)).returning();
-    if (!row) {
-      throw new NotFoundError('Setting not found');
-    }
+    assertFound(row, 'Setting not found');
     try {
       await this.ctx.vectorStore.deleteByEntity('setting', id);
     } catch (err) {
@@ -274,7 +269,7 @@ export class SettingDomainService {
     const updated = await this.ctx.db.select().from(settings).where(eq(settings.novelId, novelId));
 
     try {
-      await this.ctx.db.insert(editHistories).values({
+      await insertEditHistory(this.ctx.db, {
         novelId,
         entityType: 'settings_markdown',
         entityId: novelId,

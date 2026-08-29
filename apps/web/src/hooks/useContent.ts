@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toErrorMessage } from '@/lib/errors.js';
+import { sectionKeys } from '@/lib/queryKeys.js';
 import { fetchContent, updateContent } from '@/lib/services/index.js';
 import type { Content } from '@/lib/types.js';
 
@@ -21,15 +22,14 @@ export function useContent(sectionId: string): UseContentReturn {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['sections', sectionId, 'content'],
+    queryKey: sectionKeys.content(sectionId),
     queryFn: () => fetchContent(sectionId),
     enabled: !!sectionId,
   });
 
   const updateMutation = useMutation({
     mutationFn: (body: string) => updateContent(sectionId, { body }),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ['sections', sectionId, 'content'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sectionKeys.content(sectionId) }),
   });
 
   return {

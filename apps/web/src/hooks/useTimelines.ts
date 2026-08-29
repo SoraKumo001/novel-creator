@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toErrorMessage } from '@/lib/errors.js';
+import { novelKeys } from '@/lib/queryKeys.js';
 import { createTimeline, deleteTimeline, fetchTimelines } from '@/lib/services/index.js';
 import type { CreateTimelineInput, Timeline } from '@/lib/types.js';
 
@@ -23,26 +24,28 @@ export function useTimelines(novelId: string): UseTimelinesReturn {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['novels', novelId, 'timelines'],
+    queryKey: novelKeys.timelines(novelId),
     queryFn: () => fetchTimelines(novelId),
     enabled: !!novelId,
   });
 
   const createMutation = useMutation({
     mutationFn: (input: CreateTimelineInput) => createTimeline(novelId, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'timelines'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.timelines(novelId) }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteTimeline(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['novels', novelId, 'timelines'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.timelines(novelId) }),
   });
 
   return {
     timelines,
     loading,
     error: error ? toErrorMessage(error) : null,
-    refetch: refetch as unknown as () => Promise<void>,
+    refetch: async () => {
+      await refetch();
+    },
     createTimeline: createMutation.mutateAsync,
     deleteTimeline: (id) => deleteMutation.mutateAsync(id),
     creating: createMutation.isPending,

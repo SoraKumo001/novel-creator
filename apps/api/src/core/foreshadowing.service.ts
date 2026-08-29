@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { foreshadowings, novels, type NewForeshadowing } from '@novel-creator/db';
-import { NotFoundError, type ServiceContext } from './types.js';
+import { assertFound, type ServiceContext } from './types.js';
 
 export class ForeshadowingDomainService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -15,9 +15,7 @@ export class ForeshadowingDomainService {
 
   async getForeshadowing(id: string) {
     const [item] = await this.ctx.db.select().from(foreshadowings).where(eq(foreshadowings.id, id));
-    if (!item) {
-      throw new NotFoundError('Foreshadowing not found');
-    }
+    assertFound(item, 'Foreshadowing not found');
     return item;
   }
 
@@ -26,9 +24,7 @@ export class ForeshadowingDomainService {
     input: Omit<NewForeshadowing, 'id' | 'novelId' | 'createdAt' | 'updatedAt'>,
   ) {
     const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
-    if (!novel) {
-      throw new NotFoundError('Novel not found');
-    }
+    assertFound(novel, 'Novel not found');
 
     const [created] = await this.ctx.db
       .insert(foreshadowings)
@@ -55,9 +51,7 @@ export class ForeshadowingDomainService {
       .select()
       .from(foreshadowings)
       .where(eq(foreshadowings.id, id));
-    if (!existing) {
-      throw new NotFoundError('Foreshadowing not found');
-    }
+    assertFound(existing, 'Foreshadowing not found');
 
     const [updated] = await this.ctx.db
       .update(foreshadowings)
@@ -82,9 +76,7 @@ export class ForeshadowingDomainService {
       .select()
       .from(foreshadowings)
       .where(eq(foreshadowings.id, id));
-    if (!existing) {
-      throw new NotFoundError('Foreshadowing not found');
-    }
+    assertFound(existing, 'Foreshadowing not found');
 
     await this.ctx.db.delete(foreshadowings).where(eq(foreshadowings.id, id));
   }

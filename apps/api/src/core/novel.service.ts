@@ -1,6 +1,6 @@
 import { desc, eq } from 'drizzle-orm';
 import { chapters, characters, novels, settings } from '@novel-creator/db';
-import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
+import { assertFound, ValidationError, type ServiceContext } from './types.js';
 
 export class NovelDomainService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -11,9 +11,7 @@ export class NovelDomainService {
 
   async getNovelDetail(id: string) {
     const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, id));
-    if (!novel) {
-      throw new NotFoundError('Novel not found');
-    }
+    assertFound(novel, 'Novel not found');
 
     const [chapterRows, characterRows, settingRows] = await Promise.all([
       this.ctx.db.select().from(chapters).where(eq(chapters.novelId, id)).orderBy(chapters.order),
@@ -53,17 +51,13 @@ export class NovelDomainService {
       })
       .where(eq(novels.id, id))
       .returning();
-    if (!row) {
-      throw new NotFoundError('Novel not found');
-    }
+    assertFound(row, 'Novel not found');
     return row;
   }
 
   async deleteNovel(id: string) {
     const [row] = await this.ctx.db.delete(novels).where(eq(novels.id, id)).returning();
-    if (!row) {
-      throw new NotFoundError('Novel not found');
-    }
+    assertFound(row, 'Novel not found');
     return row;
   }
 }

@@ -12,16 +12,14 @@ import {
   streamText,
 } from '@novel-creator/llm';
 import { searchContext } from '../rag.js';
-import { NotFoundError, type ServiceContext } from './types.js';
+import { assertFound, type ServiceContext } from './types.js';
 
 export class GenerateDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
   async generatePlot(novelId: string) {
     const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
-    if (!novel) {
-      throw new NotFoundError('Novel not found');
-    }
+    assertFound(novel, 'Novel not found');
 
     const context = await searchContext(
       this.ctx.vectorStore,
@@ -49,13 +47,9 @@ export class GenerateDomainService {
 
   async generateChapterSummary(chapterId: string) {
     const [chapter] = await this.ctx.db.select().from(chapters).where(eq(chapters.id, chapterId));
-    if (!chapter) {
-      throw new NotFoundError('Chapter not found');
-    }
+    assertFound(chapter, 'Chapter not found');
     const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, chapter.novelId));
-    if (!novel) {
-      throw new NotFoundError('Novel not found');
-    }
+    assertFound(novel, 'Novel not found');
 
     const prompt = chapterSummary(
       { title: novel.title, description: novel.description ?? '' },
@@ -77,16 +71,12 @@ export class GenerateDomainService {
 
   async generateSectionSummary(sectionId: string) {
     const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
-    if (!section) {
-      throw new NotFoundError('Section not found');
-    }
+    assertFound(section, 'Section not found');
     const [chapter] = await this.ctx.db
       .select()
       .from(chapters)
       .where(eq(chapters.id, section.chapterId));
-    if (!chapter) {
-      throw new NotFoundError('Chapter not found');
-    }
+    assertFound(chapter, 'Chapter not found');
 
     const prompt = sectionSummary(
       { title: chapter.title, summary: chapter.summary ?? '' },
@@ -108,16 +98,12 @@ export class GenerateDomainService {
 
   async *generateSectionContent(sectionId: string) {
     const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
-    if (!section) {
-      throw new NotFoundError('Section not found');
-    }
+    assertFound(section, 'Section not found');
     const [chapter] = await this.ctx.db
       .select()
       .from(chapters)
       .where(eq(chapters.id, section.chapterId));
-    if (!chapter) {
-      throw new NotFoundError('Chapter not found');
-    }
+    assertFound(chapter, 'Chapter not found');
 
     const previousSections = await this.ctx.db
       .select()
@@ -162,9 +148,7 @@ export class GenerateDomainService {
 
   async extractEntities(sectionId: string) {
     const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
-    if (!section) {
-      throw new NotFoundError('Section not found');
-    }
+    assertFound(section, 'Section not found');
     const [content] = await this.ctx.db
       .select()
       .from(contents)
@@ -203,9 +187,7 @@ export class GenerateDomainService {
 
   async proofreadContent(sectionId: string, customBody?: string) {
     const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
-    if (!section) {
-      throw new NotFoundError('Section not found');
-    }
+    assertFound(section, 'Section not found');
 
     const [chapter] = await this.ctx.db
       .select()

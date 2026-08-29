@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { timelines } from '@novel-creator/db';
-import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
+import { assertFound, ValidationError, type ServiceContext } from './types.js';
 
 export class TimelineDomainService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -52,9 +52,7 @@ export class TimelineDomainService {
 
   async deleteTimeline(id: string) {
     const [row] = await this.ctx.db.delete(timelines).where(eq(timelines.id, id)).returning();
-    if (!row) {
-      throw new NotFoundError('Timeline not found');
-    }
+    assertFound(row, 'Timeline not found');
     return row;
   }
 }
