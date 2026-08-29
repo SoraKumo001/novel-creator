@@ -1,5 +1,16 @@
 // Phase 1B: LLM ラッパー
-export { createLLMProvider, createEmbeddingProvider } from './provider.js';
+export {
+  createLLMProvider,
+  createEmbeddingProvider,
+  createLanguageModel,
+  createEmbeddingModel,
+  createLanguageModelFromConfig,
+  testLLMConnection,
+  type LLMConfigInput,
+  type TestConnectionResult,
+  type ProviderSettings,
+} from './provider.js';
+
 export {
   generateText,
   streamText,

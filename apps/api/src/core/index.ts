@@ -11,3 +11,4 @@ export * from './generate.service.js';
 export * from './chat.service.js';
 export * from './backup.service.js';
 export * from './history.service.js';
+export * from './llm-config.service.js';

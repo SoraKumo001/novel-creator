@@ -238,10 +238,52 @@ export const chatRequestSchema = z.object({
   sessionId: z.string().uuid(),
   novelId: z.string().uuid().optional().nullable(),
   messages: z.array(uiMessageSchema).min(1),
+  modelConfigId: z.string().uuid().optional().nullable(),
 });
 
 export const extractChatEntitiesSchema = z.object({
   text: z.string().min(1),
+});
+
+// ---- LLM 設定 ----
+export const createLlmConfigSchema = z.object({
+  name: z.string().min(1),
+  provider: z.enum(['openai', 'anthropic', 'google', 'ollama', 'custom_openai']),
+  modelId: z.string().min(1),
+  baseUrl: z.string().optional().nullable(),
+  apiKey: z.string().optional().nullable(),
+  isDefault: z.boolean().optional(),
+  description: z.string().optional().nullable(),
+});
+
+export const updateLlmConfigSchema = z.object({
+  name: z.string().min(1).optional(),
+  provider: z.enum(['openai', 'anthropic', 'google', 'ollama', 'custom_openai']).optional(),
+  modelId: z.string().min(1).optional(),
+  baseUrl: z.string().optional().nullable(),
+  apiKey: z.string().optional().nullable(),
+  isDefault: z.boolean().optional(),
+  description: z.string().optional().nullable(),
+});
+
+export const testLlmConfigSchema = z.object({
+  provider: z.enum(['openai', 'anthropic', 'google', 'ollama', 'custom_openai']),
+  modelId: z.string().min(1),
+  baseUrl: z.string().optional().nullable(),
+  apiKey: z.string().optional().nullable(),
+});
+
+export const generateContentBodySchema = z.object({
+  modelConfigId: z.string().uuid().optional().nullable(),
+});
+
+export const proofreadBodySchema = z.object({
+  body: z.string().optional(),
+  modelConfigId: z.string().uuid().optional().nullable(),
+});
+
+export const generatePlotBodySchema = z.object({
+  modelConfigId: z.string().uuid().optional().nullable(),
 });
 
 // ---- 履歴 ----

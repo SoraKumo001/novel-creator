@@ -12,9 +12,12 @@ function makeChatValue(overrides: Partial<ChatContextValue>): ChatContextValue {
     toggleChat: fn(),
     selectedNovelId: null,
     setSelectedNovelId: fn(),
+    selectedModelConfigId: null,
+    setSelectedModelConfigId: fn(),
     sessions: [],
     currentSessionId: null,
     currentSession: null,
+
     loadingSessions: false,
     loadingMessages: false,
     startNewChat: fn(),

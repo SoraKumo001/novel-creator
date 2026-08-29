@@ -293,3 +293,52 @@ export interface ProofreadResult {
   issues: ProofreadIssue[];
   polishedBody: string;
 }
+
+// ---- LLM 設定 ----
+export interface LLMConfig {
+  id: string;
+  name: string;
+  provider: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  modelId: string;
+  baseUrl: string | null;
+  apiKeyMasked: string | null;
+  hasApiKey: boolean;
+  isDefault: boolean;
+  description: string | null;
+  createdAt: string | Date | null;
+  updatedAt: string | Date | null;
+}
+
+export interface CreateLLMConfigInput {
+  name: string;
+  provider: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  modelId: string;
+  baseUrl?: string | null;
+  apiKey?: string | null;
+  isDefault?: boolean;
+  description?: string | null;
+}
+
+export interface UpdateLLMConfigInput {
+  name?: string;
+  provider?: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  modelId?: string;
+  baseUrl?: string | null;
+  apiKey?: string | null;
+  isDefault?: boolean;
+  description?: string | null;
+}
+
+export interface TestConnectionInput {
+  provider: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  modelId: string;
+  baseUrl?: string | null;
+  apiKey?: string | null;
+}
+
+export interface TestConnectionResult {
+  success: boolean;
+  latencyMs: number;
+  message: string;
+  error?: string;
+}

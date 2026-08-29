@@ -12,9 +12,10 @@ export interface SSEExtractResult {
 export async function streamGenerateContent(
   sectionId: string,
   onChunk: (text: string) => void,
+  modelConfigId?: string | null,
 ): Promise<void> {
   try {
-    for await (const chunk of generateSectionContent(sectionId)) {
+    for await (const chunk of generateSectionContent(sectionId, modelConfigId)) {
       if (chunk) {
         onChunk(chunk);
       }
@@ -32,9 +33,10 @@ export async function streamGenerateContent(
 export async function streamGenerateContentAuto(
   sectionId: string,
   onChunk: (text: string) => void,
+  modelConfigId?: string | null,
 ): Promise<SSEExtractResult> {
   // 1. 本文ストリーミング
-  await streamGenerateContent(sectionId, onChunk);
+  await streamGenerateContent(sectionId, onChunk, modelConfigId);
 
   // 2. 抽出処理
   const res = await extractEntities(sectionId);

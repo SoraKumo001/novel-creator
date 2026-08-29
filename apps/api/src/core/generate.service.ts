@@ -1,8 +1,10 @@
 import { eq } from 'drizzle-orm';
-import { chapters, contents, novels, sections } from '@novel-creator/db';
+import type { LanguageModel } from 'ai';
+import { chapters, contents, llmConfigs, novels, sections } from '@novel-creator/db';
 import {
   chapterSummary,
   contentGeneration,
+  createLanguageModelFromConfig,
   extractSettings,
   extractTimeline,
   generateJSON,
@@ -17,7 +19,28 @@ import { assertFound, type ServiceContext } from './types.js';
 export class GenerateDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
-  async generatePlot(novelId: string) {
+  private async resolveModel(modelConfigId?: string | null): Promise<LanguageModel> {
+    if (modelConfigId) {
+      const [customConfig] = await this.ctx.db
+        .select()
+        .from(llmConfigs)
+        .where(eq(llmConfigs.id, modelConfigId));
+      if (customConfig) {
+        return createLanguageModelFromConfig(customConfig, this.ctx.env);
+      }
+    }
+    const [defaultConfig] = await this.ctx.db
+      .select()
+      .from(llmConfigs)
+      .where(eq(llmConfigs.isDefault, true));
+    if (defaultConfig) {
+      return createLanguageModelFromConfig(defaultConfig, this.ctx.env);
+    }
+
+    return this.ctx.llm;
+  }
+
+  async generatePlot(novelId: string, modelConfigId?: string | null) {
     const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
     assertFound(novel, 'Novel not found');
 
@@ -38,11 +61,12 @@ export class GenerateDomainService {
       characters: context.characters,
     });
 
+    const llm = await this.resolveModel(modelConfigId);
     return generateJSON<{
       title: string;
       description: string;
       chapters: { title: string; order: number; summary: string }[];
-    }>(this.ctx.llm, prompt);
+    }>(llm, prompt);
   }
 
   async generateChapterSummary(chapterId: string) {
@@ -96,7 +120,7 @@ export class GenerateDomainService {
     return result;
   }
 
-  async *generateSectionContent(sectionId: string) {
+  async *generateSectionContent(sectionId: string, modelConfigId?: string | null) {
     const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
     assertFound(section, 'Section not found');
     const [chapter] = await this.ctx.db
@@ -141,7 +165,8 @@ export class GenerateDomainService {
       },
     );
 
-    for await (const chunk of streamText(this.ctx.llm, prompt)) {
+    const llm = await this.resolveModel(modelConfigId);
+    for await (const chunk of streamText(llm, prompt)) {
       yield chunk;
     }
   }
@@ -185,7 +210,7 @@ export class GenerateDomainService {
     };
   }
 
-  async proofreadContent(sectionId: string, customBody?: string) {
+  async proofreadContent(sectionId: string, customBody?: string, modelConfigId?: string | null) {
     const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
     assertFound(section, 'Section not found');
 
@@ -226,6 +251,7 @@ export class GenerateDomainService {
       body: bodyText,
     });
 
+    const llm = await this.resolveModel(modelConfigId);
     const result = await generateJSON<{
       score: number;
       critique: string;
@@ -237,7 +263,7 @@ export class GenerateDomainService {
         reason: string;
       }>;
       polishedBody: string;
-    }>(this.ctx.llm, prompt);
+    }>(llm, prompt);
 
     return result;
   }

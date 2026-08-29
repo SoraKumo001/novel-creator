@@ -88,13 +88,30 @@ export function SectionEditor({
     localStorage.setItem(`novel-creator:target-words:${section.id}`, String(clamped));
   };
 
+  const [selectedModelConfigId, setSelectedModelConfigId] = useState<string | null>(() => {
+    return localStorage.getItem('novel-creator:editor-model') || null;
+  });
+
+  const handleModelChange = (id: string | null) => {
+    setSelectedModelConfigId(id);
+    if (id) {
+      localStorage.setItem('novel-creator:editor-model', id);
+    } else {
+      localStorage.removeItem('novel-creator:editor-model');
+    }
+  };
+
   async function handleGenerate() {
     resetStreamError();
     let accumulated = localBody;
-    await generateContent(section.id, (chunk) => {
-      accumulated += chunk;
-      setLocalBody(accumulated);
-    });
+    await generateContent(
+      section.id,
+      (chunk) => {
+        accumulated += chunk;
+        setLocalBody(accumulated);
+      },
+      selectedModelConfigId,
+    );
     await updateContent(accumulated);
     setSavedBody(accumulated);
   }
@@ -124,6 +141,8 @@ export function SectionEditor({
         onExtract={() => void handleExtract()}
         generatingContent={generatingContent}
         onGenerate={() => void handleGenerate()}
+        modelConfigId={selectedModelConfigId}
+        onModelConfigIdChange={handleModelChange}
         isZenMode={isZenMode}
         onToggleZenMode={onToggleZenMode}
         onOpenHistory={() => setHistoryOpen(true)}

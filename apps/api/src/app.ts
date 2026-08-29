@@ -10,6 +10,7 @@ import charactersRouter from './routes/characters.js';
 import chatRouter from './routes/chat.js';
 import contentsRouter from './routes/contents.js';
 import historiesRouter from './routes/histories.js';
+import llmConfigsRouter from './routes/llm-configs.js';
 import llmInstructionsRouter from './routes/llm-instructions.js';
 import novelsRouter from './routes/novels.js';
 import sectionsRouter from './routes/sections.js';
@@ -28,6 +29,7 @@ export const api = new Hono<AppContext>()
   .route('/timelines', timelinesRouter)
   .route('/foreshadowings', foreshadowingsRouter)
   .route('/llm-instructions', llmInstructionsRouter)
+  .route('/llm-configs', llmConfigsRouter)
   .route('/chat', chatRouter)
   .route('/backup', backupRouter)
   .route('/histories', historiesRouter);

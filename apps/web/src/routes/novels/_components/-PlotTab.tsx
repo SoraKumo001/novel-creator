@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/Button.js';
 import { ConfirmDialog } from '@/components/ConfirmDialog.js';
 import { EmptyState } from '@/components/EmptyState.js';
+import { LLMModelSelector } from '@/components/LLMModelSelector.js';
 import { Loading } from '@/components/Loading.js';
 import { useChapters } from '@/hooks/useChapters.js';
 import { useGenerate } from '@/hooks/useGenerate.js';
@@ -55,6 +56,7 @@ export function PlotTab({
   const [plotPreview, setPlotPreview] = useState(generatedPlot);
   const [selectedPlotIndices, setSelectedPlotIndices] = useState<Set<number>>(new Set());
   const [activeGeneratingId, setActiveGeneratingId] = useState<string | null>(null);
+  const [selectedModelConfigId, setSelectedModelConfigId] = useState<string | null>(null);
 
   useEffect(() => {
     if (generatedPlot) {
@@ -65,7 +67,7 @@ export function PlotTab({
 
   async function handleGeneratePlot() {
     resetGeneratedPlot();
-    const plot = await generatePlot(novel.id);
+    const plot = await generatePlot(novel.id, selectedModelConfigId);
     setPlotPreview(plot);
     setSelectedPlotIndices(new Set(plot.chapters.map((_, i) => i)));
   }
@@ -225,7 +227,12 @@ export function PlotTab({
             </button>
           )}
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <LLMModelSelector
+            value={selectedModelConfigId}
+            onChange={setSelectedModelConfigId}
+            size="sm"
+          />
           <Button
             variant="secondary"
             onClick={handleGeneratePlot}

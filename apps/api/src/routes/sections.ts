@@ -1,10 +1,16 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
-import { z } from 'zod';
 
 import type { AppContext } from '../context.js';
+
 import { getServices } from '../core/services.js';
-import { idParamSchema, updateContentSchema, updateSectionSchema } from '../schemas/index.js';
+import {
+  generateContentBodySchema,
+  idParamSchema,
+  proofreadBodySchema,
+  updateContentSchema,
+  updateSectionSchema,
+} from '../schemas/index.js';
 import { sseStream } from '../sse.js';
 
 const sectionsRouter = new Hono<AppContext>()
@@ -60,10 +66,19 @@ const sectionsRouter = new Hono<AppContext>()
     return c.json(result);
   })
   // POST /api/sections/:id/generate/content - 本文ストリーミング生成
-  .post('/:id/generate/content', zValidator('param', idParamSchema), async (c) => {
-    const { id } = c.req.valid('param');
-    return sseStream(c, getServices(c).generate.generateSectionContent(id));
-  })
+  .post(
+    '/:id/generate/content',
+    zValidator('param', idParamSchema),
+    zValidator('json', generateContentBodySchema.optional()),
+    async (c) => {
+      const { id } = c.req.valid('param');
+      const jsonBody = c.req.valid('json');
+      return sseStream(
+        c,
+        getServices(c).generate.generateSectionContent(id, jsonBody?.modelConfigId),
+      );
+    },
+  )
   // POST /api/sections/:id/generate/extract - 本文から設定・時系列を抽出
   .post('/:id/generate/extract', zValidator('param', idParamSchema), async (c) => {
     const { id } = c.req.valid('param');
@@ -74,11 +89,15 @@ const sectionsRouter = new Hono<AppContext>()
   .post(
     '/:id/generate/proofread',
     zValidator('param', idParamSchema),
-    zValidator('json', z.object({ body: z.string().optional() }).optional()),
+    zValidator('json', proofreadBodySchema.optional()),
     async (c) => {
       const { id } = c.req.valid('param');
       const jsonBody = c.req.valid('json');
-      const result = await getServices(c).generate.proofreadContent(id, jsonBody?.body);
+      const result = await getServices(c).generate.proofreadContent(
+        id,
+        jsonBody?.body,
+        jsonBody?.modelConfigId,
+      );
       return c.json(result);
     },
   );

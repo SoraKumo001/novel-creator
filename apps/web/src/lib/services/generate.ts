@@ -1,9 +1,13 @@
 import { apiClient } from '../api-client.js';
 import type { ExtractResult, GeneratedPlot, GeneratedSummary } from '../types.js';
 
-export async function generatePlot(novelId: string): Promise<GeneratedPlot> {
+export async function generatePlot(
+  novelId: string,
+  modelConfigId?: string | null,
+): Promise<GeneratedPlot> {
   const res = await apiClient.novels[':id'].generate.plot.$post({
     param: { id: novelId },
+    json: { modelConfigId: modelConfigId || null },
   });
 
   if (!res.ok) throw new Error('Failed to generate plot');
@@ -45,9 +49,13 @@ export async function generateSectionSummary(sectionId: string): Promise<Generat
   };
 }
 
-export async function* generateSectionContent(sectionId: string): AsyncIterable<string> {
+export async function* generateSectionContent(
+  sectionId: string,
+  modelConfigId?: string | null,
+): AsyncIterable<string> {
   const res = await apiClient.sections[':id'].generate.content.$post({
     param: { id: sectionId },
+    json: { modelConfigId: modelConfigId || null },
   });
   if (!res.ok || !res.body) {
     throw new Error('Failed to generate section content');
@@ -81,6 +89,19 @@ export async function* generateSectionContent(sectionId: string): AsyncIterable<
   } finally {
     reader.releaseLock();
   }
+}
+
+export async function proofreadSectionContent(
+  sectionId: string,
+  customBody?: string,
+  modelConfigId?: string | null,
+) {
+  const res = await apiClient.sections[':id'].generate.proofread.$post({
+    param: { id: sectionId },
+    json: { body: customBody, modelConfigId: modelConfigId || null },
+  });
+  if (!res.ok) throw new Error('Failed to proofread content');
+  return res.json();
 }
 
 export async function extractEntities(sectionId: string): Promise<ExtractResult> {

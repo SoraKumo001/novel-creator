@@ -325,10 +325,19 @@ const novelsRouter = new Hono<AppContext>()
     },
   )
   // POST /api/novels/:id/generate/plot - プロット生成
-  .post('/:id/generate/plot', zValidator('param', idParamSchema), async (c) => {
-    const { id: novelId } = c.req.valid('param');
-    const result = await getServices(c).generate.generatePlot(novelId);
-    return c.json(result);
-  });
+  .post(
+    '/:id/generate/plot',
+    zValidator('param', idParamSchema),
+    zValidator(
+      'json',
+      z.object({ modelConfigId: z.string().uuid().optional().nullable() }).optional(),
+    ),
+    async (c) => {
+      const { id: novelId } = c.req.valid('param');
+      const jsonBody = c.req.valid('json');
+      const result = await getServices(c).generate.generatePlot(novelId, jsonBody?.modelConfigId);
+      return c.json(result);
+    },
+  );
 
 export default novelsRouter;

@@ -1,13 +1,15 @@
 import type { z } from 'zod';
 import { desc, eq, isNull } from 'drizzle-orm';
 import { createUIMessageStreamResponse, toUIMessageStream } from 'ai';
-import { chatMessages, chatSessions, novels } from '@novel-creator/db';
+import { chatMessages, chatSessions, llmConfigs, novels } from '@novel-creator/db';
 import {
+  createLanguageModelFromConfig,
   creativeChatSystemPrompt,
   extractChatEntities,
   generateText,
   streamTextResult,
 } from '@novel-creator/llm';
+
 import { searchContext } from '../rag.js';
 import { chatRequestSchema } from '../schemas/index.js';
 import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
@@ -150,8 +152,9 @@ export class ChatDomainService {
     sessionId: string;
     novelId?: string | null;
     messages: z.infer<typeof chatRequestSchema>['messages'];
+    modelConfigId?: string | null;
   }): Promise<Response> {
-    const { sessionId, novelId, messages } = input;
+    const { sessionId, novelId, messages, modelConfigId } = input;
 
     // セッション存在確認（404）
     const [session] = await this.ctx.db
@@ -237,8 +240,28 @@ export class ChatDomainService {
         .map((m) => `${m.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${m.content}`),
     ].join('\n\n');
 
+    // 使用する LLM モデルを解決（modelConfigId 指定 or デフォルト設定 or 環境変数）
+    let llmModel = this.ctx.llm;
+    if (modelConfigId) {
+      const [customConfig] = await this.ctx.db
+        .select()
+        .from(llmConfigs)
+        .where(eq(llmConfigs.id, modelConfigId));
+      if (customConfig) {
+        llmModel = createLanguageModelFromConfig(customConfig, this.ctx.env);
+      }
+    } else {
+      const [defaultConfig] = await this.ctx.db
+        .select()
+        .from(llmConfigs)
+        .where(eq(llmConfigs.isDefault, true));
+      if (defaultConfig) {
+        llmModel = createLanguageModelFromConfig(defaultConfig, this.ctx.env);
+      }
+    }
+
     // 生の StreamTextResult を取得（接続時リトライ付き）
-    const result = await streamTextResult(this.ctx.llm, prompt);
+    const result = await streamTextResult(llmModel, prompt);
 
     // 完了時（正常終了・クライアント中断の両方）に assistant メッセージを永続化する。
     // onEnd は flush / cancel のいずれかで必ず一度だけ呼ばれるため、二重保存防止フラグで保護する。

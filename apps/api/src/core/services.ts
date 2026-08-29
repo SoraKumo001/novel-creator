@@ -12,6 +12,7 @@ import { ChatDomainService } from './chat.service.js';
 import { BackupDomainService } from './backup.service.js';
 import { HistoryDomainService } from './history.service.js';
 import { ForeshadowingDomainService } from './foreshadowing.service.js';
+import { LlmConfigDomainService } from './llm-config.service.js';
 
 export interface DomainServices {
   novel: NovelDomainService;
@@ -27,6 +28,7 @@ export interface DomainServices {
   chat: ChatDomainService;
   backup: BackupDomainService;
   history: HistoryDomainService;
+  llmConfig: LlmConfigDomainService;
 }
 
 export function createDomainServices(ctx: ServiceContext): DomainServices {
@@ -44,6 +46,7 @@ export function createDomainServices(ctx: ServiceContext): DomainServices {
     chat: new ChatDomainService(ctx),
     backup: new BackupDomainService(ctx),
     history: new HistoryDomainService(ctx),
+    llmConfig: new LlmConfigDomainService(ctx),
   };
 }
 

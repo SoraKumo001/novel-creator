@@ -17,10 +17,14 @@ interface UseGenerateReturn {
   generatedPlot: GeneratedPlot | null;
   generatedSummary: GeneratedSummary | null;
   streamError: string | null;
-  generatePlot: (novelId: string) => Promise<GeneratedPlot>;
+  generatePlot: (novelId: string, modelConfigId?: string | null) => Promise<GeneratedPlot>;
   generateChapterSummary: (chapterId: string) => Promise<GeneratedSummary>;
   generateSectionSummary: (sectionId: string) => Promise<GeneratedSummary>;
-  generateContent: (sectionId: string, onChunk: (text: string) => void) => Promise<void>;
+  generateContent: (
+    sectionId: string,
+    onChunk: (text: string) => void,
+    modelConfigId?: string | null,
+  ) => Promise<void>;
   extract: (sectionId: string) => Promise<ExtractResult>;
   resetGeneratedPlot: () => void;
   resetGeneratedSummary: () => void;
@@ -36,10 +40,10 @@ export function useGenerate(): UseGenerateReturn {
   const [generatedSummary, setGeneratedSummary] = useState<GeneratedSummary | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
 
-  const handleGeneratePlot = useCallback(async (novelId: string) => {
+  const handleGeneratePlot = useCallback(async (novelId: string, modelConfigId?: string | null) => {
     setGeneratingPlot(true);
     try {
-      const data = await generatePlot(novelId);
+      const data = await generatePlot(novelId, modelConfigId);
       setGeneratedPlot(data);
       return data;
     } finally {
@@ -70,18 +74,18 @@ export function useGenerate(): UseGenerateReturn {
   }, []);
 
   const generateContent = useCallback(
-    async (sectionId: string, onChunk: (text: string) => void) => {
+    async (sectionId: string, onChunk: (text: string) => void, modelConfigId?: string | null) => {
       setGeneratingContent(true);
       setStreamError(null);
       try {
         // SSE ストリーミングで本文を生成する。
         // 接続エラー時は一度だけフォールバックとして再試行する。
         try {
-          await streamGenerateContent(sectionId, onChunk);
+          await streamGenerateContent(sectionId, onChunk, modelConfigId);
         } catch (e) {
           setStreamError(toErrorMessage(e));
           // フォールバック: 一度だけ再試行
-          await streamGenerateContent(sectionId, onChunk);
+          await streamGenerateContent(sectionId, onChunk, modelConfigId);
         }
       } catch (e) {
         setStreamError(toErrorMessage(e));

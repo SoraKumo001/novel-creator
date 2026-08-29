@@ -14,9 +14,10 @@ import {
 const chatRouter = new Hono<AppContext>()
   // POST /api/chat - 創作相談チャットストリーミング（AI SDK UI Message Stream）
   .post('/', zValidator('json', chatRequestSchema), async (c) => {
-    const { sessionId, novelId, messages } = c.req.valid('json');
-    return getServices(c).chat.streamCreativeChat({ sessionId, novelId, messages });
+    const { sessionId, novelId, messages, modelConfigId } = c.req.valid('json');
+    return getServices(c).chat.streamCreativeChat({ sessionId, novelId, messages, modelConfigId });
   })
+
   // POST /api/chat/extract-entities - チャットテキストから人物・設定を抽出
   .post('/extract-entities', zValidator('json', extractChatEntitiesSchema), async (c) => {
     const { text } = c.req.valid('json');

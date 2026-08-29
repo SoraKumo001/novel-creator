@@ -69,6 +69,12 @@ function extractTitle(message: UIMessage): string {
 export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseChatStreamingInput) {
   const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(null);
   const currentSessionIdRef = useRef<string | null>(currentSessionId);
+  const [selectedModelConfigId, setSelectedModelConfigId] = useState<string | null>(() => {
+    return localStorage.getItem('novel-creator:chat-model') || null;
+  });
+  const selectedModelConfigIdRef = useRef<string | null>(selectedModelConfigId);
+  selectedModelConfigIdRef.current = selectedModelConfigId;
+
   const [error, setError] = useState<string | null>(null);
 
   // sessionId を同期参照するための ref。
@@ -90,8 +96,17 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     setCurrentSessionIdState(id);
   }, []);
 
-  // 送信時に毎回 sessionId / novelId を ref 経由で最新値を埋め込む。
-  // prepareSendMessagesRequest はリクエスト時に呼ばれるため stale closure にならない。
+  const handleSetSelectedModelConfigId = useCallback((id: string | null) => {
+    setSelectedModelConfigId(id);
+    selectedModelConfigIdRef.current = id;
+    if (id) {
+      localStorage.setItem('novel-creator:chat-model', id);
+    } else {
+      localStorage.removeItem('novel-creator:chat-model');
+    }
+  }, []);
+
+  // 送信時に毎回 sessionId / novelId / modelConfigId を ref 経由で最新値を埋め込む。
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -101,6 +116,7 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
             sessionId: sessionIdRef.current,
             novelId: selectedNovelIdLiveRef.current,
             messages,
+            modelConfigId: selectedModelConfigIdRef.current,
           },
         }),
       }),
@@ -289,6 +305,8 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     currentSessionId,
     setCurrentSessionId,
     currentSessionIdRef,
+    selectedModelConfigId,
+    setSelectedModelConfigId: handleSetSelectedModelConfigId,
     messages,
     setMessages: setUiMessages,
     isStreaming,

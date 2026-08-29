@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/Button.js';
+import { LLMModelSelector } from '@/components/LLMModelSelector.js';
 import type { Section } from '@/lib/types.js';
 import { PencilIcon, SparklesIcon } from './-Icons.js';
 
@@ -16,6 +17,8 @@ interface EditorToolbarProps {
   onExtract: () => void;
   generatingContent: boolean;
   onGenerate: () => void;
+  modelConfigId?: string | null;
+  onModelConfigIdChange?: (id: string | null) => void;
   isZenMode: boolean;
   onToggleZenMode: () => void;
   onOpenHistory: () => void;
@@ -35,6 +38,8 @@ export function EditorToolbar({
   onExtract,
   generatingContent,
   onGenerate,
+  modelConfigId,
+  onModelConfigIdChange,
   isZenMode,
   onToggleZenMode,
   onOpenHistory,
@@ -194,6 +199,9 @@ export function EditorToolbar({
         >
           整合性更新
         </Button>
+        {onModelConfigIdChange && (
+          <LLMModelSelector value={modelConfigId} onChange={onModelConfigIdChange} size="sm" />
+        )}
         <Button
           size="sm"
           variant="secondary"
@@ -203,6 +211,7 @@ export function EditorToolbar({
         >
           本文生成
         </Button>
+
         <Button
           size="sm"
           variant="primary"

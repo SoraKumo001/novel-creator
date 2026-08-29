@@ -63,8 +63,11 @@ export interface ChatContextValue {
   sessions: ChatSession[];
   currentSessionId: string | null;
   currentSession: ChatSession | null;
+  selectedModelConfigId: string | null;
+  setSelectedModelConfigId: (id: string | null) => void;
   loadingSessions: boolean;
   loadingMessages: boolean;
+
   startNewChat: () => void;
   createSession: (novelId?: string | null, initialTitle?: string) => Promise<ChatSession | null>;
   selectSession: (sessionId: string) => Promise<void>;
@@ -112,6 +115,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     currentSessionId,
     setCurrentSessionId,
     currentSessionIdRef,
+    selectedModelConfigId,
+    setSelectedModelConfigId,
     messages,
     setMessages,
     isStreaming,
@@ -267,8 +272,11 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         sessions,
         currentSessionId,
         currentSession,
+        selectedModelConfigId,
+        setSelectedModelConfigId,
         loadingSessions,
         loadingMessages,
+
         startNewChat,
         createSession,
         selectSession,

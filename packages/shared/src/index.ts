@@ -1,5 +1,11 @@
-export { foreshadowingStatuses } from './constants.js';
+export {
+  foreshadowingStatuses,
+  llmProviders,
+  type ForeshadowingStatusValue,
+  type LLMProviderType,
+} from './constants.js';
 export type { Env } from './env.js';
+
 export {
   scanMarkdownSections,
   buildMarkdownCategoryTree,

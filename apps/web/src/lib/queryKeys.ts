@@ -38,3 +38,8 @@ export const chatKeys = {
   all: ['chat'] as const,
   sessions: (novelId?: string) => ['chat', 'sessions', novelId ?? 'all'] as const,
 };
+
+export const llmConfigKeys = {
+  all: ['llmConfigs'] as const,
+  detail: (id: string) => ['llmConfigs', id] as const,
+};

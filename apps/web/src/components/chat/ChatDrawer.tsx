@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '@/components/Button.js';
+import { LLMModelSelector } from '@/components/LLMModelSelector.js';
 import { MarkdownText } from '@/components/MarkdownText.js';
 import { QUICK_PROMPTS, useChat, type QuickPrompt } from '@/hooks/useChat.js';
 import { useNovels } from '@/hooks/useNovels.js';
@@ -16,6 +17,8 @@ export function ChatDrawer() {
     closeChat,
     selectedNovelId,
     setSelectedNovelId,
+    selectedModelConfigId,
+    setSelectedModelConfigId,
     sessions,
     currentSessionId,
     currentSession,
@@ -273,27 +276,37 @@ export function ChatDrawer() {
         </div>
       </header>
 
-      {/* 小説コンテキスト選択バー */}
-      <div className="flex items-center justify-between gap-2 border-b border-border bg-surface-raised/50 px-4 py-2 text-xs">
-        <label
-          htmlFor="chat-novel-select"
-          className="flex shrink-0 items-center gap-1 font-medium text-muted-foreground"
-        >
-          <span>📚 相談対象:</span>
-        </label>
-        <select
-          id="chat-novel-select"
-          value={selectedNovelId ?? ''}
-          onChange={(e) => setSelectedNovelId(e.target.value ? e.target.value : null)}
-          className="w-full max-w-[280px] truncate rounded border border-border bg-surface px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        >
-          <option value="">（小説を指定しない・全般相談）</option>
-          {novels.map((n) => (
-            <option key={n.id} value={n.id}>
-              {n.title}
-            </option>
-          ))}
-        </select>
+      {/* 小説コンテキスト & LLMモデル選択バー */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-raised/50 px-4 py-2 text-xs">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <label
+            htmlFor="chat-novel-select"
+            className="flex shrink-0 items-center gap-1 font-medium text-muted-foreground"
+          >
+            <span>📚 対象:</span>
+          </label>
+          <select
+            id="chat-novel-select"
+            value={selectedNovelId ?? ''}
+            onChange={(e) => setSelectedNovelId(e.target.value ? e.target.value : null)}
+            className="max-w-[180px] truncate rounded border border-border bg-surface px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="">（全般相談）</option>
+            {novels.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.title}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <LLMModelSelector
+            value={selectedModelConfigId}
+            onChange={setSelectedModelConfigId}
+            size="sm"
+          />
+        </div>
       </div>
 
       {/* 履歴一覧ビュー */}
