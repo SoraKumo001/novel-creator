@@ -83,6 +83,13 @@ export const createTimelineSchema = z.object({
   sectionId: z.string().optional(),
 });
 
+export const updateTimelineSchema = z.object({
+  event: z.string().min(1).optional(),
+  order: z.number().int().optional(),
+  timestamp: z.string().optional().nullable(),
+  sectionId: z.string().optional().nullable(),
+});
+
 // ---- foreshadowings ----
 export const createForeshadowingSchema = z.object({
   title: z.string().min(1),

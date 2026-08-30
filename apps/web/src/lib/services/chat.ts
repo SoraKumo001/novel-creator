@@ -93,18 +93,41 @@ export async function extractChatEntities(text: string): Promise<ExtractedChatEn
     json: { text },
   });
   if (!res.ok) throw new Error('Failed to extract chat entities');
-  const data = await res.json();
+  const data = (await res.json()) as {
+    characters?: { name: string; category: string; description: string; traits: string[] }[];
+    settings?: { name: string; category: string; description: string }[];
+    foreshadowings?: {
+      title: string;
+      description: string;
+      status: 'unresolved' | 'resolved' | 'abandoned';
+    }[];
+    timelines?: { event: string; timestamp: string }[];
+    plots?: { title: string; summary: string }[];
+  };
   return {
-    characters: data.characters.map((c) => ({
+    characters: (data.characters || []).map((c) => ({
       name: c.name,
       category: c.category,
       description: c.description,
       traits: c.traits,
     })),
-    settings: data.settings.map((s) => ({
+    settings: (data.settings || []).map((s) => ({
       name: s.name,
       category: s.category,
       description: s.description,
+    })),
+    foreshadowings: (data.foreshadowings || []).map((f) => ({
+      title: f.title,
+      description: f.description,
+      status: f.status,
+    })),
+    timelines: (data.timelines || []).map((t) => ({
+      event: t.event,
+      timestamp: t.timestamp,
+    })),
+    plots: (data.plots || []).map((p) => ({
+      title: p.title,
+      summary: p.summary,
     })),
   };
 }

@@ -139,6 +139,13 @@ export interface CreateTimelineInput {
   sectionId?: string;
 }
 
+export interface UpdateTimelineInput {
+  event?: string;
+  order?: number;
+  timestamp?: string | null;
+  sectionId?: string | null;
+}
+
 export interface EditInstructionInput {
   instruction: string;
 }
@@ -254,9 +261,28 @@ export interface ExtractedCharacterItem {
   traits: string[];
 }
 
+export interface ExtractedChatForeshadowingItem {
+  title: string;
+  description: string;
+  status: 'unresolved' | 'resolved' | 'abandoned';
+}
+
+export interface ExtractedChatTimelineItem {
+  event: string;
+  timestamp?: string | null;
+}
+
+export interface ExtractedChatPlotItem {
+  title: string;
+  summary: string;
+}
+
 export interface ExtractedChatEntities {
   characters: ExtractedCharacterItem[];
   settings: ExtractedSettingItem[];
+  foreshadowings?: ExtractedChatForeshadowingItem[];
+  timelines?: ExtractedChatTimelineItem[];
+  plots?: ExtractedChatPlotItem[];
 }
 
 // ---- バックアップ・リストア ----

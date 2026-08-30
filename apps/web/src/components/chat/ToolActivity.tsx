@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getToolName } from 'ai';
 import type { ToolUIPart, DynamicToolUIPart, UITools } from 'ai';
+import { ChatProposalCard, type ProposalPayload } from './ChatProposalCard.js';
 
 /** ツールの日本語表示名マップ */
 const TOOL_LABELS: Record<string, string> = {
@@ -12,6 +13,11 @@ const TOOL_LABELS: Record<string, string> = {
   getForeshadowings: '伏線取得',
   getTimelines: '時系列取得',
   searchNovelKnowledge: '知識検索',
+  proposeCreateCharacter: '人物登録提案',
+  proposeCreateSetting: '設定登録提案',
+  proposeAddForeshadowing: '伏線登録提案',
+  proposeAddTimelineEvent: '年表追加提案',
+  proposeUpdatePlot: 'プロット更新提案',
 };
 
 /** ツール呼び出しの表示用アイコン */
@@ -24,6 +30,11 @@ const TOOL_ICONS: Record<string, string> = {
   getForeshadowings: '🔍',
   getTimelines: '⏳',
   searchNovelKnowledge: '🧠',
+  proposeCreateCharacter: '💡',
+  proposeCreateSetting: '💡',
+  proposeAddForeshadowing: '💡',
+  proposeAddTimelineEvent: '💡',
+  proposeUpdatePlot: '💡',
 };
 
 /** AI SDK v7 のツールパーツ（静的 tool-<name> / 動的 dynamic-tool の両方） */
@@ -336,6 +347,16 @@ export function ToolActivity({ parts, isStreaming: _isStreaming }: ToolActivityP
                 )}
               </div>
             )}
+
+            {/* 提案ツール（Propose Tools）の承認カード（アコーディオンの開閉によらず常時表示） */}
+            {inv.hasOutput &&
+              typeof inv.output === 'object' &&
+              inv.output !== null &&
+              (inv.output as { type?: string }).type === 'proposal' && (
+                <div className="border-t border-indigo-100 bg-white/40 p-2 dark:border-indigo-900/30 dark:bg-slate-900/40">
+                  <ChatProposalCard proposal={inv.output as ProposalPayload} />
+                </div>
+              )}
           </div>
         );
       })}

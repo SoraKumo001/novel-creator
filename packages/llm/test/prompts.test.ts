@@ -185,3 +185,15 @@ describe('creativeChatSystemPrompt', () => {
     expect(APP_USAGE_GUIDE.length).toBeLessThan(700);
   });
 });
+
+describe('extractChatEntities', () => {
+  it('登場人物、設定、伏線、年表、プロットの出力指示が含まれること', () => {
+    const prompt = extractChatEntities('会話テキスト内容');
+    expect(prompt).toContain('会話テキスト内容');
+    expect(prompt).toContain('"characters"');
+    expect(prompt).toContain('"settings"');
+    expect(prompt).toContain('"foreshadowings"');
+    expect(prompt).toContain('"timelines"');
+    expect(prompt).toContain('"plots"');
+  });
+});

@@ -50,6 +50,35 @@ export class TimelineDomainService {
     return row;
   }
 
+  async updateTimeline(
+    id: string,
+    data: {
+      event?: string;
+      order?: number;
+      timestamp?: string | null;
+      sectionId?: string | null;
+    },
+  ) {
+    const patch: Record<string, unknown> = {};
+    if (data.event !== undefined) {
+      if (!data.event.trim()) {
+        throw new ValidationError('Event cannot be empty');
+      }
+      patch.event = data.event;
+    }
+    if (data.order !== undefined) patch.order = data.order;
+    if (data.timestamp !== undefined) patch.timestamp = data.timestamp;
+    if (data.sectionId !== undefined) patch.sectionId = data.sectionId;
+
+    const [row] = await this.ctx.db
+      .update(timelines)
+      .set(patch)
+      .where(eq(timelines.id, id))
+      .returning();
+    assertFound(row, 'Timeline not found');
+    return row;
+  }
+
   async deleteTimeline(id: string) {
     const [row] = await this.ctx.db.delete(timelines).where(eq(timelines.id, id)).returning();
     assertFound(row, 'Timeline not found');

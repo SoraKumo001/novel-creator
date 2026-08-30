@@ -337,7 +337,7 @@ describe('Chat API', () => {
       tools: Record<string, unknown>;
       stopWhen: unknown;
     };
-    // 8 つの読み取りツールが登録されていること
+    // 読み取りツールおよび設定提案ツールが登録されていること
     expect(Object.keys(options.tools).sort()).toEqual([
       'getCharacters',
       'getForeshadowings',
@@ -346,6 +346,11 @@ describe('Chat API', () => {
       'getSectionContent',
       'getSettings',
       'getTimelines',
+      'proposeAddForeshadowing',
+      'proposeAddTimelineEvent',
+      'proposeCreateCharacter',
+      'proposeCreateSetting',
+      'proposeUpdatePlot',
       'searchNovelKnowledge',
     ]);
   });

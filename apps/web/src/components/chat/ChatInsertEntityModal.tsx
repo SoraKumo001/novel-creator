@@ -4,22 +4,50 @@ import { novelKeys } from '@/lib/queryKeys.js';
 import { Button } from '@/components/Button.js';
 import { Modal } from '@/components/Modal.js';
 import {
+  createChapter,
   createCharacter,
+  createForeshadowing,
   createSetting,
+  createTimeline,
   extractChatEntities,
+  fetchChapters,
   fetchCharacters,
+  fetchForeshadowings,
   fetchSettings,
+  fetchTimelines,
+  updateChapter,
   updateCharacter,
+  updateForeshadowing,
   updateSetting,
+  updateTimeline,
 } from '@/lib/services/index.js';
 import { useToast } from '@/hooks/useToast.js';
 import { useEditableEntities } from '@/hooks/useEditableEntities.js';
-import type { Character, Novel, Setting } from '@/lib/types.js';
+import type { Chapter, Character, Foreshadowing, Novel, Setting, Timeline } from '@/lib/types.js';
 import { ChatInsertCharacterTab } from './entity-insert/ChatInsertCharacterTab.js';
 import { ChatInsertSettingTab } from './entity-insert/ChatInsertSettingTab.js';
-import type { EditableCharacter, EditableSetting, EntityAction } from './entity-insert/types.js';
+import { ChatInsertForeshadowingTab } from './entity-insert/ChatInsertForeshadowingTab.js';
+import { ChatInsertTimelineTab } from './entity-insert/ChatInsertTimelineTab.js';
+import { ChatInsertPlotTab } from './entity-insert/ChatInsertPlotTab.js';
+import type {
+  EditableCharacter,
+  EditableForeshadowing,
+  EditablePlot,
+  EditableSetting,
+  EditableTimeline,
+  EntityAction,
+} from './entity-insert/types.js';
 
-export type { EditableCharacter, EditableSetting, EntityAction };
+export type {
+  EditableCharacter,
+  EditableSetting,
+  EditableForeshadowing,
+  EditableTimeline,
+  EditablePlot,
+  EntityAction,
+};
+
+type ActiveTab = 'characters' | 'settings' | 'foreshadowings' | 'timelines' | 'plots';
 
 interface ChatInsertEntityModalProps {
   isOpen: boolean;
@@ -40,13 +68,16 @@ export function ChatInsertEntityModal({
   const toast = useToast();
 
   const [targetNovelId, setTargetNovelId] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'characters' | 'settings'>('characters');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('characters');
   const [isExtracting, setIsExtracting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
 
   const [existingCharacters, setExistingCharacters] = useState<Character[]>([]);
   const [existingSettings, setExistingSettings] = useState<Setting[]>([]);
+  const [existingForeshadowings, setExistingForeshadowings] = useState<Foreshadowing[]>([]);
+  const [existingTimelines, setExistingTimelines] = useState<Timeline[]>([]);
+  const [existingChapters, setExistingChapters] = useState<Chapter[]>([]);
   const [loadingExisting, setLoadingExisting] = useState(false);
 
   const {
@@ -67,6 +98,33 @@ export function ChatInsertEntityModal({
     addEmptyItem: addEmptySetting,
   } = useEditableEntities<EditableSetting>([]);
 
+  const {
+    items: extractedForeshadowings,
+    setItems: setExtractedForeshadowings,
+    toggleItem: toggleForeshadowing,
+    updateItem: updateForeshadowingItem,
+    removeItem: removeForeshadowing,
+    addEmptyItem: addEmptyForeshadowing,
+  } = useEditableEntities<EditableForeshadowing>([]);
+
+  const {
+    items: extractedTimelines,
+    setItems: setExtractedTimelines,
+    toggleItem: toggleTimeline,
+    updateItem: updateTimelineItem,
+    removeItem: removeTimeline,
+    addEmptyItem: addEmptyTimeline,
+  } = useEditableEntities<EditableTimeline>([]);
+
+  const {
+    items: extractedPlots,
+    setItems: setExtractedPlots,
+    toggleItem: togglePlot,
+    updateItem: updatePlotItem,
+    removeItem: removePlot,
+    addEmptyItem: addEmptyPlot,
+  } = useEditableEntities<EditablePlot>([]);
+
   // 初期化・小説選択
   useEffect(() => {
     if (!isOpen) return;
@@ -80,7 +138,7 @@ export function ChatInsertEntityModal({
     }
   }, [isOpen, defaultNovelId, novels]);
 
-  // 選択中小説の既存データを取得（共有キャッシュ経由）
+  // 選択中小説の既存データを取得
   const charactersQuery = useQuery({
     queryKey: novelKeys.characters(targetNovelId),
     queryFn: () => fetchCharacters(targetNovelId),
@@ -93,23 +151,58 @@ export function ChatInsertEntityModal({
     enabled: !!isOpen && !!targetNovelId,
   });
 
+  const foreshadowingsQuery = useQuery({
+    queryKey: novelKeys.foreshadowings(targetNovelId),
+    queryFn: () => fetchForeshadowings(targetNovelId),
+    enabled: !!isOpen && !!targetNovelId,
+  });
+
+  const timelinesQuery = useQuery({
+    queryKey: novelKeys.timelines(targetNovelId),
+    queryFn: () => fetchTimelines(targetNovelId),
+    enabled: !!isOpen && !!targetNovelId,
+  });
+
+  const chaptersQuery = useQuery({
+    queryKey: novelKeys.chapters(targetNovelId),
+    queryFn: () => fetchChapters(targetNovelId),
+    enabled: !!isOpen && !!targetNovelId,
+  });
+
   // 取得データをローカル状態へ反映
   useEffect(() => {
     if (!isOpen || !targetNovelId) {
       setExistingCharacters([]);
       setExistingSettings([]);
+      setExistingForeshadowings([]);
+      setExistingTimelines([]);
+      setExistingChapters([]);
       return;
     }
 
-    if (charactersQuery.isLoading || settingsQuery.isLoading) {
+    const isLoading =
+      charactersQuery.isLoading ||
+      settingsQuery.isLoading ||
+      foreshadowingsQuery.isLoading ||
+      timelinesQuery.isLoading ||
+      chaptersQuery.isLoading;
+
+    if (isLoading) {
       setLoadingExisting(true);
       return;
     }
 
     const chars = charactersQuery.data ?? [];
     const sets = settingsQuery.data ?? [];
+    const fores = foreshadowingsQuery.data ?? [];
+    const times = timelinesQuery.data ?? [];
+    const chaps = chaptersQuery.data ?? [];
+
     setExistingCharacters(chars);
     setExistingSettings(sets);
+    setExistingForeshadowings(fores);
+    setExistingTimelines(times);
+    setExistingChapters(chaps);
     setLoadingExisting(false);
 
     // 既存データに基づいてマッチングを更新
@@ -138,13 +231,58 @@ export function ChatInsertEntityModal({
         };
       }),
     );
+
+    setExtractedForeshadowings((prev) =>
+      prev.map((f) => {
+        const matched = fores.find(
+          (ex) => ex.title.trim().toLowerCase() === f.title.trim().toLowerCase(),
+        );
+        return {
+          ...f,
+          matchedExisting: matched,
+          action: matched ? f.action || 'overwrite' : 'create',
+        };
+      }),
+    );
+
+    setExtractedTimelines((prev) =>
+      prev.map((t) => {
+        const matched = times.find(
+          (ex) => ex.event.trim().toLowerCase() === t.event.trim().toLowerCase(),
+        );
+        return {
+          ...t,
+          matchedExisting: matched,
+          action: matched ? t.action || 'overwrite' : 'create',
+        };
+      }),
+    );
+
+    setExtractedPlots((prev) =>
+      prev.map((p) => {
+        const matched = chaps.find(
+          (ex) => ex.title.trim().toLowerCase() === p.title.trim().toLowerCase(),
+        );
+        return {
+          ...p,
+          matchedExisting: matched,
+          action: matched ? p.action || 'overwrite' : 'create',
+        };
+      }),
+    );
   }, [
     isOpen,
     targetNovelId,
     charactersQuery.data,
     settingsQuery.data,
+    foreshadowingsQuery.data,
+    timelinesQuery.data,
+    chaptersQuery.data,
     charactersQuery.isLoading,
     settingsQuery.isLoading,
+    foreshadowingsQuery.isLoading,
+    timelinesQuery.isLoading,
+    chaptersQuery.isLoading,
   ]);
 
   // LLM抽出処理
@@ -184,11 +322,62 @@ export function ChatInsertEntityModal({
           };
         });
 
+        const fores: EditableForeshadowing[] = (data.foreshadowings || []).map((f, i) => {
+          const matched = existingForeshadowings.find(
+            (ex) => ex.title.trim().toLowerCase() === f.title.trim().toLowerCase(),
+          );
+          return {
+            ...f,
+            _id: `fore-${Date.now()}-${i}`,
+            _selected: true,
+            matchedExisting: matched,
+            action: matched ? 'overwrite' : 'create',
+          };
+        });
+
+        const times: EditableTimeline[] = (data.timelines || []).map((t, i) => {
+          const matched = existingTimelines.find(
+            (ex) => ex.event.trim().toLowerCase() === t.event.trim().toLowerCase(),
+          );
+          return {
+            ...t,
+            _id: `time-${Date.now()}-${i}`,
+            _selected: true,
+            matchedExisting: matched,
+            action: matched ? 'overwrite' : 'create',
+          };
+        });
+
+        const plots: EditablePlot[] = (data.plots || []).map((p, i) => {
+          const matched = existingChapters.find(
+            (ex) => ex.title.trim().toLowerCase() === p.title.trim().toLowerCase(),
+          );
+          return {
+            ...p,
+            _id: `plot-${Date.now()}-${i}`,
+            _selected: true,
+            matchedExisting: matched,
+            action: matched ? 'overwrite' : 'create',
+          };
+        });
+
         setExtractedCharacters(chars);
         setExtractedSettings(sets);
+        setExtractedForeshadowings(fores);
+        setExtractedTimelines(times);
+        setExtractedPlots(plots);
 
-        if (chars.length === 0 && sets.length > 0) {
+        // 抽出された項目があるタブを自動選択
+        if (chars.length > 0) {
+          setActiveTab('characters');
+        } else if (sets.length > 0) {
           setActiveTab('settings');
+        } else if (fores.length > 0) {
+          setActiveTab('foreshadowings');
+        } else if (times.length > 0) {
+          setActiveTab('timelines');
+        } else if (plots.length > 0) {
+          setActiveTab('plots');
         } else {
           setActiveTab('characters');
         }
@@ -279,10 +468,119 @@ export function ChatInsertEntityModal({
     });
   };
 
+  // 伏線の操作ハンドラ
+  const handleToggleForeshadowing = toggleForeshadowing;
+  const handleRemoveForeshadowing = removeForeshadowing;
+  const handleAddEmptyForeshadowing = () => {
+    addEmptyForeshadowing(
+      {
+        title: '新しい伏線',
+        description: '',
+        status: 'unresolved',
+        action: 'create',
+      },
+      'fore-',
+    );
+  };
+
+  const handleUpdateForeshadowing = (
+    id: string,
+    field: keyof EditableForeshadowing,
+    value: unknown,
+  ) => {
+    updateForeshadowingItem(id, (f) => {
+      if (field === 'title') {
+        const newTitle = String(value);
+        const matched = existingForeshadowings.find(
+          (ex) => ex.title.trim().toLowerCase() === newTitle.trim().toLowerCase(),
+        );
+        return {
+          ...f,
+          title: newTitle,
+          matchedExisting: matched,
+          action: matched ? f.action : 'create',
+        };
+      }
+      return { ...f, [field]: value };
+    });
+  };
+
+  // タイムラインの操作ハンドラ
+  const handleToggleTimeline = toggleTimeline;
+  const handleRemoveTimeline = removeTimeline;
+  const handleAddEmptyTimeline = () => {
+    addEmptyTimeline(
+      {
+        event: '新しい出来事',
+        timestamp: '',
+        action: 'create',
+      },
+      'time-',
+    );
+  };
+
+  const handleUpdateTimeline = (id: string, field: keyof EditableTimeline, value: unknown) => {
+    updateTimelineItem(id, (t) => {
+      if (field === 'event') {
+        const newEvent = String(value);
+        const matched = existingTimelines.find(
+          (ex) => ex.event.trim().toLowerCase() === newEvent.trim().toLowerCase(),
+        );
+        return {
+          ...t,
+          event: newEvent,
+          matchedExisting: matched,
+          action: matched ? t.action : 'create',
+        };
+      }
+      return { ...t, [field]: value };
+    });
+  };
+
+  // プロットの操作ハンドラ
+  const handleTogglePlot = togglePlot;
+  const handleRemovePlot = removePlot;
+  const handleAddEmptyPlot = () => {
+    addEmptyPlot(
+      {
+        title: '新しい章',
+        summary: '',
+        action: 'create',
+      },
+      'plot-',
+    );
+  };
+
+  const handleUpdatePlot = (id: string, field: keyof EditablePlot, value: unknown) => {
+    updatePlotItem(id, (p) => {
+      if (field === 'title') {
+        const newTitle = String(value);
+        const matched = existingChapters.find(
+          (ex) => ex.title.trim().toLowerCase() === newTitle.trim().toLowerCase(),
+        );
+        return {
+          ...p,
+          title: newTitle,
+          matchedExisting: matched,
+          action: matched ? p.action : 'create',
+        };
+      }
+      return { ...p, [field]: value };
+    });
+  };
+
   // 選択件数の集計
   const selectedChars = extractedCharacters.filter((c) => c._selected && c.name.trim());
   const selectedSets = extractedSettings.filter((s) => s._selected && s.name.trim());
-  const totalSelectedCount = selectedChars.length + selectedSets.length;
+  const selectedFores = extractedForeshadowings.filter((f) => f._selected && f.title.trim());
+  const selectedTimes = extractedTimelines.filter((t) => t._selected && t.event.trim());
+  const selectedPlots = extractedPlots.filter((p) => p._selected && p.title.trim());
+  const totalSelectedCount =
+    selectedChars.length +
+    selectedSets.length +
+    selectedFores.length +
+    selectedTimes.length +
+    selectedPlots.length;
 
   // 保存処理（新規追加・上書き・マージ対応）
   const handleSaveToNovel = async () => {
@@ -381,10 +679,96 @@ export function ChatInsertEntityModal({
         }
       }
 
+      // 3. 伏線の登録・更新
+      for (const f of selectedFores) {
+        const trimmedTitle = f.title.trim();
+        const trimmedDesc = f.description?.trim() || '';
+
+        if (f.action === 'overwrite' && f.matchedExisting) {
+          await updateForeshadowing(f.matchedExisting.id, {
+            title: trimmedTitle,
+            description: trimmedDesc || undefined,
+            status: f.status,
+          });
+          updatedCount++;
+        } else if (f.action === 'merge' && f.matchedExisting) {
+          const oldDesc = (f.matchedExisting.description || '').trim();
+          const mergedDesc = oldDesc ? `${oldDesc}\n\n【追記】\n${trimmedDesc}` : trimmedDesc;
+          await updateForeshadowing(f.matchedExisting.id, {
+            title: trimmedTitle,
+            description: mergedDesc || undefined,
+            status: f.status,
+          });
+          updatedCount++;
+        } else {
+          await createForeshadowing(targetNovelId, {
+            title: trimmedTitle,
+            description: trimmedDesc || undefined,
+            status: f.status,
+          });
+          createdCount++;
+        }
+      }
+
+      // 4. タイムラインの登録・更新
+      for (const t of selectedTimes) {
+        const trimmedEvent = t.event.trim();
+        const trimmedTimestamp = t.timestamp?.trim() || undefined;
+
+        if (t.action === 'overwrite' && t.matchedExisting) {
+          await updateTimeline(t.matchedExisting.id, {
+            event: trimmedEvent,
+            timestamp: trimmedTimestamp,
+          });
+          updatedCount++;
+        } else {
+          await createTimeline(targetNovelId, {
+            event: trimmedEvent,
+            timestamp: trimmedTimestamp,
+          });
+          createdCount++;
+        }
+      }
+
+      // 5. プロット（章）の登録・更新
+      for (const p of selectedPlots) {
+        const trimmedTitle = p.title.trim();
+        const trimmedSummary = p.summary?.trim() || '';
+
+        if (p.action === 'overwrite' && p.matchedExisting) {
+          await updateChapter(p.matchedExisting.id, {
+            title: trimmedTitle,
+            summary: trimmedSummary || undefined,
+          });
+          updatedCount++;
+        } else if (p.action === 'merge' && p.matchedExisting) {
+          const oldSummary = (p.matchedExisting.summary || '').trim();
+          const mergedSummary = oldSummary
+            ? `${oldSummary}\n\n【追記】\n${trimmedSummary}`
+            : trimmedSummary;
+          await updateChapter(p.matchedExisting.id, {
+            title: trimmedTitle,
+            summary: mergedSummary || undefined,
+          });
+          updatedCount++;
+        } else {
+          await createChapter(targetNovelId, {
+            title: trimmedTitle,
+            summary: trimmedSummary || undefined,
+          });
+          createdCount++;
+        }
+      }
+
       // キャッシュの無効化
-      await queryClient.invalidateQueries({
-        queryKey: novelKeys.detail(targetNovelId),
-      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: novelKeys.detail(targetNovelId) }),
+        queryClient.invalidateQueries({ queryKey: novelKeys.characters(targetNovelId) }),
+        queryClient.invalidateQueries({ queryKey: novelKeys.settings(targetNovelId) }),
+        queryClient.invalidateQueries({ queryKey: novelKeys.foreshadowings(targetNovelId) }),
+        queryClient.invalidateQueries({ queryKey: novelKeys.timelines(targetNovelId) }),
+        queryClient.invalidateQueries({ queryKey: novelKeys.chapters(targetNovelId) }),
+      ]);
 
       const parts: string[] = [];
       if (createdCount > 0) parts.push(`新規追加: ${createdCount}件`);
@@ -409,7 +793,9 @@ export function ChatInsertEntityModal({
       footer={
         <div className="flex w-full items-center justify-between">
           <div className="text-xs text-slate-500 dark:text-slate-400">
-            選択中: 人物 {selectedChars.length}件 / 設定 {selectedSets.length}件
+            選択中: 人物 {selectedChars.length}件 / 設定 {selectedSets.length}件 / 伏線{' '}
+            {selectedFores.length}件 / 年表 {selectedTimes.length}件 / プロット{' '}
+            {selectedPlots.length}件
           </div>
           <div className="flex items-center gap-2">
             <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
@@ -442,7 +828,7 @@ export function ChatInsertEntityModal({
                 id="target-novel-select"
                 value={targetNovelId}
                 onChange={(e) => setTargetNovelId(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 sm:w-72"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-850 dark:text-slate-100 sm:w-72"
               >
                 {novels.length === 0 && <option value="">小説がありません</option>}
                 {novels.map((n) => (
@@ -454,9 +840,11 @@ export function ChatInsertEntityModal({
             </div>
           </div>
 
-          <div className="mt-2 flex items-center justify-between border-t border-slate-200/80 pt-2 text-[11px] text-slate-500 dark:border-slate-700/60 dark:text-slate-400">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border-t border-slate-200/80 pt-2 text-[11px] text-slate-500 dark:border-slate-700/60 dark:text-slate-400">
             <span>
-              登録済みデータ: 人物 {existingCharacters.length}件 / 設定 {existingSettings.length}件
+              登録済み: 人物 {existingCharacters.length} / 設定 {existingSettings.length} / 伏線{' '}
+              {existingForeshadowings.length} / 年表 {existingTimelines.length} / 章{' '}
+              {existingChapters.length}
             </span>
             {loadingExisting && <span>(データ同期中...)</span>}
           </div>
@@ -465,9 +853,9 @@ export function ChatInsertEntityModal({
         {/* 抽出中ローディング */}
         {isExtracting && (
           <div className="flex flex-col items-center justify-center py-12 text-slate-500 dark:text-slate-400">
-            <div className="h-8 w-8 animate-spin rounded-full border-3 border-indigo-500 border-t-transparent mb-3" />
-            <p className="text-sm font-medium">チャットテキストから人物・設定を解析中...</p>
-            <p className="text-xs text-slate-400 mt-1">構造化データを抽出しています</p>
+            <div className="mb-3 h-8 w-8 animate-spin rounded-full border-3 border-indigo-500 border-t-transparent" />
+            <p className="text-sm font-medium">チャットテキストから設定・プロットを解析中...</p>
+            <p className="mt-1 text-xs text-slate-400">構造化データを抽出しています</p>
           </div>
         )}
 
@@ -482,18 +870,18 @@ export function ChatInsertEntityModal({
         {/* タブ切り替え & リスト */}
         {!isExtracting && (
           <div>
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 dark:border-slate-700">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setActiveTab('characters')}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
                     activeTab === 'characters'
                       ? 'bg-indigo-600 text-white shadow'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
                   }`}
                 >
-                  <span>👤 登場人物</span>
+                  <span>👤 人物</span>
                   <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
                     {extractedCharacters.length}
                   </span>
@@ -502,20 +890,65 @@ export function ChatInsertEntityModal({
                 <button
                   type="button"
                   onClick={() => setActiveTab('settings')}
-                  className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
                     activeTab === 'settings'
                       ? 'bg-indigo-600 text-white shadow'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
                   }`}
                 >
-                  <span>🌍 世界観・設定</span>
+                  <span>🌍 設定</span>
                   <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
                     {extractedSettings.length}
                   </span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('foreshadowings')}
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                    activeTab === 'foreshadowings'
+                      ? 'bg-indigo-600 text-white shadow'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+                  }`}
+                >
+                  <span>🔍 伏線</span>
+                  <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
+                    {extractedForeshadowings.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('timelines')}
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                    activeTab === 'timelines'
+                      ? 'bg-indigo-600 text-white shadow'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+                  }`}
+                >
+                  <span>⏳ 年表</span>
+                  <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
+                    {extractedTimelines.length}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('plots')}
+                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                    activeTab === 'plots'
+                      ? 'bg-indigo-600 text-white shadow'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+                  }`}
+                >
+                  <span>📖 プロット</span>
+                  <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
+                    {extractedPlots.length}
+                  </span>
+                </button>
               </div>
 
-              {activeTab === 'characters' ? (
+              {activeTab === 'characters' && (
                 <button
                   type="button"
                   onClick={handleAddEmptyCharacter}
@@ -523,13 +956,41 @@ export function ChatInsertEntityModal({
                 >
                   ＋ 人物を手動追加
                 </button>
-              ) : (
+              )}
+              {activeTab === 'settings' && (
                 <button
                   type="button"
                   onClick={handleAddEmptySetting}
                   className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
                 >
                   ＋ 設定を手動追加
+                </button>
+              )}
+              {activeTab === 'foreshadowings' && (
+                <button
+                  type="button"
+                  onClick={handleAddEmptyForeshadowing}
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                >
+                  ＋ 伏線を手動追加
+                </button>
+              )}
+              {activeTab === 'timelines' && (
+                <button
+                  type="button"
+                  onClick={handleAddEmptyTimeline}
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                >
+                  ＋ 出来事を手動追加
+                </button>
+              )}
+              {activeTab === 'plots' && (
+                <button
+                  type="button"
+                  onClick={handleAddEmptyPlot}
+                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                >
+                  ＋ プロットを手動追加
                 </button>
               )}
             </div>
@@ -551,6 +1012,36 @@ export function ChatInsertEntityModal({
                 onToggle={handleToggleSetting}
                 onRemove={handleRemoveSetting}
                 onUpdate={handleUpdateSetting}
+              />
+            )}
+
+            {/* 伏線リスト */}
+            {activeTab === 'foreshadowings' && (
+              <ChatInsertForeshadowingTab
+                foreshadowings={extractedForeshadowings}
+                onToggle={handleToggleForeshadowing}
+                onRemove={handleRemoveForeshadowing}
+                onUpdate={handleUpdateForeshadowing}
+              />
+            )}
+
+            {/* 年表リスト */}
+            {activeTab === 'timelines' && (
+              <ChatInsertTimelineTab
+                timelines={extractedTimelines}
+                onToggle={handleToggleTimeline}
+                onRemove={handleRemoveTimeline}
+                onUpdate={handleUpdateTimeline}
+              />
+            )}
+
+            {/* プロットリスト */}
+            {activeTab === 'plots' && (
+              <ChatInsertPlotTab
+                plots={extractedPlots}
+                onToggle={handleTogglePlot}
+                onRemove={handleRemovePlot}
+                onUpdate={handleUpdatePlot}
               />
             )}
           </div>

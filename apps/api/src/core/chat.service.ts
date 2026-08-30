@@ -14,6 +14,7 @@ import {
 import { searchContext } from '../rag.js';
 import { chatRequestSchema } from '../schemas/index.js';
 import { createReadTools } from './tools/readTools.js';
+import { createProposeTools } from './tools/proposeTools.js';
 import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
 
 export class ChatDomainService {
@@ -111,7 +112,14 @@ export class ChatDomainService {
     let parsed: {
       characters?: { name: string; category?: string; description?: string; traits?: string[] }[];
       settings?: { name: string; category?: string; description?: string }[];
-    } = { characters: [], settings: [] };
+      foreshadowings?: {
+        title: string;
+        description?: string;
+        status?: 'unresolved' | 'resolved' | 'abandoned';
+      }[];
+      timelines?: { event: string; timestamp?: string }[];
+      plots?: { title: string; summary?: string }[];
+    } = { characters: [], settings: [], foreshadowings: [], timelines: [], plots: [] };
 
     try {
       const jsonStr = rawResult
@@ -123,23 +131,39 @@ export class ChatDomainService {
         parsed = {
           characters: Array.isArray(resultObj.characters) ? resultObj.characters : [],
           settings: Array.isArray(resultObj.settings) ? resultObj.settings : [],
+          foreshadowings: Array.isArray(resultObj.foreshadowings) ? resultObj.foreshadowings : [],
+          timelines: Array.isArray(resultObj.timelines) ? resultObj.timelines : [],
+          plots: Array.isArray(resultObj.plots) ? resultObj.plots : [],
         };
       }
     } catch {
-      parsed = { characters: [], settings: [] };
+      parsed = { characters: [], settings: [], foreshadowings: [], timelines: [], plots: [] };
     }
 
     return {
       characters: (parsed.characters ?? []).map((c) => ({
-        name: c.name,
+        name: c.name ?? '',
         category: c.category ?? '',
         description: c.description ?? '',
         traits: c.traits ?? [],
       })),
       settings: (parsed.settings ?? []).map((s) => ({
-        name: s.name,
+        name: s.name ?? '',
         category: s.category ?? '',
         description: s.description ?? '',
+      })),
+      foreshadowings: (parsed.foreshadowings ?? []).map((f) => ({
+        title: f.title ?? '',
+        description: f.description ?? '',
+        status: f.status === 'resolved' || f.status === 'abandoned' ? f.status : 'unresolved',
+      })),
+      timelines: (parsed.timelines ?? []).map((t) => ({
+        event: t.event ?? '',
+        timestamp: t.timestamp ?? '',
+      })),
+      plots: (parsed.plots ?? []).map((p) => ({
+        title: p.title ?? '',
+        summary: p.summary ?? '',
       })),
     };
   }
@@ -262,13 +286,14 @@ export class ChatDomainService {
       }
     }
 
-    // 読み取り専用ツール群を構築する（ツール対象は小説コンテキストがある場合のみ）。
+    // ツール群（読み取りツール ＋ 設定提案ツール）を構築する（ツール対象は小説コンテキストがある場合のみ）。
     // 構築に失敗してもチャット自体は継続させる（RAG フォールバック方針に倣う）。
-    // createReadTools は Record<string, unknown> を返すため ToolSet へ safely 収める。
     let tools: ToolSet | undefined;
     if (effectiveNovelId) {
       try {
-        tools = createReadTools(this.ctx, effectiveNovelId) as ToolSet;
+        const readTools = createReadTools(this.ctx, effectiveNovelId);
+        const proposeTools = createProposeTools(this.ctx, effectiveNovelId);
+        tools = { ...readTools, ...proposeTools } as ToolSet;
       } catch {
         // ツール構築失敗時はツールなしで継続
       }
