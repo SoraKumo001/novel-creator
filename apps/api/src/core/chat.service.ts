@@ -141,29 +141,37 @@ export class ChatDomainService {
       parsed = { characters: [], settings: [], foreshadowings: [], timelines: [], plots: [] };
     }
 
+    const cleanLabel = (str?: string) =>
+      (str ?? '')
+        .replace(
+          /[（(【][\s\u3000]*(?:既存|新規|既存キャラ|新規キャラ|既存設定|新規設定|既存情報|新規案|既存人物|新規人物)[\s\u3000]*[）)】]/gi,
+          '',
+        )
+        .trim();
+
     return {
       characters: (parsed.characters ?? []).map((c) => ({
-        name: c.name ?? '',
-        category: c.category ?? '',
+        name: cleanLabel(c.name),
+        category: cleanLabel(c.category),
         description: c.description ?? '',
         traits: c.traits ?? [],
       })),
       settings: (parsed.settings ?? []).map((s) => ({
-        name: s.name ?? '',
-        category: s.category ?? '',
+        name: cleanLabel(s.name),
+        category: cleanLabel(s.category),
         description: s.description ?? '',
       })),
       foreshadowings: (parsed.foreshadowings ?? []).map((f) => ({
-        title: f.title ?? '',
+        title: cleanLabel(f.title),
         description: f.description ?? '',
         status: f.status === 'resolved' || f.status === 'abandoned' ? f.status : 'unresolved',
       })),
       timelines: (parsed.timelines ?? []).map((t) => ({
-        event: t.event ?? '',
+        event: cleanLabel(t.event),
         timestamp: t.timestamp ?? '',
       })),
       plots: (parsed.plots ?? []).map((p) => ({
-        title: p.title ?? '',
+        title: cleanLabel(p.title),
         summary: p.summary ?? '',
       })),
     };

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import {
+  cleanEntityMetadata,
   normalizeEntityName,
   reconcileCharacter,
   reconcileForeshadowing,
@@ -14,11 +14,24 @@ import type {
 import type { Character, Setting } from '../src/lib/types.js';
 
 describe('entity-insert matching logic', () => {
+  describe('cleanEntityMetadata', () => {
+    it('（既存キャラ）や（新規）などのメタ注記を除去すること', () => {
+      expect(cleanEntityMetadata('ギルド長（既存キャラ）')).toBe('ギルド長');
+      expect(cleanEntityMetadata('主人公 (既存キャラ)')).toBe('主人公');
+      expect(cleanEntityMetadata('アイン（既存）')).toBe('アイン');
+      expect(cleanEntityMetadata('護衛【新規】')).toBe('護衛');
+      expect(cleanEntityMetadata('副ギルド長（既存人物）')).toBe('副ギルド長');
+      expect(cleanEntityMetadata('世界観（既存設定）')).toBe('世界観');
+      expect(cleanEntityMetadata('')).toBe('');
+      expect(cleanEntityMetadata(null)).toBe('');
+    });
+  });
+
   describe('normalizeEntityName', () => {
-    it('前後の空白、全角空白、大文字小文字を正規化すること', () => {
-      expect(normalizeEntityName('  アイン  ')).toBe('アイン');
+    it('前後の空白、全角空白、大文字小文字を正規化し、メタ注記を除去すること', () => {
+      expect(normalizeEntityName('  アイン（既存キャラ）  ')).toBe('アイン');
       expect(normalizeEntityName('アイン　フォーサイス')).toBe('アイン フォーサイス');
-      expect(normalizeEntityName('Alice Forsyth')).toBe('alice forsyth');
+      expect(normalizeEntityName('Alice Forsyth (既存)')).toBe('alice forsyth');
       expect(normalizeEntityName(null)).toBe('');
     });
   });
@@ -36,6 +49,26 @@ describe('entity-insert matching logic', () => {
         updatedAt: new Date().toISOString(),
       },
     ];
+
+    it('「（既存キャラ）」が付いた名前やカテゴリでも既存キャラと一致し、クレンジングされること', () => {
+      const extracted: EditableCharacter = {
+        _id: 'c0',
+        _selected: true,
+        name: 'アイン（既存キャラ）',
+        category: '主人公（既存キャラ）',
+        description: '改革を進める青年',
+        traits: ['改革者'],
+        traitsString: '改革者',
+        action: 'create',
+      };
+
+      const result = reconcileCharacter(extracted, existingChars);
+      expect(result.name).toBe('アイン');
+      expect(result.category).toBe('主人公');
+      expect(result.matchedExisting).toBeDefined();
+      expect(result.matchedExisting?.id).toBe('char-1');
+      expect(result.action).toBe('overwrite');
+    });
 
     it('同名の既存人物が存在する場合、matchedExisting が設定され action が overwrite になること', () => {
       const extracted: EditableCharacter = {
