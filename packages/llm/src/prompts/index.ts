@@ -31,3 +31,8 @@ export { multiPersonaReviewPrompt } from './multiPersonaReview.js';
 export type { ReaderPersonaType, MultiPersonaReviewContext } from './multiPersonaReview.js';
 export { generateStyleGuideDraftPrompt } from './generateStyleGuideDraft.js';
 export type { GenerateStyleGuideDraftContext } from './generateStyleGuideDraft.js';
+export {
+  editStoryOutlineSection,
+  editStoryOutlineDocument,
+  generatePlotFromStoryOutline,
+} from './storyOutlinePrompts.js';

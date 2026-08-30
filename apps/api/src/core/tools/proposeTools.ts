@@ -222,5 +222,43 @@ export function createProposeTools(
         };
       },
     }),
+
+    proposeUpdateStoryOutline: createTool({
+      description:
+        'ストーリー構想（全体のあらすじ、序盤、中盤、今後の展開、結末など）への追加・更新・ブラッシュアップをユーザーに提案します。会話で良いあらすじや結末案、展開案がまとまった際に使用してください。',
+      parameters: z.object({
+        novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
+        sectionName: z
+          .string()
+          .describe(
+            '反映先セクションまたは見出し名（例: 全体あらすじ, 結末・エンディング, 今後の展開候補, 承（中盤・展開）など）',
+          ),
+        content: z.string().describe('提案するマークダウン内容・あらすじ・結末テキスト'),
+      }),
+      execute: async ({
+        novelId,
+        sectionName,
+        content,
+      }: {
+        novelId?: string;
+        sectionName: string;
+        content: string;
+      }) => {
+        const targetId = resolveNovelId(novelId);
+        if (!targetId) {
+          return { error: '対象の小説が指定されていません。' };
+        }
+        return {
+          type: 'proposal',
+          proposalType: 'story_outline',
+          novelId: targetId,
+          data: {
+            sectionName,
+            content,
+          },
+          summary: `ストーリー構想「${sectionName}」の更新提案`,
+        };
+      },
+    }),
   };
 }

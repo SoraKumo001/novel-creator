@@ -309,6 +309,65 @@ export function OverviewTab({
         </div>
       </Card>
 
+      {/* ストーリー構想 & あらすじ・結末相談 */}
+      <Card className="space-y-3">
+        <CardHeader
+          title="🗺️ ストーリー構想・あらすじ・結末（共創ワークスペース）"
+          action={
+            <Button
+              variant="secondary"
+              onClick={() =>
+                navigate({
+                  to: '/novels/$novelId',
+                  params: { novelId: novel.id },
+                  search: { tab: 'plot' },
+                })
+              }
+            >
+              {novel.storyOutline?.trim() ? '構想・相談を開く' : '構想・相談を始める'}
+            </Button>
+          }
+        />
+        {novel.storyOutline?.trim() ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                Markdown構想作成済み（{novel.storyOutline.length.toLocaleString()}文字）
+              </span>
+              <span className="text-xs text-muted-foreground">
+                AIチャット相談・セクション推敲・章立て展開と連動中
+              </span>
+            </div>
+            <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-surface-raised p-3 text-xs">
+              <MarkdownText content={novel.storyOutline} className="line-clamp-6" />
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-dashed border-border bg-surface-raised p-4">
+            <div className="space-y-1 text-xs">
+              <div className="font-bold text-foreground">ストーリー構想・あらすじが未作成です</div>
+              <p className="text-muted-foreground">
+                全体のあらすじ、序盤・中盤の展開、今後の展開候補、結末などをMarkdownで自由に記述しながら、AIと相談・反復推敲を重ねて骨格を固めることができます。
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              className="shrink-0"
+              onClick={() =>
+                navigate({
+                  to: '/novels/$novelId',
+                  params: { novelId: novel.id },
+                  search: { tab: 'plot' },
+                })
+              }
+            >
+              構想・相談を始める
+            </Button>
+          </div>
+        )}
+      </Card>
+
       {/* 執筆スタイル・文体ガイドライン */}
       <Card className="space-y-3">
         <CardHeader

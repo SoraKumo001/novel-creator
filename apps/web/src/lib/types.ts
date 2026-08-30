@@ -70,12 +70,14 @@ export interface CreateNovelInput {
   title: string;
   description?: string;
   styleGuide?: string | null;
+  storyOutline?: string | null;
 }
 
 export interface UpdateNovelInput {
   title?: string;
   description?: string;
   styleGuide?: string | null;
+  storyOutline?: string | null;
 }
 
 export interface CreateChapterInput {

@@ -345,12 +345,14 @@ describe('Chat API', () => {
       'getPlotAndChapters',
       'getSectionContent',
       'getSettings',
+      'getStoryOutline',
       'getTimelines',
       'proposeAddForeshadowing',
       'proposeAddTimelineEvent',
       'proposeCreateCharacter',
       'proposeCreateSetting',
       'proposeUpdatePlot',
+      'proposeUpdateStoryOutline',
       'searchNovelKnowledge',
     ]);
   });

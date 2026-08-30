@@ -7,13 +7,15 @@ import {
   createForeshadowing,
   createSetting,
   createTimeline,
+  fetchStoryOutline,
+  saveStoryOutline,
 } from '@/lib/services/index.js';
 import { useToast } from '@/hooks/useToast.js';
 import { Button } from '@/components/Button.js';
 
 export interface ProposalPayload {
   type: 'proposal';
-  proposalType: 'character' | 'setting' | 'foreshadowing' | 'timeline' | 'plot';
+  proposalType: 'character' | 'setting' | 'foreshadowing' | 'timeline' | 'plot' | 'story_outline';
   novelId: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: Record<string, any>;
@@ -70,6 +72,22 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           summary: data.summary,
         });
         await queryClient.invalidateQueries({ queryKey: novelKeys.chapters(novelId) });
+      } else if (proposalType === 'story_outline') {
+        const currentOutline = await fetchStoryOutline(novelId).catch(() => '');
+        const sectionHeader = `## ${data.sectionName || '提案内容'}`;
+        let updatedOutline = currentOutline.trim();
+        if (updatedOutline.includes(sectionHeader)) {
+          // 該当見出しが存在する場合は置換または追記
+          updatedOutline = updatedOutline.replace(
+            new RegExp(`(${sectionHeader}\\n)[\\s\\S]*?(?=\\n##|\\n#|$)`),
+            `$1${data.content}\n`,
+          );
+        } else {
+          updatedOutline = updatedOutline
+            ? `${updatedOutline}\n\n${sectionHeader}\n${data.content}\n`
+            : `${sectionHeader}\n${data.content}\n`;
+        }
+        await saveStoryOutline(novelId, updatedOutline);
       }
 
       await queryClient.invalidateQueries({ queryKey: novelKeys.detail(novelId) });
@@ -131,6 +149,10 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
     plot: {
       label: '📖 プロット',
       bg: 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300',
+    },
+    story_outline: {
+      label: '🗺️ ストーリー構想',
+      bg: 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300',
     },
   };
 
@@ -224,6 +246,17 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
             </div>
             <p className="line-clamp-3 text-[11px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
               {data.summary}
+            </p>
+          </div>
+        )}
+
+        {proposalType === 'story_outline' && (
+          <div className="space-y-1">
+            <div className="font-bold text-slate-900 dark:text-slate-100">
+              {data.sectionName || 'ストーリー構想案'}
+            </div>
+            <p className="line-clamp-4 text-[11px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+              {data.content}
             </p>
           </div>
         )}

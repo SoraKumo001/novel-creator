@@ -14,6 +14,8 @@ import { ChapterSectionFormModal } from './-ChapterSectionFormModal.js';
 import { ChapterTreeItem } from './-ChapterTreeItem.js';
 import { PlotPreviewPanel } from './-PlotPreviewPanel.js';
 
+import { StoryOutlineMarkdownEditor } from './-StoryOutlineMarkdownEditor.js';
+
 export function PlotTab({
   novel,
   onRefresh,
@@ -21,6 +23,8 @@ export function PlotTab({
   novel: NonNullable<ReturnType<typeof useNovel>['novel']>;
   onRefresh: () => Promise<void>;
 }) {
+  const [viewMode, setViewMode] = useState<'story_outline' | 'structure'>('structure');
+
   const {
     chapters,
     loading,
@@ -217,141 +221,188 @@ export function PlotTab({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="text-xl font-bold text-foreground">章立て・プロット</h2>
-          {chapters.length > 0 && (
-            <button
-              onClick={toggleExpandAll}
-              className="text-xs text-muted-foreground hover:text-foreground transition cursor-pointer"
-            >
-              {expandedChapterIds.size === chapters.length ? 'すべて折りたたむ' : 'すべて展開'}
-            </button>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <LLMModelSelector
-            value={selectedModelConfigId}
-            onChange={setSelectedModelConfigId}
-            size="sm"
-          />
-          <Button
-            variant="secondary"
-            onClick={handleGeneratePlot}
-            isLoading={generatingPlot}
-            leftIcon={<SparklesIcon />}
+    <div className="flex h-full flex-col space-y-4">
+      {/* サブビュー切り替えタブ */}
+      <div className="flex items-center justify-between border-b border-border pb-3 shrink-0">
+        <div className="flex items-center gap-1 rounded-lg bg-surface-raised p-1 border border-border">
+          <button
+            type="button"
+            onClick={() => setViewMode('structure')}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+              viewMode === 'structure'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
+            }`}
           >
-            プロット生成
-          </Button>
-          <Button onClick={() => setChapterForm({} as Chapter)} leftIcon={<PlusIcon />}>
-            章を追加
-          </Button>
+            <span>📋</span>
+            <span>章・節の構成</span>
+            <span className="rounded-full bg-surface/50 px-1.5 py-0.2 text-[10px]">
+              {chapters.length}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('story_outline')}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition cursor-pointer ${
+              viewMode === 'story_outline'
+                ? 'bg-primary text-primary-foreground shadow-xs'
+                : 'text-muted-foreground hover:text-foreground hover:bg-surface-hover'
+            }`}
+          >
+            <span>🗺️</span>
+            <span>ストーリー構想・あらすじ相談</span>
+            <span className="rounded bg-amber-500/20 px-1.5 py-0.2 text-[10px] text-amber-700 dark:text-amber-300 font-medium">
+              Markdown
+            </span>
+          </button>
         </div>
+
+        {viewMode === 'structure' && (
+          <div className="flex items-center gap-2">
+            <LLMModelSelector
+              value={selectedModelConfigId}
+              onChange={setSelectedModelConfigId}
+              size="sm"
+            />
+            <Button
+              variant="secondary"
+              onClick={handleGeneratePlot}
+              isLoading={generatingPlot}
+              leftIcon={<SparklesIcon />}
+            >
+              プロット自動生成
+            </Button>
+            <Button onClick={() => setChapterForm({} as Chapter)} leftIcon={<PlusIcon />}>
+              章を追加
+            </Button>
+          </div>
+        )}
       </div>
 
-      {generatingPlot && (
-        <div className="rounded-xl border border-primary/40 bg-surface-raised p-5 shadow-md animate-in fade-in duration-200">
-          <AIProgressIndicator
-            stage="AIが小説設定・登場人物を参照してプロット構成を立案中..."
-            description="物語の起承転結や伏線・キャラクター設定を考慮し、全章の構成案を生成しています"
-            startedAt={generateStartedAt ?? Date.now()}
-            onCancel={cancelGeneration}
-            cancelLabel="生成を中止"
-            variant="panel"
+      {viewMode === 'story_outline' ? (
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <StoryOutlineMarkdownEditor novelId={novel.id} onRefresh={onRefresh} />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl font-bold text-foreground">章立て・プロット</h2>
+              {chapters.length > 0 && (
+                <button
+                  onClick={toggleExpandAll}
+                  className="text-xs text-muted-foreground hover:text-foreground transition cursor-pointer"
+                >
+                  {expandedChapterIds.size === chapters.length ? 'すべて折りたたむ' : 'すべて展開'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {generatingPlot && (
+            <div className="rounded-xl border border-primary/40 bg-surface-raised p-5 shadow-md animate-in fade-in duration-200">
+              <AIProgressIndicator
+                stage="AIが小説設定・登場人物を参照してプロット構成を立案中..."
+                description="物語の起承転結や伏線・キャラクター設定を考慮し、全章の構成案を生成しています"
+                startedAt={generateStartedAt ?? Date.now()}
+                onCancel={cancelGeneration}
+                cancelLabel="生成を中止"
+                variant="panel"
+              />
+            </div>
+          )}
+
+          {plotPreview && (
+            <PlotPreviewPanel
+              plotPreview={plotPreview}
+              selectedPlotIndices={selectedPlotIndices}
+              onToggleAll={(checked) => {
+                if (checked) {
+                  setSelectedPlotIndices(new Set(plotPreview.chapters.map((_, i) => i)));
+                } else {
+                  setSelectedPlotIndices(new Set());
+                }
+              }}
+              onToggleIndex={(idx) => {
+                setSelectedPlotIndices((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(idx)) next.delete(idx);
+                  else next.add(idx);
+                  return next;
+                });
+              }}
+              onDiscard={() => {
+                setPlotPreview(null);
+                setSelectedPlotIndices(new Set());
+              }}
+              onApply={handleApplyPlot}
+            />
+          )}
+
+          {loading && <Loading message="章を読み込み中..." />}
+          {!loading && chapters.length === 0 && (
+            <EmptyState
+              title="章がありません"
+              description="章を追加するか、プロット生成から始めましょう。"
+            />
+          )}
+
+          {!loading && (
+            <div className="space-y-3">
+              {chapters.map((chapter, chIdx) => (
+                <ChapterTreeItem
+                  key={chapter.id}
+                  chapter={chapter}
+                  isExpanded={expandedChapterIds.has(chapter.id)}
+                  onToggle={() => toggleChapterExpand(chapter.id)}
+                  onEditChapter={() => setChapterForm(chapter)}
+                  onDeleteChapter={() => setDeleteTarget({ type: 'chapter', id: chapter.id })}
+                  onGenerateChapterSummary={() => handleGenerateChapterSummaryAction(chapter.id)}
+                  onAddSection={() => setSectionForm({ chapterId: chapter.id })}
+                  onEditSection={(s) => setSectionForm({ chapterId: chapter.id, section: s })}
+                  onDeleteSection={(s) => setDeleteTarget({ type: 'section', id: s.id })}
+                  onGenerateSectionSummary={(s) => handleGenerateSectionSummaryAction(s.id)}
+                  onMoveChapterUp={() => void handleMoveChapter(chapter.id, 'up')}
+                  onMoveChapterDown={() => void handleMoveChapter(chapter.id, 'down')}
+                  onMoveSectionUp={(sId) => void handleMoveSection(chapter.id, sId, 'up')}
+                  onMoveSectionDown={(sId) => void handleMoveSection(chapter.id, sId, 'down')}
+                  canMoveUp={chIdx > 0}
+                  canMoveDown={chIdx < chapters.length - 1}
+                  generatingSummaryId={activeGeneratingId}
+                />
+              ))}
+            </div>
+          )}
+
+          <ChapterSectionFormModal
+            mode="chapter"
+            isOpen={!!chapterForm}
+            onClose={() => setChapterForm(null)}
+            onSubmit={handleSaveChapter}
+            isLoading={chapterForm ? updating : creating}
+            title={chapterForm ? '章を編集' : '章を追加'}
+            defaultValues={chapterForm ?? undefined}
+          />
+          <ChapterSectionFormModal
+            mode="section"
+            isOpen={!!sectionForm}
+            onClose={() => setSectionForm(null)}
+            onSubmit={handleSaveSection}
+            isLoading={sectionForm?.section ? updating : creating}
+            title={sectionForm?.section ? '節を編集' : '節を追加'}
+            defaultValues={sectionForm?.section}
+          />
+          <ConfirmDialog
+            isOpen={!!deleteTarget}
+            onClose={() => setDeleteTarget(null)}
+            onConfirm={handleDelete}
+            title={deleteTarget?.type === 'chapter' ? '章を削除しますか？' : '節を削除しますか？'}
+            message="紐づく本文や時系列も削除されます。"
+            confirmLabel="削除"
+            isLoading={deleting}
           />
         </div>
       )}
-
-      {plotPreview && (
-        <PlotPreviewPanel
-          plotPreview={plotPreview}
-          selectedPlotIndices={selectedPlotIndices}
-          onToggleAll={(checked) => {
-            if (checked) {
-              setSelectedPlotIndices(new Set(plotPreview.chapters.map((_, i) => i)));
-            } else {
-              setSelectedPlotIndices(new Set());
-            }
-          }}
-          onToggleIndex={(idx) => {
-            setSelectedPlotIndices((prev) => {
-              const next = new Set(prev);
-              if (next.has(idx)) next.delete(idx);
-              else next.add(idx);
-              return next;
-            });
-          }}
-          onDiscard={() => {
-            setPlotPreview(null);
-            setSelectedPlotIndices(new Set());
-          }}
-          onApply={handleApplyPlot}
-        />
-      )}
-
-      {loading && <Loading message="章を読み込み中..." />}
-      {!loading && chapters.length === 0 && (
-        <EmptyState
-          title="章がありません"
-          description="章を追加するか、プロット生成から始めましょう。"
-        />
-      )}
-
-      {!loading && (
-        <div className="space-y-3">
-          {chapters.map((chapter, chIdx) => (
-            <ChapterTreeItem
-              key={chapter.id}
-              chapter={chapter}
-              isExpanded={expandedChapterIds.has(chapter.id)}
-              onToggle={() => toggleChapterExpand(chapter.id)}
-              onEditChapter={() => setChapterForm(chapter)}
-              onDeleteChapter={() => setDeleteTarget({ type: 'chapter', id: chapter.id })}
-              onGenerateChapterSummary={() => handleGenerateChapterSummaryAction(chapter.id)}
-              onAddSection={() => setSectionForm({ chapterId: chapter.id })}
-              onEditSection={(s) => setSectionForm({ chapterId: chapter.id, section: s })}
-              onDeleteSection={(s) => setDeleteTarget({ type: 'section', id: s.id })}
-              onGenerateSectionSummary={(s) => handleGenerateSectionSummaryAction(s.id)}
-              onMoveChapterUp={() => void handleMoveChapter(chapter.id, 'up')}
-              onMoveChapterDown={() => void handleMoveChapter(chapter.id, 'down')}
-              onMoveSectionUp={(sId) => void handleMoveSection(chapter.id, sId, 'up')}
-              onMoveSectionDown={(sId) => void handleMoveSection(chapter.id, sId, 'down')}
-              canMoveUp={chIdx > 0}
-              canMoveDown={chIdx < chapters.length - 1}
-              generatingSummaryId={activeGeneratingId}
-            />
-          ))}
-        </div>
-      )}
-
-      <ChapterSectionFormModal
-        mode="chapter"
-        isOpen={!!chapterForm}
-        onClose={() => setChapterForm(null)}
-        onSubmit={handleSaveChapter}
-        isLoading={chapterForm ? updating : creating}
-        title={chapterForm ? '章を編集' : '章を追加'}
-        defaultValues={chapterForm ?? undefined}
-      />
-      <ChapterSectionFormModal
-        mode="section"
-        isOpen={!!sectionForm}
-        onClose={() => setSectionForm(null)}
-        onSubmit={handleSaveSection}
-        isLoading={sectionForm?.section ? updating : creating}
-        title={sectionForm?.section ? '節を編集' : '節を追加'}
-        defaultValues={sectionForm?.section}
-      />
-      <ConfirmDialog
-        isOpen={!!deleteTarget}
-        onClose={() => setDeleteTarget(null)}
-        onConfirm={handleDelete}
-        title={deleteTarget?.type === 'chapter' ? '章を削除しますか？' : '節を削除しますか？'}
-        message="紐づく本文や時系列も削除されます。"
-        confirmLabel="削除"
-        isLoading={deleting}
-      />
     </div>
   );
 }

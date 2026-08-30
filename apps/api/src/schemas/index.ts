@@ -6,12 +6,38 @@ export const createNovelSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   styleGuide: z.string().optional(),
+  storyOutline: z.string().optional(),
 });
 
 export const updateNovelSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
   styleGuide: z.string().nullable().optional(),
+  storyOutline: z.string().nullable().optional(),
+});
+
+export const saveStoryOutlineSchema = z.object({
+  markdown: z.string(),
+});
+
+export const editStoryOutlineSectionSchema = z.object({
+  category: z.string(),
+  name: z.string(),
+  content: z.string(),
+  instruction: z.string().min(1),
+  markdown: z.string(),
+  modelConfigId: z.string().optional().nullable(),
+});
+
+export const editStoryOutlineDocumentSchema = z.object({
+  markdown: z.string(),
+  instruction: z.string().min(1),
+  modelConfigId: z.string().optional().nullable(),
+});
+
+export const generatePlotFromOutlineSchema = z.object({
+  storyOutline: z.string().min(1),
+  modelConfigId: z.string().optional().nullable(),
 });
 
 // ---- chapters ----

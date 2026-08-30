@@ -77,4 +77,13 @@ export {
   type StyleGuideTemplate,
   type StyleGuideSnippet,
 } from './styleGuideTemplates.js';
+export {
+  scanStoryOutlineSectionRanges,
+  findStoryOutlineSectionByLine,
+  buildStoryOutlineCategoryTree,
+  STORY_OUTLINE_TEMPLATES,
+  type StoryOutlineSectionRange,
+  type StoryOutlineCategoryNode,
+  type StoryOutlineTemplate,
+} from './storyOutlineMarkdown.js';
 export * from './schemas/entities.js';

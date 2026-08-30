@@ -5,6 +5,7 @@ export const novels = pgTable('novels', {
   title: text('title').notNull(),
   description: text('description'),
   styleGuide: text('style_guide'),
+  storyOutline: text('story_outline'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });

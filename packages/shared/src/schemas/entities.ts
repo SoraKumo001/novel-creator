@@ -14,6 +14,7 @@ export const novelSchema = z.object({
   title: z.string(),
   description: z.string().nullable(),
   styleGuide: z.string().nullable().optional(),
+  storyOutline: z.string().nullable().optional(),
   createdAt: isoDateOrNull,
   updatedAt: isoDateOrNull,
 });

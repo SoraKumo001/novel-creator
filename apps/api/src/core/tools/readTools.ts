@@ -129,6 +129,7 @@ export function createReadTools(
             id: detail.novel.id,
             title: detail.novel.title,
             description: detail.novel.description,
+            storyOutline: truncateText(detail.novel.storyOutline, 2000),
             chapterCount: detail.chapters.length,
             characterCount: detail.characters.length,
             settingCount: detail.settings.length,
@@ -137,6 +138,29 @@ export function createReadTools(
           };
         } catch {
           return { error: '指定された小説が見つかりませんでした。' };
+        }
+      },
+    }),
+
+    getStoryOutline: createTool({
+      description:
+        '小説のストーリー構想（全体のあらすじ、序盤・中盤・今後の展開候補、結末、構想メモ）のマークダウン内容を取得します。構成や今後の展開・結末の相談時に参照してください。',
+      parameters: z.object({
+        novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
+      }),
+      execute: async ({ novelId }: { novelId?: string }) => {
+        const targetId = resolveNovelId(novelId);
+        if (!targetId) {
+          return { error: '対象の小説が指定されていません。' };
+        }
+        try {
+          const detail = await novelService.getNovelDetail(targetId);
+          return {
+            title: detail.novel.title,
+            storyOutline: detail.novel.storyOutline || '（ストーリー構想はまだ作成されていません）',
+          };
+        } catch {
+          return { error: 'ストーリー構想の取得に失敗しました。' };
         }
       },
     }),

@@ -86,6 +86,7 @@ export async function updateNovel(id: string, input: UpdateNovelInput): Promise<
       title: input.title,
       description: input.description,
       styleGuide: input.styleGuide,
+      storyOutline: input.storyOutline,
     },
   });
   if (!res.ok) throw new Error('Failed to update novel');
@@ -95,9 +96,105 @@ export async function updateNovel(id: string, input: UpdateNovelInput): Promise<
     title: row.title,
     description: row.description ?? null,
     styleGuide: row.styleGuide ?? null,
+    storyOutline: row.storyOutline ?? null,
     createdAt: row.createdAt ?? null,
     updatedAt: row.updatedAt ?? null,
   };
+}
+
+export async function fetchStoryOutline(id: string): Promise<string> {
+  const res = await apiClient.novels[':id']['story-outline'].markdown.$get({
+    param: { id },
+  });
+  if (!res.ok) throw new Error('Failed to fetch story outline');
+  const data = await res.json();
+  return data.markdown;
+}
+
+export async function saveStoryOutline(id: string, markdown: string): Promise<Novel> {
+  const res = await apiClient.novels[':id']['story-outline'].markdown.$put({
+    param: { id },
+    json: { markdown },
+  });
+  if (!res.ok) throw new Error('Failed to save story outline');
+  const data = await res.json();
+  return {
+    id: data.novel.id,
+    title: data.novel.title,
+    description: data.novel.description ?? null,
+    styleGuide: data.novel.styleGuide ?? null,
+    storyOutline: data.novel.storyOutline ?? null,
+    createdAt: data.novel.createdAt ?? null,
+    updatedAt: data.novel.updatedAt ?? null,
+  };
+}
+
+export async function editStoryOutlineSection(
+  id: string,
+  params: {
+    activeSection: { category: string; name: string; content: string };
+    instruction: string;
+    markdown: string;
+    modelConfigId?: string | null;
+  },
+): Promise<string> {
+  const res = await apiClient.novels[':id']['story-outline']['edit-section'].$post({
+    param: { id },
+    json: {
+      category: params.activeSection.category,
+      name: params.activeSection.name,
+      content: params.activeSection.content,
+      instruction: params.instruction,
+      markdown: params.markdown,
+      modelConfigId: params.modelConfigId ?? undefined,
+    },
+  });
+  if (!res.ok) throw new Error('Failed to edit story outline section');
+  const data = await res.json();
+  return data.content;
+}
+
+export async function editStoryOutlineDocument(
+  id: string,
+  params: {
+    instruction: string;
+    markdown: string;
+    modelConfigId?: string | null;
+  },
+): Promise<string> {
+  const res = await apiClient.novels[':id']['story-outline']['edit-document'].$post({
+    param: { id },
+    json: {
+      instruction: params.instruction,
+      markdown: params.markdown,
+      modelConfigId: params.modelConfigId ?? undefined,
+    },
+  });
+  if (!res.ok) throw new Error('Failed to edit story outline document');
+  const data = await res.json();
+  return data.markdown;
+}
+
+export async function generatePlotFromStoryOutline(
+  id: string,
+  params: {
+    storyOutline: string;
+    modelConfigId?: string | null;
+  },
+): Promise<{
+  title: string;
+  description: string;
+  chapters: { title: string; order: number; summary: string }[];
+}> {
+  const res = await apiClient.novels[':id']['story-outline']['generate-plot'].$post({
+    param: { id },
+    json: {
+      storyOutline: params.storyOutline,
+      modelConfigId: params.modelConfigId ?? undefined,
+    },
+  });
+  if (!res.ok) throw new Error('Failed to generate plot from story outline');
+  return res.json();
 }
 
 export async function generateStyleGuideDraft(

@@ -57,4 +57,7 @@ export {
   type MultiPersonaReviewContext,
   generateStyleGuideDraftPrompt,
   type GenerateStyleGuideDraftContext,
+  editStoryOutlineSection,
+  editStoryOutlineDocument,
+  generatePlotFromStoryOutline,
 } from './prompts/index.js';

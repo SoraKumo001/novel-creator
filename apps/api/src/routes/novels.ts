@@ -9,6 +9,7 @@ import { novelCharactersRouter } from './novels/characters.js';
 import { novelForeshadowingsRouter } from './novels/foreshadowings.js';
 import { novelInstructionsRouter } from './novels/instructions.js';
 import { novelSettingsRouter } from './novels/settings.js';
+import { novelStoryOutlineRouter } from './novels/storyOutline.js';
 import { novelTimelinesRouter } from './novels/timelines.js';
 
 const novelsRouter = new Hono<AppContext>()
@@ -24,6 +25,7 @@ const novelsRouter = new Hono<AppContext>()
       title: body.title,
       description: body.description ?? null,
       styleGuide: body.styleGuide ?? null,
+      storyOutline: body.storyOutline ?? null,
     });
     return c.json(row, 201);
   })
@@ -63,6 +65,7 @@ const novelsRouter = new Hono<AppContext>()
   .route('/', novelForeshadowingsRouter)
   .route('/', novelTimelinesRouter)
   .route('/', novelInstructionsRouter)
-  .route('/', novelAnalysisRouter);
+  .route('/', novelAnalysisRouter)
+  .route('/', novelStoryOutlineRouter);
 
 export default novelsRouter;

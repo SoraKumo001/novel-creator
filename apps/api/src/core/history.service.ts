@@ -3,6 +3,7 @@ import {
   characters,
   contents,
   editHistories,
+  novels,
   sections,
   settings,
   type Database,
@@ -263,6 +264,28 @@ export class HistoryDomainService {
       });
 
       return { success: true, message: '設定マークダウンを復元しました' };
+    }
+
+    if (history.entityType === 'story_outline_markdown') {
+      await this.ctx.db
+        .update(novels)
+        .set({
+          storyOutline: history.content,
+          updatedAt: new Date(),
+        })
+        .where(eq(novels.id, history.novelId));
+
+      await this.recordHistory({
+        novelId: history.novelId,
+        entityType: 'story_outline_markdown',
+        entityId: history.novelId,
+        title: 'ストーリー構想マークダウン',
+        content: history.content,
+        description: `過去のバージョン(${new Date(history.createdAt).toLocaleString('ja-JP')})から復元`,
+        wordCount: history.content.length,
+      });
+
+      return { success: true, message: 'ストーリー構想マークダウンを復元しました' };
     }
 
     return { success: false, message: '未対応のエンティティタイプです' };

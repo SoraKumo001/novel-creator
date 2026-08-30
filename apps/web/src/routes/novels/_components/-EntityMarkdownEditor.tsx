@@ -18,12 +18,13 @@ export interface EntityMarkdownEditorProps<TSection extends { category: string; 
     | 'characters_markdown'
     | 'settings_markdown'
     | 'foreshadowings_document'
-    | 'foreshadowings_markdown';
+    | 'foreshadowings_markdown'
+    | 'story_outline_markdown';
   storageKey: string;
   fetchMarkdown: () => Promise<string>;
   saveMarkdown: (
     markdown: string,
-  ) => Promise<{ created: number; updated: number; deleted: number }>;
+  ) => Promise<{ created?: number; updated?: number; deleted?: number }>;
   buildTree: (markdown: string) => MarkdownCategoryNode[];
   findSectionAtLine: (markdown: string, lineNumber: number) => TSection | null;
   onEditSection: (params: {
@@ -37,6 +38,7 @@ export interface EntityMarkdownEditorProps<TSection extends { category: string; 
   editingDocument: boolean;
   sectionPlaceholder?: (activeSection: TSection | null) => string;
   documentPlaceholder?: string;
+  extraToolbarActions?: React.ReactNode;
 }
 
 export function EntityMarkdownEditor<TSection extends { category: string; name: string }>({
@@ -55,6 +57,7 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
   editingDocument,
   sectionPlaceholder,
   documentPlaceholder,
+  extraToolbarActions,
 }: EntityMarkdownEditorProps<TSection>) {
   const {
     markdown,
@@ -251,6 +254,7 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
           )}
         </div>
         <div className="flex items-center gap-2">
+          {extraToolbarActions}
           <Button
             size="sm"
             variant="secondary"
