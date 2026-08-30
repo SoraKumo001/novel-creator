@@ -8,6 +8,7 @@ import { SettingDomainService } from './setting.service.js';
 import { TimelineDomainService } from './timeline.service.js';
 import { LlmInstructionDomainService } from './llm-instruction.service.js';
 import { GenerateDomainService } from './generate.service.js';
+import { AnalysisDomainService } from './analysis.service.js';
 import { ChatDomainService } from './chat.service.js';
 import { BackupDomainService } from './backup.service.js';
 import { HistoryDomainService } from './history.service.js';
@@ -27,6 +28,7 @@ export interface DomainServices {
   foreshadowing: ForeshadowingDomainService;
   llmInstruction: LlmInstructionDomainService;
   generate: GenerateDomainService;
+  analysis: AnalysisDomainService;
   chat: ChatDomainService;
   backup: BackupDomainService;
   history: HistoryDomainService;
@@ -47,6 +49,7 @@ export function createDomainServices(ctx: ServiceContext): DomainServices {
     foreshadowing: new ForeshadowingDomainService(ctx),
     llmInstruction: new LlmInstructionDomainService(ctx),
     generate: new GenerateDomainService(ctx),
+    analysis: new AnalysisDomainService(ctx),
     chat: new ChatDomainService(ctx),
     backup: new BackupDomainService(ctx),
     history: new HistoryDomainService(ctx),

@@ -49,6 +49,14 @@ export const QUICK_PROMPTS: QuickPrompt[] = [
       '現在登録されている小説情報、世界観設定、登場人物情報を確認し、論理的な矛盾や設定の甘さ、あるいは「もっとこうすると面白くなる・整合性が高まる」改善点があれば指摘・提案してください。',
     icon: '🔍',
   },
+  {
+    id: 'app-usage-guide',
+    title: 'アプリの使い方を教えて',
+    description: '主要機能の場所と簡単な手順を案内',
+    prompt:
+      'アプリの使い方を教えてください。主要な機能と、その場所（画面やタブ）と簡単な手順を、初心者にも分かるようにまとめてください。',
+    icon: '💡',
+  },
 ];
 
 export interface ChatContextValue {

@@ -12,6 +12,7 @@ import {
   proofreadPrompt,
   sectionSummary,
 } from '../src/prompts/index.js';
+import { APP_USAGE_GUIDE, creativeChatSystemPrompt } from '../src/prompts/creativeChat.js';
 
 describe('plotGeneration', () => {
   it('必須フィールド（タイトル・あらすじ・章立て）が含まれること', () => {
@@ -155,5 +156,32 @@ describe('proofreadPrompt', () => {
     expect(prompt).toContain('"score"');
     expect(prompt).toContain('"issues"');
     expect(prompt).toContain('"polishedBody"');
+  });
+});
+
+describe('creativeChatSystemPrompt', () => {
+  it('アプリ使い方ガイドラインが含まれること', () => {
+    const prompt = creativeChatSystemPrompt();
+    expect(prompt).toContain('アプリの使い方の質問への対応');
+    expect(prompt).toContain('アプリ機能カタログ');
+  });
+
+  it('小説コンテキストありでもアプリ機能カタログが含まれること', () => {
+    const prompt = creativeChatSystemPrompt({
+      novel: { title: 'X' },
+      settings: ['s'],
+      characters: ['c'],
+    });
+    expect(prompt).toContain('アプリ機能カタログ');
+    expect(prompt).toContain('エクスポート');
+  });
+
+  it('小説コンテキストなしでもアプリ機能カタログが含まれること', () => {
+    expect(creativeChatSystemPrompt()).toContain('アプリ機能カタログ');
+    expect(creativeChatSystemPrompt({})).toContain('アプリ機能カタログ');
+  });
+
+  it('機能カタログは700文字未満であること', () => {
+    expect(APP_USAGE_GUIDE.length).toBeLessThan(700);
   });
 });

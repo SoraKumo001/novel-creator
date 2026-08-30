@@ -7,23 +7,20 @@ import { CharacterVoiceCheckerModal } from '@/components/CharacterVoiceCheckerMo
 import { MultiPersonaReviewModal } from '@/components/MultiPersonaReviewModal.js';
 import { InlineAIAssistant } from '@/components/InlineAIAssistant.js';
 import { useContent } from '@/hooks/useContent.js';
+import { useAnalysis } from '@/hooks/useAnalysis.js';
 import { useGenerate } from '@/hooks/useGenerate.js';
 import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import { countWords } from '@/lib/sse.js';
 import { proofreadSectionContent } from '@/lib/services/index.js';
-import { ReferenceSidePanel } from '@/components/ReferenceSidePanel.js';
-import { useCharacters } from '@/hooks/useCharacters.js';
-import { useSettings } from '@/hooks/useSettings.js';
-import { useForeshadowings } from '@/hooks/useForeshadowings.js';
 import type {
+  AnalysisHistoryEntry,
   CharacterVoiceCheckResult,
   ExtractResult,
   InlineAssistAction,
   MultiPersonaReviewResult,
   ProofreadResult,
   Section,
-  ChapterWithSections,
 } from '@/lib/types.js';
 import { MonacoEditor } from './-MonacoEditor.js';
 import { EditorToolbar } from './-EditorToolbar.js';
@@ -33,7 +30,6 @@ import { ExtractResultModal } from './-ExtractResultModal.js';
 interface SectionEditorProps {
   novelId: string;
   section: Section;
-  chapter?: ChapterWithSections;
   onRefresh: () => Promise<void>;
   onUpdateTitle: (newTitle: string) => Promise<void>;
   isZenMode: boolean;
@@ -43,42 +39,30 @@ interface SectionEditorProps {
 export function SectionEditor({
   novelId,
   section,
-  chapter,
   onRefresh,
   onUpdateTitle,
   isZenMode,
   onToggleZenMode,
 }: SectionEditorProps) {
-  const { characters = [] } = useCharacters(novelId);
-  const { settings = [] } = useSettings(novelId);
-  const { foreshadowings = [] } = useForeshadowings(novelId);
-
-  const [referencePanelOpen, setReferencePanelOpen] = useState(() => {
-    return localStorage.getItem('novel-creator:reference-panel-open') === 'true';
-  });
-
-  const handleToggleReferencePanel = () => {
-    setReferencePanelOpen((prev) => {
-      const next = !prev;
-      localStorage.setItem('novel-creator:reference-panel-open', String(next));
-      return next;
-    });
-  };
   const { content, loading, saving, updateContent } = useContent(section.id);
   const {
     generateContent,
     generatingContent,
     inlineAssist,
     inlineAssisting,
-    checkVoice,
-    checkingVoice,
-    reviewPersona,
-    reviewingPersona,
     extract,
     extracting,
     streamError,
     resetStreamError,
   } = useGenerate();
+
+  const {
+    running,
+    progress,
+    runVoiceCheck,
+    runPersonaReview,
+    cancel: cancelAnalysis,
+  } = useAnalysis();
 
   const [localBody, setLocalBody] = useState('');
   const [savedBody, setSavedBody] = useState('');
@@ -101,9 +85,17 @@ export function SectionEditor({
 
   const [voiceCheckerOpen, setVoiceCheckerOpen] = useState(false);
   const [voiceResult, setVoiceResult] = useState<CharacterVoiceCheckResult | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceHistoryView, setVoiceHistoryView] = useState(false);
+  const [voiceViewedAt, setVoiceViewedAt] = useState<string | null>(null);
+  const [voiceHistoryKey, setVoiceHistoryKey] = useState(0);
 
   const [personaReviewOpen, setPersonaReviewOpen] = useState(false);
   const [personaResult, setPersonaResult] = useState<MultiPersonaReviewResult | null>(null);
+  const [personaError, setPersonaError] = useState<string | null>(null);
+  const [personaHistoryView, setPersonaHistoryView] = useState(false);
+  const [personaViewedAt, setPersonaViewedAt] = useState<string | null>(null);
+  const [personaHistoryKey, setPersonaHistoryKey] = useState(0);
 
   // インラインAI支援用ステート
   const [selectedText, setSelectedText] = useState('');
@@ -217,12 +209,20 @@ export function SectionEditor({
       return;
     }
     setVoiceCheckerOpen(true);
+    setVoiceResult(null);
+    setVoiceError(null);
+    setVoiceHistoryView(false);
+    setVoiceViewedAt(null);
     try {
-      const res = await checkVoice(novelId, localBody, selectedModelConfigId);
+      const res = await runVoiceCheck(novelId, {
+        body: localBody,
+        modelConfigId: selectedModelConfigId,
+      });
       setVoiceResult(res);
+      setVoiceHistoryKey((k) => k + 1);
     } catch (e) {
-      toast.error(toErrorMessage(e));
-      setVoiceCheckerOpen(false);
+      if ((e as Error)?.name === 'AbortError') return;
+      setVoiceError(toErrorMessage(e));
     }
   };
 
@@ -233,17 +233,38 @@ export function SectionEditor({
       return;
     }
     setPersonaReviewOpen(true);
+    setPersonaResult(null);
+    setPersonaError(null);
+    setPersonaHistoryView(false);
+    setPersonaViewedAt(null);
     try {
-      const res = await reviewPersona(novelId, {
+      const res = await runPersonaReview(novelId, {
         sectionId: section.id,
         body: localBody,
         modelConfigId: selectedModelConfigId,
       });
       setPersonaResult(res);
+      setPersonaHistoryKey((k) => k + 1);
     } catch (e) {
-      toast.error(toErrorMessage(e));
-      setPersonaReviewOpen(false);
+      if ((e as Error)?.name === 'AbortError') return;
+      setPersonaError(toErrorMessage(e));
     }
+  };
+
+  // 履歴から結果を読み込む
+  const handleSelectVoiceHistory = (entry: AnalysisHistoryEntry) => {
+    if (entry.analysisType !== 'check-voice') return;
+    setVoiceResult(entry.result as CharacterVoiceCheckResult);
+    setVoiceError(null);
+    setVoiceHistoryView(true);
+    setVoiceViewedAt(entry.createdAt);
+  };
+  const handleSelectPersonaHistory = (entry: AnalysisHistoryEntry) => {
+    if (entry.analysisType !== 'persona-review') return;
+    setPersonaResult(entry.result as MultiPersonaReviewResult);
+    setPersonaError(null);
+    setPersonaHistoryView(true);
+    setPersonaViewedAt(entry.createdAt);
   };
 
   // 選択テキスト変更
@@ -346,8 +367,6 @@ export function SectionEditor({
         onOpenPersonaReview={() => void handleOpenPersonaReview()}
         onOpenProofread={() => void handleOpenProofread()}
         onSave={() => void handleSave()}
-        isReferencePanelOpen={referencePanelOpen}
-        onToggleReferencePanel={handleToggleReferencePanel}
       />
 
       {/* 目標達成度プログレスバー */}
@@ -360,62 +379,49 @@ export function SectionEditor({
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden relative flex flex-row">
-        <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
-          {loading ? (
-            <Loading message="本文を読み込み中..." />
-          ) : (
-            <div className="flex-1 min-h-0 overflow-hidden relative">
-              <MonacoEditor
-                value={localBody}
-                onChange={setLocalBody}
-                onSelectionChange={handleSelectionChange}
-              />
+      <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
+        {loading ? (
+          <Loading message="本文を読み込み中..." />
+        ) : (
+          <div className="flex-1 min-h-0 overflow-hidden relative">
+            <MonacoEditor
+              value={localBody}
+              onChange={setLocalBody}
+              onSelectionChange={handleSelectionChange}
+            />
 
-              {/* 選択テキストがある場合のインラインAIトリガーバー */}
-              {selectedText && !isInlineActive && (
-                <div className="absolute top-4 right-8 z-30 animate-in fade-in slide-in-from-top-1 duration-150">
-                  <button
-                    type="button"
-                    onClick={() => setIsInlineActive(true)}
-                    className="flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-lg hover:brightness-110 transition cursor-pointer border border-primary/20"
-                  >
-                    <span>✨ 選択範囲をAI推敲 ({selectedText.length}文字)</span>
-                  </button>
-                </div>
-              )}
+            {/* 選択テキストがある場合のインラインAIトリガーバー */}
+            {selectedText && !isInlineActive && (
+              <div className="absolute top-4 right-8 z-30 animate-in fade-in slide-in-from-top-1 duration-150">
+                <button
+                  type="button"
+                  onClick={() => setIsInlineActive(true)}
+                  className="flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-lg hover:brightness-110 transition cursor-pointer border border-primary/20"
+                >
+                  <span>✨ 選択範囲をAI推敲 ({selectedText.length}文字)</span>
+                </button>
+              </div>
+            )}
 
-              {/* インラインAIアシスタントパネル */}
-              {isInlineActive && (
-                <div className="absolute top-4 right-8 z-40 w-96 max-w-[calc(100%-4rem)]">
-                  <InlineAIAssistant
-                    selectedText={selectedText}
-                    onApplyReplace={handleApplyInlineReplace}
-                    onApplyInsertAfter={handleApplyInlineInsertAfter}
-                    onCancel={() => {
-                      setIsInlineActive(false);
-                      setInlineGeneratedText('');
-                    }}
-                    onExecuteAssist={handleExecuteInlineAssist}
-                    isLoading={inlineAssisting}
-                    generatedText={inlineGeneratedText}
-                  />
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* 📑 参考資料サイドパネル */}
-        <ReferenceSidePanel
-          isOpen={referencePanelOpen}
-          onClose={() => handleToggleReferencePanel()}
-          section={section}
-          chapter={chapter}
-          characters={characters}
-          settings={settings}
-          foreshadowings={foreshadowings}
-        />
+            {/* インラインAIアシスタントパネル */}
+            {isInlineActive && (
+              <div className="absolute top-4 right-8 z-40 w-96 max-w-[calc(100%-4rem)]">
+                <InlineAIAssistant
+                  selectedText={selectedText}
+                  onApplyReplace={handleApplyInlineReplace}
+                  onApplyInsertAfter={handleApplyInlineInsertAfter}
+                  onCancel={() => {
+                    setIsInlineActive(false);
+                    setInlineGeneratedText('');
+                  }}
+                  onExecuteAssist={handleExecuteInlineAssist}
+                  isLoading={inlineAssisting}
+                  generatedText={inlineGeneratedText}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <GenerateContentPanel generatingContent={generatingContent} streamError={streamError} />
@@ -460,14 +466,32 @@ export function SectionEditor({
         isOpen={voiceCheckerOpen}
         onClose={() => setVoiceCheckerOpen(false)}
         result={voiceResult}
-        isLoading={checkingVoice}
+        progress={progress}
+        running={running === 'check-voice'}
+        error={voiceError}
+        isHistoryView={voiceHistoryView}
+        viewedAt={voiceViewedAt}
+        novelId={novelId}
+        historyRefreshKey={voiceHistoryKey}
+        onSelectHistory={handleSelectVoiceHistory}
+        onRerun={() => void handleOpenVoiceChecker()}
+        onCancel={cancelAnalysis}
         onApplyFix={handleApplyVoiceFix}
       />
       <MultiPersonaReviewModal
         isOpen={personaReviewOpen}
         onClose={() => setPersonaReviewOpen(false)}
         result={personaResult}
-        isLoading={reviewingPersona}
+        progress={progress}
+        running={running === 'persona-review'}
+        error={personaError}
+        isHistoryView={personaHistoryView}
+        viewedAt={personaViewedAt}
+        novelId={novelId}
+        historyRefreshKey={personaHistoryKey}
+        onSelectHistory={handleSelectPersonaHistory}
+        onRerun={() => void handleOpenPersonaReview()}
+        onCancel={cancelAnalysis}
       />
     </div>
   );

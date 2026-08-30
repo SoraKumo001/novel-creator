@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { streamSSE } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 
@@ -7,6 +8,7 @@ import { getServices } from '../core/services.js';
 import {
   analyzeSettingImpactBodySchema,
   analyzeStoryArcBodySchema,
+  analysisResultParamsSchema,
   checkCharacterVoiceBodySchema,
   createChapterSchema,
   createCharacterSchema,
@@ -19,6 +21,7 @@ import {
   editSettingDocumentSchema,
   editSettingSectionSchema,
   idParamSchema,
+  listAnalysisResultsQuerySchema,
   multiPersonaReviewBodySchema,
   saveCharactersMarkdownSchema,
   saveSettingsMarkdownSchema,
@@ -343,7 +346,7 @@ const novelsRouter = new Hono<AppContext>()
       return c.json(result);
     },
   )
-  // POST /api/novels/:id/generate/check-voice - キャラクター口調・一貫性チェック
+  // POST /api/novels/:id/generate/check-voice - キャラクター口調・一貫性チェック (SSE ストリーミング)
   .post(
     '/:id/generate/check-voice',
     zValidator('param', idParamSchema),
@@ -351,13 +354,25 @@ const novelsRouter = new Hono<AppContext>()
     async (c) => {
       const { id: novelId } = c.req.valid('param');
       const jsonBody = c.req.valid('json');
-      const result = await getServices(c).generate.checkCharacterVoice(
-        novelId,
-        undefined,
-        jsonBody?.body,
-        jsonBody?.modelConfigId,
-      );
-      return c.json(result);
+
+      return streamSSE(c, async (stream) => {
+        try {
+          for await (const ev of getServices(c).analysis.streamCheckVoice(
+            novelId,
+            jsonBody?.sectionId,
+            jsonBody?.body,
+            jsonBody?.modelConfigId,
+          )) {
+            await stream.writeSSE({ event: ev.type, data: JSON.stringify(ev) });
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          await stream.writeSSE({
+            event: 'error',
+            data: JSON.stringify({ type: 'error', message }),
+          });
+        }
+      });
     },
   )
   // POST /api/novels/:id/generate/impact - 設定変更の影響範囲分析
@@ -378,7 +393,7 @@ const novelsRouter = new Hono<AppContext>()
       return c.json(result);
     },
   )
-  // POST /api/novels/:id/generate/story-arc - ストーリーアーク・テンション分析
+  // POST /api/novels/:id/generate/story-arc - ストーリーアーク・テンション分析 (SSE ストリーミング)
   .post(
     '/:id/generate/story-arc',
     zValidator('param', idParamSchema),
@@ -386,14 +401,26 @@ const novelsRouter = new Hono<AppContext>()
     async (c) => {
       const { id: novelId } = c.req.valid('param');
       const jsonBody = c.req.valid('json');
-      const result = await getServices(c).generate.analyzeStoryArc(
-        novelId,
-        jsonBody?.modelConfigId,
-      );
-      return c.json(result);
+
+      return streamSSE(c, async (stream) => {
+        try {
+          for await (const ev of getServices(c).analysis.streamStoryArc(
+            novelId,
+            jsonBody?.modelConfigId,
+          )) {
+            await stream.writeSSE({ event: ev.type, data: JSON.stringify(ev) });
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          await stream.writeSSE({
+            event: 'error',
+            data: JSON.stringify({ type: 'error', message }),
+          });
+        }
+      });
     },
   )
-  // POST /api/novels/:id/generate/persona-review - 複数ペルソナによる模擬読者レビュー
+  // POST /api/novels/:id/generate/persona-review - 複数ペルソナによる模擬読者レビュー (SSE ストリーミング)
   .post(
     '/:id/generate/persona-review',
     zValidator('param', idParamSchema),
@@ -401,13 +428,46 @@ const novelsRouter = new Hono<AppContext>()
     async (c) => {
       const { id: novelId } = c.req.valid('param');
       const jsonBody = c.req.valid('json');
-      const result = await getServices(c).generate.multiPersonaReview(novelId, {
-        sectionId: jsonBody?.sectionId,
-        chapterId: jsonBody?.chapterId,
-        customBody: jsonBody?.body,
-        modelConfigId: jsonBody?.modelConfigId,
+
+      return streamSSE(c, async (stream) => {
+        try {
+          for await (const ev of getServices(c).analysis.streamPersonaReview(novelId, {
+            sectionId: jsonBody?.sectionId,
+            chapterId: jsonBody?.chapterId,
+            customBody: jsonBody?.body,
+            modelConfigId: jsonBody?.modelConfigId,
+          })) {
+            await stream.writeSSE({ event: ev.type, data: JSON.stringify(ev) });
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          await stream.writeSSE({
+            event: 'error',
+            data: JSON.stringify({ type: 'error', message }),
+          });
+        }
       });
-      return c.json(result);
+    },
+  )
+  // GET /api/novels/:id/analysis-results - AI 分析結果履歴一覧
+  .get(
+    '/:id/analysis-results',
+    zValidator('param', idParamSchema),
+    zValidator('query', listAnalysisResultsQuerySchema),
+    async (c) => {
+      const { id: novelId } = c.req.valid('param');
+      const query = c.req.valid('query');
+      return c.json(await getServices(c).analysis.listResults(novelId, query.analysisType));
+    },
+  )
+  // DELETE /api/novels/:id/analysis-results/:resultId - AI 分析結果履歴削除
+  .delete(
+    '/:id/analysis-results/:resultId',
+    zValidator('param', analysisResultParamsSchema),
+    async (c) => {
+      const { id, resultId } = c.req.valid('param');
+      await getServices(c).analysis.deleteResult(id, resultId);
+      return c.json({ ok: true });
     },
   );
 

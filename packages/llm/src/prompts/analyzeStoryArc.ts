@@ -31,6 +31,7 @@ export function analyzeStoryArcPrompt(context: AnalyzeStoryArcContext): string {
   }
 
   prompt += `\n以下の基準で各節を分析し、JSON 形式で出力してください。JSON 以外のテキストは含めないでください。
+すべてのテキスト値（summary・pacingCritique・keyEvent・advice 等）は必ず日本語で出力してください。
 
 【スコアリング指標】
 - tension: 0〜100 (緊張感・サスペンス・切迫度。0: 平穏な日常, 50: 事件の発生・対立, 100: 究極の決戦・最大の危機)

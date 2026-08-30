@@ -29,6 +29,7 @@ export function multiPersonaReviewPrompt(context: MultiPersonaReviewContext): st
   prompt += `\n■ 対象本文:\n\`\`\`\n${context.text}\n\`\`\`\n\n`;
 
   prompt += `以下の JSON 形式で出力してください。JSON 以外のテキストは含めないでください。
+overallImpression・catchphrase・praise・criticism・advice 等のすべてのテキスト値は必ず日本語で出力してください。personaName は指定された日本語名称をそのまま使用してください。
 {
   "overallImpression": "チーム全体の総合的な読後感まとめ",
   "reviews": [

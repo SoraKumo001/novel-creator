@@ -2,24 +2,18 @@ import { useCallback, useState } from 'react';
 import { toErrorMessage } from '@/lib/errors.js';
 import {
   analyzeSettingImpact,
-  analyzeStoryArc,
-  checkCharacterVoice,
   extractEntities,
   generateChapterSummary,
   generatePlot,
   generateSectionSummary,
-  multiPersonaReview,
 } from '@/lib/services/index.js';
 import { streamGenerateContent, streamInlineAssist } from '@/lib/sse.js';
 import type {
-  CharacterVoiceCheckResult,
   ExtractResult,
   GeneratedPlot,
   GeneratedSummary,
   InlineAssistInput,
-  MultiPersonaReviewResult,
   SettingImpactResult,
-  StoryArcResult,
 } from '@/lib/types.js';
 
 interface UseGenerateReturn {
@@ -28,10 +22,7 @@ interface UseGenerateReturn {
   generatingContent: boolean;
   extracting: boolean;
   inlineAssisting: boolean;
-  checkingVoice: boolean;
   analyzingImpact: boolean;
-  analyzingArc: boolean;
-  reviewingPersona: boolean;
   generatedPlot: GeneratedPlot | null;
   generatedSummary: GeneratedSummary | null;
   streamError: string | null;
@@ -48,11 +39,6 @@ interface UseGenerateReturn {
     input: InlineAssistInput,
     onChunk: (text: string) => void,
   ) => Promise<void>;
-  checkVoice: (
-    novelId: string,
-    body?: string,
-    modelConfigId?: string | null,
-  ) => Promise<CharacterVoiceCheckResult>;
   analyzeImpact: (
     novelId: string,
     input: {
@@ -63,16 +49,6 @@ interface UseGenerateReturn {
       modelConfigId?: string | null;
     },
   ) => Promise<SettingImpactResult>;
-  analyzeArc: (novelId: string, modelConfigId?: string | null) => Promise<StoryArcResult>;
-  reviewPersona: (
-    novelId: string,
-    input: {
-      sectionId?: string;
-      chapterId?: string;
-      body?: string;
-      modelConfigId?: string | null;
-    },
-  ) => Promise<MultiPersonaReviewResult>;
   extract: (sectionId: string) => Promise<ExtractResult>;
   resetGeneratedPlot: () => void;
   resetGeneratedSummary: () => void;
@@ -85,10 +61,7 @@ export function useGenerate(): UseGenerateReturn {
   const [generatingContent, setGeneratingContent] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [inlineAssisting, setInlineAssisting] = useState(false);
-  const [checkingVoice, setCheckingVoice] = useState(false);
   const [analyzingImpact, setAnalyzingImpact] = useState(false);
-  const [analyzingArc, setAnalyzingArc] = useState(false);
-  const [reviewingPersona, setReviewingPersona] = useState(false);
   const [generatedPlot, setGeneratedPlot] = useState<GeneratedPlot | null>(null);
   const [generatedSummary, setGeneratedSummary] = useState<GeneratedSummary | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
@@ -163,18 +136,6 @@ export function useGenerate(): UseGenerateReturn {
     [],
   );
 
-  const checkVoice = useCallback(
-    async (novelId: string, body?: string, modelConfigId?: string | null) => {
-      setCheckingVoice(true);
-      try {
-        return await checkCharacterVoice(novelId, body, modelConfigId);
-      } finally {
-        setCheckingVoice(false);
-      }
-    },
-    [],
-  );
-
   const analyzeImpact = useCallback(
     async (
       novelId: string,
@@ -196,35 +157,6 @@ export function useGenerate(): UseGenerateReturn {
     [],
   );
 
-  const analyzeArc = useCallback(async (novelId: string, modelConfigId?: string | null) => {
-    setAnalyzingArc(true);
-    try {
-      return await analyzeStoryArc(novelId, modelConfigId);
-    } finally {
-      setAnalyzingArc(false);
-    }
-  }, []);
-
-  const reviewPersona = useCallback(
-    async (
-      novelId: string,
-      input: {
-        sectionId?: string;
-        chapterId?: string;
-        body?: string;
-        modelConfigId?: string | null;
-      },
-    ) => {
-      setReviewingPersona(true);
-      try {
-        return await multiPersonaReview(novelId, input);
-      } finally {
-        setReviewingPersona(false);
-      }
-    },
-    [],
-  );
-
   const extract = useCallback(async (sectionId: string) => {
     setExtracting(true);
     try {
@@ -240,10 +172,7 @@ export function useGenerate(): UseGenerateReturn {
     generatingContent,
     extracting,
     inlineAssisting,
-    checkingVoice,
     analyzingImpact,
-    analyzingArc,
-    reviewingPersona,
     generatedPlot,
     generatedSummary,
     streamError,
@@ -252,10 +181,7 @@ export function useGenerate(): UseGenerateReturn {
     generateSectionSummary: handleGenerateSectionSummary,
     generateContent,
     inlineAssist,
-    checkVoice,
     analyzeImpact,
-    analyzeArc,
-    reviewPersona,
     extract,
     resetGeneratedPlot: () => setGeneratedPlot(null),
     resetGeneratedSummary: () => setGeneratedSummary(null),

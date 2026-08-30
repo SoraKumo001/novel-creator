@@ -32,6 +32,7 @@ export function checkCharacterVoicePrompt(context: CheckCharacterVoiceContext): 
   prompt += `\n■ 精査対象本文:\n\`\`\`\n${context.body}\n\`\`\`\n\n`;
 
   prompt += `以下の JSON 形式で出力してください。JSON 以外のテキストは含めないでください。
+summary・reason・suggestion 等のすべてのテキスト値は必ず日本語で出力してください。
 {
   "summary": "全体のキャラクター描写・口調の一貫性に関する総括",
   "issues": [

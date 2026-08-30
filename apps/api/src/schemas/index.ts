@@ -331,6 +331,7 @@ export const inlineAssistBodySchema = z.object({
 
 export const checkCharacterVoiceBodySchema = z.object({
   body: z.string().optional(),
+  sectionId: z.string().uuid().optional(),
   modelConfigId: z.string().uuid().optional().nullable(),
 });
 
@@ -359,4 +360,16 @@ export const listHistoriesQuerySchema = z.object({
   entityType: z.string().optional(),
   entityId: z.string().uuid().optional(),
   limit: z.coerce.number().int().positive().optional(),
+});
+
+// ---- AI 分析結果 ----
+export const analysisTypeSchema = z.enum(['story-arc', 'check-voice', 'persona-review']);
+
+export const listAnalysisResultsQuerySchema = z.object({
+  analysisType: analysisTypeSchema.optional(),
+});
+
+export const analysisResultParamsSchema = z.object({
+  id: z.uuid(),
+  resultId: z.uuid(),
 });

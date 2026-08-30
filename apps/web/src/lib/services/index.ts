@@ -7,6 +7,7 @@ export * from './setting.js';
 export * from './timeline.js';
 export * from './llmInstruction.js';
 export * from './generate.js';
+export * from './analysis.js';
 export * from './chat.js';
 export * from './backup.js';
 export * from './history.js';

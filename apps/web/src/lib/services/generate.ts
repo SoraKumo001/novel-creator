@@ -179,19 +179,6 @@ export async function* inlineAssistSectionContent(
   }
 }
 
-export async function checkCharacterVoice(
-  novelId: string,
-  body?: string,
-  modelConfigId?: string | null,
-) {
-  const res = await apiClient.novels[':id'].generate['check-voice'].$post({
-    param: { id: novelId },
-    json: { body, modelConfigId: modelConfigId || null },
-  });
-  if (!res.ok) throw new Error('Failed to check character voice');
-  return res.json();
-}
-
 export async function analyzeSettingImpact(
   novelId: string,
   input: {
@@ -213,36 +200,5 @@ export async function analyzeSettingImpact(
     },
   });
   if (!res.ok) throw new Error('Failed to analyze setting impact');
-  return res.json();
-}
-
-export async function analyzeStoryArc(novelId: string, modelConfigId?: string | null) {
-  const res = await apiClient.novels[':id'].generate['story-arc'].$post({
-    param: { id: novelId },
-    json: { modelConfigId: modelConfigId || null },
-  });
-  if (!res.ok) throw new Error('Failed to analyze story arc');
-  return res.json();
-}
-
-export async function multiPersonaReview(
-  novelId: string,
-  input: {
-    sectionId?: string;
-    chapterId?: string;
-    body?: string;
-    modelConfigId?: string | null;
-  },
-) {
-  const res = await apiClient.novels[':id'].generate['persona-review'].$post({
-    param: { id: novelId },
-    json: {
-      sectionId: input.sectionId,
-      chapterId: input.chapterId,
-      body: input.body,
-      modelConfigId: input.modelConfigId || null,
-    },
-  });
-  if (!res.ok) throw new Error('Failed to generate multi-persona review');
   return res.json();
 }

@@ -474,3 +474,24 @@ export interface MultiPersonaReviewResult {
   overallImpression: string;
   reviews: ReaderPersonaReview[];
 }
+
+// ---- AI分析（ストーリーアーク / 口調チェック / ペルソナレビュー）----
+export type AnalysisType = 'story-arc' | 'check-voice' | 'persona-review';
+
+/** SSE 進捗イベント。stage は表示用日本語ラベル。total が 0 の場合は不定間隔（インジケーター表示用）。 */
+export interface AnalysisProgress {
+  stage: string;
+  current: number;
+  total: number;
+}
+
+/** 保存済み分析結果の履歴エントリ。result の実際の型は analysisType で判別してキャストすること。 */
+export interface AnalysisHistoryEntry {
+  id: string;
+  novelId: string;
+  analysisType: AnalysisType;
+  result: StoryArcResult | CharacterVoiceCheckResult | MultiPersonaReviewResult;
+  targetSectionId: string | null;
+  targetChapterId: string | null;
+  createdAt: string;
+}

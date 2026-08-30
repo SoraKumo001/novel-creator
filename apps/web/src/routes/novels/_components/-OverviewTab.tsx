@@ -11,11 +11,11 @@ import { CharacterVoiceCheckerModal } from '@/components/CharacterVoiceCheckerMo
 import { MultiPersonaReviewModal } from '@/components/MultiPersonaReviewModal.js';
 import { StoryArcChartModal } from '@/components/StoryArcChartModal.js';
 import { useChapters } from '@/hooks/useChapters.js';
-import { useGenerate } from '@/hooks/useGenerate.js';
+import { useAnalysis } from '@/hooks/useAnalysis.js';
 import { useNovel } from '@/hooks/useNovel.js';
-import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import type {
+  AnalysisHistoryEntry,
   CharacterVoiceCheckResult,
   MultiPersonaReviewResult,
   StoryArcResult,
@@ -31,10 +31,15 @@ export function OverviewTab({
 }) {
   const { updateNovel, updating, deleteNovel, deleting } = useNovel(novel.id);
   const { chapters } = useChapters(novel.id);
-  const { analyzeArc, analyzingArc, checkVoice, checkingVoice, reviewPersona, reviewingPersona } =
-    useGenerate();
+  const {
+    running,
+    progress,
+    runStoryArc,
+    runVoiceCheck,
+    runPersonaReview,
+    cancel: cancelAnalysis,
+  } = useAnalysis();
   const navigate = useNavigate();
-  const toast = useToast();
 
   const [isOpen, setIsOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -45,12 +50,24 @@ export function OverviewTab({
   // 分析モーダル用ステート
   const [arcModalOpen, setArcModalOpen] = useState(false);
   const [arcResult, setArcResult] = useState<StoryArcResult | null>(null);
+  const [arcError, setArcError] = useState<string | null>(null);
+  const [arcHistoryView, setArcHistoryView] = useState(false);
+  const [arcViewedAt, setArcViewedAt] = useState<string | null>(null);
+  const [arcHistoryKey, setArcHistoryKey] = useState(0);
 
   const [voiceModalOpen, setVoiceModalOpen] = useState(false);
   const [voiceResult, setVoiceResult] = useState<CharacterVoiceCheckResult | null>(null);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceHistoryView, setVoiceHistoryView] = useState(false);
+  const [voiceViewedAt, setVoiceViewedAt] = useState<string | null>(null);
+  const [voiceHistoryKey, setVoiceHistoryKey] = useState(0);
 
   const [personaModalOpen, setPersonaModalOpen] = useState(false);
   const [personaResult, setPersonaResult] = useState<MultiPersonaReviewResult | null>(null);
+  const [personaError, setPersonaError] = useState<string | null>(null);
+  const [personaHistoryView, setPersonaHistoryView] = useState(false);
+  const [personaViewedAt, setPersonaViewedAt] = useState<string | null>(null);
+  const [personaHistoryKey, setPersonaHistoryKey] = useState(0);
 
   const [heatmapModalOpen, setHeatmapModalOpen] = useState(false);
 
@@ -69,37 +86,75 @@ export function OverviewTab({
   // ストーリーアーク分析実行
   const handleRunStoryArc = async () => {
     setArcModalOpen(true);
+    setArcResult(null);
+    setArcError(null);
+    setArcHistoryView(false);
+    setArcViewedAt(null);
     try {
-      const res = await analyzeArc(novel.id);
+      const res = await runStoryArc(novel.id);
       setArcResult(res);
+      setArcHistoryKey((k) => k + 1);
     } catch (e) {
-      toast.error(toErrorMessage(e));
-      setArcModalOpen(false);
+      if ((e as Error)?.name === 'AbortError') return; // キャンセルは静かに無視
+      setArcError(toErrorMessage(e)); // モーダルは開いたまま再試行を促す
     }
   };
 
   // 全体口調チェック実行
   const handleRunVoiceCheck = async () => {
     setVoiceModalOpen(true);
+    setVoiceResult(null);
+    setVoiceError(null);
+    setVoiceHistoryView(false);
+    setVoiceViewedAt(null);
     try {
-      const res = await checkVoice(novel.id);
+      const res = await runVoiceCheck(novel.id, {});
       setVoiceResult(res);
+      setVoiceHistoryKey((k) => k + 1);
     } catch (e) {
-      toast.error(toErrorMessage(e));
-      setVoiceModalOpen(false);
+      if ((e as Error)?.name === 'AbortError') return;
+      setVoiceError(toErrorMessage(e));
     }
   };
 
   // 全体模擬読者レビュー実行
   const handleRunPersonaReview = async () => {
     setPersonaModalOpen(true);
+    setPersonaResult(null);
+    setPersonaError(null);
+    setPersonaHistoryView(false);
+    setPersonaViewedAt(null);
     try {
-      const res = await reviewPersona(novel.id, {});
+      const res = await runPersonaReview(novel.id, {});
       setPersonaResult(res);
+      setPersonaHistoryKey((k) => k + 1);
     } catch (e) {
-      toast.error(toErrorMessage(e));
-      setPersonaModalOpen(false);
+      if ((e as Error)?.name === 'AbortError') return;
+      setPersonaError(toErrorMessage(e));
     }
+  };
+
+  // 履歴から結果を読み込む
+  const handleSelectArcHistory = (entry: AnalysisHistoryEntry) => {
+    if (entry.analysisType !== 'story-arc') return;
+    setArcResult(entry.result as StoryArcResult);
+    setArcError(null);
+    setArcHistoryView(true);
+    setArcViewedAt(entry.createdAt);
+  };
+  const handleSelectVoiceHistory = (entry: AnalysisHistoryEntry) => {
+    if (entry.analysisType !== 'check-voice') return;
+    setVoiceResult(entry.result as CharacterVoiceCheckResult);
+    setVoiceError(null);
+    setVoiceHistoryView(true);
+    setVoiceViewedAt(entry.createdAt);
+  };
+  const handleSelectPersonaHistory = (entry: AnalysisHistoryEntry) => {
+    if (entry.analysisType !== 'persona-review') return;
+    setPersonaResult(entry.result as MultiPersonaReviewResult);
+    setPersonaError(null);
+    setPersonaHistoryView(true);
+    setPersonaViewedAt(entry.createdAt);
   };
 
   const handleSaveTargetWords = (val: number) => {
@@ -317,21 +372,48 @@ export function OverviewTab({
         isOpen={arcModalOpen}
         onClose={() => setArcModalOpen(false)}
         result={arcResult}
-        isLoading={analyzingArc}
+        progress={progress}
+        running={running === 'story-arc'}
+        error={arcError}
+        isHistoryView={arcHistoryView}
+        viewedAt={arcViewedAt}
+        novelId={novel.id}
+        historyRefreshKey={arcHistoryKey}
+        onSelectHistory={handleSelectArcHistory}
+        onRerun={() => void handleRunStoryArc()}
+        onCancel={cancelAnalysis}
       />
 
       <CharacterVoiceCheckerModal
         isOpen={voiceModalOpen}
         onClose={() => setVoiceModalOpen(false)}
         result={voiceResult}
-        isLoading={checkingVoice}
+        progress={progress}
+        running={running === 'check-voice'}
+        error={voiceError}
+        isHistoryView={voiceHistoryView}
+        viewedAt={voiceViewedAt}
+        novelId={novel.id}
+        historyRefreshKey={voiceHistoryKey}
+        onSelectHistory={handleSelectVoiceHistory}
+        onRerun={() => void handleRunVoiceCheck()}
+        onCancel={cancelAnalysis}
       />
 
       <MultiPersonaReviewModal
         isOpen={personaModalOpen}
         onClose={() => setPersonaModalOpen(false)}
         result={personaResult}
-        isLoading={reviewingPersona}
+        progress={progress}
+        running={running === 'persona-review'}
+        error={personaError}
+        isHistoryView={personaHistoryView}
+        viewedAt={personaViewedAt}
+        novelId={novel.id}
+        historyRefreshKey={personaHistoryKey}
+        onSelectHistory={handleSelectPersonaHistory}
+        onRerun={() => void handleRunPersonaReview()}
+        onCancel={cancelAnalysis}
       />
 
       <CharacterHeatmapModal
@@ -339,13 +421,6 @@ export function OverviewTab({
         onClose={() => setHeatmapModalOpen(false)}
         characters={novel.characters}
         chapters={chapters}
-        onSelectSection={() => {
-          void navigate({
-            to: '/novels/$novelId',
-            params: { novelId: novel.id },
-            search: { tab: 'editor' },
-          });
-        }}
       />
     </div>
   );
