@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from './Button.js';
+import { MarkdownText } from '@/components/MarkdownText.js';
 import { Modal } from './Modal.js';
 import type { ProofreadResult } from '@/lib/types.js';
 
@@ -123,12 +124,15 @@ export function ProofreadModal({
 
           <div className="flex-1 space-y-1.5 min-w-0 text-sm">
             <div className="font-bold text-foreground">編集者・査読者総評</div>
-            <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
-              {result.critique}
-            </p>
+            <MarkdownText
+              compact
+              content={result.critique}
+              className="text-xs text-muted-foreground"
+            />
             {result.advice && (
               <div className="mt-2 rounded-md bg-primary/5 border border-primary/20 p-2 text-xs text-primary leading-relaxed">
-                💡 <span className="font-semibold">改善のヒント:</span> {result.advice}
+                💡 <span className="font-semibold">改善のヒント:</span>{' '}
+                <MarkdownText compact content={result.advice} className="text-primary" />
               </div>
             )}
           </div>

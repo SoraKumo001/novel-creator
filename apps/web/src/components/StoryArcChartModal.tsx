@@ -3,6 +3,7 @@ import { HistoryViewBanner } from './HistoryViewBanner.js';
 import { AnalysisHistoryPanel } from './AnalysisHistoryPanel.js';
 import { AnalysisProgressPanel } from './AnalysisProgressPanel.js';
 import { Button } from './Button.js';
+import { MarkdownText } from '@/components/MarkdownText.js';
 import { Modal } from './Modal.js';
 import type { AnalysisProgress } from '@/hooks/useAnalysis.js';
 import type { AnalysisHistoryEntry, StoryArcResult } from '@/lib/types.js';
@@ -214,13 +215,15 @@ function ResultBody({
         <div className="font-bold text-foreground text-sm flex items-center justify-between">
           <span>📋 ストーリー構成 & テンポ評価</span>
         </div>
-        <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-          {result.summary}
-        </p>
+        <MarkdownText compact content={result.summary} className="text-muted-foreground" />
         {result.pacingCritique && (
           <div className="rounded-md bg-amber-500/10 border border-amber-500/30 p-2.5 text-amber-700 dark:text-amber-300 text-[11px] leading-relaxed">
             💡 <span className="font-semibold">テンポ・構成へのアドバイス:</span>{' '}
-            {result.pacingCritique}
+            <MarkdownText
+              compact
+              content={result.pacingCritique}
+              className="text-amber-700 dark:text-amber-300"
+            />
           </div>
         )}
       </div>
@@ -340,9 +343,14 @@ function ResultBody({
             <strong className="text-primary mr-1">劇的出来事:</strong> {selectedPoint.keyEvent}
           </p>
           {selectedPoint.advice && (
-            <p className="text-muted-foreground leading-relaxed">
-              💡 <strong className="mr-1">盛り上げ助言:</strong> {selectedPoint.advice}
-            </p>
+            <div className="text-muted-foreground leading-relaxed">
+              💡 <strong className="mr-1">盛り上げ助言:</strong>{' '}
+              <MarkdownText
+                compact
+                content={selectedPoint.advice}
+                className="text-muted-foreground"
+              />
+            </div>
           )}
         </div>
       ) : (

@@ -3,6 +3,7 @@ import { HistoryViewBanner } from './HistoryViewBanner.js';
 import { AnalysisHistoryPanel } from './AnalysisHistoryPanel.js';
 import { AnalysisProgressPanel } from './AnalysisProgressPanel.js';
 import { Button } from './Button.js';
+import { MarkdownText } from '@/components/MarkdownText.js';
 import { Modal } from './Modal.js';
 import type { AnalysisProgress } from '@/hooks/useAnalysis.js';
 import type {
@@ -164,9 +165,11 @@ function ResultBody({
       {/* 全体読後感 */}
       <div className="rounded-xl border border-border bg-surface-raised p-4 space-y-1.5 text-xs">
         <div className="font-bold text-foreground text-sm">📋 査読チーム総合インプレッション</div>
-        <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-          {result.overallImpression}
-        </p>
+        <MarkdownText
+          compact
+          content={result.overallImpression}
+          className="text-muted-foreground"
+        />
       </div>
 
       {/* ペルソナ選択タブ */}
@@ -228,18 +231,22 @@ function ResultBody({
               <div className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                 <span>✨ 良かった点・魅力</span>
               </div>
-              <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap text-[11px]">
-                {currentReview.praise}
-              </p>
+              <MarkdownText
+                compact
+                content={currentReview.praise}
+                className="text-muted-foreground"
+              />
             </div>
 
             <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 space-y-1">
               <div className="font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
                 <span>💬 改善が望まれる点・懸念</span>
               </div>
-              <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap text-[11px]">
-                {currentReview.criticism}
-              </p>
+              <MarkdownText
+                compact
+                content={currentReview.criticism}
+                className="text-muted-foreground"
+              />
             </div>
           </div>
 
@@ -247,9 +254,7 @@ function ResultBody({
             <div className="font-bold text-primary flex items-center gap-1">
               <span>💡 このペルソナからのリライト助言:</span>
             </div>
-            <p className="text-foreground leading-relaxed whitespace-pre-wrap text-[11px]">
-              {currentReview.advice}
-            </p>
+            <MarkdownText compact content={currentReview.advice} className="text-foreground" />
           </div>
         </div>
       )}

@@ -3,6 +3,7 @@ import { HistoryViewBanner } from './HistoryViewBanner.js';
 import { AnalysisHistoryPanel } from './AnalysisHistoryPanel.js';
 import { AnalysisProgressPanel } from './AnalysisProgressPanel.js';
 import { Button } from './Button.js';
+import { MarkdownText } from '@/components/MarkdownText.js';
 import { Modal } from './Modal.js';
 import type { AnalysisProgress } from '@/hooks/useAnalysis.js';
 import type { AnalysisHistoryEntry, CharacterVoiceCheckResult } from '@/lib/types.js';
@@ -148,9 +149,7 @@ function ResultBody({
             指摘件数: {result.issues.length} 件
           </span>
         </div>
-        <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-          {result.summary}
-        </p>
+        <MarkdownText compact content={result.summary} className="text-muted-foreground" />
       </div>
 
       {/* 指摘一覧 */}

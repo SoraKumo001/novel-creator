@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from './Button.js';
+import { MarkdownText } from '@/components/MarkdownText.js';
 import type { InlineAssistAction } from '@/lib/types.js';
 
 interface InlineAIAssistantProps {
@@ -137,7 +138,7 @@ export function InlineAIAssistant({
               <span>{isLoading ? '🤖 AIが執筆・推敲中...' : '🎉 生成結果'}</span>
               <span>{generatedText.length.toLocaleString()} 文字</span>
             </div>
-            <div className="whitespace-pre-wrap text-foreground">{generatedText}</div>
+            <MarkdownText compact content={generatedText} className="text-foreground" />
           </div>
 
           {!isLoading && (

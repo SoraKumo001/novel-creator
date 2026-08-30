@@ -6,12 +6,14 @@ import { renderMermaid } from '@/lib/mermaid.js';
 interface MarkdownTextProps {
   content: string;
   className?: string;
+  /** 折り返し表示用のコンパクトスタイル。LLM 出力の小さなボックス内表示向け。 */
+  compact?: boolean;
 }
 
-export function MarkdownText({ content, className }: MarkdownTextProps) {
+export function MarkdownText({ content, className, compact }: MarkdownTextProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const html = useMemo(() => {
-    const raw = marked.parse(content, { async: false }) as string;
+    const raw = marked.parse(content, { async: false, breaks: true }) as string;
     return DOMPurify.sanitize(raw) as string;
   }, [content]);
 
@@ -39,7 +41,7 @@ export function MarkdownText({ content, className }: MarkdownTextProps) {
   return (
     <div
       ref={containerRef}
-      className={`prose prose-sm max-w-none dark:prose-invert ${className ?? ''}`}
+      className={`prose prose-sm max-w-none dark:prose-invert ${className ?? ''} ${compact ? 'text-[11px] leading-relaxed prose-headings:hidden prose-strong:text-inherit' : ''}`}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

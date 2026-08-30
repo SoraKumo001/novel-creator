@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from './Button.js';
+import { MarkdownText } from '@/components/MarkdownText.js';
 import { Modal } from './Modal.js';
 import type { SettingImpactResult } from '@/lib/types.js';
 
@@ -136,9 +137,11 @@ export function ImpactAnalysisModal({
                   {IMPACT_BADGES[result.impactLevel]?.label}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                {result.summary}
-              </p>
+              <MarkdownText
+                compact
+                content={result.summary}
+                className="text-xs text-muted-foreground"
+              />
             </div>
 
             {/* 影響箇所リスト */}
