@@ -1,9 +1,10 @@
+import { parseResponseError } from '../errors.js';
 import { apiClient } from '../api-client.js';
 import type { CreateTimelineInput, Timeline, UpdateTimelineInput } from '../types.js';
 
 export async function fetchTimelines(novelId: string): Promise<Timeline[]> {
   const res = await apiClient.novels[':id'].timelines.$get({ param: { id: novelId } });
-  if (!res.ok) throw new Error('Failed to fetch timelines');
+  if (!res.ok) throw await parseResponseError(res, 'タイムライン一覧の取得');
   const rows = await res.json();
   return rows.map((t) => ({
     id: t.id,
@@ -29,7 +30,7 @@ export async function createTimeline(
       timestamp: input.timestamp,
     },
   });
-  if (!res.ok) throw new Error('Failed to create timeline');
+  if (!res.ok) throw await parseResponseError(res, 'タイムラインの作成');
   const row = await res.json();
   return {
     id: row.id,
@@ -52,7 +53,7 @@ export async function updateTimeline(id: string, input: UpdateTimelineInput): Pr
       timestamp: input.timestamp,
     },
   });
-  if (!res.ok) throw new Error('Failed to update timeline');
+  if (!res.ok) throw await parseResponseError(res, 'タイムラインの更新');
   const row = await res.json();
   return {
     id: row.id,
@@ -67,5 +68,5 @@ export async function updateTimeline(id: string, input: UpdateTimelineInput): Pr
 
 export async function deleteTimeline(id: string): Promise<void> {
   const res = await apiClient.timelines[':id'].$delete({ param: { id } });
-  if (!res.ok) throw new Error('Failed to delete timeline');
+  if (!res.ok) throw await parseResponseError(res, 'タイムラインの削除');
 }

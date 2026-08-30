@@ -4,7 +4,7 @@ import type { CreateNovelInput, Novel, NovelDetail, UpdateNovelInput } from '../
 
 export async function fetchNovels(): Promise<Novel[]> {
   const res = await apiClient.novels.$get();
-  if (!res.ok) throw new Error('Failed to fetch novels');
+  if (!res.ok) throw await parseResponseError(res, '小説一覧の取得');
   const rows = await res.json();
   return rows.map((n) => ({
     id: n.id,
@@ -18,7 +18,7 @@ export async function fetchNovels(): Promise<Novel[]> {
 
 export async function fetchNovelDetail(id: string): Promise<NovelDetail> {
   const res = await apiClient.novels[':id'].$get({ param: { id } });
-  if (!res.ok) throw new Error('Failed to fetch novel detail');
+  if (!res.ok) throw await parseResponseError(res, '小説詳細の取得');
   const n = await res.json();
   return {
     id: n.id,
@@ -68,7 +68,7 @@ export async function createNovel(input: CreateNovelInput): Promise<Novel> {
       styleGuide: input.styleGuide ?? undefined,
     },
   });
-  if (!res.ok) throw new Error('Failed to create novel');
+  if (!res.ok) throw await parseResponseError(res, '小説の作成');
   const row = await res.json();
   return {
     id: row.id,
@@ -90,7 +90,7 @@ export async function updateNovel(id: string, input: UpdateNovelInput): Promise<
       storyOutline: input.storyOutline,
     },
   });
-  if (!res.ok) throw new Error('Failed to update novel');
+  if (!res.ok) throw await parseResponseError(res, '小説の更新');
   const row = await res.json();
   return {
     id: row.id,
@@ -206,14 +206,14 @@ export async function generateStyleGuideDraft(
     param: { id: novelId },
     json: { modelConfigId: modelConfigId ?? null },
   });
-  if (!res.ok) throw new Error('Failed to generate style guide draft');
+  if (!res.ok) throw await parseResponseError(res, '執筆スタイルのドラフト生成');
   const data = await res.json();
   return data.draft;
 }
 
 export async function deleteNovel(id: string): Promise<void> {
   const res = await apiClient.novels[':id'].$delete({ param: { id } });
-  if (!res.ok) throw new Error('Failed to delete novel');
+  if (!res.ok) throw await parseResponseError(res, '小説の削除');
 }
 
 export async function fetchNovelExportData(id: string) {
@@ -222,8 +222,8 @@ export async function fetchNovelExportData(id: string) {
     apiClient.novels[':id'].chapters.$get({ param: { id } }),
   ]);
 
-  if (!novelRes.ok) throw new Error('Failed to fetch novel data');
-  if (!chaptersRes.ok) throw new Error('Failed to fetch chapters');
+  if (!novelRes.ok) throw await parseResponseError(novelRes, '小説データの取得');
+  if (!chaptersRes.ok) throw await parseResponseError(chaptersRes, '章データの取得');
 
   const novel = await novelRes.json();
   const rawChapters = await chaptersRes.json();

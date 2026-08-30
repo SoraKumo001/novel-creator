@@ -118,6 +118,6 @@ describe('useNovels', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(result.current.error).toContain('Failed to fetch novels');
+    expect(result.current.error).toContain('サーバーエラーが発生しました');
   });
 });

@@ -14,6 +14,8 @@ import { ChapterSectionFormModal } from './-ChapterSectionFormModal.js';
 import { ChapterTreeItem } from './-ChapterTreeItem.js';
 import { PlotPreviewPanel } from './-PlotPreviewPanel.js';
 
+import { useToast } from '@/hooks/useToast.js';
+import { toErrorMessage } from '@/lib/errors.js';
 import { StoryOutlineMarkdownEditor } from './-StoryOutlineMarkdownEditor.js';
 
 export function PlotTab({
@@ -24,6 +26,7 @@ export function PlotTab({
   onRefresh: () => Promise<void>;
 }) {
   const [viewMode, setViewMode] = useState<'story_outline' | 'structure'>('structure');
+  const toast = useToast();
 
   const {
     chapters,
@@ -74,20 +77,30 @@ export function PlotTab({
 
   async function handleGeneratePlot() {
     resetGeneratedPlot();
-    const plot = await generatePlot(novel.id, selectedModelConfigId);
-    setPlotPreview(plot);
-    setSelectedPlotIndices(new Set(plot.chapters.map((_, i) => i)));
+    try {
+      const plot = await generatePlot(novel.id, selectedModelConfigId);
+      setPlotPreview(plot);
+      setSelectedPlotIndices(new Set(plot.chapters.map((_, i) => i)));
+      toast.success('プロット構成案を生成しました');
+    } catch (err) {
+      toast.error(toErrorMessage(err));
+    }
   }
 
   async function handleApplyPlot() {
     if (!plotPreview) return;
-    const selectedChapters = plotPreview.chapters.filter((_, i) => selectedPlotIndices.has(i));
-    for (const ch of selectedChapters) {
-      await createChapter({ title: ch.title, order: ch.order, summary: ch.summary });
+    try {
+      const selectedChapters = plotPreview.chapters.filter((_, i) => selectedPlotIndices.has(i));
+      for (const ch of selectedChapters) {
+        await createChapter({ title: ch.title, order: ch.order, summary: ch.summary });
+      }
+      setPlotPreview(null);
+      setSelectedPlotIndices(new Set());
+      toast.success(`${selectedChapters.length} 件の章を追加しました`);
+      await onRefresh();
+    } catch (err) {
+      toast.error(toErrorMessage(err));
     }
-    setPlotPreview(null);
-    setSelectedPlotIndices(new Set());
-    await onRefresh();
   }
 
   const toggleExpandAll = () => {
@@ -111,35 +124,53 @@ export function PlotTab({
   };
 
   async function handleSaveChapter(input: { title: string; order: number; summary: string }) {
-    if (chapterForm) {
-      await updateChapter(chapterForm.id, input);
-    } else {
-      await createChapter(input);
+    try {
+      if (chapterForm) {
+        await updateChapter(chapterForm.id, input);
+        toast.success('章を更新しました');
+      } else {
+        await createChapter(input);
+        toast.success('章を追加しました');
+      }
+      setChapterForm(null);
+      await onRefresh();
+    } catch (err) {
+      toast.error(toErrorMessage(err));
     }
-    setChapterForm(null);
-    await onRefresh();
   }
 
   async function handleSaveSection(input: { title: string; order: number; summary: string }) {
     if (!sectionForm) return;
-    if (sectionForm.section) {
-      await updateSection(sectionForm.section.id, input);
-    } else {
-      await createSection(sectionForm.chapterId, input);
+    try {
+      if (sectionForm.section) {
+        await updateSection(sectionForm.section.id, input);
+        toast.success('節を更新しました');
+      } else {
+        await createSection(sectionForm.chapterId, input);
+        toast.success('節を追加しました');
+      }
+      setSectionForm(null);
+      await onRefresh();
+    } catch (err) {
+      toast.error(toErrorMessage(err));
     }
-    setSectionForm(null);
-    await onRefresh();
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    if (deleteTarget.type === 'chapter') {
-      await deleteChapter(deleteTarget.id);
-    } else {
-      await deleteSection(deleteTarget.id);
+    try {
+      if (deleteTarget.type === 'chapter') {
+        await deleteChapter(deleteTarget.id);
+        toast.success('章を削除しました');
+      } else {
+        await deleteSection(deleteTarget.id);
+        toast.success('節を削除しました');
+      }
+      setDeleteTarget(null);
+      await onRefresh();
+    } catch (err) {
+      toast.error(toErrorMessage(err));
     }
-    setDeleteTarget(null);
-    await onRefresh();
   }
 
   async function handleGenerateChapterSummaryAction(chapterId: string) {
@@ -148,6 +179,9 @@ export function PlotTab({
       await generateChapterSummary(chapterId);
       await refetchChapters();
       await onRefresh();
+      toast.success('章のあらすじを生成しました');
+    } catch (err) {
+      toast.error(toErrorMessage(err));
     } finally {
       setActiveGeneratingId(null);
     }
@@ -159,6 +193,9 @@ export function PlotTab({
       await generateSectionSummary(sectionId);
       await refetchChapters();
       await onRefresh();
+      toast.success('節のあらすじを生成しました');
+    } catch (err) {
+      toast.error(toErrorMessage(err));
     } finally {
       setActiveGeneratingId(null);
     }

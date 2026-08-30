@@ -1,3 +1,4 @@
+import { parseResponseError } from '../errors.js';
 import { apiClient } from '../api-client.js';
 import type { ExtractResult, GeneratedPlot, GeneratedSummary } from '../types.js';
 
@@ -14,7 +15,7 @@ export async function generatePlot(
     { init: { signal } },
   );
 
-  if (!res.ok) throw new Error('Failed to generate plot');
+  if (!res.ok) throw await parseResponseError(res, 'プロット生成');
   const data = await res.json();
   return {
     title: data.title,
@@ -37,7 +38,7 @@ export async function generateChapterSummary(
     },
     { init: { signal } },
   );
-  if (!res.ok) throw new Error('Failed to generate chapter summary');
+  if (!res.ok) throw await parseResponseError(res, '章のあらすじ生成');
   const data = await res.json();
   return {
     title: data.title,
@@ -56,7 +57,7 @@ export async function generateSectionSummary(
     },
     { init: { signal } },
   );
-  if (!res.ok) throw new Error('Failed to generate section summary');
+  if (!res.ok) throw await parseResponseError(res, '節のあらすじ生成');
   const data = await res.json();
   return {
     title: data.title,
@@ -77,8 +78,11 @@ export async function* generateSectionContent(
     },
     { init: { signal } },
   );
-  if (!res.ok || !res.body) {
-    throw new Error('Failed to generate section content');
+  if (!res.ok) {
+    throw await parseResponseError(res, '本文生成');
+  }
+  if (!res.body) {
+    throw new Error('レスポンスボディが空です');
   }
 
   const reader = res.body.getReader();
@@ -125,7 +129,7 @@ export async function proofreadSectionContent(
     },
     { init: { signal } },
   );
-  if (!res.ok) throw new Error('Failed to proofread content');
+  if (!res.ok) throw await parseResponseError(res, '校正・推敲');
   return res.json();
 }
 
@@ -139,7 +143,7 @@ export async function extractEntities(
     },
     { init: { signal } },
   );
-  if (!res.ok) throw new Error('Failed to extract entities');
+  if (!res.ok) throw await parseResponseError(res, '人物・設定の抽出');
   const data = await res.json();
   return {
     timelines: data.timelines.map((t) => ({
@@ -180,8 +184,11 @@ export async function* inlineAssistSectionContent(
     { init: { signal } },
   );
 
-  if (!res.ok || !res.body) {
-    throw new Error('Failed to generate inline assist content');
+  if (!res.ok) {
+    throw await parseResponseError(res, 'AIアシスト生成');
+  }
+  if (!res.body) {
+    throw new Error('レスポンスボディが空です');
   }
 
   const reader = res.body.getReader();
@@ -239,6 +246,6 @@ export async function analyzeSettingImpact(
     },
     { init: { signal } },
   );
-  if (!res.ok) throw new Error('Failed to analyze setting impact');
+  if (!res.ok) throw await parseResponseError(res, '影響分析');
   return res.json();
 }

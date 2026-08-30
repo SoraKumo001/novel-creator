@@ -1,3 +1,4 @@
+import { parseResponseError } from '../errors.js';
 import { apiClient } from '../api-client.js';
 
 export interface HistoryItem {
@@ -24,7 +25,7 @@ export async function fetchHistories(
       limit: options?.limit !== undefined ? String(options.limit) : undefined,
     },
   });
-  if (!res.ok) throw new Error('Failed to fetch histories');
+  if (!res.ok) throw await parseResponseError(res, '編集履歴一覧の取得');
   const rows = await res.json();
   return rows.map((h) => ({
     id: h.id,
@@ -41,7 +42,7 @@ export async function fetchHistories(
 
 export async function fetchHistory(id: string): Promise<HistoryItem> {
   const res = await apiClient.histories[':id'].$get({ param: { id } });
-  if (!res.ok) throw new Error('Failed to fetch history');
+  if (!res.ok) throw await parseResponseError(res, '編集履歴詳細の取得');
   const h = await res.json();
   return {
     id: h.id,
@@ -58,7 +59,7 @@ export async function fetchHistory(id: string): Promise<HistoryItem> {
 
 export async function restoreHistory(id: string): Promise<{ success: boolean; message: string }> {
   const res = await apiClient.histories[':id'].restore.$post({ param: { id } });
-  if (!res.ok) throw new Error('Failed to restore history');
+  if (!res.ok) throw await parseResponseError(res, '履歴の復元');
   const result = await res.json();
   return {
     success: result.success,

@@ -177,7 +177,7 @@ export function OverviewTab({
       await deleteNovel(novel.id);
       navigate({ to: '/novels' });
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : '削除に失敗しました');
+      setFormError(toErrorMessage(e));
     }
   }
 
@@ -192,7 +192,7 @@ export function OverviewTab({
       setIsOpen(false);
       await onRefresh();
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : '保存に失敗しました');
+      setFormError(toErrorMessage(e));
     }
   }
 

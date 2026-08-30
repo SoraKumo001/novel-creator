@@ -1,3 +1,4 @@
+import { parseResponseError } from '../errors.js';
 import { apiClient } from '../api-client.js';
 import type {
   CreateForeshadowingInput,
@@ -9,7 +10,7 @@ export async function fetchForeshadowings(novelId: string): Promise<Foreshadowin
   const res = await apiClient.foreshadowings.novel[':novelId'].$get({
     param: { novelId },
   });
-  if (!res.ok) throw new Error('Failed to fetch foreshadowings');
+  if (!res.ok) throw await parseResponseError(res, '伏線一覧の取得');
   const list = await res.json();
   return list.map((item) => ({
     id: item.id,
@@ -29,7 +30,7 @@ export async function getForeshadowing(id: string): Promise<Foreshadowing> {
   const res = await apiClient.foreshadowings[':id'].$get({
     param: { id },
   });
-  if (!res.ok) throw new Error('Failed to fetch foreshadowing');
+  if (!res.ok) throw await parseResponseError(res, '伏線詳細の取得');
   const item = await res.json();
   return {
     id: item.id,
@@ -60,7 +61,7 @@ export async function createForeshadowing(
       resolvedSectionId: input.resolvedSectionId,
     },
   });
-  if (!res.ok) throw new Error('Failed to create foreshadowing');
+  if (!res.ok) throw await parseResponseError(res, '伏線の作成');
   const item = await res.json();
   return {
     id: item.id,
@@ -91,7 +92,7 @@ export async function updateForeshadowing(
       resolvedSectionId: input.resolvedSectionId,
     },
   });
-  if (!res.ok) throw new Error('Failed to update foreshadowing');
+  if (!res.ok) throw await parseResponseError(res, '伏線の更新');
   const item = await res.json();
   return {
     id: item.id,
@@ -111,14 +112,14 @@ export async function deleteForeshadowing(id: string): Promise<void> {
   const res = await apiClient.foreshadowings[':id'].$delete({
     param: { id },
   });
-  if (!res.ok) throw new Error('Failed to delete foreshadowing');
+  if (!res.ok) throw await parseResponseError(res, '伏線の削除');
 }
 
 export async function getForeshadowingsMarkdown(novelId: string): Promise<string> {
   const res = await apiClient.novels[':id'].foreshadowings.markdown.$get({
     param: { id: novelId },
   });
-  if (!res.ok) throw new Error('Failed to fetch foreshadowings markdown');
+  if (!res.ok) throw await parseResponseError(res, '伏線マークダウンの取得');
   const data = await res.json();
   return data.markdown;
 }
@@ -131,7 +132,7 @@ export async function saveForeshadowingsMarkdown(
     param: { id: novelId },
     json: { markdown },
   });
-  if (!res.ok) throw new Error('Failed to save foreshadowings markdown');
+  if (!res.ok) throw await parseResponseError(res, '伏線マークダウンの保存');
   return res.json();
 }
 
@@ -144,7 +145,7 @@ export async function editForeshadowingDocument(
     param: { id: novelId },
     json: { instruction, markdown },
   });
-  if (!res.ok) throw new Error('Failed to edit foreshadowings document with LLM');
+  if (!res.ok) throw await parseResponseError(res, '伏線ドキュメントのAI編集');
   const data = await res.json();
   return data.markdown;
 }
@@ -164,7 +165,7 @@ export async function editForeshadowingSection(
       instruction,
     },
   });
-  if (!res.ok) throw new Error('Failed to edit foreshadowing section with LLM');
+  if (!res.ok) throw await parseResponseError(res, '伏線セクションのAI編集');
   const data = await res.json();
   return data.markdown;
 }
@@ -193,7 +194,7 @@ export async function generateForeshadowingDraft(
         : undefined,
     },
   });
-  if (!res.ok) throw new Error('Failed to generate foreshadowing draft');
+  if (!res.ok) throw await parseResponseError(res, '伏線ドラフトの生成');
   return res.json() as Promise<{
     category: string;
     title: string;

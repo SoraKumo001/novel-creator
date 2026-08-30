@@ -5,6 +5,7 @@ import { useCharacters } from '@/hooks/useCharacters.js';
 import { useChat } from '@/hooks/useChat.js';
 import { useLlmInstructions } from '@/hooks/useLlmInstructions.js';
 import { useToast } from '@/hooks/useToast.js';
+import { toErrorMessage } from '@/lib/errors.js';
 import { MonacoEditor } from './-MonacoEditor.js';
 import { EntityEditorShell } from './-EntityEditorShell.js';
 
@@ -113,7 +114,7 @@ export function CharacterEditor({ novelId, characterId }: CharacterEditorProps) 
       await saveInstruction({ entityType: 'character', instruction: instruction.trim() });
       toast.success('AI編集が完了しました');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'AI生成に失敗しました');
+      toast.error(toErrorMessage(e));
     } finally {
       setGenerating(false);
     }
@@ -149,7 +150,7 @@ export function CharacterEditor({ novelId, characterId }: CharacterEditorProps) 
       }
       toast.success(isEdit ? '人物情報を更新しました' : '人物を作成しました');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '保存に失敗しました');
+      toast.error(toErrorMessage(e));
     }
   }
 

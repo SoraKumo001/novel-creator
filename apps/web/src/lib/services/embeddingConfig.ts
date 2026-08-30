@@ -1,3 +1,4 @@
+import { parseResponseError } from '../errors.js';
 import { apiClient } from '../api-client.js';
 import type {
   CreateEmbeddingConfigInput,
@@ -9,7 +10,7 @@ import type {
 
 export async function fetchEmbeddingConfigs(): Promise<EmbeddingConfig[]> {
   const res = await apiClient['embedding-configs'].$get();
-  if (!res.ok) throw new Error('Failed to fetch Embedding configs');
+  if (!res.ok) throw await parseResponseError(res, '埋め込み設定一覧の取得');
   const data = await res.json();
   return data as unknown as EmbeddingConfig[];
 }
@@ -29,7 +30,7 @@ export async function createEmbeddingConfig(
       description: input.description || null,
     },
   });
-  if (!res.ok) throw new Error('Failed to create Embedding config');
+  if (!res.ok) throw await parseResponseError(res, '埋め込み設定の作成');
   const data = await res.json();
   return data as unknown as EmbeddingConfig;
 }
@@ -42,7 +43,7 @@ export async function updateEmbeddingConfig(
     param: { id },
     json: input,
   });
-  if (!res.ok) throw new Error('Failed to update Embedding config');
+  if (!res.ok) throw await parseResponseError(res, '埋め込み設定の更新');
   const data = await res.json();
   return data as unknown as EmbeddingConfig;
 }
@@ -51,14 +52,14 @@ export async function deleteEmbeddingConfig(id: string): Promise<void> {
   const res = await apiClient['embedding-configs'][':id'].$delete({
     param: { id },
   });
-  if (!res.ok) throw new Error('Failed to delete Embedding config');
+  if (!res.ok) throw await parseResponseError(res, '埋め込み設定の削除');
 }
 
 export async function setDefaultEmbeddingConfig(id: string): Promise<EmbeddingConfig> {
   const res = await apiClient['embedding-configs'][':id']['set-default'].$post({
     param: { id },
   });
-  if (!res.ok) throw new Error('Failed to set default Embedding config');
+  if (!res.ok) throw await parseResponseError(res, 'デフォルト埋め込み設定の変更');
   const data = await res.json();
   return data as unknown as EmbeddingConfig;
 }
@@ -75,7 +76,7 @@ export async function testEmbeddingConfig(
       apiKey: input.apiKey || null,
     },
   });
-  if (!res.ok) throw new Error('Failed to test Embedding connection');
+  if (!res.ok) throw await parseResponseError(res, '埋め込み接続テスト');
   const data = await res.json();
   return data as unknown as TestConnectionResult;
 }

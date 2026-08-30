@@ -1,3 +1,4 @@
+import { parseResponseError } from '../errors.js';
 import { apiClient } from '../api-client.js';
 import type {
   Character,
@@ -10,7 +11,7 @@ import type {
 
 export async function fetchCharacters(novelId: string): Promise<Character[]> {
   const res = await apiClient.novels[':id'].characters.$get({ param: { id: novelId } });
-  if (!res.ok) throw new Error('Failed to fetch characters');
+  if (!res.ok) throw await parseResponseError(res, '登場人物一覧の取得');
   const rows = await res.json();
   return rows.map((c) => ({
     id: c.id,
@@ -39,7 +40,7 @@ export async function createCharacter(
       relationships: input.relationships,
     },
   });
-  if (!res.ok) throw new Error('Failed to create character');
+  if (!res.ok) throw await parseResponseError(res, '登場人物の作成');
   const row = await res.json();
   return {
     id: row.id,
@@ -65,7 +66,7 @@ export async function updateCharacter(id: string, input: UpdateCharacterInput): 
       relationships: input.relationships,
     },
   });
-  if (!res.ok) throw new Error('Failed to update character');
+  if (!res.ok) throw await parseResponseError(res, '登場人物の更新');
   const row = await res.json();
   return {
     id: row.id,
@@ -82,7 +83,7 @@ export async function updateCharacter(id: string, input: UpdateCharacterInput): 
 
 export async function deleteCharacter(id: string): Promise<void> {
   const res = await apiClient.characters[':id'].$delete({ param: { id } });
-  if (!res.ok) throw new Error('Failed to delete character');
+  if (!res.ok) throw await parseResponseError(res, '登場人物の削除');
 }
 
 export async function editCharacter(id: string, input: EditInstructionInput): Promise<Character> {
@@ -92,7 +93,7 @@ export async function editCharacter(id: string, input: EditInstructionInput): Pr
       instruction: input.instruction,
     },
   });
-  if (!res.ok) throw new Error('Failed to edit character');
+  if (!res.ok) throw await parseResponseError(res, '登場人物のAI編集');
   const row = await res.json();
   return {
     id: row.id,
@@ -111,7 +112,7 @@ export async function fetchCharactersMarkdown(novelId: string): Promise<{ markdo
   const res = await apiClient.novels[':id'].characters.markdown.$get({
     param: { id: novelId },
   });
-  if (!res.ok) throw new Error('Failed to fetch characters markdown');
+  if (!res.ok) throw await parseResponseError(res, '登場人物マークダウンの取得');
   return res.json();
 }
 
@@ -123,7 +124,7 @@ export async function saveCharactersMarkdown(
     param: { id: novelId },
     json: { markdown },
   });
-  if (!res.ok) throw new Error('Failed to save characters markdown');
+  if (!res.ok) throw await parseResponseError(res, '登場人物マークダウンの保存');
   return res.json();
 }
 
@@ -142,7 +143,7 @@ export async function editCharacterSection(
     param: { id: novelId },
     json: data,
   });
-  if (!res.ok) throw new Error('Failed to edit character section');
+  if (!res.ok) throw await parseResponseError(res, '登場人物セクションのAI編集');
   return res.json();
 }
 
@@ -155,6 +156,6 @@ export async function editCharacterDocument(
     param: { id: novelId },
     json: { markdown, instruction },
   });
-  if (!res.ok) throw new Error('Failed to edit character document');
+  if (!res.ok) throw await parseResponseError(res, '登場人物ドキュメントのAI編集');
   return res.json();
 }

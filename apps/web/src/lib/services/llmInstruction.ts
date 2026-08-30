@@ -1,3 +1,4 @@
+import { parseResponseError } from '../errors.js';
 import { apiClient } from '../api-client.js';
 import type { CreateLlmInstructionInput, LlmInstruction } from '../types.js';
 
@@ -9,7 +10,7 @@ export async function fetchLlmInstructions(
     param: { id: novelId },
     query: { entityType },
   });
-  if (!res.ok) throw new Error('Failed to fetch LLM instructions');
+  if (!res.ok) throw await parseResponseError(res, '指示テンプレート一覧の取得');
   const rows = await res.json();
   return rows.map((ins) => ({
     id: ins.id,
@@ -31,7 +32,7 @@ export async function createLlmInstruction(
       instruction: input.instruction,
     },
   });
-  if (!res.ok) throw new Error('Failed to create LLM instruction');
+  if (!res.ok) throw await parseResponseError(res, '指示テンプレートの作成');
   const row = await res.json();
   return {
     id: row.id,
@@ -46,5 +47,5 @@ export async function deleteLlmInstruction(id: string): Promise<void> {
   const res = await apiClient['llm-instructions'][':id'].$delete({
     param: { id },
   });
-  if (!res.ok) throw new Error('Failed to delete LLM instruction');
+  if (!res.ok) throw await parseResponseError(res, '指示テンプレートの削除');
 }

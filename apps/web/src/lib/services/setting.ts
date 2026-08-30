@@ -1,3 +1,4 @@
+import { parseResponseError } from '../errors.js';
 import { apiClient } from '../api-client.js';
 import type {
   CreateSettingInput,
@@ -15,7 +16,7 @@ export async function fetchSettings(novelId: string, category?: string): Promise
     param: { id: novelId },
     query: { category },
   });
-  if (!res.ok) throw new Error('Failed to fetch settings');
+  if (!res.ok) throw await parseResponseError(res, '設定一覧の取得');
   const rows = await res.json();
   return rows.map((s) => ({
     id: s.id,
@@ -39,7 +40,7 @@ export async function createSetting(novelId: string, input: CreateSettingInput):
       metadata: input.metadata,
     },
   });
-  if (!res.ok) throw new Error('Failed to create setting');
+  if (!res.ok) throw await parseResponseError(res, '設定の作成');
   const row = await res.json();
   return {
     id: row.id,
@@ -63,7 +64,7 @@ export async function updateSetting(id: string, input: UpdateSettingInput): Prom
       metadata: input.metadata,
     },
   });
-  if (!res.ok) throw new Error('Failed to update setting');
+  if (!res.ok) throw await parseResponseError(res, '設定の更新');
   const row = await res.json();
   return {
     id: row.id,
@@ -79,7 +80,7 @@ export async function updateSetting(id: string, input: UpdateSettingInput): Prom
 
 export async function deleteSetting(id: string): Promise<void> {
   const res = await apiClient.settings[':id'].$delete({ param: { id } });
-  if (!res.ok) throw new Error('Failed to delete setting');
+  if (!res.ok) throw await parseResponseError(res, '設定の削除');
 }
 
 export async function editSetting(id: string, input: EditInstructionInput): Promise<Setting> {
@@ -89,7 +90,7 @@ export async function editSetting(id: string, input: EditInstructionInput): Prom
       instruction: input.instruction,
     },
   });
-  if (!res.ok) throw new Error('Failed to edit setting');
+  if (!res.ok) throw await parseResponseError(res, '設定のAI編集');
   const row = await res.json();
   return {
     id: row.id,
@@ -114,7 +115,7 @@ export async function generateSettingDraft(
       currentDraft: input.currentDraft,
     },
   });
-  if (!res.ok) throw new Error('Failed to generate setting draft');
+  if (!res.ok) throw await parseResponseError(res, '設定ドラフトの生成');
   return res.json();
 }
 
@@ -122,7 +123,7 @@ export async function fetchSettingsMarkdown(novelId: string): Promise<{ markdown
   const res = await apiClient.novels[':id'].settings.markdown.$get({
     param: { id: novelId },
   });
-  if (!res.ok) throw new Error('Failed to fetch settings markdown');
+  if (!res.ok) throw await parseResponseError(res, '設定マークダウンの取得');
   return res.json();
 }
 
@@ -134,7 +135,7 @@ export async function saveSettingsMarkdown(
     param: { id: novelId },
     json: { markdown },
   });
-  if (!res.ok) throw new Error('Failed to save settings markdown');
+  if (!res.ok) throw await parseResponseError(res, '設定マークダウンの保存');
   return res.json();
 }
 
@@ -146,7 +147,7 @@ export async function editSettingSection(
     param: { id: novelId },
     json: data,
   });
-  if (!res.ok) throw new Error('Failed to edit setting section');
+  if (!res.ok) throw await parseResponseError(res, '設定セクションのAI編集');
   return res.json();
 }
 
@@ -159,6 +160,6 @@ export async function editSettingDocument(
     param: { id: novelId },
     json: { markdown, instruction },
   });
-  if (!res.ok) throw new Error('Failed to edit setting document');
+  if (!res.ok) throw await parseResponseError(res, '設定ドキュメントのAI編集');
   return res.json();
 }

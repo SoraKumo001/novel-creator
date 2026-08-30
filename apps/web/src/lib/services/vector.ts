@@ -1,3 +1,4 @@
+import { parseResponseError } from '../errors.js';
 import type { ReindexProgressEvent } from '../types.js';
 
 export async function streamReindex(
@@ -18,7 +19,7 @@ export async function streamReindex(
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to start reindexing: ${response.statusText}`);
+    throw await parseResponseError(response, 'ベクトルの再インデックス開始');
   }
 
   const reader = response.body?.getReader();

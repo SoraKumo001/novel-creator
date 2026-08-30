@@ -9,6 +9,7 @@ import { MarkdownText } from '@/components/MarkdownText.js';
 import { Modal } from '@/components/Modal.js';
 import { Textarea } from '@/components/Textarea.js';
 import { useNovels } from '@/hooks/useNovels.js';
+import { toErrorMessage } from '@/lib/errors.js';
 
 export const Route = createFileRoute('/novels/')({
   component: NovelsIndexPage,
@@ -44,7 +45,7 @@ function NovelsIndexPage() {
       setDescription('');
       void refetch();
     } catch (e) {
-      setFormError(e instanceof Error ? e.message : '作成に失敗しました');
+      setFormError(toErrorMessage(e));
     }
   }
 

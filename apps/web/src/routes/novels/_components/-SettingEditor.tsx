@@ -5,6 +5,7 @@ import { useChat } from '@/hooks/useChat.js';
 import { useLlmInstructions } from '@/hooks/useLlmInstructions.js';
 import { useSettings } from '@/hooks/useSettings.js';
 import { useToast } from '@/hooks/useToast.js';
+import { toErrorMessage } from '@/lib/errors.js';
 import { MonacoEditor } from './-MonacoEditor.js';
 import { EntityEditorShell } from './-EntityEditorShell.js';
 
@@ -93,7 +94,7 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
       await saveInstruction({ entityType: 'setting', instruction: instruction.trim() });
       toast.success('設定案を生成しました');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '生成に失敗しました');
+      toast.error(toErrorMessage(e));
     }
   }
 
@@ -122,7 +123,7 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
       }
       toast.success(isEdit ? '設定を更新しました' : '設定を作成しました');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '保存に失敗しました');
+      toast.error(toErrorMessage(e));
     }
   }
 

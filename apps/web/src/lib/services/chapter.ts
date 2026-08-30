@@ -1,3 +1,4 @@
+import { parseResponseError } from '../errors.js';
 import { apiClient } from '../api-client.js';
 import type {
   Chapter,
@@ -10,7 +11,7 @@ import type {
 
 export async function fetchChapters(novelId: string): Promise<ChapterWithSections[]> {
   const res = await apiClient.novels[':id'].chapters.$get({ param: { id: novelId } });
-  if (!res.ok) throw new Error('Failed to fetch chapters');
+  if (!res.ok) throw await parseResponseError(res, '章一覧の取得');
   const chapters = await res.json();
   const results: ChapterWithSections[] = [];
   for (const ch of chapters) {
@@ -42,7 +43,7 @@ export async function fetchChapters(novelId: string): Promise<ChapterWithSection
 
 export async function fetchChapter(id: string): Promise<ChapterWithSections> {
   const res = await apiClient.chapters[':id'].$get({ param: { id } });
-  if (!res.ok) throw new Error('Failed to fetch chapter');
+  if (!res.ok) throw await parseResponseError(res, '章詳細の取得');
   const detail = await res.json();
   return {
     id: detail.id,
@@ -73,7 +74,7 @@ export async function createChapter(novelId: string, input: CreateChapterInput):
       summary: input.summary,
     },
   });
-  if (!res.ok) throw new Error('Failed to create chapter');
+  if (!res.ok) throw await parseResponseError(res, '章の作成');
   const row = await res.json();
   return {
     id: row.id,
@@ -95,7 +96,7 @@ export async function updateChapter(id: string, input: UpdateChapterInput): Prom
       summary: input.summary,
     },
   });
-  if (!res.ok) throw new Error('Failed to update chapter');
+  if (!res.ok) throw await parseResponseError(res, '章の更新');
   const row = await res.json();
   return {
     id: row.id,
@@ -110,7 +111,7 @@ export async function updateChapter(id: string, input: UpdateChapterInput): Prom
 
 export async function deleteChapter(id: string): Promise<void> {
   const res = await apiClient.chapters[':id'].$delete({ param: { id } });
-  if (!res.ok) throw new Error('Failed to delete chapter');
+  if (!res.ok) throw await parseResponseError(res, '章の削除');
 }
 
 export async function createSection(
@@ -125,7 +126,7 @@ export async function createSection(
       summary: input.summary,
     },
   });
-  if (!res.ok) throw new Error('Failed to create section');
+  if (!res.ok) throw await parseResponseError(res, '節の作成');
   const row = await res.json();
   return {
     id: row.id,

@@ -1,3 +1,4 @@
+import { parseResponseError } from '../errors.js';
 import { apiClient } from '../api-client.js';
 import type {
   AnalysisHistoryEntry,
@@ -121,7 +122,7 @@ export async function runStoryArcAnalysis(
   );
 
   if (!res.ok) {
-    throw new Error('分析の開始に失敗しました');
+    throw await parseResponseError(res, 'ストーリーアーク分析の開始');
   }
 
   let result!: StoryArcResult;
@@ -160,7 +161,7 @@ export async function runVoiceCheckAnalysis(
   );
 
   if (!res.ok) {
-    throw new Error('分析の開始に失敗しました');
+    throw await parseResponseError(res, 'キャラクター口調チェックの開始');
   }
 
   let result!: CharacterVoiceCheckResult;
@@ -200,7 +201,7 @@ export async function runPersonaReviewAnalysis(
   );
 
   if (!res.ok) {
-    throw new Error('分析の開始に失敗しました');
+    throw await parseResponseError(res, '模擬読者レビューの開始');
   }
 
   let result!: MultiPersonaReviewResult;
@@ -233,7 +234,7 @@ export async function listAnalysisResults(
           {},
   });
   if (!res.ok) {
-    throw new Error('分析履歴の取得に失敗しました');
+    throw await parseResponseError(res, '分析履歴の取得');
   }
   return ((await res.json()) as unknown as AnalysisHistoryEntry[]).map((entry) => ({
     ...entry,
@@ -249,6 +250,6 @@ export async function deleteAnalysisResult(novelId: string, resultId: string): P
     param: { id: novelId, resultId },
   });
   if (!res.ok) {
-    throw new Error('分析履歴の削除に失敗しました');
+    throw await parseResponseError(res, '分析履歴の削除');
   }
 }

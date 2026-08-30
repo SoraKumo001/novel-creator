@@ -6,6 +6,7 @@ import { useChat } from '@/hooks/useChat.js';
 import { useForeshadowings } from '@/hooks/useForeshadowings.js';
 import { useLlmInstructions } from '@/hooks/useLlmInstructions.js';
 import { useToast } from '@/hooks/useToast.js';
+import { toErrorMessage } from '@/lib/errors.js';
 import type { ForeshadowingStatus } from '@/lib/types.js';
 import { EntityEditorShell } from './-EntityEditorShell.js';
 import { MonacoEditor } from './-MonacoEditor.js';
@@ -99,7 +100,7 @@ export function ForeshadowingEditor({ novelId, foreshadowingId }: ForeshadowingE
       await saveInstruction({ entityType: 'foreshadowing', instruction: instruction.trim() });
       toast.success('伏線案を生成しました');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '生成に失敗しました');
+      toast.error(toErrorMessage(e));
     }
   }
 
@@ -130,7 +131,7 @@ export function ForeshadowingEditor({ novelId, foreshadowingId }: ForeshadowingE
       }
       toast.success(isEdit ? '伏線を更新しました' : '伏線を作成しました');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '保存に失敗しました');
+      toast.error(toErrorMessage(e));
     }
   }
 
