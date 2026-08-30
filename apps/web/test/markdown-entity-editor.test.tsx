@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   useMarkdownEntityEditor,
@@ -55,14 +55,15 @@ describe('useMarkdownEntityEditor', () => {
       }),
     );
 
+    // markdown ロード完了待ち
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+      expect(result.current.markdown).toBe(sampleMarkdown);
+    });
+
     // エディタマウント
     act(() => {
       result.current.handleEditorMount(mockEditor);
-    });
-
-    // markdown ロード待ち
-    await vi.waitFor(() => {
-      expect(result.current.markdown).toBe(sampleMarkdown);
     });
 
     // 初期カーソル（3行目: ## 大正一）で activeSection が大正一になっていること

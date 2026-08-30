@@ -14,13 +14,12 @@ import {
 } from '@/lib/services/index.js';
 import { useToast } from '@/hooks/useToast.js';
 import { useEditableEntities } from '@/hooks/useEditableEntities.js';
-import type {
-  Character,
-  ExtractedCharacterItem,
-  ExtractedSettingItem,
-  Novel,
-  Setting,
-} from '@/lib/types.js';
+import type { Character, Novel, Setting } from '@/lib/types.js';
+import { ChatInsertCharacterTab } from './entity-insert/ChatInsertCharacterTab.js';
+import { ChatInsertSettingTab } from './entity-insert/ChatInsertSettingTab.js';
+import type { EditableCharacter, EditableSetting, EntityAction } from './entity-insert/types.js';
+
+export type { EditableCharacter, EditableSetting, EntityAction };
 
 interface ChatInsertEntityModalProps {
   isOpen: boolean;
@@ -28,23 +27,6 @@ interface ChatInsertEntityModalProps {
   sourceText: string;
   defaultNovelId: string | null;
   novels: Novel[];
-}
-
-export type EntityAction = 'create' | 'overwrite' | 'merge';
-
-export interface EditableCharacter extends ExtractedCharacterItem {
-  _id: string;
-  _selected: boolean;
-  traitsString: string;
-  matchedExisting?: Character;
-  action: EntityAction;
-}
-
-export interface EditableSetting extends ExtractedSettingItem {
-  _id: string;
-  _selected: boolean;
-  matchedExisting?: Setting;
-  action: EntityAction;
 }
 
 export function ChatInsertEntityModal({
@@ -221,7 +203,7 @@ export function ChatInsertEntityModal({
     void runExtract();
   }, [isOpen, sourceText]);
 
-  // 人物の操作ハンドラ（トグル・削除・追加は汎用フックをそのまま利用）
+  // 人物の操作ハンドラ
   const handleToggleCharacter = toggleCharacter;
   const handleRemoveCharacter = removeCharacter;
   const handleAddEmptyCharacter = () => {
@@ -238,7 +220,6 @@ export function ChatInsertEntityModal({
     );
   };
 
-  // 人物の更新（名前マッチング・traits 分割はエンティティ固有ロジック）
   const handleUpdateCharacter = (id: string, field: keyof EditableCharacter, value: unknown) => {
     updateCharacterItem(id, (c) => {
       if (field === 'name') {
@@ -265,7 +246,7 @@ export function ChatInsertEntityModal({
     });
   };
 
-  // 設定の操作ハンドラ（トグル・削除・追加は汎用フックをそのまま利用）
+  // 設定の操作ハンドラ
   const handleToggleSetting = toggleSetting;
   const handleRemoveSetting = removeSetting;
   const handleAddEmptySetting = () => {
@@ -280,7 +261,6 @@ export function ChatInsertEntityModal({
     );
   };
 
-  // 設定の更新（名前マッチングはエンティティ固有ロジック）
   const handleUpdateSetting = (id: string, field: keyof EditableSetting, value: unknown) => {
     updateSettingItem(id, (s) => {
       if (field === 'name') {
@@ -326,7 +306,6 @@ export function ChatInsertEntityModal({
         const trimmedCategory = char.category.trim() || '未分類';
         const trimmedDesc = char.description?.trim() || '';
 
-        // traits の安全な配列化
         const traitsList: string[] = Array.isArray(char.traits)
           ? char.traits.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
           : (char.traitsString || '')
@@ -335,7 +314,6 @@ export function ChatInsertEntityModal({
               .filter((t) => t.length > 0);
 
         if (char.action === 'overwrite' && char.matchedExisting) {
-          // 上書き更新
           await updateCharacter(char.matchedExisting.id, {
             name: trimmedName,
             category: trimmedCategory,
@@ -344,7 +322,6 @@ export function ChatInsertEntityModal({
           });
           updatedCount++;
         } else if (char.action === 'merge' && char.matchedExisting) {
-          // 追記マージ
           const oldDesc = (char.matchedExisting.description || '').trim();
           const mergedDesc = oldDesc ? `${oldDesc}\n\n【追記】\n${trimmedDesc}` : trimmedDesc;
 
@@ -361,7 +338,6 @@ export function ChatInsertEntityModal({
           });
           updatedCount++;
         } else {
-          // 新規追加 (create)
           await createCharacter(targetNovelId, {
             name: trimmedName,
             category: trimmedCategory,
@@ -379,7 +355,6 @@ export function ChatInsertEntityModal({
         const trimmedDesc = set.description?.trim() || '';
 
         if (set.action === 'overwrite' && set.matchedExisting) {
-          // 上書き更新
           await updateSetting(set.matchedExisting.id, {
             name: trimmedName,
             category: trimmedCategory,
@@ -387,7 +362,6 @@ export function ChatInsertEntityModal({
           });
           updatedCount++;
         } else if (set.action === 'merge' && set.matchedExisting) {
-          // 追記マージ
           const oldDesc = (set.matchedExisting.description || '').trim();
           const mergedDesc = oldDesc ? `${oldDesc}\n\n【追記】\n${trimmedDesc}` : trimmedDesc;
 
@@ -398,7 +372,6 @@ export function ChatInsertEntityModal({
           });
           updatedCount++;
         } else {
-          // 新規追加 (create)
           await createSetting(targetNovelId, {
             name: trimmedName,
             category: trimmedCategory,
@@ -408,7 +381,7 @@ export function ChatInsertEntityModal({
         }
       }
 
-      // キャッシュの無効化（小説配下の全データを一括無効化）
+      // キャッシュの無効化
       await queryClient.invalidateQueries({
         queryKey: novelKeys.detail(targetNovelId),
       });
@@ -563,289 +536,22 @@ export function ChatInsertEntityModal({
 
             {/* 人物リスト */}
             {activeTab === 'characters' && (
-              <div className="mt-3 space-y-3">
-                {extractedCharacters.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-slate-400">
-                    検出された登場人物はありませんでした。「＋ 人物を手動追加」から追加できます。
-                  </div>
-                ) : (
-                  extractedCharacters.map((char) => (
-                    <div
-                      key={char._id}
-                      className={`rounded-xl border p-3 transition ${
-                        char._selected
-                          ? 'border-indigo-300 bg-indigo-50/40 dark:border-indigo-600/60 dark:bg-indigo-950/20'
-                          : 'border-slate-200 bg-white opacity-60 dark:border-slate-700 dark:bg-slate-800'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2 pt-1">
-                          <input
-                            type="checkbox"
-                            checked={char._selected}
-                            onChange={() => handleToggleCharacter(char._id)}
-                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
-                          />
-                        </div>
-
-                        <div className="flex-1 space-y-2">
-                          {/* 既存データとの重複判定 & アクション選択 */}
-                          {char.matchedExisting ? (
-                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-1.5 text-xs dark:border-amber-900/40 dark:bg-amber-950/30">
-                              <span className="font-semibold text-amber-800 dark:text-amber-300">
-                                ⚠️ 既存の人物「{char.matchedExisting.name}」と名前が一致
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                <label className="text-[11px] text-slate-600 dark:text-slate-300">
-                                  反映方法:
-                                </label>
-                                <select
-                                  value={char.action}
-                                  onChange={(e) =>
-                                    handleUpdateCharacter(
-                                      char._id,
-                                      'action',
-                                      e.target.value as EntityAction,
-                                    )
-                                  }
-                                  className="rounded border border-amber-300 bg-white px-2 py-0.5 text-xs text-slate-800 focus:outline-none dark:border-amber-700 dark:bg-slate-800 dark:text-slate-100"
-                                >
-                                  <option value="overwrite">上書き更新</option>
-                                  <option value="merge">追記マージ</option>
-                                  <option value="create">新規追加（同名別件）</option>
-                                </select>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                              ✨ 新規追加
-                            </div>
-                          )}
-
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                            <div className="sm:col-span-2">
-                              <label className="block text-[10px] font-semibold text-slate-500 uppercase">
-                                名前
-                              </label>
-                              <input
-                                type="text"
-                                value={char.name}
-                                onChange={(e) =>
-                                  handleUpdateCharacter(char._id, 'name', e.target.value)
-                                }
-                                placeholder="例: アリス・フォーサイス"
-                                className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-semibold text-slate-500 uppercase">
-                                役割・カテゴリ
-                              </label>
-                              <input
-                                type="text"
-                                value={char.category}
-                                onChange={(e) =>
-                                  handleUpdateCharacter(char._id, 'category', e.target.value)
-                                }
-                                placeholder="例: 主人公, 敵対者"
-                                className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase">
-                              特徴・属性タグ（カンマ区切り）
-                            </label>
-                            <input
-                              type="text"
-                              value={char.traitsString}
-                              onChange={(e) =>
-                                handleUpdateCharacter(char._id, 'traitsString', e.target.value)
-                              }
-                              placeholder="例: 銀髪, 剣術, 冷静沈着"
-                              className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase">
-                              説明・背景・動機
-                            </label>
-                            <textarea
-                              rows={2}
-                              value={char.description || ''}
-                              onChange={(e) =>
-                                handleUpdateCharacter(char._id, 'description', e.target.value)
-                              }
-                              placeholder="人物の外見、性格、目的などの説明"
-                              className="w-full resize-none rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                            />
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCharacter(char._id)}
-                          className="text-slate-400 hover:text-rose-500 dark:text-slate-500 dark:hover:text-rose-400"
-                          title="候補から削除"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth={1.5}
-                            stroke="currentColor"
-                            className="h-4 w-4"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+              <ChatInsertCharacterTab
+                characters={extractedCharacters}
+                onToggle={handleToggleCharacter}
+                onRemove={handleRemoveCharacter}
+                onUpdate={handleUpdateCharacter}
+              />
             )}
 
             {/* 設定リスト */}
             {activeTab === 'settings' && (
-              <div className="mt-3 space-y-3">
-                {extractedSettings.length === 0 ? (
-                  <div className="py-8 text-center text-xs text-slate-400">
-                    検出された設定情報はありませんでした。「＋ 設定を手動追加」から追加できます。
-                  </div>
-                ) : (
-                  extractedSettings.map((set) => (
-                    <div
-                      key={set._id}
-                      className={`rounded-xl border p-3 transition ${
-                        set._selected
-                          ? 'border-indigo-300 bg-indigo-50/40 dark:border-indigo-600/60 dark:bg-indigo-950/20'
-                          : 'border-slate-200 bg-white opacity-60 dark:border-slate-700 dark:bg-slate-800'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-2 pt-1">
-                          <input
-                            type="checkbox"
-                            checked={set._selected}
-                            onChange={() => handleToggleSetting(set._id)}
-                            className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600"
-                          />
-                        </div>
-
-                        <div className="flex-1 space-y-2">
-                          {/* 既存データとの重複判定 & アクション選択 */}
-                          {set.matchedExisting ? (
-                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50/80 px-2.5 py-1.5 text-xs dark:border-amber-900/40 dark:bg-amber-950/30">
-                              <span className="font-semibold text-amber-800 dark:text-amber-300">
-                                ⚠️ 既存の設定「{set.matchedExisting.name}」と名前が一致
-                              </span>
-                              <div className="flex items-center gap-1.5">
-                                <label className="text-[11px] text-slate-600 dark:text-slate-300">
-                                  反映方法:
-                                </label>
-                                <select
-                                  value={set.action}
-                                  onChange={(e) =>
-                                    handleUpdateSetting(
-                                      set._id,
-                                      'action',
-                                      e.target.value as EntityAction,
-                                    )
-                                  }
-                                  className="rounded border border-amber-300 bg-white px-2 py-0.5 text-xs text-slate-800 focus:outline-none dark:border-amber-700 dark:bg-slate-800 dark:text-slate-100"
-                                >
-                                  <option value="overwrite">上書き更新</option>
-                                  <option value="merge">追記マージ</option>
-                                  <option value="create">新規追加（同名別件）</option>
-                                </select>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                              ✨ 新規追加
-                            </div>
-                          )}
-
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                            <div className="sm:col-span-2">
-                              <label className="block text-[10px] font-semibold text-slate-500 uppercase">
-                                設定名
-                              </label>
-                              <input
-                                type="text"
-                                value={set.name}
-                                onChange={(e) =>
-                                  handleUpdateSetting(set._id, 'name', e.target.value)
-                                }
-                                placeholder="例: 神聖ルミナス帝国"
-                                className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-[10px] font-semibold text-slate-500 uppercase">
-                                カテゴリ
-                              </label>
-                              <input
-                                type="text"
-                                value={set.category}
-                                onChange={(e) =>
-                                  handleUpdateSetting(set._id, 'category', e.target.value)
-                                }
-                                placeholder="例: 世界観, 魔法, 地理"
-                                className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                              />
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-semibold text-slate-500 uppercase">
-                              詳細説明
-                            </label>
-                            <textarea
-                              rows={2}
-                              value={set.description || ''}
-                              onChange={(e) =>
-                                handleUpdateSetting(set._id, 'description', e.target.value)
-                              }
-                              placeholder="設定の詳細内容やルールなど"
-                              className="w-full resize-none rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
-                            />
-                          </div>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSetting(set._id)}
-                          className="text-slate-400 hover:text-rose-500 dark:text-slate-500 dark:hover:text-rose-400"
-                          title="候補から削除"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            strokeWidth={1.5}
-                            stroke="currentColor"
-                            className="h-4 w-4"
-                          >
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              d="M6 18L18 6M6 6l12 12"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+              <ChatInsertSettingTab
+                settings={extractedSettings}
+                onToggle={handleToggleSetting}
+                onRemove={handleRemoveSetting}
+                onUpdate={handleUpdateSetting}
+              />
             )}
           </div>
         )}
