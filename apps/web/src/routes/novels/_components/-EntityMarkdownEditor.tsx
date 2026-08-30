@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MarkdownCategoryNode } from '@novel-creator/shared';
+import { AIProgressIndicator } from '@/components/AIProgressIndicator.js';
 import { Button } from '@/components/Button.js';
 import { ConfirmDialog } from '@/components/ConfirmDialog.js';
 import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
@@ -87,6 +88,7 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
   const { openChat } = useChat();
   const [historyOpen, setHistoryOpen] = useState(false);
   const toast = useToast();
+  const runStartedAtRef = useRef<number>(Date.now());
 
   const handleOpenChat = useCallback(() => {
     if (selectedText.trim()) {
@@ -120,6 +122,7 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
       return;
     }
 
+    runStartedAtRef.current = Date.now();
     try {
       if (editScope === 'document') {
         const next = await onEditDocument({ markdown, instruction });
@@ -320,6 +323,19 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
               LLMで編集
             </Button>
           </div>
+
+          {isBusy && (
+            <AIProgressIndicator
+              variant="inline"
+              stage={
+                editingDocument || editScope === 'document'
+                  ? `AIが${entityTitle}マークダウン全体を再編成・推敲中...`
+                  : `AIが「${activeSection?.name ?? entityTitle}」を推敲・編集案を生成中...`
+              }
+              description="指示内容に基づいてマークダウンを生成しています。完了までしばらくお待ちください。"
+              startedAt={runStartedAtRef.current}
+            />
+          )}
         </div>
       </div>
 
