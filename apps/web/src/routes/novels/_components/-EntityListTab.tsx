@@ -29,6 +29,14 @@ export interface EntityListTabConfig<
   deleteConfirmLabel: string;
 }
 
+export type EntitySortOption =
+  | 'category-asc-name-asc'
+  | 'category-asc-name-desc'
+  | 'category-desc-name-asc'
+  | 'category-desc-name-desc'
+  | 'name-asc'
+  | 'name-desc';
+
 export function EntityListTab<
   T extends { id: string; name: string; category: string; description: string | null },
 >({
@@ -51,19 +59,48 @@ export function EntityListTab<
   const [viewMode, setViewMode] = useState<'cards' | 'markdown'>('cards');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(256);
+  const [sortOption, setSortOption] = useState<EntitySortOption>(() => {
+    const saved = localStorage.getItem(`novel-creator:sort:${config.idPrefix}`);
+    return (saved as EntitySortOption) || 'category-asc-name-asc';
+  });
+
+  const handleSortChange = (newSort: EntitySortOption) => {
+    setSortOption(newSort);
+    localStorage.setItem(`novel-creator:sort:${config.idPrefix}`, newSort);
+  };
 
   const isDraggingRef = useRef(false);
 
   const grouped = useMemo(() => {
     const map = new Map<string, T[]>();
     for (const entity of entities) {
-      const cat = config.categoryOf(entity);
+      const cat = config.categoryOf(entity) || '未分類';
       const list = map.get(cat) ?? [];
       list.push(entity);
       map.set(cat, list);
     }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  }, [entities, config]);
+
+    // カテゴリ内のアイテムをソート
+    for (const [_, items] of map.entries()) {
+      items.sort((a, b) => {
+        if (sortOption.endsWith('desc')) {
+          return b.name.localeCompare(a.name, 'ja');
+        }
+        return a.name.localeCompare(b.name, 'ja');
+      });
+    }
+
+    // カテゴリ自体のソート
+    const entries = Array.from(map.entries());
+    entries.sort((a, b) => {
+      if (sortOption.startsWith('category-desc')) {
+        return b[0].localeCompare(a[0], 'ja');
+      }
+      return a[0].localeCompare(b[0], 'ja');
+    });
+
+    return entries;
+  }, [entities, config, sortOption]);
 
   const handleSplitterMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -109,11 +146,30 @@ export function EntityListTab<
     <div className="flex h-full flex-col space-y-4">
       <div className="flex shrink-0 items-center justify-between border-b border-border pb-3">
         <h2 className="text-xl font-bold text-foreground">{config.title}</h2>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {viewMode === 'cards' && (
-            <Button onClick={config.onNew} leftIcon={<PlusIcon />}>
-              {config.newLabel}
-            </Button>
+            <>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span>並び順:</span>
+                <select
+                  aria-label="並び順"
+                  value={sortOption}
+                  onChange={(e) => handleSortChange(e.target.value as EntitySortOption)}
+                  className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                >
+                  <option value="category-asc-name-asc">カテゴリ昇順・名前昇順</option>
+                  <option value="category-asc-name-desc">カテゴリ昇順・名前降順</option>
+                  <option value="category-desc-name-asc">カテゴリ降順・名前昇順</option>
+                  <option value="category-desc-name-desc">カテゴリ降順・名前降順</option>
+                  <option value="name-asc">名前昇順 (あ→ん)</option>
+                  <option value="name-desc">名前降順 (ん→あ)</option>
+                </select>
+              </div>
+
+              <Button onClick={config.onNew} leftIcon={<PlusIcon />}>
+                {config.newLabel}
+              </Button>
+            </>
           )}
           <div className="flex rounded-lg border border-border bg-surface p-0.5">
             <button

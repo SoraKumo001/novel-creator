@@ -130,4 +130,42 @@ describe('EntityListTab', () => {
 
     expect(screen.getByText('読み込み中...')).toBeInTheDocument();
   });
+
+  it('並び順セレクターでカテゴリや名前のソート順が切り替わること', () => {
+    renderTab({
+      entities: [
+        makeEntity({ id: 'ent-1', name: 'ボブ', category: 'Bグループ' }),
+        makeEntity({ id: 'ent-2', name: 'アリス', category: 'Aグループ' }),
+        makeEntity({ id: 'ent-3', name: 'キャロル', category: 'Aグループ' }),
+      ],
+    });
+
+    const sortSelect = screen.getByRole('combobox', { name: '並び順' });
+    expect(sortSelect).toBeInTheDocument();
+
+    // デフォルト: カテゴリ昇順 (Aグループ -> Bグループ)、名前昇順 (アリス -> キャロル)
+    let headings = screen.getAllByRole('heading', { level: 3 });
+    expect(headings.map((h) => h.textContent)).toEqual([
+      'Aグループ',
+      'アリス',
+      'キャロル',
+      'Bグループ',
+      'ボブ',
+    ]);
+
+    // カテゴリ降順・名前降順に変更
+    fireEvent.change(sortSelect, { target: { value: 'category-desc-name-desc' } });
+
+    // カテゴリ降順 (Bグループ -> Aグループ)、名前降順 (キャロル -> アリス)
+    headings = screen.getAllByRole('heading', { level: 3 });
+    expect(headings.map((h) => h.textContent)).toEqual([
+      'Bグループ',
+      'ボブ',
+      'Aグループ',
+      'キャロル',
+      'アリス',
+    ]);
+
+    expect(sortSelect).toHaveValue('category-desc-name-desc');
+  });
 });
