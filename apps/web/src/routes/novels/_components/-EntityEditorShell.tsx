@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { useNavigate } from '@tanstack/react-router';
+import { AIProgressIndicator } from '@/components/AIProgressIndicator.js';
 import { Button } from '@/components/Button.js';
 import { Card, CardHeader } from '@/components/Card.js';
 import { ConfirmDialog } from '@/components/ConfirmDialog.js';
@@ -97,6 +98,13 @@ export function EntityEditorShell({
   children,
 }: EntityEditorShellProps) {
   const navigate = useNavigate();
+  const generateStartedAtRef = useRef<number>(Date.now());
+  const wasGenerateLoadingRef = useRef(false);
+
+  if (generateLoading && !wasGenerateLoadingRef.current) {
+    generateStartedAtRef.current = Date.now();
+  }
+  wasGenerateLoadingRef.current = generateLoading;
 
   if (loading) return <Loading message={loadingMessage} />;
 
@@ -201,6 +209,14 @@ export function EntityEditorShell({
                   {generateLabel}
                 </Button>
               </div>
+
+              {generateLoading && (
+                <AIProgressIndicator
+                  variant="inline"
+                  stage="AIが設定内容を推敲・生成中..."
+                  startedAt={generateStartedAtRef.current}
+                />
+              )}
 
               {onChatConsult && (
                 <Button

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { novelKeys } from '@/lib/queryKeys.js';
+import { AIProgressIndicator } from '@/components/AIProgressIndicator.js';
 import { Button } from '@/components/Button.js';
 import { Modal } from '@/components/Modal.js';
 import {
@@ -285,6 +286,8 @@ export function ChatInsertEntityModal({
     chaptersQuery.isLoading,
   ]);
 
+  const extractStartedAtRef = useRef<number>(Date.now());
+
   // LLM抽出処理
   useEffect(() => {
     if (!isOpen) return;
@@ -292,6 +295,7 @@ export function ChatInsertEntityModal({
     const runExtract = async () => {
       setIsExtracting(true);
       setExtractError(null);
+      extractStartedAtRef.current = Date.now();
       try {
         const data = await extractChatEntities(sourceText);
 
@@ -852,10 +856,15 @@ export function ChatInsertEntityModal({
 
         {/* 抽出中ローディング */}
         {isExtracting && (
-          <div className="flex flex-col items-center justify-center py-12 text-slate-500 dark:text-slate-400">
-            <div className="mb-3 h-8 w-8 animate-spin rounded-full border-3 border-indigo-500 border-t-transparent" />
-            <p className="text-sm font-medium">チャットテキストから設定・プロットを解析中...</p>
-            <p className="mt-1 text-xs text-slate-400">構造化データを抽出しています</p>
+          <div className="rounded-xl border border-primary/30 bg-surface-raised p-4">
+            <AIProgressIndicator
+              stage="チャットテキストから設定・プロットを解析中..."
+              description="対話ログから登場人物・世界観設定・伏線・年表・章構成の構造化データを抽出しています"
+              startedAt={extractStartedAtRef.current}
+              onCancel={onClose}
+              cancelLabel="抽出を中止"
+              variant="panel"
+            />
           </div>
         )}
 

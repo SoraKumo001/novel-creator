@@ -4,11 +4,15 @@ import type { ExtractResult, GeneratedPlot, GeneratedSummary } from '../types.js
 export async function generatePlot(
   novelId: string,
   modelConfigId?: string | null,
+  signal?: AbortSignal,
 ): Promise<GeneratedPlot> {
-  const res = await apiClient.novels[':id'].generate.plot.$post({
-    param: { id: novelId },
-    json: { modelConfigId: modelConfigId || null },
-  });
+  const res = await apiClient.novels[':id'].generate.plot.$post(
+    {
+      param: { id: novelId },
+      json: { modelConfigId: modelConfigId || null },
+    },
+    { init: { signal } },
+  );
 
   if (!res.ok) throw new Error('Failed to generate plot');
   const data = await res.json();
@@ -23,10 +27,16 @@ export async function generatePlot(
   };
 }
 
-export async function generateChapterSummary(chapterId: string): Promise<GeneratedSummary> {
-  const res = await apiClient.chapters[':id'].generate.summary.$post({
-    param: { id: chapterId },
-  });
+export async function generateChapterSummary(
+  chapterId: string,
+  signal?: AbortSignal,
+): Promise<GeneratedSummary> {
+  const res = await apiClient.chapters[':id'].generate.summary.$post(
+    {
+      param: { id: chapterId },
+    },
+    { init: { signal } },
+  );
   if (!res.ok) throw new Error('Failed to generate chapter summary');
   const data = await res.json();
   return {
@@ -36,10 +46,16 @@ export async function generateChapterSummary(chapterId: string): Promise<Generat
   };
 }
 
-export async function generateSectionSummary(sectionId: string): Promise<GeneratedSummary> {
-  const res = await apiClient.sections[':id'].generate.summary.$post({
-    param: { id: sectionId },
-  });
+export async function generateSectionSummary(
+  sectionId: string,
+  signal?: AbortSignal,
+): Promise<GeneratedSummary> {
+  const res = await apiClient.sections[':id'].generate.summary.$post(
+    {
+      param: { id: sectionId },
+    },
+    { init: { signal } },
+  );
   if (!res.ok) throw new Error('Failed to generate section summary');
   const data = await res.json();
   return {
@@ -52,11 +68,15 @@ export async function generateSectionSummary(sectionId: string): Promise<Generat
 export async function* generateSectionContent(
   sectionId: string,
   modelConfigId?: string | null,
+  signal?: AbortSignal,
 ): AsyncIterable<string> {
-  const res = await apiClient.sections[':id'].generate.content.$post({
-    param: { id: sectionId },
-    json: { modelConfigId: modelConfigId || null },
-  });
+  const res = await apiClient.sections[':id'].generate.content.$post(
+    {
+      param: { id: sectionId },
+      json: { modelConfigId: modelConfigId || null },
+    },
+    { init: { signal } },
+  );
   if (!res.ok || !res.body) {
     throw new Error('Failed to generate section content');
   }
@@ -67,6 +87,7 @@ export async function* generateSectionContent(
 
   try {
     while (true) {
+      if (signal?.aborted) break;
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
@@ -95,19 +116,29 @@ export async function proofreadSectionContent(
   sectionId: string,
   customBody?: string,
   modelConfigId?: string | null,
+  signal?: AbortSignal,
 ) {
-  const res = await apiClient.sections[':id'].generate.proofread.$post({
-    param: { id: sectionId },
-    json: { body: customBody, modelConfigId: modelConfigId || null },
-  });
+  const res = await apiClient.sections[':id'].generate.proofread.$post(
+    {
+      param: { id: sectionId },
+      json: { body: customBody, modelConfigId: modelConfigId || null },
+    },
+    { init: { signal } },
+  );
   if (!res.ok) throw new Error('Failed to proofread content');
   return res.json();
 }
 
-export async function extractEntities(sectionId: string): Promise<ExtractResult> {
-  const res = await apiClient.sections[':id'].generate.extract.$post({
-    param: { id: sectionId },
-  });
+export async function extractEntities(
+  sectionId: string,
+  signal?: AbortSignal,
+): Promise<ExtractResult> {
+  const res = await apiClient.sections[':id'].generate.extract.$post(
+    {
+      param: { id: sectionId },
+    },
+    { init: { signal } },
+  );
   if (!res.ok) throw new Error('Failed to extract entities');
   const data = await res.json();
   return {
@@ -133,17 +164,21 @@ export async function* inlineAssistSectionContent(
     surroundingText?: string;
     modelConfigId?: string | null;
   },
+  signal?: AbortSignal,
 ): AsyncIterable<string> {
-  const res = await apiClient.sections[':id'].generate['inline-assist'].$post({
-    param: { id: sectionId },
-    json: {
-      selectedText: input.selectedText,
-      action: input.action,
-      customInstruction: input.customInstruction,
-      surroundingText: input.surroundingText,
-      modelConfigId: input.modelConfigId || null,
+  const res = await apiClient.sections[':id'].generate['inline-assist'].$post(
+    {
+      param: { id: sectionId },
+      json: {
+        selectedText: input.selectedText,
+        action: input.action,
+        customInstruction: input.customInstruction,
+        surroundingText: input.surroundingText,
+        modelConfigId: input.modelConfigId || null,
+      },
     },
-  });
+    { init: { signal } },
+  );
 
   if (!res.ok || !res.body) {
     throw new Error('Failed to generate inline assist content');
@@ -155,6 +190,7 @@ export async function* inlineAssistSectionContent(
 
   try {
     while (true) {
+      if (signal?.aborted) break;
       const { done, value } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
@@ -188,17 +224,21 @@ export async function analyzeSettingImpact(
     afterValue: string;
     modelConfigId?: string | null;
   },
+  signal?: AbortSignal,
 ) {
-  const res = await apiClient.novels[':id'].generate.impact.$post({
-    param: { id: novelId },
-    json: {
-      changeTarget: input.changeTarget,
-      targetName: input.targetName,
-      beforeValue: input.beforeValue,
-      afterValue: input.afterValue,
-      modelConfigId: input.modelConfigId || null,
+  const res = await apiClient.novels[':id'].generate.impact.$post(
+    {
+      param: { id: novelId },
+      json: {
+        changeTarget: input.changeTarget,
+        targetName: input.targetName,
+        beforeValue: input.beforeValue,
+        afterValue: input.afterValue,
+        modelConfigId: input.modelConfigId || null,
+      },
     },
-  });
+    { init: { signal } },
+  );
   if (!res.ok) throw new Error('Failed to analyze setting impact');
   return res.json();
 }

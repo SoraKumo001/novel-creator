@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from './Button.js';
+import { formatElapsed } from './AIProgressIndicator.js';
 import { MarkdownText } from '@/components/MarkdownText.js';
 import type { InlineAssistAction } from '@/lib/types.js';
 
@@ -10,6 +11,7 @@ interface InlineAIAssistantProps {
   onCancel: () => void;
   onExecuteAssist: (action: InlineAssistAction, customInstruction?: string) => Promise<void>;
   isLoading: boolean;
+  startedAt?: number | null;
   generatedText: string;
 }
 
@@ -43,10 +45,24 @@ export function InlineAIAssistant({
   onCancel,
   onExecuteAssist,
   isLoading,
+  startedAt,
   generatedText,
 }: InlineAIAssistantProps) {
   const [customInstruction, setCustomInstruction] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!isLoading || !startedAt) {
+      setElapsedSeconds(0);
+      return;
+    }
+    setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    const id = setInterval(() => {
+      setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startedAt) / 1000)));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [isLoading, startedAt]);
 
   return (
     <div className="rounded-xl border border-primary/40 bg-surface-raised p-4 shadow-xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -135,29 +151,55 @@ export function InlineAIAssistant({
         <div className="space-y-3">
           <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs leading-relaxed max-h-48 overflow-y-auto space-y-1">
             <div className="flex items-center justify-between text-[11px] font-semibold text-primary">
-              <span>{isLoading ? '🤖 AIが執筆・推敲中...' : '🎉 生成結果'}</span>
-              <span>{generatedText.length.toLocaleString()} 文字</span>
+              <span className="flex items-center gap-1.5">
+                {isLoading && <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />}
+                {isLoading
+                  ? generatedText
+                    ? '✍️ AIが推敲文を生成中...'
+                    : '🤖 文脈と思考を解析中...'
+                  : '🎉 生成結果'}
+              </span>
+              <div className="flex items-center gap-2">
+                {isLoading && (
+                  <span className="text-muted-foreground font-mono">
+                    ({formatElapsed(elapsedSeconds)})
+                  </span>
+                )}
+                <span>{generatedText.length.toLocaleString()} 文字</span>
+              </div>
             </div>
-            <MarkdownText compact content={generatedText} className="text-foreground" />
+            {generatedText ? (
+              <MarkdownText compact content={generatedText} className="text-foreground" />
+            ) : (
+              <div className="py-2 text-muted-foreground italic">
+                LLMからの応答を待機しています...
+              </div>
+            )}
           </div>
 
-          {!isLoading && (
-            <div className="flex items-center justify-end gap-2 pt-1">
-              <Button size="sm" variant="secondary" onClick={onCancel}>
-                破棄
+          <div className="flex items-center justify-end gap-2 pt-1">
+            {isLoading ? (
+              <Button size="sm" variant="danger" onClick={onCancel}>
+                ■ 停止
               </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={() => onApplyInsertAfter(generatedText)}
-              >
-                選択範囲の直後に挿入
-              </Button>
-              <Button size="sm" variant="primary" onClick={() => onApplyReplace(generatedText)}>
-                ✍️ 選択範囲を置換
-              </Button>
-            </div>
-          )}
+            ) : (
+              <>
+                <Button size="sm" variant="secondary" onClick={onCancel}>
+                  破棄
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => onApplyInsertAfter(generatedText)}
+                >
+                  選択範囲の直後に挿入
+                </Button>
+                <Button size="sm" variant="primary" onClick={() => onApplyReplace(generatedText)}>
+                  ✍️ 選択範囲を置換
+                </Button>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>

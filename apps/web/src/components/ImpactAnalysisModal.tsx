@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { AIProgressIndicator } from './AIProgressIndicator.js';
 import { Button } from './Button.js';
 import { MarkdownText } from '@/components/MarkdownText.js';
 import { Modal } from './Modal.js';
@@ -10,12 +11,15 @@ interface ImpactAnalysisModalProps {
   targetType: 'character' | 'setting';
   targetName: string;
   beforeValue: string;
-  onAnalyze: (input: {
-    changeTarget: 'character' | 'setting';
-    targetName: string;
-    beforeValue: string;
-    afterValue: string;
-  }) => Promise<SettingImpactResult>;
+  onAnalyze: (
+    input: {
+      changeTarget: 'character' | 'setting';
+      targetName: string;
+      beforeValue: string;
+      afterValue: string;
+    },
+    signal?: AbortSignal,
+  ) => Promise<SettingImpactResult>;
 }
 
 const IMPACT_BADGES = {
@@ -45,39 +49,61 @@ export function ImpactAnalysisModal({
   const [afterValue, setAfterValue] = useState(beforeValue);
   const [result, setResult] = useState<SettingImpactResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const startTimeRef = useRef<number>(Date.now());
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const handleCancelAnalysis = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setAnalyzing(false);
+  };
 
   const handleRunAnalysis = async () => {
     if (!afterValue.trim()) return;
     setAnalyzing(true);
+    setResult(null);
+    startTimeRef.current = Date.now();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     try {
-      const res = await onAnalyze({
-        changeTarget: targetType,
-        targetName,
-        beforeValue,
-        afterValue,
-      });
+      const res = await onAnalyze(
+        {
+          changeTarget: targetType,
+          targetName,
+          beforeValue,
+          afterValue,
+        },
+        controller.signal,
+      );
       setResult(res);
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError' || controller.signal.aborted) {
+        return;
+      }
+      throw e;
     } finally {
       setAnalyzing(false);
+      abortControllerRef.current = null;
     }
   };
 
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={analyzing ? handleCancelAnalysis : onClose}
       title="⚡ 設定変更の影響範囲シミュレーター"
       size="xl"
       footer={
         <div className="flex w-full items-center justify-between">
-          <Button variant="secondary" onClick={onClose}>
-            閉じる
+          <Button variant="secondary" onClick={analyzing ? handleCancelAnalysis : onClose}>
+            {analyzing ? 'キャンセル' : '閉じる'}
           </Button>
-          {!result && (
+          {!result && !analyzing && (
             <Button
               variant="primary"
               onClick={() => void handleRunAnalysis()}
-              isLoading={analyzing}
               disabled={afterValue === beforeValue}
             >
               🔍 影響範囲をシミュレーション分析
@@ -106,6 +132,7 @@ export function ImpactAnalysisModal({
             <textarea
               value={afterValue}
               onChange={(e) => setAfterValue(e.target.value)}
+              disabled={analyzing}
               rows={4}
               placeholder="新しい設定内容を入力してください..."
               className="w-full rounded-lg border border-primary p-2.5 text-xs text-foreground bg-surface focus:outline-none font-medium"
@@ -113,13 +140,17 @@ export function ImpactAnalysisModal({
           </div>
         </div>
 
-        {/* 分析結果 */}
+        {/* 分析実行中プログレス */}
         {analyzing && (
-          <div className="flex flex-col items-center justify-center py-12 space-y-3">
-            <div className="h-8 w-8 animate-spin rounded-full border-3 border-primary border-t-transparent" />
-            <p className="text-xs text-muted-foreground">
-              全プロット・章節・年表・伏線との整合性を検証中...
-            </p>
+          <div className="rounded-xl border border-primary/30 bg-surface-raised p-4 shadow-inner">
+            <AIProgressIndicator
+              stage="全プロット・章節・年表・伏線との整合性を検証中..."
+              description="設定の変更による物語全体の矛盾や影響箇所をAIが網羅的にスキャンしています"
+              startedAt={startTimeRef.current}
+              onCancel={handleCancelAnalysis}
+              cancelLabel="分析を中止"
+              variant="panel"
+            />
           </div>
         )}
 

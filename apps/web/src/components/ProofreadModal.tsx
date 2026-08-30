@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { AIProgressIndicator } from './AIProgressIndicator.js';
 import { Button } from './Button.js';
 import { MarkdownText } from '@/components/MarkdownText.js';
 import { Modal } from './Modal.js';
@@ -10,6 +11,7 @@ interface ProofreadModalProps {
   result: ProofreadResult | null;
   isLoading: boolean;
   onApplyPolishedBody?: (newBody: string) => void;
+  onCancel?: () => void;
 }
 
 const TYPE_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
@@ -57,21 +59,28 @@ export function ProofreadModal({
   result,
   isLoading,
   onApplyPolishedBody,
+  onCancel,
 }: ProofreadModalProps) {
   const [activeTab, setActiveTab] = useState<'issues' | 'polished'>('issues');
+  const startTimeRef = useRef<number>(Date.now());
+  const wasLoadingRef = useRef(false);
+
+  if (isLoading && !wasLoadingRef.current) {
+    startTimeRef.current = Date.now();
+  }
+  wasLoadingRef.current = isLoading;
 
   if (isLoading) {
     return (
-      <Modal isOpen={isOpen} onClose={onClose} title="AI校正・推敲中..." size="lg">
-        <div className="flex flex-col items-center justify-center py-12 space-y-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <div className="text-center">
-            <p className="font-semibold text-foreground">プロ編集者の視点で文章を精読中...</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              視点ブレ・誤字脱字・リズム・設定の整合性を総合的にチェックしています
-            </p>
-          </div>
-        </div>
+      <Modal isOpen={isOpen} onClose={onCancel ?? onClose} title="AI 校正・推敲レビュー" size="lg">
+        <AIProgressIndicator
+          stage="プロ編集者の視点で文章を精読中..."
+          description="視点ブレ・誤字脱字・リズム・設定整合性を総合的にチェックし、推敲案を作成しています"
+          startedAt={startTimeRef.current}
+          onCancel={onCancel ?? onClose}
+          cancelLabel="校正を中止"
+          variant="panel"
+        />
       </Modal>
     );
   }

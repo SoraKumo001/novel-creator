@@ -454,8 +454,8 @@ export function ChatDrawer() {
 
             {/* ストリーミング中のリアルタイム表示 */}
             {isStreaming && (
-              <div className="flex flex-col items-start">
-                {(streamingContent || (streamingParts && streamingParts.length > 0)) && (
+              <div className="flex flex-col items-start space-y-1">
+                {streamingContent || (streamingParts && streamingParts.length > 0) ? (
                   <>
                     <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-primary font-medium">
                       <span className="h-1.5 w-1.5 rounded-full bg-primary animate-ping" />
@@ -467,6 +467,11 @@ export function ChatDrawer() {
                       {streamingContent && <MarkdownText content={streamingContent} />}
                     </div>
                   </>
+                ) : (
+                  <div className="flex items-center gap-2 rounded-2xl rounded-bl-xs bg-surface-raised border border-border px-4 py-3 text-xs text-muted-foreground shadow-xs animate-pulse">
+                    <span className="h-2 w-2 rounded-full bg-primary animate-ping" />
+                    <span>AIパートナーが思考中...（小説データと文脈を参照しています）</span>
+                  </div>
                 )}
               </div>
             )}

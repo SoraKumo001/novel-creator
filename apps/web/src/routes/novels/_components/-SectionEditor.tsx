@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AIProgressIndicator } from '@/components/AIProgressIndicator.js';
 import { Loading } from '@/components/Loading.js';
 import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
 import { ProofreadModal } from '@/components/ProofreadModal.js';
@@ -53,6 +54,9 @@ export function SectionEditor({
     inlineAssisting,
     extract,
     extracting,
+    startedAt: generateStartedAt,
+    generatedChars,
+    cancelGeneration,
     streamError,
     resetStreamError,
   } = useGenerate();
@@ -184,6 +188,8 @@ export function SectionEditor({
     setExtractResultOpen(true);
   }
 
+  const proofreadAbortControllerRef = useRef<AbortController | null>(null);
+
   // 校正モーダル
   const handleOpenProofread = async () => {
     if (!localBody.trim()) {
@@ -192,15 +198,35 @@ export function SectionEditor({
     }
     setProofreadOpen(true);
     setProofreading(true);
+    const controller = new AbortController();
+    proofreadAbortControllerRef.current = controller;
     try {
-      const res = await proofreadSectionContent(section.id, localBody, selectedModelConfigId);
+      const res = await proofreadSectionContent(
+        section.id,
+        localBody,
+        selectedModelConfigId,
+        controller.signal,
+      );
       setProofreadResult(res);
     } catch (e) {
+      if ((e as Error)?.name === 'AbortError' || controller.signal.aborted) {
+        return;
+      }
       toast.error(toErrorMessage(e));
       setProofreadOpen(false);
     } finally {
       setProofreading(false);
+      proofreadAbortControllerRef.current = null;
     }
+  };
+
+  const handleCancelProofread = () => {
+    if (proofreadAbortControllerRef.current) {
+      proofreadAbortControllerRef.current.abort();
+      proofreadAbortControllerRef.current = null;
+    }
+    setProofreading(false);
+    setProofreadOpen(false);
   };
 
   // 口調チェッカーモーダル
@@ -404,6 +430,18 @@ export function SectionEditor({
         />
       </div>
 
+      {extracting && (
+        <div className="px-4 py-2 border-b border-border bg-surface shrink-0">
+          <AIProgressIndicator
+            variant="inline"
+            stage="AIが本文から設定・時系列を自動抽出中..."
+            startedAt={generateStartedAt ?? Date.now()}
+            onCancel={cancelGeneration}
+            cancelLabel="抽出を中止"
+          />
+        </div>
+      )}
+
       <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
         {loading ? (
           <Loading message="本文を読み込み中..." />
@@ -443,11 +481,15 @@ export function SectionEditor({
                   onApplyReplace={handleApplyInlineReplace}
                   onApplyInsertAfter={handleApplyInlineInsertAfter}
                   onCancel={() => {
+                    if (inlineAssisting) {
+                      cancelGeneration();
+                    }
                     setIsInlineActive(false);
                     setInlineGeneratedText('');
                   }}
                   onExecuteAssist={handleExecuteInlineAssist}
                   isLoading={inlineAssisting}
+                  startedAt={inlineAssisting ? generateStartedAt : null}
                   generatedText={inlineGeneratedText}
                 />
               </div>
@@ -456,7 +498,13 @@ export function SectionEditor({
         )}
       </div>
 
-      <GenerateContentPanel generatingContent={generatingContent} streamError={streamError} />
+      <GenerateContentPanel
+        generatingContent={generatingContent}
+        streamError={streamError}
+        startedAt={generateStartedAt}
+        generatedChars={generatedChars}
+        onCancel={cancelGeneration}
+      />
 
       <ExtractResultModal
         isOpen={extractResultOpen}
@@ -489,6 +537,7 @@ export function SectionEditor({
         onClose={() => setProofreadOpen(false)}
         result={proofreadResult}
         isLoading={proofreading}
+        onCancel={handleCancelProofread}
         onApplyPolishedBody={(polished) => {
           setLocalBody(polished);
           toast.success('推敲後の文章を本文に反映しました');

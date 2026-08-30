@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AIProgressIndicator } from '@/components/AIProgressIndicator.js';
 import { Button } from '@/components/Button.js';
 import { ConfirmDialog } from '@/components/ConfirmDialog.js';
 import { EmptyState } from '@/components/EmptyState.js';
@@ -39,6 +40,8 @@ export function PlotTab({
     generateChapterSummary,
     generateSectionSummary,
     generatingPlot,
+    startedAt: generateStartedAt,
+    cancelGeneration,
     generatedPlot,
     resetGeneratedPlot,
   } = useGenerate();
@@ -246,6 +249,19 @@ export function PlotTab({
           </Button>
         </div>
       </div>
+
+      {generatingPlot && (
+        <div className="rounded-xl border border-primary/40 bg-surface-raised p-5 shadow-md animate-in fade-in duration-200">
+          <AIProgressIndicator
+            stage="AIが小説設定・登場人物を参照してプロット構成を立案中..."
+            description="物語の起承転結や伏線・キャラクター設定を考慮し、全章の構成案を生成しています"
+            startedAt={generateStartedAt ?? Date.now()}
+            onCancel={cancelGeneration}
+            cancelLabel="生成を中止"
+            variant="panel"
+          />
+        </div>
+      )}
 
       {plotPreview && (
         <PlotPreviewPanel

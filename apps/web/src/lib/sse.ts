@@ -18,14 +18,19 @@ export async function streamGenerateContent(
   sectionId: string,
   onChunk: (text: string) => void,
   modelConfigId?: string | null,
+  signal?: AbortSignal,
 ): Promise<void> {
   try {
-    for await (const chunk of generateSectionContent(sectionId, modelConfigId)) {
+    for await (const chunk of generateSectionContent(sectionId, modelConfigId, signal)) {
+      if (signal?.aborted) break;
       if (chunk) {
         onChunk(chunk);
       }
     }
   } catch (err) {
+    if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+      return;
+    }
     const message = err instanceof Error ? err.message : 'Failed to generate content';
     throw new Error(message, { cause: err });
   }
@@ -38,14 +43,19 @@ export async function streamInlineAssist(
   sectionId: string,
   input: InlineAssistInput,
   onChunk: (text: string) => void,
+  signal?: AbortSignal,
 ): Promise<void> {
   try {
-    for await (const chunk of inlineAssistSectionContent(sectionId, input)) {
+    for await (const chunk of inlineAssistSectionContent(sectionId, input, signal)) {
+      if (signal?.aborted) break;
       if (chunk) {
         onChunk(chunk);
       }
     }
   } catch (err) {
+    if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+      return;
+    }
     const message = err instanceof Error ? err.message : 'Failed to inline assist';
     throw new Error(message, { cause: err });
   }
@@ -59,12 +69,13 @@ export async function streamGenerateContentAuto(
   sectionId: string,
   onChunk: (text: string) => void,
   modelConfigId?: string | null,
+  signal?: AbortSignal,
 ): Promise<SSEExtractResult> {
   // 1. 本文ストリーミング
-  await streamGenerateContent(sectionId, onChunk, modelConfigId);
+  await streamGenerateContent(sectionId, onChunk, modelConfigId, signal);
 
   // 2. 抽出処理
-  const res = await extractEntities(sectionId);
+  const res = await extractEntities(sectionId, signal);
   return {
     timelines: res.timelines.map((t) => ({
       event: t.event,
