@@ -99,11 +99,11 @@ export async function upsertEntityEmbedding(
 
 ---
 
-## 3. Agentic ツール実行システム (`createReadTools`)
+## 3. Agentic ツール実行システム (`readTools` & `proposeTools`)
 
-創作相談チャット（Creative Chat）では、静的な RAG 注入だけでなく、LLM が自律的に必要な小説データを参照できるように AI SDK の **Tool Calling 機能** を活用した 8 つの読み取り専用ツール（`readTools`）を提供しています。
+創作相談チャット（Creative Chat）では、静的な RAG 注入だけでなく、LLM が自律的に必要な小説データを参照・提案できるように AI SDK の **Tool Calling 機能** を活用した 13 種類のツールを提供しています。
 
-### 3.1 提供ツール一覧
+### 3.1 読み取り専用ツール (`readTools`)
 
 | ツール名                   | 引数 (Zod Schema)                                       | 役割と戻り値                                                                 |
 | :------------------------- | :------------------------------------------------------ | :--------------------------------------------------------------------------- |
@@ -116,10 +116,23 @@ export async function upsertEntityEmbedding(
 | **`getTimelines`**         | `novelId?`                                              | 作中の時系列・年表イベント一覧を取得                                         |
 | **`searchNovelKnowledge`** | `query`, `novelId?`                                     | 質問・キーワードに関する人物・設定を VectorStore からセマンティック検索      |
 
-### 3.2 ツール呼び出しとクライアント連携
+### 3.2 設定提案ツール (`proposeTools`)
+
+会話中に新しい設定やアイデアが固まった際、LLM が自律的に呼び出してユーザーに反映を提案します（Human-in-the-loop 方式）。
+
+| ツール名                      | 引数 (Zod Schema)                             | 役割と戻り値                                                          |
+| :---------------------------- | :-------------------------------------------- | :-------------------------------------------------------------------- |
+| **`proposeCreateCharacter`**  | `name`, `category?`, `description`, `traits?` | 新規登場人物の登録をチャット上で提案（承認カードを表示）              |
+| **`proposeCreateSetting`**    | `name`, `category`, `description`             | 新規世界観・設定の登録をチャット上で提案（承認カードを表示）          |
+| **`proposeAddForeshadowing`** | `title`, `description`, `status?`             | 新規伏線の登録をチャット上で提案（承認カードを表示）                  |
+| **`proposeAddTimelineEvent`** | `event`, `timestamp?`                         | 年表への出来事追加をチャット上で提案（承認カードを表示）              |
+| **`proposeUpdatePlot`**       | `chapterTitle`, `summary`                     | 章プロット・あらすじの作成/更新をチャット上で提案（承認カードを表示） |
+
+### 3.3 ツール呼び出しとクライアント連携
 
 - **自律的探索**: LLM はユーザーの質問（例:「第2章の伏線と主人公の関係性は？」）に応じて、`getForeshadowings` や `getCharacters`、`getPlotAndChapters` を連鎖的に呼び出して文脈を把握します。
-- **UI 表示 (`ToolActivity`)**: AI SDK UI の Data Stream 経由でツール呼び出し（`tool-call`）と実行結果（`tool-result`）がクライアントにリアルタイム配信され、チャット画面上に「設定を検索中」「登場人物を取得完了」といったカードが展開されます。
+- **提案とインライン承認 (`ChatProposalCard`)**: LLM が `propose〜` ツールを呼ぶと、即時書き込みは行わず提案ペイロードを返します。クライアント側ではインライン承認カードが描画され、作家がワンクリックで小説データへ登録できます。
+- **UI 表示 (`ToolActivity`)**: AI SDK UI の Data Stream 経由でツール呼び出し（`tool-call`）と実行結果（`tool-result`）がクライアントにリアルタイム配信され、チャット画面上にカードとして展開されます。
 
 ---
 
@@ -139,8 +152,8 @@ export async function upsertEntityEmbedding(
 | **`analyzeSettingImpactPrompt`**                              | 設定や人物設定の変更に伴う既存プロット・章節・年表・伏線への影響を予測         | JSON 形式の影響度・矛盾点・修正案     |
 | **`analyzeStoryArcPrompt`**                                   | 全章節の緊張感（Tension: 0〜100）と感情価（Valence: -100〜+100）をスコアリング | JSON 形式のアークデータ・助言         |
 | **`multiPersonaReviewPrompt`**                                | 商業編集者、一般読者、設定考察派、辛口評論家の4視点による多角査読              | JSON 形式の星評価・講評・リライト助言 |
-| **`creativeChatPrompt`**                                      | 小説の基本情報をシステムプロンプトに持ち、自律ツール呼び出しを案内して対話     | チャット応答（ツール呼出/テキスト）   |
-| **`extractChatEntitiesPrompt`**                               | チャットログから新しく合意された人物や世界観設定を自動抽出                     | JSON 構造化データ（人物・設定リスト） |
+| **`creativeChatPrompt`**                                      | 小説の基本情報をシステムプロンプトに持ち、自律参照・提案ツールを案内して対話   | チャット応答（ツール呼出/テキスト）   |
+| **`extractChatEntitiesPrompt`**                               | チャットログから人物・世界観設定・伏線・年表・プロットを自動構造化抽出         | JSON 構造化データ（5種エンティティ）  |
 | **`extractSettingsPrompt` / `extractTimelinePrompt`**         | 執筆された本文を解析し、登場した新情報や時系列イベントを抽出                   | JSON 構造化データ（整合性同期用）     |
 | **`editCharacterSectionPrompt` / `editSettingSectionPrompt`** | Markdown の特定セクションに対して自然言語指示で部分修正                        | 修正後のセクション Markdown           |
 | **`createCharacterDraftPrompt` / `createSettingDraftPrompt`** | 名前や簡単な要望から、人物や設定の詳細な初期ドラフトを自動生成                 | 生成された人物・設定詳細データ        |
