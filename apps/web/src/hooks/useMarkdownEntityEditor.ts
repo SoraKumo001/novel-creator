@@ -45,6 +45,8 @@ export interface UseMarkdownEntityEditorReturn<
   handleEditorMount: (editorInstance: MonacoEditorInstance) => void;
   handleTreeClick: (headingLine: number) => void;
   handleSplitterMouseDown: (e: React.MouseEvent) => void;
+  selectedText: string;
+  handleSelectionChange: (selectedText: string) => void;
   clearDraft: () => void;
 }
 
@@ -69,10 +71,15 @@ export function useMarkdownEntityEditor<
   const [activeSection, setActiveSection] = useState<TSection | null>(null);
   const [savedMarkdown, setSavedMarkdown] = useState('');
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [selectedText, setSelectedText] = useState('');
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(`${storageKey}:sidebar-width`);
     return saved ? parseInt(saved, 10) : 256;
   });
+
+  const handleSelectionChange = useCallback((text: string) => {
+    setSelectedText(text.trim());
+  }, []);
 
   const editorRef = useRef<MonacoEditorInstance | null>(null);
   const isDraggingRef = useRef(false);
@@ -259,6 +266,8 @@ export function useMarkdownEntityEditor<
     handleEditorMount,
     handleTreeClick,
     handleSplitterMouseDown,
+    selectedText,
+    handleSelectionChange,
     clearDraft,
   };
 }

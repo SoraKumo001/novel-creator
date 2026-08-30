@@ -22,10 +22,12 @@ export interface QuickPrompt {
  * ChatDrawer が入力欄へのプリフィルに消費する。
  */
 export interface ChatFocusContext {
-  entityType: 'character' | 'setting';
-  /** 例: 設定「大まかなあらすじ」/ 人物「主人公」 */
+  entityType: 'character' | 'setting' | 'section' | 'selection' | 'markdown_section';
+  /** 例: 設定「大まかなあらすじ」/ 人物「主人公」/ 第1話「プロローグ」/ 選択テキスト */
   title: string;
-  /** category / 概要テキスト（長すぎる場合は先頭数百文字に切り詰め済みであることが望ましい） */
+  /** 選択中のテキスト（ある場合） */
+  selectedText?: string;
+  /** category / 概要 / セクション本文など */
   summary?: string;
 }
 

@@ -269,6 +269,17 @@ describe('buildChatPrefill', () => {
     });
     expect(text).toBe('人物「主人公」について相談したいです。\n\n');
   });
+
+  it('selectedText があるときは選択テキスト引用フォーマットを返すこと', () => {
+    const text = buildChatPrefill({
+      entityType: 'selection',
+      title: '第1話 プロローグ',
+      selectedText: '夜の帳が下りる頃、彼は歩き始めた。',
+    });
+    expect(text).toContain('【選択中のテキスト（第1話 プロローグ）】');
+    expect(text).toContain('夜の帳が下りる頃、彼は歩き始めた。');
+    expect(text).toContain('この部分について相談したいです：');
+  });
 });
 
 describe('rowToUIMessage', () => {

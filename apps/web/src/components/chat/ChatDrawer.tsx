@@ -15,6 +15,11 @@ type DrawerWidth = 'normal' | 'wide' | 'full';
 
 /** focus 情報から相談フォーカス用のプリフィルテキストを生成する（純関数・テスト可能） */
 export function buildChatPrefill(focus: ChatFocusContext): string {
+  if (focus.selectedText?.trim()) {
+    const selected = focus.selectedText.trim();
+    return `【選択中のテキスト（${focus.title}）】\n${selected}\n\nこの部分について相談したいです：\n`;
+  }
+
   const header = `${focus.title}について相談したいです。`;
   const summary = focus.summary?.trim();
   if (!summary) {
@@ -95,6 +100,8 @@ export function ChatDrawer() {
       if (el) {
         el.style.height = 'auto';
         el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
       }
     });
   }, [isOpen, chatFocus, consumeFocus]);

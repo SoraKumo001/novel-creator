@@ -26,6 +26,7 @@ interface EditorToolbarProps {
   onOpenVoiceChecker: () => void;
   onOpenPersonaReview: () => void;
   onOpenProofread: () => void;
+  onOpenChat?: () => void;
   onSave: () => void;
   isReferencePanelOpen?: boolean;
   onToggleReferencePanel?: () => void;
@@ -53,6 +54,7 @@ export function EditorToolbar({
   onOpenVoiceChecker,
   onOpenPersonaReview,
   onOpenProofread,
+  onOpenChat,
   onSave,
   isReferencePanelOpen,
   onToggleReferencePanel,
@@ -273,6 +275,25 @@ export function EditorToolbar({
                     </div>
                   </div>
                 </button>
+
+                {onOpenChat && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiMenuOpen(false);
+                      onOpenChat();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-foreground hover:bg-surface-raised transition cursor-pointer text-left"
+                  >
+                    <span className="text-base">💬</span>
+                    <div>
+                      <div className="font-semibold">チャットで相談・壁打ち</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        この話の展開や設定をAIと相談
+                      </div>
+                    </div>
+                  </button>
+                )}
               </div>
 
               <div className="py-1">

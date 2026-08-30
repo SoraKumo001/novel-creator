@@ -9,6 +9,7 @@ import { InlineAIAssistant } from '@/components/InlineAIAssistant.js';
 import { useContent } from '@/hooks/useContent.js';
 import { useAnalysis } from '@/hooks/useAnalysis.js';
 import { useGenerate } from '@/hooks/useGenerate.js';
+import { useChat } from '@/hooks/useChat.js';
 import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import { countWords } from '@/lib/sse.js';
@@ -267,6 +268,29 @@ export function SectionEditor({
     setPersonaViewedAt(entry.createdAt);
   };
 
+  const { openChat } = useChat();
+
+  // チャット相談起動
+  const handleOpenChat = useCallback(
+    (useSelected = false) => {
+      if (useSelected && selectedText.trim()) {
+        openChat(novelId, {
+          entityType: 'selection',
+          title: `第${section.order}節「${section.title || '（無題）'}」（選択テキスト）`,
+          selectedText: selectedText.trim(),
+        });
+        return;
+      }
+
+      openChat(novelId, {
+        entityType: 'section',
+        title: `第${section.order}節「${section.title || '（無題）'}」`,
+        summary: localBody.slice(0, 800) + (localBody.length > 800 ? '…' : ''),
+      });
+    },
+    [localBody, novelId, openChat, section.order, section.title, selectedText],
+  );
+
   // 選択テキスト変更
   const handleSelectionChange = (text: string) => {
     const trimmed = text.trim();
@@ -366,6 +390,7 @@ export function SectionEditor({
         onOpenVoiceChecker={() => void handleOpenVoiceChecker()}
         onOpenPersonaReview={() => void handleOpenPersonaReview()}
         onOpenProofread={() => void handleOpenProofread()}
+        onOpenChat={() => handleOpenChat(false)}
         onSave={() => void handleSave()}
       />
 
@@ -390,15 +415,22 @@ export function SectionEditor({
               onSelectionChange={handleSelectionChange}
             />
 
-            {/* 選択テキストがある場合のインラインAIトリガーバー */}
+            {/* 選択テキストがある場合のインラインAI・チャット相談トリガーバー */}
             {selectedText && !isInlineActive && (
-              <div className="absolute top-4 right-8 z-30 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="absolute top-4 right-8 z-30 flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-150">
                 <button
                   type="button"
                   onClick={() => setIsInlineActive(true)}
                   className="flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-lg hover:brightness-110 transition cursor-pointer border border-primary/20"
                 >
                   <span>✨ 選択範囲をAI推敲 ({selectedText.length}文字)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleOpenChat(true)}
+                  className="flex items-center gap-1.5 rounded-full bg-surface-raised border border-border px-3.5 py-1.5 text-xs font-bold text-foreground shadow-lg hover:bg-surface-hover hover:border-primary/50 transition cursor-pointer"
+                >
+                  <span>💬 チャットで相談</span>
                 </button>
               </div>
             )}

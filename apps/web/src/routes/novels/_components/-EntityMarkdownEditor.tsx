@@ -6,6 +6,7 @@ import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
 import { Input } from '@/components/Input.js';
 import { Loading } from '@/components/Loading.js';
 import { useMarkdownEntityEditor } from '@/hooks/useMarkdownEntityEditor.js';
+import { useChat } from '@/hooks/useChat.js';
 import { useToast } from '@/hooks/useToast.js';
 import { MonacoEditor } from './-MonacoEditor.js';
 
@@ -73,6 +74,8 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
     handleEditorMount,
     handleTreeClick,
     handleSplitterMouseDown,
+    selectedText,
+    handleSelectionChange,
     clearDraft,
   } = useMarkdownEntityEditor<MarkdownCategoryNode[], TSection>({
     storageKey,
@@ -81,8 +84,35 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
     findSectionAtLine,
   });
 
+  const { openChat } = useChat();
   const [historyOpen, setHistoryOpen] = useState(false);
   const toast = useToast();
+
+  const handleOpenChat = useCallback(() => {
+    if (selectedText.trim()) {
+      openChat(novelId, {
+        entityType: 'selection',
+        title: `${entityTitle}（選択範囲）`,
+        selectedText: selectedText.trim(),
+      });
+      return;
+    }
+
+    if (activeSection) {
+      openChat(novelId, {
+        entityType: 'markdown_section',
+        title: `${entityTitle}「${activeSection.name}」`,
+        summary: `カテゴリー: ${activeSection.category}\n名前: ${activeSection.name}`,
+      });
+      return;
+    }
+
+    openChat(novelId, {
+      entityType: 'markdown_section',
+      title: `${entityTitle}全体`,
+      summary: markdown.slice(0, 500) + (markdown.length > 500 ? '…' : ''),
+    });
+  }, [activeSection, entityTitle, markdown, novelId, openChat, selectedText]);
 
   const handleRun = useCallback(async () => {
     if (!instruction.trim()) {
@@ -213,6 +243,16 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
             <span className="text-xs text-muted-foreground">（未保存の変更があります）</span>
           )}
         </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleOpenChat}
+            title="選択中のテキストまたは現在のセクションについてチャットでAIに相談"
+          >
+            💬 チャットで相談
+          </Button>
+        </div>
       </div>
 
       <div className="border-b border-border p-4 bg-surface">
@@ -337,7 +377,21 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
             value={markdown}
             onChange={handleEditorChange}
             onMount={handleEditorMount}
+            onSelectionChange={handleSelectionChange}
           />
+
+          {/* 選択テキストがある場合のチャット相談トリガーバー */}
+          {selectedText && (
+            <div className="absolute top-4 right-8 z-30 animate-in fade-in slide-in-from-top-1 duration-150">
+              <button
+                type="button"
+                onClick={handleOpenChat}
+                className="flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-lg hover:brightness-110 transition cursor-pointer border border-primary/20"
+              >
+                <span>💬 選択範囲をチャットで相談 ({selectedText.length}文字)</span>
+              </button>
+            </div>
+          )}
         </main>
       </div>
 
