@@ -16,15 +16,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^4.0.42",
-    "@ai-sdk/google": "4.0.51",
-    "@ai-sdk/openai": "^4.0.47",
-    "ai": "7.0.79"
+    "@ai-sdk/anthropic": "^4.0.45",
+    "@ai-sdk/google": "4.0.57",
+    "@ai-sdk/openai": "^4.0.51",
+    "ai": "7.0.84"
   },
   "peerDependencies": {
     "@novel-creator/shared": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^26.3.0"
+    "@types/node": "^26.4.0"
   }
 }
