@@ -75,12 +75,12 @@ function NovelDetailPage() {
 
   const tabs: TabItem[] = [
     { id: 'overview', label: '概要', icon: '📋', shortcut: '1' },
-    { id: 'settings', label: '設定', icon: '🌍', shortcut: '2' },
-    { id: 'characters', label: '人物', icon: '👥', shortcut: '3' },
-    { id: 'plot', label: 'プロット', icon: '🗺️', shortcut: '4' },
-    { id: 'editor', label: '本文', icon: '✍️', shortcut: '5' },
-    { id: 'timeline', label: 'タイムライン', icon: '⏱️', shortcut: '6' },
-    { id: 'foreshadowing', label: '伏線', icon: '🚩', shortcut: '7' },
+    { id: 'characters', label: '人物', icon: '👥', shortcut: '2' },
+    { id: 'settings', label: '設定', icon: '🌍', shortcut: '3' },
+    { id: 'foreshadowing', label: '伏線', icon: '🚩', shortcut: '4' },
+    { id: 'timeline', label: 'タイムライン', icon: '⏱️', shortcut: '5' },
+    { id: 'plot', label: 'プロット', icon: '🗺️', shortcut: '6' },
+    { id: 'editor', label: '本文', icon: '✍️', shortcut: '7' },
   ];
 
   // グローバルショートカット: Alt+1~6 でタブ切り替え、Ctrl+J でチャット開閉
