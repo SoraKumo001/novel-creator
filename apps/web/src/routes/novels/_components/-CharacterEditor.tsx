@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Input } from '@/components/Input.js';
 import { useCharacters } from '@/hooks/useCharacters.js';
+import { useChat } from '@/hooks/useChat.js';
 import { useLlmInstructions } from '@/hooks/useLlmInstructions.js';
 import { useToast } from '@/hooks/useToast.js';
 import { MonacoEditor } from './-MonacoEditor.js';
@@ -15,6 +16,7 @@ interface CharacterEditorProps {
 export function CharacterEditor({ novelId, characterId }: CharacterEditorProps) {
   const navigate = useNavigate();
   const toast = useToast();
+  const { openChat } = useChat();
   const {
     characters,
     loading: charactersLoading,
@@ -164,6 +166,22 @@ export function CharacterEditor({ novelId, characterId }: CharacterEditorProps) 
     setInstruction(text);
   }
 
+  // 編集中フォームの現在値からチャット相談フォーカスを構築してドロワーを開く。
+  // 未保存の編集内容が対象になる点が価値なので summary に「未保存」旨を添える。
+  function handleChatConsult() {
+    const summaryParts = [
+      category.trim() && `カテゴリー: ${category.trim()}`,
+      description.trim() &&
+        `説明: ${description.trim().slice(0, 500)}${description.trim().length > 500 ? '…' : ''}`,
+      isEdit && '※エディタ上の未保存の内容を含みます',
+    ].filter(Boolean);
+    openChat(novelId, {
+      entityType: 'character',
+      title: `人物「${name.trim() || '（名称未設定）'}」`,
+      summary: summaryParts.length > 0 ? summaryParts.join('\n') : undefined,
+    });
+  }
+
   const isBusy = creating || updating || llmEditing || generating;
 
   return (
@@ -187,6 +205,7 @@ export function CharacterEditor({ novelId, characterId }: CharacterEditorProps) 
       generateLoading={isBusy}
       generateDisabled={!instruction.trim() || isBusy}
       generateLabel={isEdit ? 'AIで人物を更新' : 'AIでドラフト生成'}
+      onChatConsult={handleChatConsult}
       instructions={instructions}
       onApplyHistory={applyHistory}
       onRequestDeleteInstruction={setDeleteInstructionId}

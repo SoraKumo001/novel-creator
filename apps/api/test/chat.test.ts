@@ -235,6 +235,23 @@ describe('Chat API', () => {
     expect(prompt).toContain('ユーザー: 今回の質問');
   });
 
+  it('system prompt - creativeChatSystemPrompt に提案フォーマットの指針が含まれること', async () => {
+    // 実システムプロンプト自体を検証する。vi.mock により静的 import も 'mock prompt' に
+    // 置き換わるため、vi.importActual で実物のモジュールを取得して呼び出す。
+    const actual = await vi.importActual<typeof import('@novel-creator/llm')>('@novel-creator/llm');
+    const systemPrompt = actual.creativeChatSystemPrompt({
+      novel: { title: 'テスト小説' },
+    });
+
+    // extract-entities / 📥 設定・人物へ取り込む フローに備えた提案フォーマットの指針が含まれること
+    expect(systemPrompt).toContain('提案のフォーマット');
+    expect(systemPrompt).toContain('【名前】');
+    expect(systemPrompt).toContain('【役割/身分】');
+    expect(systemPrompt).toContain('【分類】');
+    expect(systemPrompt).toContain('【名称】');
+    expect(systemPrompt).toContain('【概要】');
+  });
+
   it('POST /api/chat - 未知の sessionId で 404 になること', async () => {
     const { db } = createMockDb({ session: null, history: [] });
 
@@ -280,6 +297,86 @@ describe('Chat API', () => {
     });
 
     expect(res.status).toBe(400);
+  });
+
+  it('POST /api/chat - novelId がある場合に読み取りツール群が streamTextResult に渡されること', async () => {
+    const novelId = '22222222-2222-4222-8222-222222222222';
+    const { db } = createMockDb({
+      session: { id: SESSION_ID, novelId, title: '相談' },
+      novel: { id: novelId, title: 'テスト小説', description: null },
+      history: [],
+    });
+    mockStreamTextResult.mockResolvedValue(createFakeStreamResult('回答') as never);
+
+    const app = createTestChatApp(db);
+
+    const res = await app.request('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: SESSION_ID,
+        novelId,
+        messages: [userMessage('主人公について教えて')],
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    await res.text();
+
+    // 第 3 引数に tools / stopWhen が渡されていること
+    expect(mockStreamTextResult).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.any(String),
+      expect.objectContaining({
+        tools: expect.anything(),
+        stopWhen: expect.anything(),
+      }),
+    );
+
+    const options = mockStreamTextResult.mock.calls[0][2] as {
+      tools: Record<string, unknown>;
+      stopWhen: unknown;
+    };
+    // 8 つの読み取りツールが登録されていること
+    expect(Object.keys(options.tools).sort()).toEqual([
+      'getCharacters',
+      'getForeshadowings',
+      'getNovelInfo',
+      'getPlotAndChapters',
+      'getSectionContent',
+      'getSettings',
+      'getTimelines',
+      'searchNovelKnowledge',
+    ]);
+  });
+
+  it('POST /api/chat - novelId がない場合に tools が渡されないこと', async () => {
+    const { db } = createMockDb({
+      session: { id: SESSION_ID, novelId: null, title: '相談' },
+      history: [],
+    });
+    mockStreamTextResult.mockResolvedValue(createFakeStreamResult('回答') as never);
+
+    const app = createTestChatApp(db);
+
+    const res = await app.request('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: SESSION_ID,
+        messages: [userMessage('世界観のアイデアをください')],
+      }),
+    });
+
+    expect(res.status).toBe(200);
+    await res.text();
+
+    const options = mockStreamTextResult.mock.calls[0][2] as {
+      tools?: unknown;
+      stopWhen: unknown;
+    };
+    expect(options.tools).toBeUndefined();
+    expect(options.stopWhen).toBeDefined();
   });
 
   it('POST /api/chat/sessions - 新規セッションが作成できること', async () => {

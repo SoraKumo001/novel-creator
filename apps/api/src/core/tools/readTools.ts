@@ -1,5 +1,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
+import { chapters } from '@novel-creator/db';
 import type { ServiceContext } from '../types.js';
 import { NovelDomainService } from '../novel.service.js';
 import { CharacterDomainService } from '../character.service.js';
@@ -12,6 +14,82 @@ import { searchContext } from '../../rag.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createTool = tool as any;
+
+// ===== トークン爆発防止のための truncation ヘルパー（pure function） =====
+
+/** 一覧系ツール（getCharacters / getSettings）で返す最大件数 */
+export const MAX_LIST_ITEMS = 30;
+/** 構造系ツール（getPlotAndChapters / getForeshadowings / getTimelines）で返す最大件数 */
+export const MAX_STRUCTURE_ITEMS = 50;
+/** セマンティック検索（searchNovelKnowledge）でカテゴリごとに返す最大件数 */
+export const MAX_SEARCH_ITEMS = 10;
+/** description 等の長文テキストの最大文字数 */
+export const MAX_TEXT_LENGTH = 600;
+/** 切り詰め時に付与する接尾辞 */
+export const TRUNCATION_SUFFIX = '...(切り詰め)';
+
+/**
+ * 長文テキストを max 文字に切り詰める。
+ * 切り詰めた場合は末尾に TRUNCATION_SUFFIX を付与し、LLM が省略を認識できるようにする。
+ * null / undefined は null のまま返す。
+ */
+export function truncateText(
+  text: string | null | undefined,
+  max: number = MAX_TEXT_LENGTH,
+): string | null {
+  if (text == null) return null;
+  if (text.length <= max) return text;
+  return `${text.slice(0, max)}${TRUNCATION_SUFFIX}`;
+}
+
+export interface TruncationResult<T> {
+  /** 表示対象となる切り詰め後の配列 */
+  items: T[];
+  /** 元の配列の総件数 */
+  total: number;
+  /** 実際に表示する件数 */
+  shown: number;
+  /** 省略された件数 */
+  omitted: number;
+  /** 件数切り詰めが発生した場合の省略明示文言（未発生時は null） */
+  notice: string | null;
+}
+
+/**
+ * 配列を max 件までに切り詰め、件数情報と省略明示文言を返す。
+ */
+export function truncateList<T>(items: readonly T[], max: number): TruncationResult<T> {
+  const total = items.length;
+  const sliced = items.slice(0, max);
+  const omitted = total - sliced.length;
+  return {
+    items: sliced,
+    total,
+    shown: sliced.length,
+    omitted,
+    notice: omitted > 0 ? truncationNotice(total, sliced.length) : null,
+  };
+}
+
+/**
+ * 件数切り詰めが発生したことを LLM に明示するための文言を生成する。
+ */
+export function truncationNotice(total: number, shown: number): string {
+  return `[truncated: showing ${shown} of ${total}] 残り ${total - shown} 件は省略されました`;
+}
+
+/**
+ * 節がバインドされた小説に属するかを判定する純関数。
+ * sections テーブルには novelId カラムが存在しないため、
+ * 親章（chapters）の novelId がバインドされた novelId と一致する場合のみ閲覧を許可する。
+ */
+export function isSectionInScope(
+  boundNovelId: string | null | undefined,
+  chapter: { novelId: string | null | undefined } | null | undefined,
+): boolean {
+  if (!boundNovelId) return false;
+  return chapter?.novelId === boundNovelId;
+}
 
 /**
  * 創作相談チャット用の小説データ読み取りツール群を作成する。
@@ -99,11 +177,14 @@ export function createReadTools(
           }
           return {
             count: list.length,
-            characters: list.map((c) => ({
+            ...(list.length > MAX_LIST_ITEMS
+              ? { truncated: truncationNotice(list.length, MAX_LIST_ITEMS) }
+              : {}),
+            characters: truncateList(list, MAX_LIST_ITEMS).items.map((c) => ({
               id: c.id,
               name: c.name,
               category: c.category,
-              description: c.description,
+              description: truncateText(c.description),
               traits: c.traits,
             })),
           };
@@ -149,11 +230,14 @@ export function createReadTools(
           }
           return {
             count: list.length,
-            settings: list.map((s) => ({
+            ...(list.length > MAX_LIST_ITEMS
+              ? { truncated: truncationNotice(list.length, MAX_LIST_ITEMS) }
+              : {}),
+            settings: truncateList(list, MAX_LIST_ITEMS).items.map((s) => ({
               id: s.id,
               name: s.name,
               category: s.category,
-              description: s.description,
+              description: truncateText(s.description),
             })),
           };
         } catch {
@@ -174,26 +258,30 @@ export function createReadTools(
           return { error: '対象の小説が指定されていません。' };
         }
         try {
-          const chapters = await chapterService.listChapters(targetId);
+          const chapterRows = await chapterService.listChapters(targetId);
+          const chapterTrunc = truncateList(chapterRows, MAX_STRUCTURE_ITEMS);
           const chaptersWithSections = await Promise.all(
-            chapters.map(async (ch) => {
+            chapterTrunc.items.map(async (ch) => {
               const sections = await sectionService.listSections(ch.id);
+              const sectionTrunc = truncateList(sections, MAX_STRUCTURE_ITEMS);
               return {
                 id: ch.id,
                 title: ch.title,
                 order: ch.order,
-                summary: ch.summary,
-                sections: sections.map((sec) => ({
+                summary: truncateText(ch.summary),
+                sections: sectionTrunc.items.map((sec) => ({
                   id: sec.id,
                   title: sec.title,
                   order: sec.order,
-                  summary: sec.summary,
+                  summary: truncateText(sec.summary),
                 })),
+                ...(sectionTrunc.notice ? { truncatedSections: sectionTrunc.notice } : {}),
               };
             }),
           );
           return {
-            chapterCount: chaptersWithSections.length,
+            chapterCount: chapterRows.length,
+            ...(chapterTrunc.notice ? { truncated: chapterTrunc.notice } : {}),
             chapters: chaptersWithSections,
           };
         } catch {
@@ -208,13 +296,30 @@ export function createReadTools(
         sectionId: z.string().describe('取得対象の節ID（Section ID）'),
       }),
       execute: async ({ sectionId }: { sectionId: string }) => {
+        // バインドされた novelId にスコープを限定する（LLM による指定は受け付けない）。
+        const scopedNovelId = defaultNovelId || null;
+        if (!scopedNovelId) {
+          return { error: '対象の小説が指定されていません。' };
+        }
         try {
           const { section, content } = await sectionService.getSectionWithContent(sectionId);
+          // novelId スコープ判定: sections テーブルに novelId カラムはないため、
+          // 親章（chapters）の novelId がバインドされた小説と一致するかを確認する。
+          const [chapter] = await ctx.db
+            .select()
+            .from(chapters)
+            .where(eq(chapters.id, section.chapterId));
+          if (!isSectionInScope(scopedNovelId, chapter)) {
+            return {
+              error:
+                '指定された節が見つかりません（他の小説に属しているため、現在の相談対象からは参照できません）。',
+            };
+          }
           return {
             sectionId: section.id,
             title: section.title,
-            summary: section.summary,
-            content: content ? content.body : '（本文はまだ作成されていません）',
+            summary: truncateText(section.summary),
+            content: content ? truncateText(content.body) : '（本文はまだ作成されていません）',
           };
         } catch {
           return { error: '指定された節または本文が見つかりませんでした。' };
@@ -250,13 +355,15 @@ export function createReadTools(
           if (status) {
             list = list.filter((f) => f.status === status);
           }
+          const trunc = truncateList(list, MAX_STRUCTURE_ITEMS);
           return {
             count: list.length,
-            foreshadowings: list.map((f) => ({
+            ...(trunc.notice ? { truncated: trunc.notice } : {}),
+            foreshadowings: trunc.items.map((f) => ({
               id: f.id,
               title: f.title,
               status: f.status,
-              description: f.description,
+              description: truncateText(f.description),
               placedSectionId: f.placedSectionId,
               resolvedSectionId: f.resolvedSectionId,
               createdAt: f.createdAt,
@@ -280,11 +387,13 @@ export function createReadTools(
         }
         try {
           const list = await timelineService.listTimelines(targetId);
+          const trunc = truncateList(list, MAX_STRUCTURE_ITEMS);
           return {
             count: list.length,
-            timelines: list.map((t) => ({
+            ...(trunc.notice ? { truncated: trunc.notice } : {}),
+            timelines: trunc.items.map((t) => ({
               id: t.id,
-              event: t.event,
+              event: truncateText(t.event),
               timestamp: t.timestamp,
               order: t.order,
               sectionId: t.sectionId,
@@ -316,9 +425,18 @@ export function createReadTools(
             { query },
             ctx.env,
           );
+          // セマンティック検索結果もカテゴリごとに件数上限を適用する（topK 超過に備える）。
+          const charTrunc = truncateList(ragResult.characters, MAX_SEARCH_ITEMS);
+          const settingTrunc = truncateList(ragResult.settings, MAX_SEARCH_ITEMS);
           return {
-            characters: ragResult.characters,
-            settings: ragResult.settings,
+            ...(charTrunc.notice || settingTrunc.notice
+              ? {
+                  truncated:
+                    [charTrunc.notice, settingTrunc.notice].filter(Boolean).join(' / ') || null,
+                }
+              : {}),
+            characters: charTrunc.items.map((c) => truncateText(c)),
+            settings: settingTrunc.items.map((s) => truncateText(s)),
           };
         } catch {
           return { error: '関連ナレッジの検索に失敗しました。' };

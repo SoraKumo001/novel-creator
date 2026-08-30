@@ -16,6 +16,19 @@ export interface QuickPrompt {
   icon: string;
 }
 
+/**
+ * エディタからチャットへ渡す相談フォーカス情報。
+ * 「この設定/人物について相談」ボタンから openChat に渡され、
+ * ChatDrawer が入力欄へのプリフィルに消費する。
+ */
+export interface ChatFocusContext {
+  entityType: 'character' | 'setting';
+  /** 例: 設定「大まかなあらすじ」/ 人物「主人公」 */
+  title: string;
+  /** category / 概要テキスト（長すぎる場合は先頭数百文字に切り詰め済みであることが望ましい） */
+  summary?: string;
+}
+
 export const QUICK_PROMPTS: QuickPrompt[] = [
   {
     id: 'character-ideas',
@@ -61,9 +74,13 @@ export const QUICK_PROMPTS: QuickPrompt[] = [
 
 export interface ChatContextValue {
   isOpen: boolean;
-  openChat: (targetNovelId?: string | null) => void;
+  openChat: (targetNovelId?: string | null, focus?: ChatFocusContext) => void;
   closeChat: () => void;
   toggleChat: () => void;
+  /** openChat に渡された未消費の相談フォーカス（プリフィル用） */
+  chatFocus: ChatFocusContext | null;
+  /** chatFocus を消費済みにする（二重プリフィル防止） */
+  consumeFocus: () => void;
   selectedNovelId: string | null;
   setSelectedNovelId: (id: string | null) => void;
 
@@ -87,6 +104,8 @@ export interface ChatContextValue {
   messages: ChatMessage[];
   isStreaming: boolean;
   streamingContent: string;
+  /** ストリーミング中のアシスタントメッセージの生 parts（ツール呼び出しの随時表示用） */
+  streamingParts: UIMessage['parts'] | null;
   error: string | null;
   sendMessage: (content: string) => Promise<void>;
   abortStream: () => void;
@@ -98,6 +117,7 @@ export const ChatContext = createContext<ChatContextValue | null>(null);
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedNovelId, setSelectedNovelIdState] = useState<string | null>(null);
+  const [chatFocus, setChatFocus] = useState<ChatFocusContext | null>(null);
   const [loadingMessages, setLoadingMessages] = useState(false);
 
   const queryClient = useQueryClient();
@@ -131,6 +151,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setIsStreaming,
     streamingContent,
     setStreamingContent,
+    streamingParts,
     error,
     setError,
     abortControllerRef,
@@ -248,14 +269,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   );
 
   const openChat = useCallback(
-    (targetNovelId?: string | null) => {
+    (targetNovelId?: string | null, focus?: ChatFocusContext) => {
       if (targetNovelId !== undefined && targetNovelId !== selectedNovelIdRef.current) {
         setSelectedNovelId(targetNovelId);
+      }
+      if (focus !== undefined) {
+        setChatFocus(focus);
       }
       setIsOpen(true);
     },
     [setSelectedNovelId],
   );
+
+  const consumeFocus = useCallback(() => {
+    setChatFocus(null);
+  }, []);
 
   const closeChat = useCallback(() => {
     setIsOpen(false);
@@ -274,6 +302,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         openChat,
         closeChat,
         toggleChat,
+        chatFocus,
+        consumeFocus,
         selectedNovelId,
         setSelectedNovelId,
 
@@ -295,6 +325,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         messages,
         isStreaming,
         streamingContent,
+        streamingParts,
         error,
         sendMessage,
         abortStream,

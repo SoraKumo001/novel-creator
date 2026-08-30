@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Input } from '@/components/Input.js';
+import { useChat } from '@/hooks/useChat.js';
 import { useLlmInstructions } from '@/hooks/useLlmInstructions.js';
 import { useSettings } from '@/hooks/useSettings.js';
 import { useToast } from '@/hooks/useToast.js';
@@ -15,6 +16,7 @@ interface SettingEditorProps {
 export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
   const navigate = useNavigate();
   const toast = useToast();
+  const { openChat } = useChat();
   const {
     settings,
     loading: settingsLoading,
@@ -137,6 +139,22 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
     setInstruction(text);
   }
 
+  // 編集中フォームの現在値からチャット相談フォーカスを構築してドロワーを開く。
+  // 未保存の編集内容が対象になる点が価値なので summary に「未保存」旨を添える。
+  function handleChatConsult() {
+    const summaryParts = [
+      category.trim() && `カテゴリー: ${category.trim()}`,
+      description.trim() &&
+        `説明: ${description.trim().slice(0, 500)}${description.trim().length > 500 ? '…' : ''}`,
+      isEdit && '※エディタ上の未保存の内容を含みます',
+    ].filter(Boolean);
+    openChat(novelId, {
+      entityType: 'setting',
+      title: `設定「${name.trim() || '（名称未設定）'}」`,
+      summary: summaryParts.length > 0 ? summaryParts.join('\n') : undefined,
+    });
+  }
+
   return (
     <EntityEditorShell
       novelId={novelId}
@@ -160,6 +178,7 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
       generateLabel={
         isEdit || category || name || description ? 'AIで設定を更新' : 'AIでドラフト生成'
       }
+      onChatConsult={handleChatConsult}
       instructions={instructions}
       onApplyHistory={applyHistory}
       onRequestDeleteInstruction={setDeleteInstructionId}

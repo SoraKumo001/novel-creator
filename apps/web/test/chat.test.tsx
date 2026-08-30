@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatProvider, useChat } from '../src/context/ChatContext.js';
+import { buildChatPrefill } from '../src/components/chat/ChatDrawer.js';
 import { rowToUIMessage } from '../src/hooks/useChatStreaming.js';
 
 const mockFetch = vi.fn();
@@ -130,6 +131,44 @@ describe('ChatContext & useChat', () => {
     expect(result.current.error).toBeNull();
   });
 
+  it('openChat に focus を渡すと chatFocus に保持され、consumeFocus でクリアされること', () => {
+    const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
+
+    expect(result.current.chatFocus).toBeNull();
+
+    act(() => {
+      result.current.openChat('novel-123', {
+        entityType: 'setting',
+        title: '設定「大まかなあらすじ」',
+        summary: 'カテゴリー: 世界観\n説明: 魔法が衰退した世界',
+      });
+    });
+
+    expect(result.current.isOpen).toBe(true);
+    expect(result.current.chatFocus).toEqual({
+      entityType: 'setting',
+      title: '設定「大まかなあらすじ」',
+      summary: 'カテゴリー: 世界観\n説明: 魔法が衰退した世界',
+    });
+
+    act(() => {
+      result.current.consumeFocus();
+    });
+
+    expect(result.current.chatFocus).toBeNull();
+  });
+
+  it('focus 未指定の openChat は chatFocus を変更しないこと', () => {
+    const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
+
+    act(() => {
+      result.current.openChat('novel-123');
+    });
+
+    expect(result.current.isOpen).toBe(true);
+    expect(result.current.chatFocus).toBeNull();
+  });
+
   it('sendMessage がセッション自動作成後に /api/chat へ sessionId を含めて送信し、応答を messages に反映すること', async () => {
     const createdSession = {
       id: 'sess-abc',
@@ -197,6 +236,38 @@ describe('ChatContext & useChat', () => {
     expect(body.sessionId).toBe('sess-abc');
     expect(body.novelId).toBe('novel-123');
     expect(Array.isArray(body.messages)).toBe(true);
+  });
+});
+
+describe('buildChatPrefill', () => {
+  it('summary があるときはテンプレート形式に展開し末尾に改行を付けること', () => {
+    const text = buildChatPrefill({
+      entityType: 'setting',
+      title: '設定「大まかなあらすじ」',
+      summary: 'カテゴリー: 世界観\n説明: 魔法が衰退した世界',
+    });
+    expect(text).toContain('設定「大まかなあらすじ」について相談したいです。');
+    expect(text).toContain('--- 現在の内容 ---');
+    expect(text).toContain('カテゴリー: 世界観');
+    expect(text).toContain('--- ここまで ---');
+    expect(text.endsWith('\n\n')).toBe(true);
+  });
+
+  it('summary が無いときはヘッダーのみを返すこと', () => {
+    const text = buildChatPrefill({
+      entityType: 'character',
+      title: '人物「主人公」',
+    });
+    expect(text).toBe('人物「主人公」について相談したいです。\n\n');
+  });
+
+  it('summary が空文字のときはヘッダーのみを返すこと', () => {
+    const text = buildChatPrefill({
+      entityType: 'character',
+      title: '人物「主人公」',
+      summary: '   ',
+    });
+    expect(text).toBe('人物「主人公」について相談したいです。\n\n');
   });
 });
 

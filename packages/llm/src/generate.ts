@@ -4,7 +4,14 @@ import {
   generateText as aiGenerateText,
   streamText as aiStreamText,
 } from 'ai';
-import type { EmbeddingModel, LanguageModel, OutputInterface, StreamTextResult } from 'ai';
+import type {
+  EmbeddingModel,
+  LanguageModel,
+  OutputInterface,
+  StopCondition,
+  StreamTextResult,
+  ToolSet,
+} from 'ai';
 
 /**
  * リトライ設定。
@@ -101,12 +108,39 @@ export async function* streamText(
  * 呼び出し側で result.stream / result.toUIMessageStream() などを利用して
  * UI Message Stream への変換や onFinish での永続化を行う。
  */
-export async function streamTextResult(
+
+/**
+ * AI SDK 側では Arrayable<T> = T | T[] | undefined として定義されているが、
+ * `ai` パッケージからは export されないためローカルで同型を定義する。
+ */
+type Arrayable<T> = T | T[] | undefined;
+
+export interface StreamTextOptions extends RetryOptions {
+  /** LLM に渡すツール群（AI SDK の tool() 形式） */
+  tools?: ToolSet;
+  /** ツールループの停止条件。未指定時は AI SDK デフォルト（isStepCount(1)） */
+  stopWhen?: Arrayable<StopCondition<ToolSet, Record<string, unknown>>>;
+}
+
+export async function streamTextResult<TOOLS extends ToolSet = Record<string, never>>(
   model: LanguageModel,
   prompt: string,
-  options: RetryOptions = {},
-): Promise<StreamTextResult<Record<string, never>, Record<string, unknown>, OutputInterface>> {
-  return withRetry(async () => aiStreamText({ model, prompt }), options);
+  options: StreamTextOptions = {} as StreamTextOptions,
+): Promise<StreamTextResult<TOOLS, Record<string, unknown>, OutputInterface>> {
+  return withRetry(
+    async () =>
+      aiStreamText({
+        model,
+        prompt,
+        ...(options.tools ? { tools: options.tools as TOOLS } : {}),
+        ...(options.stopWhen
+          ? {
+              stopWhen: options.stopWhen as NonNullable<StreamTextOptions['stopWhen']>,
+            }
+          : {}),
+      }),
+    options,
+  );
 }
 
 /**

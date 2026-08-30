@@ -9,6 +9,11 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   createdAt: number;
+  /**
+   * UI Message の生 parts（v7）。ツールパーツ（tool-<name>）表示などに使用。
+   * text パーツの連結結果が content に入るが、ツールパーツは content には含まれない。
+   */
+  parts: UIMessage['parts'];
 }
 
 /** チャットのストリーミング状態機械に必要なセッション層の入力 */
@@ -25,6 +30,14 @@ function textOf(message: UIMessage): string {
     .filter((p): p is Extract<typeof p, { type: 'text' }> => p.type === 'text')
     .map((p) => p.text)
     .join('');
+}
+
+/** ツールパーツ（tool-<name> / dynamic-tool）が含まれるか */
+function hasToolPart(parts: UIMessage['parts']): boolean {
+  return parts.some((p) => {
+    const t = (p as { type?: string }).type;
+    return typeof t === 'string' && (t.startsWith('tool-') || t === 'dynamic-tool');
+  });
 }
 
 /**
@@ -178,8 +191,9 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
         role: (m.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user',
         content: textOf(m),
         createdAt: Date.now(),
+        parts: m.parts,
       }))
-      .filter((m) => m.content !== '');
+      .filter((m) => m.content !== '' || hasToolPart(m.parts));
   }, [uiMessages]);
 
   // ストリーミング中のリアルタイム表示用テキスト
@@ -188,6 +202,15 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     const last = uiMessages[uiMessages.length - 1];
     if (!last || last.role !== 'assistant') return '';
     return textOf(last);
+  }, [uiMessages, isStreaming]);
+
+  // ストリーミング中のアシスタントメッセージの生 parts。
+  // ツール呼び出しパーツを送信完了前でも随時表示するために公開する。
+  const streamingParts = useMemo<UIMessage['parts'] | null>(() => {
+    if (!isStreaming) return null;
+    const last = uiMessages[uiMessages.length - 1];
+    if (!last || last.role !== 'assistant') return null;
+    return last.parts;
   }, [uiMessages, isStreaming]);
 
   // 下位コンポーネント（ChatContext 内）が abort のために参照する互換 shim。
@@ -313,6 +336,7 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     setIsStreaming,
     streamingContent,
     setStreamingContent,
+    streamingParts,
     error,
     setError,
     abortControllerRef,

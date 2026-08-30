@@ -3,18 +3,32 @@ import { Button } from '@/components/Button.js';
 import { LLMModelSelector } from '@/components/LLMModelSelector.js';
 import { MarkdownText } from '@/components/MarkdownText.js';
 import { QUICK_PROMPTS, useChat, type QuickPrompt } from '@/hooks/useChat.js';
+import type { ChatFocusContext } from '@/context/ChatContext.js';
 import { useNovels } from '@/hooks/useNovels.js';
 import { usePinnedSessions } from '@/hooks/usePinnedSessions.js';
 import { useToast } from '@/hooks/useToast.js';
 import { ChatInsertEntityModal } from './ChatInsertEntityModal.js';
 import { ChatSessionList } from './ChatSessionList.js';
+import { ToolActivity } from './ToolActivity.js';
 
 type DrawerWidth = 'normal' | 'wide' | 'full';
+
+/** focus 情報から相談フォーカス用のプリフィルテキストを生成する（純関数・テスト可能） */
+export function buildChatPrefill(focus: ChatFocusContext): string {
+  const header = `${focus.title}について相談したいです。`;
+  const summary = focus.summary?.trim();
+  if (!summary) {
+    return `${header}\n\n`;
+  }
+  return `${header}\n\n--- 現在の内容 ---\n${summary}\n--- ここまで ---\n\n`;
+}
 
 export function ChatDrawer() {
   const {
     isOpen,
     closeChat,
+    chatFocus,
+    consumeFocus,
     selectedNovelId,
     setSelectedNovelId,
     selectedModelConfigId,
@@ -30,6 +44,7 @@ export function ChatDrawer() {
     messages,
     isStreaming,
     streamingContent,
+    streamingParts,
     error,
     sendMessage,
     abortStream,
@@ -67,6 +82,22 @@ export function ChatDrawer() {
       textareaRef.current?.focus();
     }
   }, [isOpen, messages, streamingContent, showHistoryView]);
+
+  // エディタからの「AIと相談」フォーカスが未消費なら入力欄にプリフィルする。
+  // 既存入力は上書きせず末尾へ追記し、消費後はクリアして二重プリフィルを防ぐ。
+  useEffect(() => {
+    if (!isOpen || !chatFocus) return;
+    const prefill = buildChatPrefill(chatFocus);
+    setInput((prev) => (prev ? `${prev}\n\n${prefill}` : prefill));
+    consumeFocus();
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.style.height = 'auto';
+        el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+      }
+    });
+  }, [isOpen, chatFocus, consumeFocus]);
 
   // 送信ハンドラ
   const handleSend = async () => {
@@ -382,7 +413,11 @@ export function ChatDrawer() {
                     {isUser ? (
                       <div className="whitespace-pre-wrap">{m.content}</div>
                     ) : (
-                      <MarkdownText content={m.content} />
+                      <>
+                        {/* AI のツール呼び出し活動（v7 パーツから抽出。無ければ非表示） */}
+                        <ToolActivity parts={m.parts} />
+                        {m.content && <MarkdownText content={m.content} />}
+                      </>
                     )}
                   </div>
 
@@ -411,15 +446,21 @@ export function ChatDrawer() {
             })}
 
             {/* ストリーミング中のリアルタイム表示 */}
-            {isStreaming && streamingContent && (
+            {isStreaming && (
               <div className="flex flex-col items-start">
-                <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-primary font-medium">
-                  <span className="h-1.5 w-1.5 rounded-full bg-primary animate-ping" />
-                  <span>AIパートナーが入力中...</span>
-                </div>
-                <div className="rounded-2xl rounded-bl-xs bg-surface-raised border border-primary/30 px-4 py-2.5 max-w-[88%] text-sm text-foreground shadow-xs">
-                  <MarkdownText content={streamingContent} />
-                </div>
+                {(streamingContent || (streamingParts && streamingParts.length > 0)) && (
+                  <>
+                    <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-primary font-medium">
+                      <span className="h-1.5 w-1.5 rounded-full bg-primary animate-ping" />
+                      <span>AIパートナーが入力中...</span>
+                    </div>
+                    <div className="rounded-2xl rounded-bl-xs bg-surface-raised border border-primary/30 px-4 py-2.5 max-w-[88%] text-sm text-foreground shadow-xs">
+                      {/* ツール呼び出しはテキスト生成前でも随時表示する */}
+                      <ToolActivity parts={streamingParts} />
+                      {streamingContent && <MarkdownText content={streamingContent} />}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

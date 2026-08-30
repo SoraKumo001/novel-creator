@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 import { desc, eq, isNull } from 'drizzle-orm';
-import { createUIMessageStreamResponse, toUIMessageStream } from 'ai';
+import { createUIMessageStreamResponse, isStepCount, toUIMessageStream } from 'ai';
+import type { ToolSet } from 'ai';
 import { chatMessages, chatSessions, llmConfigs, novels } from '@novel-creator/db';
 import {
   createLanguageModelFromConfig,
@@ -12,6 +13,7 @@ import {
 
 import { searchContext } from '../rag.js';
 import { chatRequestSchema } from '../schemas/index.js';
+import { createReadTools } from './tools/readTools.js';
 import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
 
 export class ChatDomainService {
@@ -260,14 +262,30 @@ export class ChatDomainService {
       }
     }
 
+    // 読み取り専用ツール群を構築する（ツール対象は小説コンテキストがある場合のみ）。
+    // 構築に失敗してもチャット自体は継続させる（RAG フォールバック方針に倣う）。
+    // createReadTools は Record<string, unknown> を返すため ToolSet へ safely 収める。
+    let tools: ToolSet | undefined;
+    if (effectiveNovelId) {
+      try {
+        tools = createReadTools(this.ctx, effectiveNovelId) as ToolSet;
+      } catch {
+        // ツール構築失敗時はツールなしで継続
+      }
+    }
+
     // 生の StreamTextResult を取得（接続時リトライ付き）
-    const result = await streamTextResult(llmModel, prompt);
+    const result = await streamTextResult(llmModel, prompt, {
+      tools,
+      stopWhen: isStepCount(8),
+    });
 
     // 完了時（正常終了・クライアント中断の両方）に assistant メッセージを永続化する。
     // onEnd は flush / cancel のいずれかで必ず一度だけ呼ばれるため、二重保存防止フラグで保護する。
     let assistantSaved = false;
     const uiStream = toUIMessageStream({
       stream: result.stream,
+      tools,
       onEnd: async ({ responseMessage }) => {
         if (assistantSaved) return;
         assistantSaved = true;

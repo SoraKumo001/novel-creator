@@ -128,6 +128,13 @@ export const Default: Story = {
   args: baseArgs,
 };
 
+export const WithChatConsult: Story = {
+  args: {
+    ...baseArgs,
+    onChatConsult: fn(),
+  },
+};
+
 export const Loading: Story = {
   args: {
     ...baseArgs,
