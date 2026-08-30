@@ -232,19 +232,25 @@ export class ChatDomainService {
     // RAG コンテキスト構築（現状維持）
     let contextSettings: string[] = [];
     let contextCharacters: string[] = [];
-    let novelInfo: { title: string; description?: string | null } | undefined;
+    let novelInfo:
+      { title: string; description?: string | null; styleGuide?: string | null } | undefined;
 
     const effectiveNovelId = novelId ?? session.novelId;
     if (effectiveNovelId) {
       try {
         const [novel] = await this.ctx.db
-          .select({ title: novels.title, description: novels.description })
+          .select({
+            title: novels.title,
+            description: novels.description,
+            styleGuide: novels.styleGuide,
+          })
           .from(novels)
           .where(eq(novels.id, effectiveNovelId));
         if (novel) {
           novelInfo = {
             title: novel.title,
             description: novel.description,
+            styleGuide: novel.styleGuide,
           };
         }
 

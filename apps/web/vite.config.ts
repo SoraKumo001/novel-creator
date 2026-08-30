@@ -3,6 +3,17 @@ import react from '@vitejs/plugin-react';
 import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
 import path from 'node:path';
 
+const proxy = {
+  '/api': {
+    target: 'http://localhost:3000',
+    changeOrigin: true,
+  },
+  '/novelcreator.v1.': {
+    target: 'http://localhost:3000',
+    changeOrigin: true,
+  },
+};
+
 export default defineConfig({
   plugins: [TanStackRouterVite(), react()],
   resolve: {
@@ -12,15 +23,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-      },
-      '/novelcreator.v1.': {
-        target: 'http://localhost:3000',
-        changeOrigin: true,
-      },
-    },
+    proxy,
+  },
+  preview: {
+    port: 5173,
+    proxy,
   },
 });

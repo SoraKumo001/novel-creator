@@ -1,5 +1,5 @@
 import { jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { novels } from './novels';
+import { novels } from './novels.js';
 
 /**
  * AI 分析結果（ストーリーアーク / 口調チェック / ペルソナレビュー）の保存テーブル。

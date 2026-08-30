@@ -5,11 +5,13 @@ import { foreshadowingStatusSchema } from '@novel-creator/shared/schemas';
 export const createNovelSchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
+  styleGuide: z.string().optional(),
 });
 
 export const updateNovelSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().optional(),
+  styleGuide: z.string().nullable().optional(),
 });
 
 // ---- chapters ----
@@ -389,6 +391,10 @@ export const multiPersonaReviewBodySchema = z.object({
   sectionId: z.string().uuid().optional(),
   chapterId: z.string().uuid().optional(),
   body: z.string().optional(),
+  modelConfigId: z.string().uuid().optional().nullable(),
+});
+
+export const generateStyleGuideDraftBodySchema = z.object({
   modelConfigId: z.string().uuid().optional().nullable(),
 });
 

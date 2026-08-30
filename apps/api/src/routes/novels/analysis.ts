@@ -9,6 +9,7 @@ import {
   analyzeSettingImpactBodySchema,
   analyzeStoryArcBodySchema,
   checkCharacterVoiceBodySchema,
+  generateStyleGuideDraftBodySchema,
   idParamSchema,
   listAnalysisResultsQuerySchema,
   multiPersonaReviewBodySchema,
@@ -28,6 +29,21 @@ export const novelAnalysisRouter = new Hono<AppContext>()
       const jsonBody = c.req.valid('json');
       const result = await getServices(c).generate.generatePlot(novelId, jsonBody?.modelConfigId);
       return c.json(result);
+    },
+  )
+  // POST /api/novels/:id/generate/style-guide - 執筆スタイルガイド下書き生成
+  .post(
+    '/:id/generate/style-guide',
+    zValidator('param', idParamSchema),
+    zValidator('json', generateStyleGuideDraftBodySchema.optional()),
+    async (c) => {
+      const { id: novelId } = c.req.valid('param');
+      const jsonBody = c.req.valid('json');
+      const draft = await getServices(c).generate.generateStyleGuideDraft(
+        novelId,
+        jsonBody?.modelConfigId,
+      );
+      return c.json({ draft });
     },
   )
   // POST /api/novels/:id/generate/check-voice - キャラクター口調・一貫性チェック (SSE ストリーミング)

@@ -29,3 +29,5 @@ export { analyzeStoryArcPrompt } from './analyzeStoryArc.js';
 export type { AnalyzeStoryArcContext } from './analyzeStoryArc.js';
 export { multiPersonaReviewPrompt } from './multiPersonaReview.js';
 export type { ReaderPersonaType, MultiPersonaReviewContext } from './multiPersonaReview.js';
+export { generateStyleGuideDraftPrompt } from './generateStyleGuideDraft.js';
+export type { GenerateStyleGuideDraftContext } from './generateStyleGuideDraft.js';

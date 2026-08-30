@@ -5,14 +5,16 @@ export interface CreativeChatContext {
   novel?: {
     title: string;
     description?: string | null;
+    styleGuide?: string | null;
   };
   settings?: string[];
   characters?: string[];
+  styleGuide?: string | null;
   additionalContext?: string[];
 }
 
 // アプリ機能カタログ（出典: doc/features-and-workflows.md — 内容を更新する際はそちらも参照のこと）
-export const APP_USAGE_GUIDE = `- 基本の流れ: ①概要 (Alt+1) → ②人物 (Alt+2) → ③設定 (Alt+3) → ④プロット (Alt+4) → ⑤本文執筆 (Alt+5) → ⑥伏線管理 (Alt+6) → ⑦タイムライン (Alt+7) → ⑧エクスポート
+export const APP_USAGE_GUIDE = `- 基本の流れ: ①概要 (Alt+1: 執筆スタイル・文体ガイド設定含む) → ②人物 (Alt+2) → ③設定 (Alt+3) → ④プロット (Alt+4) → ⑤本文執筆 (Alt+5) → ⑥伏線管理 (Alt+6) → ⑦タイムライン (Alt+7) → ⑧エクスポート
 - 創作チャット: アイデア出し・相談・壁打ち。会話から人物・設定・伏線・年表・プロットを抽出してワンクリックで小説へ反映可能
 - 人物・設定管理: GUIフォーム / Markdown一括編集、スラッシュ（/）区切りの複数階層カテゴリ（例: 採取ギルド / 幹部 / ギルド長）、AI下書き生成、セクション単位のAI編集
 - プロット・章・節管理: プロットの段階的生成、章・節の並べ替え、あらすじ同期
@@ -38,6 +40,11 @@ export function creativeChatSystemPrompt(context?: CreativeChatContext): string 
     parts.push(`\n# 現在相談中の小説情報
 - タイトル: ${context.novel.title}
 - あらすじ・概要: ${context.novel.description || '（未設定）'}`);
+
+    const guide = context.styleGuide || context.novel.styleGuide;
+    if (guide && guide.trim()) {
+      parts.push(`\n# 登録済みの執筆スタイル・文体ガイドライン\n${guide.trim()}`);
+    }
 
     if (context.settings && context.settings.length > 0) {
       parts.push(`\n# 登録済みの世界観・設定情報

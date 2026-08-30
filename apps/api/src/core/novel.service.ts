@@ -27,7 +27,11 @@ export class NovelDomainService {
     };
   }
 
-  async createNovel(data: { title: string; description?: string | null }) {
+  async createNovel(data: {
+    title: string;
+    description?: string | null;
+    styleGuide?: string | null;
+  }) {
     if (!data.title?.trim()) {
       throw new ValidationError('Title is required');
     }
@@ -36,17 +40,26 @@ export class NovelDomainService {
       .values({
         title: data.title,
         description: data.description ?? null,
+        styleGuide: data.styleGuide ?? null,
       })
       .returning();
     return row;
   }
 
-  async updateNovel(id: string, data: { title?: string; description?: string | null }) {
+  async updateNovel(
+    id: string,
+    data: {
+      title?: string;
+      description?: string | null;
+      styleGuide?: string | null;
+    },
+  ) {
     const [row] = await this.ctx.db
       .update(novels)
       .set({
         ...(data.title !== undefined ? { title: data.title } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
+        ...(data.styleGuide !== undefined ? { styleGuide: data.styleGuide } : {}),
         updatedAt: new Date(),
       })
       .where(eq(novels.id, id))

@@ -9,6 +9,7 @@ export type InlineAssistAction =
 export interface InlineAssistContext {
   novelTitle?: string;
   characters?: string;
+  styleGuide?: string;
   surroundingText?: string;
   selectedText: string;
   action: InlineAssistAction;
@@ -35,7 +36,7 @@ export function inlineAssistPrompt(context: InlineAssistContext): string {
 
 【最重要ルール】
 - 前後の文脈に自然に繋がる文章にしてください。
-- 登場人物の口調や作品の世界観を崩さないでください。
+- 作品の執筆スタイル・文体ガイドライン、登場人物の口調や世界観を崩さないでください。
 - 余計な挨拶や解説（「以下のように書き換えました」等）は一切含めず、**書き換え後の本文テキストのみ**を出力してください。
 - ルビ記法（|漢字《かんじ》）が含まれる場合は適切に保持・活用してください。
 
@@ -43,6 +44,9 @@ export function inlineAssistPrompt(context: InlineAssistContext): string {
 
   if (context.novelTitle) {
     prompt += `■ 作品タイトル: ${context.novelTitle}\n`;
+  }
+  if (context.styleGuide) {
+    prompt += `■ 作品の執筆スタイル・文体ガイドライン:\n${context.styleGuide}\n\n`;
   }
   if (context.characters) {
     prompt += `■ 関連キャラクター情報:\n${context.characters}\n\n`;

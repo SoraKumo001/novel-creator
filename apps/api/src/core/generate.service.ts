@@ -17,6 +17,8 @@ import {
   extractSettings,
   extractTimeline,
   generateJSON,
+  generateText,
+  generateStyleGuideDraftPrompt,
   inlineAssistPrompt,
   plotGeneration,
   proofreadPrompt,
@@ -167,12 +169,15 @@ export class GenerateDomainService {
       this.ctx.env,
     );
 
+    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, chapter.novelId));
+
     const prompt = contentGeneration(
       { title: section.title ?? undefined, summary: section.summary ?? '' },
       {
         previousContent: ragContext.previousContent,
         characters: ragContext.characters,
         settings: ragContext.settings,
+        styleGuide: novel?.styleGuide,
       },
     );
 
@@ -257,6 +262,7 @@ export class GenerateDomainService {
       chapterTitle: chapter?.title,
       sectionTitle: section.title ?? undefined,
       sectionSummary: section.summary ?? undefined,
+      styleGuide: novel?.styleGuide ?? undefined,
       characters: context.characters.join('\n'),
       settings: context.settings.join('\n'),
       body: bodyText,
@@ -311,6 +317,7 @@ export class GenerateDomainService {
 
     const prompt = inlineAssistPrompt({
       novelTitle: novel?.title,
+      styleGuide: novel?.styleGuide ?? undefined,
       characters: context.characters.join('\n'),
       surroundingText: input.surroundingText,
       selectedText: input.selectedText,
@@ -322,6 +329,31 @@ export class GenerateDomainService {
     for await (const chunk of streamText(llm, prompt)) {
       yield chunk;
     }
+  }
+
+  async generateStyleGuideDraft(novelId: string, modelConfigId?: string | null): Promise<string> {
+    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
+    assertFound(novel, 'Novel not found');
+
+    const context = await searchContext(
+      this.ctx.vectorStore,
+      this.ctx.embedding,
+      novelId,
+      {
+        query: `${novel.title} ${novel.description ?? ''}`,
+      },
+      this.ctx.env,
+    );
+
+    const prompt = generateStyleGuideDraftPrompt({
+      novelTitle: novel.title,
+      description: novel.description,
+      characters: context.characters,
+      settings: context.settings,
+    });
+
+    const llm = await this.resolveModel(modelConfigId);
+    return generateText(llm, prompt);
   }
 
   async analyzeSettingImpact(

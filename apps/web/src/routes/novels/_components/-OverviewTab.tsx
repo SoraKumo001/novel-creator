@@ -11,6 +11,7 @@ import { CharacterVoiceCheckerModal } from '@/components/CharacterVoiceCheckerMo
 import { MarkdownText } from '@/components/MarkdownText.js';
 import { MultiPersonaReviewModal } from '@/components/MultiPersonaReviewModal.js';
 import { StoryArcChartModal } from '@/components/StoryArcChartModal.js';
+import { StyleGuideModal } from '@/components/StyleGuideModal.js';
 import { useChapters } from '@/hooks/useChapters.js';
 import { useAnalysis } from '@/hooks/useAnalysis.js';
 import { useNovel } from '@/hooks/useNovel.js';
@@ -71,6 +72,12 @@ export function OverviewTab({
   const [personaHistoryKey, setPersonaHistoryKey] = useState(0);
 
   const [heatmapModalOpen, setHeatmapModalOpen] = useState(false);
+  const [styleGuideModalOpen, setStyleGuideModalOpen] = useState(false);
+
+  const handleSaveStyleGuide = async (newStyleGuide: string) => {
+    await updateNovel(novel.id, { styleGuide: newStyleGuide });
+    await onRefresh();
+  };
 
   // 目標文字数管理
   const [targetWordCount, setTargetWordCount] = useState<number>(() => {
@@ -302,6 +309,50 @@ export function OverviewTab({
         </div>
       </Card>
 
+      {/* 執筆スタイル・文体ガイドライン */}
+      <Card className="space-y-3">
+        <CardHeader
+          title="📝 執筆スタイル & 文体ガイドライン"
+          action={
+            <Button variant="secondary" onClick={() => setStyleGuideModalOpen(true)}>
+              {novel.styleGuide?.trim() ? 'スタイルを編集' : 'スタイルを設定'}
+            </Button>
+          }
+        />
+        {novel.styleGuide?.trim() ? (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary border border-primary/20">
+                設定済み（{novel.styleGuide.length.toLocaleString()}文字）
+              </span>
+              <span className="text-xs text-muted-foreground">
+                本文生成・推敲・校正プロンプトへ自動適用中
+              </span>
+            </div>
+            <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-surface-raised p-3 text-xs">
+              <MarkdownText content={novel.styleGuide} className="line-clamp-6" />
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border border-dashed border-border bg-surface-raised p-4">
+            <div className="space-y-1 text-xs">
+              <div className="font-bold text-foreground">執筆スタイル・作法が未設定です</div>
+              <p className="text-muted-foreground">
+                一人称/三人称視点、視点人物、自称、文体トーン、表記作法などを定義すると、AIの本文生成・推敲・校正の品質と一貫性が大幅に向上します。
+              </p>
+            </div>
+            <Button
+              variant="primary"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setStyleGuideModalOpen(true)}
+            >
+              テンプレートから設定
+            </Button>
+          </div>
+        )}
+      </Card>
+
       {/* 基本情報 */}
       <Card>
         <CardHeader
@@ -431,6 +482,15 @@ export function OverviewTab({
         onClose={() => setHeatmapModalOpen(false)}
         characters={novel.characters}
         chapters={chapters}
+      />
+
+      <StyleGuideModal
+        isOpen={styleGuideModalOpen}
+        onClose={() => setStyleGuideModalOpen(false)}
+        novelId={novel.id}
+        initialStyleGuide={novel.styleGuide}
+        onSave={handleSaveStyleGuide}
+        saving={updating}
       />
     </div>
   );

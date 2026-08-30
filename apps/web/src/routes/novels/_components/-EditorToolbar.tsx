@@ -27,6 +27,7 @@ interface EditorToolbarProps {
   onOpenPersonaReview: () => void;
   onOpenProofread: () => void;
   onOpenChat?: () => void;
+  onOpenStyleGuide?: () => void;
   onSave: () => void;
   isReferencePanelOpen?: boolean;
   onToggleReferencePanel?: () => void;
@@ -55,6 +56,7 @@ export function EditorToolbar({
   onOpenPersonaReview,
   onOpenProofread,
   onOpenChat,
+  onOpenStyleGuide,
   onSave,
   isReferencePanelOpen,
   onToggleReferencePanel,
@@ -349,6 +351,20 @@ export function EditorToolbar({
                 <span>縦書きプレビュー</span>
               </button>
 
+              {onOpenStyleGuide && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMenuOpen(false);
+                    onOpenStyleGuide();
+                  }}
+                  className="w-full flex items-center gap-2 px-3.5 py-2 text-xs text-foreground hover:bg-surface-raised transition cursor-pointer text-left"
+                >
+                  <span>📝</span>
+                  <span>執筆スタイル・文体ガイド</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => {
@@ -375,6 +391,18 @@ export function EditorToolbar({
             </div>
           )}
         </div>
+
+        {/* 📝 執筆ガイドボタン */}
+        {onOpenStyleGuide && (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={onOpenStyleGuide}
+            title="視点・文体・執筆ガイドラインを確認・編集"
+          >
+            📝 執筆ガイド
+          </Button>
+        )}
 
         {/* 📑 参考資料ペイン開閉トグル */}
         {onToggleReferencePanel && (

@@ -55,4 +55,6 @@ export {
   multiPersonaReviewPrompt,
   type ReaderPersonaType,
   type MultiPersonaReviewContext,
+  generateStyleGuideDraftPrompt,
+  type GenerateStyleGuideDraftContext,
 } from './prompts/index.js';

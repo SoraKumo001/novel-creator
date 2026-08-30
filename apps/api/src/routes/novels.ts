@@ -23,6 +23,7 @@ const novelsRouter = new Hono<AppContext>()
     const row = await getServices(c).novel.createNovel({
       title: body.title,
       description: body.description ?? null,
+      styleGuide: body.styleGuide ?? null,
     });
     return c.json(row, 201);
   })

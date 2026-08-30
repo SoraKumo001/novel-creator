@@ -9,6 +9,7 @@ export async function fetchNovels(): Promise<Novel[]> {
     id: n.id,
     title: n.title,
     description: n.description ?? null,
+    styleGuide: n.styleGuide ?? null,
     createdAt: n.createdAt ?? null,
     updatedAt: n.updatedAt ?? null,
   }));
@@ -22,6 +23,7 @@ export async function fetchNovelDetail(id: string): Promise<NovelDetail> {
     id: n.id,
     title: n.title,
     description: n.description ?? null,
+    styleGuide: n.styleGuide ?? null,
     createdAt: n.createdAt ?? null,
     updatedAt: n.updatedAt ?? null,
     chapters: n.chapters.map((ch) => ({
@@ -62,6 +64,7 @@ export async function createNovel(input: CreateNovelInput): Promise<Novel> {
     json: {
       title: input.title,
       description: input.description,
+      styleGuide: input.styleGuide ?? undefined,
     },
   });
   if (!res.ok) throw new Error('Failed to create novel');
@@ -70,6 +73,7 @@ export async function createNovel(input: CreateNovelInput): Promise<Novel> {
     id: row.id,
     title: row.title,
     description: row.description ?? null,
+    styleGuide: row.styleGuide ?? null,
     createdAt: row.createdAt ?? null,
     updatedAt: row.updatedAt ?? null,
   };
@@ -81,6 +85,7 @@ export async function updateNovel(id: string, input: UpdateNovelInput): Promise<
     json: {
       title: input.title,
       description: input.description,
+      styleGuide: input.styleGuide,
     },
   });
   if (!res.ok) throw new Error('Failed to update novel');
@@ -89,9 +94,23 @@ export async function updateNovel(id: string, input: UpdateNovelInput): Promise<
     id: row.id,
     title: row.title,
     description: row.description ?? null,
+    styleGuide: row.styleGuide ?? null,
     createdAt: row.createdAt ?? null,
     updatedAt: row.updatedAt ?? null,
   };
+}
+
+export async function generateStyleGuideDraft(
+  novelId: string,
+  modelConfigId?: string | null,
+): Promise<string> {
+  const res = await apiClient.novels[':id'].generate['style-guide'].$post({
+    param: { id: novelId },
+    json: { modelConfigId: modelConfigId ?? null },
+  });
+  if (!res.ok) throw new Error('Failed to generate style guide draft');
+  const data = await res.json();
+  return data.draft;
 }
 
 export async function deleteNovel(id: string): Promise<void> {

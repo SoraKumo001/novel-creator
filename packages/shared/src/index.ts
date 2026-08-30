@@ -71,3 +71,10 @@ export {
   type CategoryTreeNode,
   type CategorySortOption,
 } from './categoryTree.js';
+export {
+  STYLE_GUIDE_TEMPLATES,
+  STYLE_GUIDE_SNIPPETS,
+  type StyleGuideTemplate,
+  type StyleGuideSnippet,
+} from './styleGuideTemplates.js';
+export * from './schemas/entities.js';

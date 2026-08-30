@@ -5,6 +5,7 @@ export interface ProofreadContext {
   sectionSummary?: string;
   characters?: string;
   settings?: string;
+  styleGuide?: string;
   body: string;
 }
 
@@ -13,11 +14,11 @@ export function proofreadPrompt(context: ProofreadContext): string {
 以下の小説の本文を精読し、プロフェッショナルな視点から校正・推敲・レビューを行ってください。
 
 【評価・推敲の重点ポイント】
-1. **視点（POV）のブレ**: 一人称/三人称の視点混同や、主人公が見聞きできない情報の不自然な描写がないか。
+1. **視点（POV）のブレ**: 一人称/三人称の視点混同や、指定された執筆スタイル・視点人物が見聞きできない情報の不自然な描写がないか。
 2. **誤字・脱字・表記揺れ・助詞**: 誤用、表記ゆれ（例：「子供」と「子ども」）、助詞の連続や不自然な係り受け。
-3. **文体・リズム・テンポ**: 語尾の単調な連続（「〜だった。〜だった。」）、冗長な修飾、テンポの悪さの改善。
+3. **文体・リズム・テンポ**: 指定された文体トーンとの乖離、語尾の単調な連続（「〜だった。〜だった。」）、冗長な修飾、テンポの悪さの改善。
 4. **感情描写・臨場感**: 読者が感情移入しやすい五感を使った描写や、キャラクターの個性・感情の鮮やかさ。
-5. **設定・文脈の整合性**: 提示された設定やキャラクター像と矛盾していないか。
+5. **設定・文脈・執筆ルールの整合性**: 提示された設定、キャラクター像、作品の執筆ガイドライン（作法・禁止事項）と矛盾していないか。
 
 `;
 
@@ -32,6 +33,9 @@ export function proofreadPrompt(context: ProofreadContext): string {
   }
   if (context.sectionSummary) {
     prompt += `■ 節のあらすじ: ${context.sectionSummary}\n`;
+  }
+  if (context.styleGuide) {
+    prompt += `■ 作品の執筆スタイル・文体ガイドライン:\n${context.styleGuide}\n\n`;
   }
   if (context.characters) {
     prompt += `■ 関連キャラクター情報:\n${context.characters}\n\n`;

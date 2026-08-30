@@ -6,11 +6,13 @@ import { ProofreadModal } from '@/components/ProofreadModal.js';
 import { VerticalPreviewModal } from '@/components/VerticalPreviewModal.js';
 import { CharacterVoiceCheckerModal } from '@/components/CharacterVoiceCheckerModal.js';
 import { MultiPersonaReviewModal } from '@/components/MultiPersonaReviewModal.js';
+import { StyleGuideModal } from '@/components/StyleGuideModal.js';
 import { InlineAIAssistant } from '@/components/InlineAIAssistant.js';
 import { useContent } from '@/hooks/useContent.js';
 import { useAnalysis } from '@/hooks/useAnalysis.js';
 import { useGenerate } from '@/hooks/useGenerate.js';
 import { useChat } from '@/hooks/useChat.js';
+import { useNovel } from '@/hooks/useNovel.js';
 import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import { countWords } from '@/lib/sse.js';
@@ -68,6 +70,14 @@ export function SectionEditor({
     runPersonaReview,
     cancel: cancelAnalysis,
   } = useAnalysis();
+
+  const { novel, updateNovel, updating: updatingNovel } = useNovel(novelId);
+  const [styleGuideOpen, setStyleGuideOpen] = useState(false);
+
+  const handleSaveStyleGuide = async (newGuide: string) => {
+    await updateNovel(novelId, { styleGuide: newGuide });
+    await onRefresh();
+  };
 
   const [localBody, setLocalBody] = useState('');
   const [savedBody, setSavedBody] = useState('');
@@ -417,6 +427,7 @@ export function SectionEditor({
         onOpenPersonaReview={() => void handleOpenPersonaReview()}
         onOpenProofread={() => void handleOpenProofread()}
         onOpenChat={() => handleOpenChat(false)}
+        onOpenStyleGuide={() => setStyleGuideOpen(true)}
         onSave={() => void handleSave()}
       />
 
@@ -573,6 +584,14 @@ export function SectionEditor({
         onSelectHistory={handleSelectPersonaHistory}
         onRerun={() => void handleOpenPersonaReview()}
         onCancel={cancelAnalysis}
+      />
+      <StyleGuideModal
+        isOpen={styleGuideOpen}
+        onClose={() => setStyleGuideOpen(false)}
+        novelId={novelId}
+        initialStyleGuide={novel?.styleGuide}
+        onSave={handleSaveStyleGuide}
+        saving={updatingNovel}
       />
     </div>
   );

@@ -13,6 +13,7 @@ export const novelSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: z.string().nullable(),
+  styleGuide: z.string().nullable().optional(),
   createdAt: isoDateOrNull,
   updatedAt: isoDateOrNull,
 });
