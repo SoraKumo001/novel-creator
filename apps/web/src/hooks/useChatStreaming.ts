@@ -299,12 +299,16 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     }
   }, [abortStream, deleteSession, setUiMessages]);
 
+  // 送信した最後のプロンプトを再試行用に記憶する
+  const lastPromptRef = useRef<string | null>(null);
+
   // メッセージ送信（セッション自動作成 → AI SDK ストリーミング）
   const sendMessage = useCallback(
     async (content: string) => {
       const text = content.trim();
       if (!text || isStreaming) return;
 
+      lastPromptRef.current = text;
       setError(null);
 
       let activeSessionId = currentSessionIdRef.current;
@@ -324,6 +328,17 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     [createSession, chatSendMessage, isStreaming],
   );
 
+  // 直前のメッセージを再試行する
+  const retryLastMessage = useCallback(async () => {
+    if (!lastPromptRef.current || isStreaming) return;
+    await sendMessage(lastPromptRef.current);
+  }, [sendMessage, isStreaming]);
+
+  // エラー表示を消去する
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
   return {
     currentSessionId,
     setCurrentSessionId,
@@ -339,6 +354,9 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     streamingParts,
     error,
     setError,
+    clearError,
+    lastPrompt: lastPromptRef.current,
+    retryLastMessage,
     abortControllerRef,
     createSession,
     deleteSession,

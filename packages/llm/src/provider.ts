@@ -51,18 +51,26 @@ export function createLanguageModel(
   settings: ProviderSettings,
 ): LanguageModel {
   switch (provider) {
-    case 'openai':
-      return createOpenAI(settings)(model);
+    case 'openai': {
+      const openai = createOpenAI(settings);
+      // OpenAI / OpenAI互換エンドポイントともに Responses API（item_reference）ではなく
+      // 互換性の高い Chat Completions API（.chat）を使用する
+      return openai.chat(model);
+    }
     case 'anthropic':
       return createAnthropic(settings)(model);
-    case 'ollama':
-      // Ollama / OllamaCloud は OpenAI 互換 API を提供するため createOpenAI を使用する。
-      return createOpenAI(settings)(model);
+    case 'ollama': {
+      // Ollama / OllamaCloud は OpenAI 互換 API（Chat Completions）を提供するため .chat を使用する。
+      const openai = createOpenAI(settings);
+      return openai.chat(model);
+    }
     case 'google':
       return createGoogleGenerativeAI(settings)(model);
-    case 'custom_openai':
-      // OpenRouter, Groq, LM Studio, vLLM などの OpenAI 互換エンドポイント
-      return createOpenAI(settings)(model);
+    case 'custom_openai': {
+      // OpenRouter, Groq, LM Studio, vLLM などの OpenAI 互換エンドポイント（Chat Completions）
+      const openai = createOpenAI(settings);
+      return openai.chat(model);
+    }
     default: {
       const exhaustive: never = provider;
       throw new Error(`Unsupported LLM provider: ${String(exhaustive)}`);

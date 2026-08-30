@@ -30,6 +30,13 @@ import { ChatInsertSettingTab } from './entity-insert/ChatInsertSettingTab.js';
 import { ChatInsertForeshadowingTab } from './entity-insert/ChatInsertForeshadowingTab.js';
 import { ChatInsertTimelineTab } from './entity-insert/ChatInsertTimelineTab.js';
 import { ChatInsertPlotTab } from './entity-insert/ChatInsertPlotTab.js';
+import {
+  reconcileCharacter,
+  reconcileForeshadowing,
+  reconcilePlot,
+  reconcileSetting,
+  reconcileTimeline,
+} from './entity-insert/matching.js';
 import type {
   EditableCharacter,
   EditableForeshadowing,
@@ -80,6 +87,13 @@ export function ChatInsertEntityModal({
   const [existingTimelines, setExistingTimelines] = useState<Timeline[]>([]);
   const [existingChapters, setExistingChapters] = useState<Chapter[]>([]);
   const [loadingExisting, setLoadingExisting] = useState(false);
+
+  // 非同期抽出処理や更新ハンドラから最新の既存データを即座に参照するための ref
+  const existingCharactersRef = useRef<Character[]>([]);
+  const existingSettingsRef = useRef<Setting[]>([]);
+  const existingForeshadowingsRef = useRef<Foreshadowing[]>([]);
+  const existingTimelinesRef = useRef<Timeline[]>([]);
+  const existingChaptersRef = useRef<Chapter[]>([]);
 
   const {
     items: extractedCharacters,
@@ -178,6 +192,11 @@ export function ChatInsertEntityModal({
       setExistingForeshadowings([]);
       setExistingTimelines([]);
       setExistingChapters([]);
+      existingCharactersRef.current = [];
+      existingSettingsRef.current = [];
+      existingForeshadowingsRef.current = [];
+      existingTimelinesRef.current = [];
+      existingChaptersRef.current = [];
       return;
     }
 
@@ -204,73 +223,19 @@ export function ChatInsertEntityModal({
     setExistingForeshadowings(fores);
     setExistingTimelines(times);
     setExistingChapters(chaps);
+    existingCharactersRef.current = chars;
+    existingSettingsRef.current = sets;
+    existingForeshadowingsRef.current = fores;
+    existingTimelinesRef.current = times;
+    existingChaptersRef.current = chaps;
     setLoadingExisting(false);
 
-    // 既存データに基づいてマッチングを更新
-    setExtractedCharacters((prev) =>
-      prev.map((c) => {
-        const matched = chars.find(
-          (ex) => ex.name.trim().toLowerCase() === c.name.trim().toLowerCase(),
-        );
-        return {
-          ...c,
-          matchedExisting: matched,
-          action: matched ? c.action || 'overwrite' : 'create',
-        };
-      }),
-    );
-
-    setExtractedSettings((prev) =>
-      prev.map((s) => {
-        const matched = sets.find(
-          (ex) => ex.name.trim().toLowerCase() === s.name.trim().toLowerCase(),
-        );
-        return {
-          ...s,
-          matchedExisting: matched,
-          action: matched ? s.action || 'overwrite' : 'create',
-        };
-      }),
-    );
-
-    setExtractedForeshadowings((prev) =>
-      prev.map((f) => {
-        const matched = fores.find(
-          (ex) => ex.title.trim().toLowerCase() === f.title.trim().toLowerCase(),
-        );
-        return {
-          ...f,
-          matchedExisting: matched,
-          action: matched ? f.action || 'overwrite' : 'create',
-        };
-      }),
-    );
-
-    setExtractedTimelines((prev) =>
-      prev.map((t) => {
-        const matched = times.find(
-          (ex) => ex.event.trim().toLowerCase() === t.event.trim().toLowerCase(),
-        );
-        return {
-          ...t,
-          matchedExisting: matched,
-          action: matched ? t.action || 'overwrite' : 'create',
-        };
-      }),
-    );
-
-    setExtractedPlots((prev) =>
-      prev.map((p) => {
-        const matched = chaps.find(
-          (ex) => ex.title.trim().toLowerCase() === p.title.trim().toLowerCase(),
-        );
-        return {
-          ...p,
-          matchedExisting: matched,
-          action: matched ? p.action || 'overwrite' : 'create',
-        };
-      }),
-    );
+    // 既存データに基づいてマッチングを更新（重複時はデフォルト上書き更新）
+    setExtractedCharacters((prev) => prev.map((c) => reconcileCharacter(c, chars)));
+    setExtractedSettings((prev) => prev.map((s) => reconcileSetting(s, sets)));
+    setExtractedForeshadowings((prev) => prev.map((f) => reconcileForeshadowing(f, fores)));
+    setExtractedTimelines((prev) => prev.map((t) => reconcileTimeline(t, times)));
+    setExtractedPlots((prev) => prev.map((p) => reconcilePlot(p, chaps)));
   }, [
     isOpen,
     targetNovelId,
@@ -284,6 +249,11 @@ export function ChatInsertEntityModal({
     foreshadowingsQuery.isLoading,
     timelinesQuery.isLoading,
     chaptersQuery.isLoading,
+    setExtractedCharacters,
+    setExtractedSettings,
+    setExtractedForeshadowings,
+    setExtractedTimelines,
+    setExtractedPlots,
   ]);
 
   const extractStartedAtRef = useRef<number>(Date.now());
@@ -300,69 +270,54 @@ export function ChatInsertEntityModal({
         const data = await extractChatEntities(sourceText);
 
         const chars: EditableCharacter[] = (data.characters || []).map((c, i) => {
-          const matched = existingCharacters.find(
-            (ex) => ex.name.trim().toLowerCase() === c.name.trim().toLowerCase(),
-          );
-          return {
+          const rawItem: EditableCharacter = {
             ...c,
             _id: `char-${Date.now()}-${i}`,
             _selected: true,
             traitsString: Array.isArray(c.traits) ? c.traits.join(', ') : '',
-            matchedExisting: matched,
-            action: matched ? 'overwrite' : 'create',
+            action: 'create',
           };
+          return reconcileCharacter(rawItem, existingCharactersRef.current);
         });
 
         const sets: EditableSetting[] = (data.settings || []).map((s, i) => {
-          const matched = existingSettings.find(
-            (ex) => ex.name.trim().toLowerCase() === s.name.trim().toLowerCase(),
-          );
-          return {
+          const rawItem: EditableSetting = {
             ...s,
             _id: `set-${Date.now()}-${i}`,
             _selected: true,
-            matchedExisting: matched,
-            action: matched ? 'overwrite' : 'create',
+            action: 'create',
           };
+          return reconcileSetting(rawItem, existingSettingsRef.current);
         });
 
         const fores: EditableForeshadowing[] = (data.foreshadowings || []).map((f, i) => {
-          const matched = existingForeshadowings.find(
-            (ex) => ex.title.trim().toLowerCase() === f.title.trim().toLowerCase(),
-          );
-          return {
+          const rawItem: EditableForeshadowing = {
             ...f,
             _id: `fore-${Date.now()}-${i}`,
             _selected: true,
-            matchedExisting: matched,
-            action: matched ? 'overwrite' : 'create',
+            action: 'create',
           };
+          return reconcileForeshadowing(rawItem, existingForeshadowingsRef.current);
         });
 
         const times: EditableTimeline[] = (data.timelines || []).map((t, i) => {
-          const matched = existingTimelines.find(
-            (ex) => ex.event.trim().toLowerCase() === t.event.trim().toLowerCase(),
-          );
-          return {
+          const rawItem: EditableTimeline = {
             ...t,
             _id: `time-${Date.now()}-${i}`,
             _selected: true,
-            matchedExisting: matched,
-            action: matched ? 'overwrite' : 'create',
+            action: 'create',
           };
+          return reconcileTimeline(rawItem, existingTimelinesRef.current);
         });
 
         const plots: EditablePlot[] = (data.plots || []).map((p, i) => {
-          const matched = existingChapters.find(
-            (ex) => ex.title.trim().toLowerCase() === p.title.trim().toLowerCase(),
-          );
-          return {
+          const rawItem: EditablePlot = {
             ...p,
             _id: `plot-${Date.now()}-${i}`,
             _selected: true,
-            matchedExisting: matched,
-            action: matched ? 'overwrite' : 'create',
+            action: 'create',
           };
+          return reconcilePlot(rawItem, existingChaptersRef.current);
         });
 
         setExtractedCharacters(chars);
@@ -394,7 +349,15 @@ export function ChatInsertEntityModal({
     };
 
     void runExtract();
-  }, [isOpen, sourceText]);
+  }, [
+    isOpen,
+    sourceText,
+    setExtractedCharacters,
+    setExtractedSettings,
+    setExtractedForeshadowings,
+    setExtractedTimelines,
+    setExtractedPlots,
+  ]);
 
   // 人物の操作ハンドラ
   const handleToggleCharacter = toggleCharacter;
@@ -416,16 +379,8 @@ export function ChatInsertEntityModal({
   const handleUpdateCharacter = (id: string, field: keyof EditableCharacter, value: unknown) => {
     updateCharacterItem(id, (c) => {
       if (field === 'name') {
-        const newName = String(value);
-        const matched = existingCharacters.find(
-          (ex) => ex.name.trim().toLowerCase() === newName.trim().toLowerCase(),
-        );
-        return {
-          ...c,
-          name: newName,
-          matchedExisting: matched,
-          action: matched ? c.action : 'create',
-        };
+        const updated = { ...c, name: String(value) };
+        return reconcileCharacter(updated, existingCharactersRef.current);
       }
       if (field === 'traitsString') {
         const str = String(value);
@@ -457,16 +412,8 @@ export function ChatInsertEntityModal({
   const handleUpdateSetting = (id: string, field: keyof EditableSetting, value: unknown) => {
     updateSettingItem(id, (s) => {
       if (field === 'name') {
-        const newName = String(value);
-        const matched = existingSettings.find(
-          (ex) => ex.name.trim().toLowerCase() === newName.trim().toLowerCase(),
-        );
-        return {
-          ...s,
-          name: newName,
-          matchedExisting: matched,
-          action: matched ? s.action : 'create',
-        };
+        const updated = { ...s, name: String(value) };
+        return reconcileSetting(updated, existingSettingsRef.current);
       }
       return { ...s, [field]: value };
     });
@@ -494,16 +441,8 @@ export function ChatInsertEntityModal({
   ) => {
     updateForeshadowingItem(id, (f) => {
       if (field === 'title') {
-        const newTitle = String(value);
-        const matched = existingForeshadowings.find(
-          (ex) => ex.title.trim().toLowerCase() === newTitle.trim().toLowerCase(),
-        );
-        return {
-          ...f,
-          title: newTitle,
-          matchedExisting: matched,
-          action: matched ? f.action : 'create',
-        };
+        const updated = { ...f, title: String(value) };
+        return reconcileForeshadowing(updated, existingForeshadowingsRef.current);
       }
       return { ...f, [field]: value };
     });
@@ -526,16 +465,8 @@ export function ChatInsertEntityModal({
   const handleUpdateTimeline = (id: string, field: keyof EditableTimeline, value: unknown) => {
     updateTimelineItem(id, (t) => {
       if (field === 'event') {
-        const newEvent = String(value);
-        const matched = existingTimelines.find(
-          (ex) => ex.event.trim().toLowerCase() === newEvent.trim().toLowerCase(),
-        );
-        return {
-          ...t,
-          event: newEvent,
-          matchedExisting: matched,
-          action: matched ? t.action : 'create',
-        };
+        const updated = { ...t, event: String(value) };
+        return reconcileTimeline(updated, existingTimelinesRef.current);
       }
       return { ...t, [field]: value };
     });
@@ -558,16 +489,8 @@ export function ChatInsertEntityModal({
   const handleUpdatePlot = (id: string, field: keyof EditablePlot, value: unknown) => {
     updatePlotItem(id, (p) => {
       if (field === 'title') {
-        const newTitle = String(value);
-        const matched = existingChapters.find(
-          (ex) => ex.title.trim().toLowerCase() === newTitle.trim().toLowerCase(),
-        );
-        return {
-          ...p,
-          title: newTitle,
-          matchedExisting: matched,
-          action: matched ? p.action : 'create',
-        };
+        const updated = { ...p, title: String(value) };
+        return reconcilePlot(updated, existingChaptersRef.current);
       }
       return { ...p, [field]: value };
     });

@@ -109,7 +109,10 @@ export interface ChatContextValue {
   /** ストリーミング中のアシスタントメッセージの生 parts（ツール呼び出しの随時表示用） */
   streamingParts: UIMessage['parts'] | null;
   error: string | null;
+  lastPrompt: string | null;
   sendMessage: (content: string) => Promise<void>;
+  retryLastMessage: () => Promise<void>;
+  clearError: () => void;
   abortStream: () => void;
   clearMessages: () => void;
 }
@@ -156,6 +159,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     streamingParts,
     error,
     setError,
+    clearError,
+    lastPrompt,
+    retryLastMessage,
     abortControllerRef,
     createSession,
     deleteSession,
@@ -329,7 +335,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         streamingContent,
         streamingParts,
         error,
+        lastPrompt,
         sendMessage,
+        retryLastMessage,
+        clearError,
         abortStream,
         clearMessages,
       }}

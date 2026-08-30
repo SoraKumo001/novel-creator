@@ -237,6 +237,51 @@ describe('ChatContext & useChat', () => {
     expect(body.novelId).toBe('novel-123');
     expect(Array.isArray(body.messages)).toBe(true);
   });
+
+  it('APIエラー発生時に error に詳細が設定され、clearError で解除できること', async () => {
+    const createdSession = {
+      id: 'sess-err',
+      novelId: null,
+      title: 'エラーのテスト',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    mockFetch
+      .mockResolvedValueOnce(jsonResponse([]))
+      .mockResolvedValueOnce(jsonResponse(createdSession, 201))
+      .mockResolvedValueOnce(jsonResponse([createdSession]))
+      .mockImplementation(async (input: RequestInfo | URL) => {
+        const url = String(input);
+        if (url.endsWith('/api/chat')) {
+          return new Response(JSON.stringify({ error: 'LLM API のレート制限に達しました。' }), {
+            status: 429,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        return jsonResponse([]);
+      });
+
+    const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
+
+    await waitFor(() => expect(result.current.loadingSessions).toBe(false));
+
+    await act(async () => {
+      await result.current.sendMessage('エラーのテスト');
+    });
+
+    await waitFor(() => {
+      expect(result.current.error).toBeTruthy();
+    });
+
+    expect(result.current.lastPrompt).toBe('エラーのテスト');
+
+    act(() => {
+      result.current.clearError();
+    });
+
+    expect(result.current.error).toBeNull();
+  });
 });
 
 describe('buildChatPrefill', () => {

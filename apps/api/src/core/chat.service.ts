@@ -13,6 +13,7 @@ import {
 
 import { searchContext } from '../rag.js';
 import { chatRequestSchema } from '../schemas/index.js';
+import { formatErrorMessage } from '../middleware/error-handler.js';
 import { createReadTools } from './tools/readTools.js';
 import { createProposeTools } from './tools/proposeTools.js';
 import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
@@ -311,6 +312,10 @@ export class ChatDomainService {
     const uiStream = toUIMessageStream({
       stream: result.stream,
       tools,
+      onError: (error) => {
+        console.error('[Chat Stream Error]', error);
+        return formatErrorMessage(error);
+      },
       onEnd: async ({ responseMessage }) => {
         if (assistantSaved) return;
         assistantSaved = true;

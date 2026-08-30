@@ -466,4 +466,53 @@ describe('Chat API', () => {
     expect(data.settings).toHaveLength(1);
     expect(data.settings[0].name).toBe('魔法王国');
   });
+
+  describe('formatErrorMessage & classifyError', () => {
+    it('APICallError 429 の場合にレート制限メッセージと詳細を返すこと', async () => {
+      const { APICallError } = await import('ai');
+      const { formatErrorMessage, classifyError } =
+        await import('../src/middleware/error-handler.js');
+      const apiErr = new APICallError({
+        message: 'Rate limit exceeded: 15 requests per minute',
+        statusCode: 429,
+        url: 'https://api.example.com',
+        requestBodyValues: {},
+      });
+
+      const classified = classifyError(apiErr);
+      expect(classified.code).toBe('RATE_LIMITED');
+      expect(classified.status).toBe(429);
+
+      const formatted = formatErrorMessage(apiErr);
+      expect(formatted).toContain('レート制限');
+      expect(formatted).toContain('Rate limit exceeded');
+    });
+
+    it('APICallError 401 の場合に認証エラーメッセージと詳細を返すこと', async () => {
+      const { APICallError } = await import('ai');
+      const { formatErrorMessage, classifyError } =
+        await import('../src/middleware/error-handler.js');
+      const apiErr = new APICallError({
+        message: 'Invalid API key provided',
+        statusCode: 401,
+        url: 'https://api.example.com',
+        requestBodyValues: {},
+      });
+
+      const classified = classifyError(apiErr);
+      expect(classified.code).toBe('LLM_AUTH_ERROR');
+      expect(classified.status).toBe(502);
+
+      const formatted = formatErrorMessage(apiErr);
+      expect(formatted).toContain('認証に失敗しました');
+      expect(formatted).toContain('Invalid API key');
+    });
+
+    it('一般の Error の場合にエラーメッセージを返すこと', async () => {
+      const { formatErrorMessage } = await import('../src/middleware/error-handler.js');
+      const err = new Error('Database connection timed out');
+      const formatted = formatErrorMessage(err);
+      expect(formatted).toBe('Database connection timed out');
+    });
+  });
 });

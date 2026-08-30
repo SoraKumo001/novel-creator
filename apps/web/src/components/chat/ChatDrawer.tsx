@@ -51,7 +51,10 @@ export function ChatDrawer() {
     streamingContent,
     streamingParts,
     error,
+    lastPrompt,
     sendMessage,
+    retryLastMessage,
+    clearError,
     abortStream,
   } = useChat();
 
@@ -483,8 +486,55 @@ export function ChatDrawer() {
             )}
 
             {error && (
-              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive">
-                {error}
+              <div
+                role="alert"
+                className="rounded-xl border border-destructive/40 bg-destructive/10 p-3.5 text-xs text-destructive space-y-2 shadow-xs"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-1.5 font-semibold">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="h-4 w-4 shrink-0"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    <span>エラーが発生しました</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={clearError}
+                    className="text-destructive/70 hover:text-destructive text-xs cursor-pointer p-0.5"
+                    title="閉じる"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <div className="whitespace-pre-wrap break-words text-foreground/90 font-mono text-[11px] bg-background/60 p-2 rounded border border-destructive/20 max-h-36 overflow-y-auto">
+                  {error}
+                </div>
+                {lastPrompt && (
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        clearError();
+                        void retryLastMessage();
+                      }}
+                      disabled={isStreaming}
+                      className="h-7 text-xs"
+                    >
+                      🔄 もう一度試す
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 
