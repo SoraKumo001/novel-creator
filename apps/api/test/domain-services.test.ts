@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
+
+vi.mock('../src/rag.js', () => ({
+  upsertEntityEmbedding: vi.fn().mockResolvedValue(undefined),
+  searchContext: vi.fn().mockResolvedValue({ settings: '', characters: '' }),
+}));
 import {
   ChapterDomainService,
   ContentDomainService,
   countWords,
+  ForeshadowingDomainService,
   LlmInstructionDomainService,
   NotFoundError,
   NovelDomainService,
@@ -140,6 +146,45 @@ describe('Domain Services', () => {
       await expect(
         service.createInstruction({ novelId: 'n1', entityType: 'character', instruction: ' ' }),
       ).rejects.toThrow(ValidationError);
+    });
+  });
+
+  describe('ForeshadowingDomainService', () => {
+    it('createForeshadowing - タイトルが空の場合に ValidationError をスローすること', async () => {
+      const service = new ForeshadowingDomainService(createMockContext({}));
+      await expect(service.createForeshadowing('n1', { title: '  ' })).rejects.toThrow(
+        ValidationError,
+      );
+    });
+
+    it('createForeshadowing - 正常に伏線を作成できること', async () => {
+      const created = {
+        id: 'f-1',
+        novelId: 'n1',
+        category: '主要伏線',
+        title: 'テスト伏線',
+        description: 'メモ',
+        status: 'unresolved',
+      };
+      const mockDb = {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([{ id: 'n1', title: '小説' }]),
+          }),
+        }),
+        insert: vi.fn().mockReturnValue({
+          values: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([created]),
+          }),
+        }),
+      };
+      const service = new ForeshadowingDomainService(createMockContext(mockDb));
+      const res = await service.createForeshadowing('n1', {
+        category: '主要伏線',
+        title: 'テスト伏線',
+        description: 'メモ',
+      });
+      expect(res).toEqual(created);
     });
   });
 });

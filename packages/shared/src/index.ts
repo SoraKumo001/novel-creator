@@ -52,6 +52,18 @@ export {
 export { generateCharacterMermaidGraph, type CharacterGraphNode } from './characterGraph.js';
 export { parseRubyToHtml, stripRuby } from './ruby.js';
 export {
+  serializeForeshadowingsToMarkdown,
+  parseForeshadowingsMarkdown,
+  scanForeshadowingSectionRanges,
+  findForeshadowingSectionByLine,
+  buildForeshadowingCategoryTree,
+  diffForeshadowings,
+  type ParsedForeshadowingSection,
+  type ForeshadowingSectionRange,
+  type ForeshadowingCategoryNode,
+  type ForeshadowingsDiff,
+} from './foreshadowingsMarkdown.js';
+export {
   parseCategoryPath,
   formatCategoryPath,
   buildCategoryTree,

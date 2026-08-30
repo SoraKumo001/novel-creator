@@ -13,6 +13,8 @@ export const novelKeys = {
   settingsMarkdown: (novelId: string) => ['novels', novelId, 'settings', 'markdown'] as const,
   timelines: (novelId: string) => ['novels', novelId, 'timelines'] as const,
   foreshadowings: (novelId: string) => ['novels', novelId, 'foreshadowings'] as const,
+  foreshadowingsMarkdown: (novelId: string) =>
+    ['novels', novelId, 'foreshadowings', 'markdown'] as const,
   llmInstructions: (novelId: string, entityType: string) =>
     ['novels', novelId, 'llmInstructions', entityType] as const,
 };

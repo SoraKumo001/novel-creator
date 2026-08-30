@@ -6,6 +6,7 @@ import { createNovelSchema, idParamSchema, updateNovelSchema } from '../schemas/
 import { novelAnalysisRouter } from './novels/analysis.js';
 import { novelChaptersRouter } from './novels/chapters.js';
 import { novelCharactersRouter } from './novels/characters.js';
+import { novelForeshadowingsRouter } from './novels/foreshadowings.js';
 import { novelInstructionsRouter } from './novels/instructions.js';
 import { novelSettingsRouter } from './novels/settings.js';
 import { novelTimelinesRouter } from './novels/timelines.js';
@@ -58,6 +59,7 @@ const novelsRouter = new Hono<AppContext>()
   .route('/', novelChaptersRouter)
   .route('/', novelCharactersRouter)
   .route('/', novelSettingsRouter)
+  .route('/', novelForeshadowingsRouter)
   .route('/', novelTimelinesRouter)
   .route('/', novelInstructionsRouter)
   .route('/', novelAnalysisRouter);

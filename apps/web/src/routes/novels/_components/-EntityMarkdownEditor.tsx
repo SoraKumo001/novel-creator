@@ -14,7 +14,11 @@ import { MonacoEditor } from './-MonacoEditor.js';
 export interface EntityMarkdownEditorProps<TSection extends { category: string; name: string }> {
   novelId: string;
   entityTitle: string;
-  entityType: 'characters_markdown' | 'settings_markdown';
+  entityType:
+    | 'characters_markdown'
+    | 'settings_markdown'
+    | 'foreshadowings_document'
+    | 'foreshadowings_markdown';
   storageKey: string;
   fetchMarkdown: () => Promise<string>;
   saveMarkdown: (

@@ -33,6 +33,7 @@ export type {
 
 export interface CreateForeshadowingInput {
   title: string;
+  category?: string;
   description?: string;
   status?: ForeshadowingStatus;
   placedSectionId?: string | null;
@@ -41,6 +42,7 @@ export interface CreateForeshadowingInput {
 
 export interface UpdateForeshadowingInput {
   title?: string;
+  category?: string;
   description?: string | null;
   status?: ForeshadowingStatus;
   placedSectionId?: string | null;

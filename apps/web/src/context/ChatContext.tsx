@@ -22,7 +22,8 @@ export interface QuickPrompt {
  * ChatDrawer が入力欄へのプリフィルに消費する。
  */
 export interface ChatFocusContext {
-  entityType: 'character' | 'setting' | 'section' | 'selection' | 'markdown_section';
+  entityType:
+    'character' | 'setting' | 'foreshadowing' | 'section' | 'selection' | 'markdown_section';
   /** 例: 設定「大まかなあらすじ」/ 人物「主人公」/ 第1話「プロローグ」/ 選択テキスト */
   title: string;
   /** 選択中のテキスト（ある場合） */

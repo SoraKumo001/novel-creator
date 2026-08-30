@@ -93,6 +93,7 @@ export const updateTimelineSchema = z.object({
 // ---- foreshadowings ----
 export const createForeshadowingSchema = z.object({
   title: z.string().min(1),
+  category: z.string().optional(),
   description: z.string().optional(),
   status: foreshadowingStatusSchema.optional(),
   placedSectionId: z.string().uuid().optional().nullable(),
@@ -101,10 +102,40 @@ export const createForeshadowingSchema = z.object({
 
 export const updateForeshadowingSchema = z.object({
   title: z.string().min(1).optional(),
+  category: z.string().optional(),
   description: z.string().optional().nullable(),
   status: foreshadowingStatusSchema.optional(),
   placedSectionId: z.string().uuid().optional().nullable(),
   resolvedSectionId: z.string().uuid().optional().nullable(),
+});
+
+export const foreshadowingDraftSchema = z.object({
+  instruction: z.string().min(1),
+  currentDraft: z
+    .object({
+      category: z.string().optional(),
+      title: z.string(),
+      description: z.string().optional(),
+      status: foreshadowingStatusSchema.optional(),
+    })
+    .optional(),
+});
+
+export const saveForeshadowingsMarkdownSchema = z.object({
+  markdown: z.string().min(1),
+});
+
+export const editForeshadowingSectionSchema = z.object({
+  category: z.string().min(1),
+  title: z.string().min(1),
+  description: z.string(),
+  status: foreshadowingStatusSchema.optional(),
+  instruction: z.string().min(1),
+});
+
+export const editForeshadowingDocumentSchema = z.object({
+  markdown: z.string().min(1),
+  instruction: z.string().min(1),
 });
 
 // ---- バックアップ ----

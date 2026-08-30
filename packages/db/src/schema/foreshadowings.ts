@@ -9,6 +9,7 @@ export const foreshadowings = pgTable('foreshadowings', {
     .notNull()
     .references(() => novels.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
+  category: text('category').notNull().default('未分類'),
   description: text('description'),
   status: text('status', { enum: [...foreshadowingStatuses] })
     .notNull()

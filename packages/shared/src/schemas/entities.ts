@@ -90,6 +90,7 @@ export const foreshadowingSchema = z.object({
   id: z.string(),
   novelId: z.string(),
   title: z.string(),
+  category: z.string().default('未分類'),
   description: z.string().nullable(),
   status: foreshadowingStatusSchema,
   placedSectionId: z.string().nullable(),
