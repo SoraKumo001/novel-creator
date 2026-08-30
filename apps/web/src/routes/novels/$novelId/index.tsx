@@ -4,6 +4,7 @@ import type { NovelExportData } from '@novel-creator/shared';
 import { Button } from '@/components/Button.js';
 import { ExportModal } from '@/components/ExportModal.js';
 import { Loading } from '@/components/Loading.js';
+import { MarkdownText } from '@/components/MarkdownText.js';
 import { useChat } from '@/hooks/useChat.js';
 import { useNovel } from '@/hooks/useNovel.js';
 import { useToast } from '@/hooks/useToast.js';
@@ -130,9 +131,10 @@ function NovelDetailPage() {
                 {novel.title}
               </h1>
               {novel.description && (
-                <p className="mt-1 max-w-4xl text-sm text-muted-foreground line-clamp-2">
-                  {novel.description}
-                </p>
+                <MarkdownText
+                  content={novel.description}
+                  className="mt-1 max-w-4xl text-sm text-muted-foreground line-clamp-2 [&_p]:my-0"
+                />
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">

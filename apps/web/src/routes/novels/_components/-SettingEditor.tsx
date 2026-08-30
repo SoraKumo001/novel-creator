@@ -99,14 +99,33 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
       if (isEdit && settingId) {
         await updateSetting(settingId, input);
       } else {
-        await createSetting(input);
+        const created = await createSetting(input);
+        // 新規作成後に重複保存が起きないよう編集ページへ置換遷移する（一覧には遷移しない）
+        navigate({
+          to: '/novels/$novelId/settings/$settingId',
+          params: { novelId, settingId: created.id },
+          replace: true,
+        });
       }
       toast.success(isEdit ? '設定を更新しました' : '設定を作成しました');
-      navigate({ to: '/novels/$novelId', params: { novelId }, search: { tab: 'settings' } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '保存に失敗しました');
     }
   }
+
+  // Ctrl+S / Cmd+S ショートカットで保存（頁遷移なし）
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        if (category.trim() && name.trim() && !creating && !updating) {
+          void handleSave();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [category, creating, name, updating, handleSave]);
 
   async function handleDeleteInstruction() {
     if (!deleteInstructionId) return;

@@ -5,6 +5,7 @@ import { Card, CardHeader } from '@/components/Card.js';
 import { EmptyState } from '@/components/EmptyState.js';
 import { Input } from '@/components/Input.js';
 import { Loading } from '@/components/Loading.js';
+import { MarkdownText } from '@/components/MarkdownText.js';
 import { Modal } from '@/components/Modal.js';
 import { Textarea } from '@/components/Textarea.js';
 import { useNovels } from '@/hooks/useNovels.js';
@@ -83,9 +84,10 @@ function NovelsIndexPage() {
               <Card className="h-full">
                 <CardHeader title={novel.title} subtitle={formatDate(novel.updatedAt)} />
                 {novel.description ? (
-                  <p className="line-clamp-3 text-sm leading-relaxed text-foreground-secondary">
-                    {novel.description}
-                  </p>
+                  <MarkdownText
+                    content={novel.description}
+                    className="line-clamp-3 text-sm leading-relaxed text-foreground-secondary [&_p]:my-0 [&_p]:leading-relaxed"
+                  />
                 ) : (
                   <p className="text-sm italic text-muted">説明がありません。</p>
                 )}

@@ -126,10 +126,15 @@ export function CharacterEditor({ novelId, characterId }: CharacterEditorProps) 
       if (isEdit && characterId) {
         await updateCharacter(characterId, input);
       } else {
-        await createCharacter(input);
+        const created = await createCharacter(input);
+        // 新規作成後に重複保存が起きないよう編集ページへ置換遷移する（一覧には遷移しない）
+        navigate({
+          to: '/novels/$novelId/characters/$characterId',
+          params: { novelId, characterId: created.id },
+          replace: true,
+        });
       }
       toast.success(isEdit ? '人物情報を更新しました' : '人物を作成しました');
-      navigate({ to: '/novels/$novelId', params: { novelId }, search: { tab: 'characters' } });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '保存に失敗しました');
     }

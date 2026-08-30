@@ -217,8 +217,7 @@ const novelsRouter = new Hono<AppContext>()
     zValidator('json', settingDraftSchema),
     async (c) => {
       const { instruction, currentDraft } = c.req.valid('json');
-      const category = currentDraft?.category ?? '';
-      const result = await getServices(c).setting.generateDraft(instruction, category);
+      const result = await getServices(c).setting.generateDraft(instruction, currentDraft);
       return c.json(result);
     },
   )

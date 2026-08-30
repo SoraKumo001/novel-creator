@@ -185,12 +185,11 @@ export class SettingDomainService {
     return row;
   }
 
-  async generateDraft(query: string, category: string) {
-    const prompt = createSettingDraft(query, {
-      category,
-      name: '',
-      description: '',
-    });
+  async generateDraft(
+    query: string,
+    currentDraft?: { category: string; name: string; description?: string },
+  ) {
+    const prompt = createSettingDraft(query, currentDraft);
     return generateJSON<{
       category: string;
       name: string;

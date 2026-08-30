@@ -8,6 +8,7 @@ import { Modal } from '@/components/Modal.js';
 import { Textarea } from '@/components/Textarea.js';
 import { CharacterHeatmapModal } from '@/components/CharacterHeatmapModal.js';
 import { CharacterVoiceCheckerModal } from '@/components/CharacterVoiceCheckerModal.js';
+import { MarkdownText } from '@/components/MarkdownText.js';
 import { MultiPersonaReviewModal } from '@/components/MultiPersonaReviewModal.js';
 import { StoryArcChartModal } from '@/components/StoryArcChartModal.js';
 import { useChapters } from '@/hooks/useChapters.js';
@@ -318,7 +319,16 @@ export function OverviewTab({
           </div>
           <div>
             <dt className="text-slate-500 dark:text-slate-400">説明</dt>
-            <dd className="text-slate-700 dark:text-slate-300">{novel.description || '未設定'}</dd>
+            <dd className="text-slate-700 dark:text-slate-300">
+              {novel.description ? (
+                <MarkdownText
+                  content={novel.description}
+                  className="text-slate-700 dark:text-slate-300"
+                />
+              ) : (
+                '未設定'
+              )}
+            </dd>
           </div>
         </dl>
       </Card>
