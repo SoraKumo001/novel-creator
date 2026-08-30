@@ -275,7 +275,7 @@ export function ToolActivity({ parts, isStreaming: _isStreaming }: ToolActivityP
                 <span className="font-medium truncate text-foreground">{label}</span>
 
                 {argsSummary && (
-                  <span className="text-[11px] text-muted-foreground truncate max-w-[160px]">
+                  <span className="text-[11px] text-muted-foreground truncate max-w-40">
                     ({argsSummary})
                   </span>
                 )}

@@ -143,7 +143,7 @@ function ToastViewport({
   onDismiss: (id: number) => void;
 }) {
   return (
-    <div className="pointer-events-none fixed bottom-6 right-6 z-[100] flex w-88 max-w-[calc(100vw-3rem)] flex-col gap-2.5">
+    <div className="pointer-events-none fixed bottom-6 right-6 z-100 flex w-88 max-w-[calc(100vw-3rem)] flex-col gap-2.5">
       {toasts.map((toast) => (
         <div
           key={toast.id}
@@ -151,7 +151,9 @@ function ToastViewport({
           className={`pointer-events-auto flex items-center gap-3 rounded-xl p-3.5 text-xs font-medium shadow-2xl transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 ${typeStyles[toast.type]}`}
         >
           {typeIcons[toast.type]}
-          <div className="flex-1 break-words text-foreground font-semibold">{toast.message}</div>
+          <div className="flex-1 wrap-break-word text-foreground font-semibold">
+            {toast.message}
+          </div>
           <button
             onClick={() => onDismiss(toast.id)}
             className="shrink-0 rounded-md p-1 text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"

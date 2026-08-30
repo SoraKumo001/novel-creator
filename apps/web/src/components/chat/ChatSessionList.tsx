@@ -71,7 +71,7 @@ export function ChatSessionList({
           size="sm"
           variant="secondary"
           onClick={onStartNewChat}
-          className="!py-1 !text-xs"
+          className="py-1! text-xs!"
         >
           ＋ 新規相談
         </Button>

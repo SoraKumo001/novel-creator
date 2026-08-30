@@ -327,7 +327,7 @@ export function ChatDrawer() {
             id="chat-novel-select"
             value={selectedNovelId ?? ''}
             onChange={(e) => setSelectedNovelId(e.target.value ? e.target.value : null)}
-            className="max-w-[180px] truncate rounded border border-border bg-surface px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="max-w-45 truncate rounded border border-border bg-surface px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="">（全般相談）</option>
             {novels.map((n) => (
@@ -497,7 +497,7 @@ export function ChatDrawer() {
                 placeholder="創作の相談を入力... (Ctrl + Enter で送信)"
                 rows={1}
                 disabled={isStreaming}
-                className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary max-h-[180px]"
+                className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary max-h-45"
               />
               <div className="flex items-center justify-between">
                 <span className="text-[11px] text-muted-foreground">Ctrl + Enter で送信</span>

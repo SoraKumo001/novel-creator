@@ -107,7 +107,7 @@ export function ReindexProgressModal({
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span>進捗: {progress ? `${progress.current} / ${progress.total}` : '0 / 0'} 件</span>
               {progress?.itemTitle && (
-                <span className="truncate max-w-[200px]" title={progress.itemTitle}>
+                <span className="truncate max-w-50" title={progress.itemTitle}>
                   {progress.itemTitle}
                 </span>
               )}
