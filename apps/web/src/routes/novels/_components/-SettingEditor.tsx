@@ -51,6 +51,17 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
     [settings, settingId],
   );
 
+  // 既存の設定カテゴリ一覧（サジェスト用）
+  const existingCategories = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of settings ?? []) {
+      if (s.category?.trim()) {
+        set.add(s.category.trim());
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ja'));
+  }, [settings]);
+
   // 編集対象の設定情報をフォームに反映
   // 同一IDの再取得（refetch）で編集中のフォームを再初期化しないよう、反映済みIDでガードする
   const populatedSettingIdRef = useRef<string | null>(null);
@@ -195,12 +206,20 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
       onRestoreSuccess={setDescription}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input
-          label="カテゴリー"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          placeholder="例: アイテム, 世界観・現象, 組織・国家, 地理・場所..."
-        />
+        <div>
+          <Input
+            label="カテゴリー（スラッシュ区切りで階層化可能）"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="例: 世界観 / 魔法体系 / 禁忌魔法, 組織 / 採取ギルド..."
+            list="setting-categories-list"
+          />
+          <datalist id="setting-categories-list">
+            {existingCategories.map((cat) => (
+              <option key={cat} value={cat} />
+            ))}
+          </datalist>
+        </div>
         <Input
           label="名前"
           value={name}

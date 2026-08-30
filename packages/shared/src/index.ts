@@ -51,3 +51,11 @@ export {
 } from './exportFormatter.js';
 export { generateCharacterMermaidGraph, type CharacterGraphNode } from './characterGraph.js';
 export { parseRubyToHtml, stripRuby } from './ruby.js';
+export {
+  parseCategoryPath,
+  formatCategoryPath,
+  buildCategoryTree,
+  flattenCategoryTree,
+  type CategoryTreeNode,
+  type CategorySortOption,
+} from './categoryTree.js';

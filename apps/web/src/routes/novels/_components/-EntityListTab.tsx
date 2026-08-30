@@ -1,4 +1,10 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  buildCategoryTree,
+  flattenCategoryTree,
+  type CategorySortOption,
+  type CategoryTreeNode,
+} from '@novel-creator/shared';
 import { Button } from '@/components/Button.js';
 import { Card, CardHeader } from '@/components/Card.js';
 import { ConfirmDialog } from '@/components/ConfirmDialog.js';
@@ -29,13 +35,7 @@ export interface EntityListTabConfig<
   deleteConfirmLabel: string;
 }
 
-export type EntitySortOption =
-  | 'category-asc-name-asc'
-  | 'category-asc-name-desc'
-  | 'category-desc-name-asc'
-  | 'category-desc-name-desc'
-  | 'name-asc'
-  | 'name-desc';
+export type EntitySortOption = CategorySortOption;
 
 export function EntityListTab<
   T extends { id: string; name: string; category: string; description: string | null },
@@ -71,36 +71,13 @@ export function EntityListTab<
 
   const isDraggingRef = useRef(false);
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, T[]>();
-    for (const entity of entities) {
-      const cat = config.categoryOf(entity) || '未分類';
-      const list = map.get(cat) ?? [];
-      list.push(entity);
-      map.set(cat, list);
-    }
-
-    // カテゴリ内のアイテムをソート
-    for (const [_, items] of map.entries()) {
-      items.sort((a, b) => {
-        if (sortOption.endsWith('desc')) {
-          return b.name.localeCompare(a.name, 'ja');
-        }
-        return a.name.localeCompare(b.name, 'ja');
-      });
-    }
-
-    // カテゴリ自体のソート
-    const entries = Array.from(map.entries());
-    entries.sort((a, b) => {
-      if (sortOption.startsWith('category-desc')) {
-        return b[0].localeCompare(a[0], 'ja');
-      }
-      return a[0].localeCompare(b[0], 'ja');
-    });
-
-    return entries;
+  const categoryTree = useMemo(() => {
+    return buildCategoryTree(entities, config.categoryOf, sortOption);
   }, [entities, config, sortOption]);
+
+  const flattenedSections = useMemo(() => {
+    return flattenCategoryTree(categoryTree).filter((s) => s.items.length > 0);
+  }, [categoryTree]);
 
   const handleSplitterMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -211,30 +188,13 @@ export function EntityListTab<
             {entities.length === 0 ? (
               <div className="text-muted-foreground p-2 italic">{config.sidebarEmpty}</div>
             ) : (
-              grouped.map(([category, items]) => (
-                <div key={category} className="mb-2">
-                  <button
-                    type="button"
-                    onClick={() => scrollToElement(`${idPrefix}-cat-${category}`)}
-                    className="w-full text-left font-bold text-foreground px-2 py-1 bg-surface-raised rounded hover:bg-surface-hover transition truncate block"
-                    title={category}
-                  >
-                    {category}
-                  </button>
-                  <div className="ml-2 mt-1 space-y-0.5">
-                    {items.map((entity) => (
-                      <button
-                        key={entity.id}
-                        type="button"
-                        onClick={() => scrollToElement(`${idPrefix}-${entity.id}`)}
-                        className="w-full text-left px-2 py-1 rounded truncate block text-foreground hover:bg-surface-raised hover:text-primary transition"
-                        title={entity.name}
-                      >
-                        {entity.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              categoryTree.map((node) => (
+                <SidebarTreeNode
+                  key={node.fullPath}
+                  node={node}
+                  idPrefix={idPrefix}
+                  onScrollTo={scrollToElement}
+                />
               ))
             )}
           </aside>
@@ -253,17 +213,38 @@ export function EntityListTab<
               <EmptyState title={config.emptyTitle} description={config.emptyDescription} />
             )}
             {!loading &&
-              grouped.map(([category, items]) => (
-                <section key={category} id={`${idPrefix}-cat-${category}`} className="space-y-3">
+              flattenedSections.map((section) => (
+                <section
+                  key={section.fullPath}
+                  id={`${idPrefix}-cat-${encodeURIComponent(section.fullPath)}`}
+                  className="space-y-3 scroll-mt-4"
+                >
                   <div className="flex items-center gap-2 border-b border-border pb-2">
                     <span className="inline-block h-3.5 w-1 rounded-full bg-primary" />
-                    <h3 className="text-sm font-bold text-foreground">{category}</h3>
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-1.5 flex-wrap">
+                      {section.fullPath.split(' / ').map((segment, idx, arr) => (
+                        <span key={idx} className="flex items-center gap-1.5">
+                          {idx > 0 && (
+                            <span className="text-muted-foreground/60 font-normal">›</span>
+                          )}
+                          <span
+                            className={
+                              idx === arr.length - 1
+                                ? 'text-foreground'
+                                : 'text-muted-foreground font-medium'
+                            }
+                          >
+                            {segment}
+                          </span>
+                        </span>
+                      ))}
+                    </h3>
                     <span className="rounded-full bg-surface-raised px-2 py-0.5 text-[11px] font-semibold text-muted-foreground border border-border">
-                      {items.length}件
+                      {section.items.length}件
                     </span>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {items.map((entity) => (
+                    {section.items.map((entity) => (
                       <div key={entity.id} id={`${idPrefix}-${entity.id}`} className="scroll-mt-4">
                         <Card
                           className={`flex ${config.cardHeight} flex-col justify-between overflow-hidden`}
@@ -316,6 +297,71 @@ export function EntityListTab<
         confirmLabel={config.deleteConfirmLabel}
         isLoading={deleting}
       />
+    </div>
+  );
+}
+
+interface SidebarTreeNodeProps<T extends { id: string; name: string }> {
+  node: CategoryTreeNode<T>;
+  idPrefix: string;
+  onScrollTo: (id: string) => void;
+}
+
+function SidebarTreeNode<T extends { id: string; name: string }>({
+  node,
+  idPrefix,
+  onScrollTo,
+}: SidebarTreeNodeProps<T>) {
+  const isRoot = node.level === 0;
+
+  return (
+    <div className={isRoot ? 'mb-2' : 'mt-0.5 pl-2.5 border-l border-border/70'}>
+      <button
+        type="button"
+        onClick={() => onScrollTo(`${idPrefix}-cat-${encodeURIComponent(node.fullPath)}`)}
+        className={`w-full text-left rounded px-2 py-1 truncate block transition flex items-center justify-between gap-1.5 ${
+          isRoot
+            ? 'font-bold text-foreground bg-surface-raised hover:bg-surface-hover text-xs'
+            : 'font-semibold text-foreground/80 hover:bg-surface-raised hover:text-foreground text-[11px]'
+        }`}
+        title={node.fullPath}
+      >
+        <span className="truncate">{node.name}</span>
+        <span className="shrink-0 text-[10px] font-normal text-muted-foreground">
+          {node.totalCount}
+        </span>
+      </button>
+
+      {/* 直属のアイテム */}
+      {node.items.length > 0 && (
+        <div className="ml-1.5 mt-0.5 space-y-0.5">
+          {node.items.map((entity) => (
+            <button
+              key={entity.id}
+              type="button"
+              onClick={() => onScrollTo(`${idPrefix}-${entity.id}`)}
+              className="w-full text-left px-2 py-0.5 rounded truncate block text-[11px] text-foreground-secondary hover:bg-surface-raised hover:text-primary transition"
+              title={entity.name}
+            >
+              {entity.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* 子カテゴリ */}
+      {node.children.length > 0 && (
+        <div className="mt-0.5 space-y-0.5">
+          {node.children.map((child) => (
+            <SidebarTreeNode
+              key={child.fullPath}
+              node={child}
+              idPrefix={idPrefix}
+              onScrollTo={onScrollTo}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

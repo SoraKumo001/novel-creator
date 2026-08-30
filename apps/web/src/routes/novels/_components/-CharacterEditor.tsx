@@ -54,6 +54,17 @@ export function CharacterEditor({ novelId, characterId }: CharacterEditorProps) 
     [characters, characterId],
   );
 
+  // 既存のカテゴリ一覧（サジェスト用）
+  const existingCategories = useMemo(() => {
+    const set = new Set<string>();
+    for (const c of characters ?? []) {
+      if (c.category?.trim()) {
+        set.add(c.category.trim());
+      }
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ja'));
+  }, [characters]);
+
   // 編集対象の人物情報をフォームに反映
   // 同一IDの再取得（refetch）で編集中のフォームを再初期化しないよう、反映済みIDでガードする
   const populatedCharacterIdRef = useRef<string | null>(null);
@@ -222,12 +233,20 @@ export function CharacterEditor({ novelId, characterId }: CharacterEditorProps) 
       onRestoreSuccess={setDescription}
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Input
-          label="カテゴリー"
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          placeholder="例: 主要人物, サブキャラクター, 敵役, 協力者..."
-        />
+        <div>
+          <Input
+            label="カテゴリー（スラッシュ区切りで階層化可能）"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            placeholder="例: 採取ギルド / 採取メンバー, 騎士団 / 団長, 主人公..."
+            list="character-categories-list"
+          />
+          <datalist id="character-categories-list">
+            {existingCategories.map((cat) => (
+              <option key={cat} value={cat} />
+            ))}
+          </datalist>
+        </div>
         <Input
           label="名前"
           value={name}

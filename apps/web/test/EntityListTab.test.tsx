@@ -169,4 +169,22 @@ describe('EntityListTab', () => {
 
     expect(sortSelect).toHaveValue('category-desc-name-desc');
   });
+
+  it('スラッシュ区切りの階層カテゴリでパンくず見出しとサイドバーツリーが表示されること', () => {
+    renderTab({
+      entities: [
+        makeEntity({ id: 'ent-1', name: 'アイン', category: '採取ギルド / 採取メンバー' }),
+        makeEntity({ id: 'ent-2', name: 'ユーグ', category: '採取ギルド / 幹部 / ギルド長' }),
+      ],
+    });
+
+    // サイドバーや見出しに階層ノード・パンくずが表示される
+    expect(screen.getAllByText('採取ギルド').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('採取メンバー').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('幹部').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('ギルド長').length).toBeGreaterThan(0);
+
+    // パンくずの各セグメントが表示される
+    expect(screen.getAllByText('›').length).toBeGreaterThan(0);
+  });
 });
