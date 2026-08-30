@@ -153,18 +153,26 @@ export class NovelDomainService {
     const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, id));
     assertFound(novel, 'Novel not found');
 
-    const context = await searchContext(
-      this.ctx.vectorStore,
-      this.ctx.embedding,
-      id,
-      { query: `${params.activeSection.name} ${params.instruction}` },
-      this.ctx.env,
-    );
+    let contextSettings: string[] = [];
+    let contextCharacters: string[] = [];
+    try {
+      const context = await searchContext(
+        this.ctx.vectorStore,
+        this.ctx.embedding,
+        id,
+        { query: `${params.activeSection.name} ${params.instruction}` },
+        this.ctx.env,
+      );
+      contextSettings = context.settings;
+      contextCharacters = context.characters;
+    } catch {
+      // ベクトル検索失敗時は空コンテキストで継続
+    }
 
     const prompt = editStoryOutlineSection(params.activeSection, params.instruction, {
       novelTitle: novel.title,
-      characters: context.characters,
-      settings: context.settings,
+      characters: contextCharacters,
+      settings: contextSettings,
       entireOutlinePreview: params.markdown.slice(0, 3000),
     });
 
@@ -183,18 +191,26 @@ export class NovelDomainService {
     const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, id));
     assertFound(novel, 'Novel not found');
 
-    const context = await searchContext(
-      this.ctx.vectorStore,
-      this.ctx.embedding,
-      id,
-      { query: `${novel.title} ${params.instruction}` },
-      this.ctx.env,
-    );
+    let contextSettings: string[] = [];
+    let contextCharacters: string[] = [];
+    try {
+      const context = await searchContext(
+        this.ctx.vectorStore,
+        this.ctx.embedding,
+        id,
+        { query: `${novel.title} ${params.instruction}` },
+        this.ctx.env,
+      );
+      contextSettings = context.settings;
+      contextCharacters = context.characters;
+    } catch {
+      // ベクトル検索失敗時は空コンテキストで継続
+    }
 
     const prompt = editStoryOutlineDocument(params.markdown, params.instruction, {
       novelTitle: novel.title,
-      characters: context.characters,
-      settings: context.settings,
+      characters: contextCharacters,
+      settings: contextSettings,
     });
 
     const llm = await this.resolveModel(params.modelConfigId);
@@ -211,19 +227,27 @@ export class NovelDomainService {
     const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, id));
     assertFound(novel, 'Novel not found');
 
-    const context = await searchContext(
-      this.ctx.vectorStore,
-      this.ctx.embedding,
-      id,
-      { query: `${novel.title} ${params.storyOutline.slice(0, 500)}` },
-      this.ctx.env,
-    );
+    let contextSettings: string[] = [];
+    let contextCharacters: string[] = [];
+    try {
+      const context = await searchContext(
+        this.ctx.vectorStore,
+        this.ctx.embedding,
+        id,
+        { query: `${novel.title} ${params.storyOutline.slice(0, 500)}` },
+        this.ctx.env,
+      );
+      contextSettings = context.settings;
+      contextCharacters = context.characters;
+    } catch {
+      // ベクトル検索失敗時は空コンテキストで継続
+    }
 
     const prompt = generatePlotFromStoryOutline({
       novelTitle: novel.title,
       storyOutline: params.storyOutline,
-      characters: context.characters,
-      settings: context.settings,
+      characters: contextCharacters,
+      settings: contextSettings,
     });
 
     const llm = await this.resolveModel(params.modelConfigId);

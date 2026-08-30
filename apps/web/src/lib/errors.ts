@@ -41,3 +41,62 @@ function tryParseApiError(text: string): string | null {
   }
   return null;
 }
+
+/**
+ * Fetch Response オブジェクトから適切な日本語エラーメッセージを抽出・構築する。
+ */
+export async function parseResponseError(
+  res: Response,
+  defaultActionName: string = '処理',
+): Promise<Error> {
+  let detail = '';
+  try {
+    const json = (await res.json()) as Record<string, unknown>;
+    if (json && typeof json === 'object') {
+      const errObj = (json.error as Record<string, unknown>) ?? json;
+      if (typeof errObj.message === 'string' && errObj.message.trim()) {
+        detail = errObj.message.trim();
+      }
+    }
+  } catch {
+    try {
+      detail = (await res.text()).trim();
+    } catch {
+      // ignore
+    }
+  }
+
+  if (res.status === 502) {
+    return new Error(
+      `APIサーバーに接続できませんでした (502 Bad Gateway)。バックエンドサーバー（pnpm dev）が起動しているか確認してください。${detail ? ` [詳細: ${detail}]` : ''}`,
+    );
+  }
+
+  if (res.status === 504) {
+    return new Error(
+      `AIの処理がタイムアウトしました (504 Gateway Timeout)。指示内容を簡潔にして再試行してください。${detail ? ` [詳細: ${detail}]` : ''}`,
+    );
+  }
+
+  if (res.status === 429) {
+    return new Error(
+      `AIサービスのレート制限（利用制限）に達しました (429)。しばらく待ってから再試行してください。${detail ? ` [詳細: ${detail}]` : ''}`,
+    );
+  }
+
+  if (res.status === 401 || res.status === 403) {
+    return new Error(
+      `AIサービスの認証に失敗しました (${res.status})。APIキー設定をご確認ください。${detail ? ` [詳細: ${detail}]` : ''}`,
+    );
+  }
+
+  if (res.status >= 500) {
+    return new Error(
+      `サーバーエラーが発生しました (${res.status} ${res.statusText})。${detail ? ` [詳細: ${detail}]` : ''}`,
+    );
+  }
+
+  return new Error(
+    detail || `${defaultActionName}に失敗しました (${res.status} ${res.statusText})`,
+  );
+}

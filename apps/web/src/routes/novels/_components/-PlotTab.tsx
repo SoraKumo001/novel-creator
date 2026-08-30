@@ -236,7 +236,13 @@ export function PlotTab({
           >
             <span>📋</span>
             <span>章・節の構成</span>
-            <span className="rounded-full bg-surface/50 px-1.5 py-0.2 text-[10px]">
+            <span
+              className={`rounded-full px-1.5 py-0.2 text-[10px] font-medium ${
+                viewMode === 'structure'
+                  ? 'bg-primary-foreground/20 text-primary-foreground'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
               {chapters.length}
             </span>
           </button>
@@ -251,7 +257,13 @@ export function PlotTab({
           >
             <span>🗺️</span>
             <span>ストーリー構想・あらすじ相談</span>
-            <span className="rounded bg-amber-500/20 px-1.5 py-0.2 text-[10px] text-amber-700 dark:text-amber-300 font-medium">
+            <span
+              className={`rounded px-1.5 py-0.2 text-[10px] font-medium ${
+                viewMode === 'story_outline'
+                  ? 'bg-primary-foreground/20 text-primary-foreground'
+                  : 'bg-primary/10 text-primary'
+              }`}
+            >
               Markdown
             </span>
           </button>

@@ -71,6 +71,13 @@
       "when": 1788081644896,
       "tag": "0009_overjoyed_phantom_reporter",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788094702576,
+      "tag": "0010_small_leo",
+      "breakpoints": true
     }
   ]
 }

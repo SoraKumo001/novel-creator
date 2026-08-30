@@ -9,6 +9,7 @@ import { Loading } from '@/components/Loading.js';
 import { useMarkdownEntityEditor } from '@/hooks/useMarkdownEntityEditor.js';
 import { useChat } from '@/hooks/useChat.js';
 import { useToast } from '@/hooks/useToast.js';
+import { toErrorMessage } from '@/lib/errors.js';
 import { MonacoEditor } from './-MonacoEditor.js';
 
 export interface EntityMarkdownEditorProps<TSection extends { category: string; name: string }> {
@@ -94,6 +95,7 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
 
   const { openChat } = useChat();
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const toast = useToast();
   const runStartedAtRef = useRef<number>(Date.now());
 
@@ -129,6 +131,7 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
       return;
     }
 
+    setAiError(null);
     runStartedAtRef.current = Date.now();
     try {
       if (editScope === 'document') {
@@ -154,7 +157,9 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
       setMarkdown(nextSummary);
       toast.success(`「${activeSection.name}」のAI編集が完了しました`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '編集に失敗しました');
+      const errMsg = toErrorMessage(e);
+      setAiError(errMsg);
+      toast.error(errMsg);
     }
   }, [
     activeSection,
@@ -312,7 +317,10 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
                     : (documentPlaceholder ?? '全体への指示')
                 }
                 value={instruction}
-                onChange={(e) => setInstruction(e.target.value)}
+                onChange={(e) => {
+                  setInstruction(e.target.value);
+                  if (aiError) setAiError(null);
+                }}
                 disabled={isBusy}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -331,6 +339,28 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
               LLMで編集
             </Button>
           </div>
+
+          {aiError && (
+            <div className="flex items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive animate-in fade-in duration-200">
+              <div className="flex items-start gap-2 min-w-0">
+                <span className="text-base shrink-0 leading-none">⚠️</span>
+                <div className="space-y-1 min-w-0">
+                  <div className="font-bold">AI編集エラーが発生しました</div>
+                  <p className="whitespace-pre-wrap leading-relaxed break-words font-mono text-[11px] opacity-95">
+                    {aiError}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAiError(null)}
+                className="shrink-0 rounded p-1 text-destructive/70 hover:text-destructive hover:bg-destructive/10 transition cursor-pointer"
+                title="エラー表示を閉じる"
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {isBusy && (
             <AIProgressIndicator

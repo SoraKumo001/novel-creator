@@ -9,6 +9,7 @@ import {
 import { Button } from '@/components/Button.js';
 import { Modal } from '@/components/Modal.js';
 import { useToast } from '@/hooks/useToast.js';
+import { toErrorMessage } from '@/lib/errors.js';
 import {
   editStoryOutlineDocument,
   editStoryOutlineSection,
@@ -137,7 +138,7 @@ export function StoryOutlineMarkdownEditor({
       setPlotPreview(result);
       setSelectedPlotIndices(new Set(result.chapters.map((_, i) => i)));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'プロット生成に失敗しました';
+      const msg = toErrorMessage(err);
       toast.error(msg);
     } finally {
       setGeneratingPlot(false);

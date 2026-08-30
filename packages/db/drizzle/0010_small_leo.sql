@@ -1,0 +1,1 @@
+ALTER TABLE "novels" ADD COLUMN "story_outline" text;

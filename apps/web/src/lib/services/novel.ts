@@ -1,3 +1,4 @@
+import { parseResponseError } from '@/lib/errors.js';
 import { apiClient } from '../api-client.js';
 import type { CreateNovelInput, Novel, NovelDetail, UpdateNovelInput } from '../types.js';
 
@@ -106,7 +107,7 @@ export async function fetchStoryOutline(id: string): Promise<string> {
   const res = await apiClient.novels[':id']['story-outline'].markdown.$get({
     param: { id },
   });
-  if (!res.ok) throw new Error('Failed to fetch story outline');
+  if (!res.ok) throw await parseResponseError(res, 'ストーリー構想の取得');
   const data = await res.json();
   return data.markdown;
 }
@@ -116,7 +117,7 @@ export async function saveStoryOutline(id: string, markdown: string): Promise<No
     param: { id },
     json: { markdown },
   });
-  if (!res.ok) throw new Error('Failed to save story outline');
+  if (!res.ok) throw await parseResponseError(res, 'ストーリー構想の保存');
   const data = await res.json();
   return {
     id: data.novel.id,
@@ -149,7 +150,7 @@ export async function editStoryOutlineSection(
       modelConfigId: params.modelConfigId ?? undefined,
     },
   });
-  if (!res.ok) throw new Error('Failed to edit story outline section');
+  if (!res.ok) throw await parseResponseError(res, 'セクションのAI編集');
   const data = await res.json();
   return data.content;
 }
@@ -170,7 +171,7 @@ export async function editStoryOutlineDocument(
       modelConfigId: params.modelConfigId ?? undefined,
     },
   });
-  if (!res.ok) throw new Error('Failed to edit story outline document');
+  if (!res.ok) throw await parseResponseError(res, '全体のAI編集');
   const data = await res.json();
   return data.markdown;
 }
@@ -193,7 +194,7 @@ export async function generatePlotFromStoryOutline(
       modelConfigId: params.modelConfigId ?? undefined,
     },
   });
-  if (!res.ok) throw new Error('Failed to generate plot from story outline');
+  if (!res.ok) throw await parseResponseError(res, '章立て（プロット）の自動設計');
   return res.json();
 }
 

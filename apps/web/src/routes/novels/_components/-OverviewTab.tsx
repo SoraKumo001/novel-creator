@@ -331,9 +331,7 @@ export function OverviewTab({
         {novel.storyOutline?.trim() ? (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-md bg-amber-500/10 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300 border border-amber-500/20">
-                Markdown構想作成済み（{novel.storyOutline.length.toLocaleString()}文字）
-              </span>
+              <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary border border-primary/20"></span>
               <span className="text-xs text-muted-foreground">
                 AIチャット相談・セクション推敲・章立て展開と連動中
               </span>
