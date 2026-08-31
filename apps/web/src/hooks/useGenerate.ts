@@ -48,9 +48,10 @@ interface UseGenerateReturn {
   inlineAssist: (
     sectionId: string,
     input: InlineAssistInput,
-    onChunk: (text: string) => void,
+    onChunk: (text: string, variant: number) => void,
     signal?: AbortSignal,
   ) => Promise<void>;
+
   analyzeImpact: (
     novelId: string,
     input: {
@@ -200,7 +201,7 @@ export function useGenerate(): UseGenerateReturn {
     async (
       sectionId: string,
       input: InlineAssistInput,
-      onChunk: (text: string) => void,
+      onChunk: (text: string, variant: number) => void,
       signal?: AbortSignal,
     ) => {
       setInlineAssisting(true);
@@ -210,9 +211,9 @@ export function useGenerate(): UseGenerateReturn {
       setStreamError(null);
       const sig = createSignal(signal);
 
-      const countingOnChunk = (text: string) => {
+      const countingOnChunk = (text: string, variant: number) => {
         setGeneratedChars((prev) => prev + text.length);
-        onChunk(text);
+        onChunk(text, variant);
       };
 
       try {

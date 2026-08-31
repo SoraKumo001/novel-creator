@@ -19,6 +19,7 @@ import timelinesRouter from './routes/timelines.js';
 import foreshadowingsRouter from './routes/foreshadowings.js';
 import embeddingConfigsRouter from './routes/embedding-configs.js';
 import vectorRouter from './routes/vector.js';
+import { customPromptsRouter } from './routes/custom-prompts.js';
 
 // API ルーター定義
 export const api = new Hono<AppContext>()
@@ -36,7 +37,8 @@ export const api = new Hono<AppContext>()
   .route('/vector', vectorRouter)
   .route('/chat', chatRouter)
   .route('/backup', backupRouter)
-  .route('/histories', historiesRouter);
+  .route('/histories', historiesRouter)
+  .route('/custom-prompts', customPromptsRouter);
 
 // Hono RPC 用のアプリケーション型定義
 export type ApiType = typeof api;

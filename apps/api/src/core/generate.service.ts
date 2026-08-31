@@ -8,6 +8,7 @@ import {
   novels,
   sections,
   timelines,
+  customPrompts,
 } from '@novel-creator/db';
 import {
   analyzeSettingImpactPrompt,
@@ -291,10 +292,12 @@ export class GenerateDomainService {
       selectedText: string;
       action: InlineAssistAction;
       customInstruction?: string;
+      customPromptId?: string | null;
       surroundingText?: string;
       modelConfigId?: string | null;
+      variantCount?: number;
     },
-  ) {
+  ): AsyncIterable<{ text: string; variant: number }> {
     const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
     assertFound(section, 'Section not found');
     const [chapter] = await this.ctx.db
@@ -313,21 +316,117 @@ export class GenerateDomainService {
           { query: input.selectedText },
           this.ctx.env,
         )
-      : { characters: [] };
+      : { characters: [], settings: [] };
 
-    const prompt = inlineAssistPrompt({
-      novelTitle: novel?.title,
-      styleGuide: novel?.styleGuide ?? undefined,
-      characters: context.characters.join('\n'),
-      surroundingText: input.surroundingText,
-      selectedText: input.selectedText,
-      action: input.action,
-      customInstruction: input.customInstruction,
-    });
+    let action = input.action;
+    let customTemplate: string | undefined;
 
+    if (input.customPromptId) {
+      const [promptRecord] = await this.ctx.db
+        .select()
+        .from(customPrompts)
+        .where(eq(customPrompts.id, input.customPromptId));
+      if (promptRecord) {
+        action = 'template';
+        customTemplate = promptRecord.userPrompt;
+      }
+    }
+
+    const totalVariants = Math.max(1, Math.min(3, input.variantCount ?? 1));
     const llm = await this.resolveModel(input.modelConfigId);
-    for await (const chunk of streamText(llm, prompt)) {
-      yield chunk;
+
+    // 単一生成の場合
+    if (totalVariants === 1) {
+      const prompt = inlineAssistPrompt({
+        novelTitle: novel?.title,
+        chapterTitle: chapter?.title,
+        sectionTitle: section.title ?? undefined,
+        sectionSummary: section.summary ?? undefined,
+        styleGuide: novel?.styleGuide ?? undefined,
+        characters: context.characters.join('\n'),
+        settings: context.settings.join('\n'),
+        surroundingText: input.surroundingText,
+        selectedText: input.selectedText,
+        action,
+        customInstruction: input.customInstruction,
+        customTemplate,
+        variantIndex: 1,
+        totalVariants: 1,
+      });
+
+      for await (const chunk of streamText(llm, prompt)) {
+        yield { text: chunk, variant: 0 };
+      }
+      return;
+    }
+
+    // 複数バリエーション並列生成の場合
+    type VariantChunk = { text: string; variant: number } | { error: unknown } | null;
+    const queue: VariantChunk[] = [];
+    let resolveNext: (() => void) | null = null;
+    let activeTasks = totalVariants;
+
+    const pushItem = (item: VariantChunk) => {
+      queue.push(item);
+      if (resolveNext) {
+        const r = resolveNext;
+        resolveNext = null;
+        r();
+      }
+    };
+
+    for (let v = 0; v < totalVariants; v++) {
+      const variantIndex = v + 1;
+      const prompt = inlineAssistPrompt({
+        novelTitle: novel?.title,
+        chapterTitle: chapter?.title,
+        sectionTitle: section.title ?? undefined,
+        sectionSummary: section.summary ?? undefined,
+        styleGuide: novel?.styleGuide ?? undefined,
+        characters: context.characters.join('\n'),
+        settings: context.settings.join('\n'),
+        surroundingText: input.surroundingText,
+        selectedText: input.selectedText,
+        action,
+        customInstruction: input.customInstruction,
+        customTemplate,
+        variantIndex,
+        totalVariants,
+      });
+
+      (async () => {
+        try {
+          for await (const chunk of streamText(llm, prompt)) {
+            pushItem({ text: chunk, variant: v });
+          }
+        } catch (err) {
+          pushItem({ error: err });
+        } finally {
+          activeTasks--;
+          if (activeTasks === 0) {
+            pushItem(null); // 終了シグナル
+          }
+        }
+      })();
+    }
+
+    while (true) {
+      if (queue.length === 0) {
+        await new Promise<void>((r) => {
+          resolveNext = r;
+        });
+      }
+
+      const item = queue.shift();
+      if (item === null) {
+        break;
+      }
+      if (item && 'error' in item) {
+        throw item.error;
+      }
+      if (item && 'text' in item) {
+        yield item;
+      }
     }
   }
 

@@ -14,6 +14,7 @@ import type {
   LlmInstruction,
   ChatSession,
   ChatMessageItem,
+  CustomPrompt,
 } from '@novel-creator/shared/schemas';
 
 export type {
@@ -29,6 +30,7 @@ export type {
   LlmInstruction,
   ChatSession,
   ChatMessageItem,
+  CustomPrompt,
 };
 
 export interface CreateForeshadowingInput {
@@ -432,14 +434,37 @@ export interface ReindexProgressEvent {
 
 // ---- インラインAIアシスト ----
 export type InlineAssistAction =
-  'expand' | 'shorten' | 'emotional' | 'dialogue' | 'paraphrase' | 'custom';
+  'expand' | 'shorten' | 'emotional' | 'dialogue' | 'paraphrase' | 'custom' | 'template';
 
 export interface InlineAssistInput {
   selectedText: string;
   action: InlineAssistAction;
   customInstruction?: string;
+  customPromptId?: string | null;
   surroundingText?: string;
   modelConfigId?: string | null;
+  variantCount?: number;
+}
+
+export interface CreateCustomPromptInput {
+  novelId?: string | null;
+  name: string;
+  description?: string | null;
+  icon?: string | null;
+  category?: 'inline' | 'generation' | 'chat' | 'general';
+  systemPrompt?: string | null;
+  userPrompt: string;
+  order?: number;
+}
+
+export interface UpdateCustomPromptInput {
+  name?: string;
+  description?: string | null;
+  icon?: string | null;
+  category?: 'inline' | 'generation' | 'chat' | 'general';
+  systemPrompt?: string | null;
+  userPrompt?: string;
+  order?: number;
 }
 
 // ---- 口調・一貫性チェック ----

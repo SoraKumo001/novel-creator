@@ -61,3 +61,8 @@ export {
   editStoryOutlineDocument,
   generatePlotFromStoryOutline,
 } from './prompts/index.js';
+export {
+  renderPromptTemplate,
+  AVAILABLE_PROMPT_VARIABLES,
+  type TemplateVariables,
+} from './templateEngine.js';

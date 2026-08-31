@@ -130,3 +130,18 @@ export const chatMessageSchema = z.object({
 export type ChatMessage = z.infer<typeof chatMessageSchema>;
 /** web 側の型名（ChatMessageItem）に合わせたエイリアス */
 export type ChatMessageItem = ChatMessage;
+
+export const customPromptSchema = z.object({
+  id: z.string(),
+  novelId: z.string().nullable(),
+  name: z.string(),
+  description: z.string().nullable(),
+  icon: z.string().nullable(),
+  category: z.enum(['inline', 'generation', 'chat', 'general']),
+  systemPrompt: z.string().nullable(),
+  userPrompt: z.string(),
+  order: z.number(),
+  createdAt: isoDateOrNull,
+  updatedAt: isoDateOrNull,
+});
+export type CustomPrompt = z.infer<typeof customPromptSchema>;

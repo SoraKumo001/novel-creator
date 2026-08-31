@@ -78,6 +78,13 @@
       "when": 1788094702576,
       "tag": "0010_small_leo",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1788177136769,
+      "tag": "0011_wakeful_solo",
+      "breakpoints": true
     }
   ]
 }

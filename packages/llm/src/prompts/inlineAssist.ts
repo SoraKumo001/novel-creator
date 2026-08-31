@@ -1,19 +1,29 @@
+import { renderPromptTemplate } from '../templateEngine.js';
+
 export type InlineAssistAction =
   | 'expand' // 描写・五感・情景を膨らませる
   | 'shorten' // 簡潔・スピーディーに
   | 'emotional' // 感情・心理描写を高める
   | 'dialogue' // セリフをより生き生きと・テンポよく
   | 'paraphrase' // 別の表現・言い回し
-  | 'custom'; // 自由な指示
+  | 'custom' // 自由な指示
+  | 'template'; // カスタムテンプレート
 
 export interface InlineAssistContext {
   novelTitle?: string;
+  chapterTitle?: string;
+  sectionTitle?: string;
+  sectionSummary?: string;
   characters?: string;
+  settings?: string;
   styleGuide?: string;
   surroundingText?: string;
   selectedText: string;
   action: InlineAssistAction;
   customInstruction?: string;
+  customTemplate?: string;
+  variantIndex?: number;
+  totalVariants?: number;
 }
 
 const ACTION_DESCRIPTIONS: Record<InlineAssistAction, string> = {
@@ -25,12 +35,45 @@ const ACTION_DESCRIPTIONS: Record<InlineAssistAction, string> = {
     '登場人物の内面心理、葛藤、微細な感情の揺れ動きを深く描き込む表現に書き換えてください。',
   dialogue:
     'キャラクターの個性や口調を際立たせ、会話の掛け合いをテンポよく魅力的に書き換えてください。',
-  paraphrase:
-    '同じ意味合いを別の表現や比喩、文学的な言い回しを用いて魅力的に書き換えてください。3パターンの候補を提示するのではなく、最も完成度の高い1つの文章を出力してください。',
+  paraphrase: '同じ意味合いを別の表現や比喩、文学的な言い回しを用いて魅力的に書き換えてください。',
   custom: '作家からの個別指示に従って書き換えてください。',
+  template: '指定されたカスタムプロンプトテンプレートに従って推敲・書き換えを行ってください。',
+};
+
+const VARIANT_HINTS: Record<number, string> = {
+  1: '【バリエーション方針 案1】文脈に忠実で最も自然かつ王道なバランスの取れた表現にしてください。',
+  2: '【バリエーション方針 案2】より感情やドラマ性・空気感を際立たせ、印象的な表現・語彙を使ってください。',
+  3: '【バリエーション方針 案3】テンポ感やリズムを重視し、キレのあるダイナミックな表現にしてください。',
 };
 
 export function inlineAssistPrompt(context: InlineAssistContext): string {
+  // カスタムテンプレートが指定されている場合はテンプレートエンジンで変数展開
+  if (context.action === 'template' && context.customTemplate) {
+    let rendered = renderPromptTemplate(context.customTemplate, {
+      selectedText: context.selectedText,
+      surroundingText: context.surroundingText,
+      novelTitle: context.novelTitle,
+      chapterTitle: context.chapterTitle,
+      sectionTitle: context.sectionTitle,
+      sectionSummary: context.sectionSummary,
+      characters: context.characters,
+      settings: context.settings,
+      styleGuide: context.styleGuide,
+      instruction: context.customInstruction,
+      customInstruction: context.customInstruction,
+      variantIndex: context.variantIndex,
+    });
+
+    if (context.totalVariants && context.totalVariants > 1 && context.variantIndex) {
+      const hint =
+        VARIANT_HINTS[context.variantIndex] ||
+        `【バリエーション 案${context.variantIndex}】他の候補と表現や語彙の切り口を変えてください。`;
+      rendered = `${hint}\n\n${rendered}`;
+    }
+
+    return rendered;
+  }
+
   let prompt = `あなたはプロの小説執筆アシスタントです。
 作家が執筆中の小説本文の一部（選択範囲）に対して、指定された方針で推敲・書き換え・加筆を行ってください。
 
@@ -41,6 +84,12 @@ export function inlineAssistPrompt(context: InlineAssistContext): string {
 - ルビ記法（|漢字《かんじ》）が含まれる場合は適切に保持・活用してください。
 
 `;
+
+  if (context.totalVariants && context.totalVariants > 1 && context.variantIndex) {
+    const hint =
+      VARIANT_HINTS[context.variantIndex] || `【バリエーション 案${context.variantIndex}】`;
+    prompt += `${hint}\n\n`;
+  }
 
   if (context.novelTitle) {
     prompt += `■ 作品タイトル: ${context.novelTitle}\n`;
@@ -56,7 +105,7 @@ export function inlineAssistPrompt(context: InlineAssistContext): string {
   }
 
   prompt += `■ 指針: ${ACTION_DESCRIPTIONS[context.action]}\n`;
-  if (context.action === 'custom' && context.customInstruction) {
+  if ((context.action === 'custom' || context.customInstruction) && context.customInstruction) {
     prompt += `■ 作家からの指示: ${context.customInstruction}\n`;
   }
 

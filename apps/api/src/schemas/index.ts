@@ -389,10 +389,20 @@ export const generatePlotBodySchema = z.object({
 
 export const inlineAssistBodySchema = z.object({
   selectedText: z.string().min(1),
-  action: z.enum(['expand', 'shorten', 'emotional', 'dialogue', 'paraphrase', 'custom']),
+  action: z.enum([
+    'expand',
+    'shorten',
+    'emotional',
+    'dialogue',
+    'paraphrase',
+    'custom',
+    'template',
+  ]),
   customInstruction: z.string().optional(),
+  customPromptId: z.string().uuid().optional().nullable(),
   surroundingText: z.string().optional(),
   modelConfigId: z.string().uuid().optional().nullable(),
+  variantCount: z.coerce.number().int().min(1).max(3).optional().default(1),
 });
 
 export const checkCharacterVoiceBodySchema = z.object({
@@ -422,6 +432,35 @@ export const multiPersonaReviewBodySchema = z.object({
 
 export const generateStyleGuideDraftBodySchema = z.object({
   modelConfigId: z.string().uuid().optional().nullable(),
+});
+
+// ---- カスタムプロンプト ----
+export const promptCategorySchema = z.enum(['inline', 'generation', 'chat', 'general']);
+
+export const listCustomPromptsQuerySchema = z.object({
+  novelId: z.string().uuid().optional().nullable(),
+  category: promptCategorySchema.optional(),
+});
+
+export const createCustomPromptSchema = z.object({
+  novelId: z.string().uuid().optional().nullable(),
+  name: z.string().min(1),
+  description: z.string().optional().nullable(),
+  icon: z.string().optional().nullable(),
+  category: promptCategorySchema.optional().default('inline'),
+  systemPrompt: z.string().optional().nullable(),
+  userPrompt: z.string().min(1),
+  order: z.number().int().optional().default(0),
+});
+
+export const updateCustomPromptSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  icon: z.string().nullable().optional(),
+  category: promptCategorySchema.optional(),
+  systemPrompt: z.string().nullable().optional(),
+  userPrompt: z.string().min(1).optional(),
+  order: z.number().int().optional(),
 });
 
 // ---- 履歴 ----

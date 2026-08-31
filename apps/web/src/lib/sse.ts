@@ -42,14 +42,14 @@ export async function streamGenerateContent(
 export async function streamInlineAssist(
   sectionId: string,
   input: InlineAssistInput,
-  onChunk: (text: string) => void,
+  onChunk: (text: string, variant: number) => void,
   signal?: AbortSignal,
 ): Promise<void> {
   try {
     for await (const chunk of inlineAssistSectionContent(sectionId, input, signal)) {
       if (signal?.aborted) break;
-      if (chunk) {
-        onChunk(chunk);
+      if (chunk && chunk.text) {
+        onChunk(chunk.text, chunk.variant ?? 0);
       }
     }
   } catch (err) {

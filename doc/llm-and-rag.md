@@ -157,3 +157,45 @@ export async function upsertEntityEmbedding(
 | **`extractSettingsPrompt` / `extractTimelinePrompt`**         | 執筆された本文を解析し、登場した新情報や時系列イベントを抽出                   | JSON 構造化データ（整合性同期用）     |
 | **`editCharacterSectionPrompt` / `editSettingSectionPrompt`** | Markdown の特定セクションに対して自然言語指示で部分修正                        | 修正後のセクション Markdown           |
 | **`createCharacterDraftPrompt` / `createSettingDraftPrompt`** | 名前や簡単な要望から、人物や設定の詳細な初期ドラフトを自動生成                 | 生成された人物・設定詳細データ        |
+
+---
+
+## 5. カスタムプロンプトエンジン & バリエーション並列生成
+
+### 5.1 プロンプトテンプレートエンジン (`packages/llm/src/templateEngine.ts`)
+
+作家が自由に定義したプロンプトテンプレートに対して、エディタの動的コンテキスト（選択テキスト、前後文脈、関連人物、世界観設定、文体ガイド等）を安全にバインド・展開します。
+
+- **サポートするプレースホルダー変数**:
+  - `{selectedText}`: エディタ上で範囲選択中のテキスト
+  - `{surroundingText}`: 選択範囲の前後の文脈（直前・直後の段落）
+  - `{instruction}` / `{customInstruction}`: 実行時に入力された自由指示
+  - `{novelTitle}` / `{sectionTitle}` / `{sectionSummary}`: 作品・章節のメタ情報
+  - `{characters}` / `{settings}`: RAG セマンティック検索で抽出された関連人物・世界観設定
+  - `{styleGuide}`: 作品全体の執筆スタイル・文体ガイドライン
+
+### 5.2 バリエーション並列生成と SSE ストリーム多重化
+
+1 回の推敲指示に対して最大 3 つの異なるアプローチ（案 1: 王道バランス、案 2: ドラマ・感情強調、案 3: テンポ感重視など）を並列で実行・ストリーミング配信します。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UI as Web Client (InlineAIAssistant)
+    participant API as API Server (/generate/inline-assist)
+    participant LLM as Language Model (Parallel streamText)
+
+    UI->>API: POST /inline-assist { variantCount: 2, action, ... }
+    par バリエーション 1 (案1)
+        API->>LLM: streamText(llm, promptVariant1)
+    and バリエーション 2 (案2)
+        API->>LLM: streamText(llm, promptVariant2)
+    end
+    Note over API,UI: SSE 多重化ストリーミング
+    LLM-->>API: 案1 チャンク "彼"
+    API-->>UI: data: {"text": "彼", "variant": 0}
+    LLM-->>API: 案2 チャンク "静寂を"
+    API-->>UI: data: {"text": "静寂を", "variant": 1}
+    API-->>UI: data: {"done": true}
+    Note over UI: タブ / 並列比較 (Split View) で描画 & 選択採用
+```

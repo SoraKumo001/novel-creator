@@ -13,3 +13,4 @@ export * from './backup.service.js';
 export * from './history.service.js';
 export * from './foreshadowing.service.js';
 export * from './llm-config.service.js';
+export * from './custom-prompt.service.js';

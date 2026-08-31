@@ -28,7 +28,9 @@ interface EditorToolbarProps {
   onOpenProofread: () => void;
   onOpenChat?: () => void;
   onOpenStyleGuide?: () => void;
+  onOpenCustomPrompts?: () => void;
   onSave: () => void;
+
   isReferencePanelOpen?: boolean;
   onToggleReferencePanel?: () => void;
 }
@@ -57,8 +59,10 @@ export function EditorToolbar({
   onOpenProofread,
   onOpenChat,
   onOpenStyleGuide,
+  onOpenCustomPrompts,
   onSave,
   isReferencePanelOpen,
+
   onToggleReferencePanel,
 }: EditorToolbarProps) {
   const [isEditingTarget, setIsEditingTarget] = useState(false);
@@ -292,6 +296,25 @@ export function EditorToolbar({
                       <div className="font-semibold">チャットで相談・壁打ち</div>
                       <div className="text-[10px] text-muted-foreground">
                         この話の展開や設定をAIと相談
+                      </div>
+                    </div>
+                  </button>
+                )}
+
+                {onOpenCustomPrompts && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiMenuOpen(false);
+                      onOpenCustomPrompts();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs text-foreground hover:bg-surface-raised transition cursor-pointer text-left"
+                  >
+                    <span className="text-base">🪄</span>
+                    <div>
+                      <div className="font-semibold">カスタムプロンプト管理</div>
+                      <div className="text-[10px] text-muted-foreground">
+                        推敲・生成プロンプトの作成・編集
                       </div>
                     </div>
                   </button>

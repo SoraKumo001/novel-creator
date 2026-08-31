@@ -16,6 +16,7 @@ erDiagram
     novels ||--o{ chat_sessions : "has"
     novels ||--o{ llm_instructions : "has"
     novels ||--o{ edit_histories : "has"
+    novels ||--o{ custom_prompts : "has (optional)"
 
     chapters ||--o{ sections : "has"
     sections ||--o| contents : "has"
@@ -134,6 +135,20 @@ erDiagram
         text after_text
         text prompt
         timestamp created_at
+    }
+
+    custom_prompts {
+        uuid id PK
+        uuid novel_id FK "Nullable (NULL=Global)"
+        text name
+        text description
+        text icon
+        text category "inline | generation | chat | general"
+        text system_prompt
+        text user_prompt
+        integer order
+        timestamp created_at
+        timestamp updated_at
     }
 ```
 

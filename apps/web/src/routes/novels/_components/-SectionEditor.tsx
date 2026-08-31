@@ -8,7 +8,9 @@ import { CharacterVoiceCheckerModal } from '@/components/CharacterVoiceCheckerMo
 import { MultiPersonaReviewModal } from '@/components/MultiPersonaReviewModal.js';
 import { StyleGuideModal } from '@/components/StyleGuideModal.js';
 import { InlineAIAssistant } from '@/components/InlineAIAssistant.js';
+import { CustomPromptManagerModal } from '@/components/CustomPromptManagerModal.js';
 import { useContent } from '@/hooks/useContent.js';
+
 import { useAnalysis } from '@/hooks/useAnalysis.js';
 import { useGenerate } from '@/hooks/useGenerate.js';
 import { useChat } from '@/hooks/useChat.js';
@@ -114,8 +116,10 @@ export function SectionEditor({
 
   // インラインAI支援用ステート
   const [selectedText, setSelectedText] = useState('');
-  const [inlineGeneratedText, setInlineGeneratedText] = useState('');
+  const [inlineVariants, setInlineVariants] = useState<string[]>(['']);
+  const [activeVariantIndex, setActiveVariantIndex] = useState(0);
   const [isInlineActive, setIsInlineActive] = useState(false);
+  const [customPromptManagerOpen, setCustomPromptManagerOpen] = useState(false);
 
   const toast = useToast();
 
@@ -339,10 +343,16 @@ export function SectionEditor({
   const handleExecuteInlineAssist = async (
     action: InlineAssistAction,
     customInstruction?: string,
+    customPromptId?: string | null,
+    variantCount: number = 1,
   ) => {
     if (!selectedText) return;
-    setInlineGeneratedText('');
-    let acc = '';
+    const count = Math.max(1, Math.min(3, variantCount));
+    const initialVariants = Array.from({ length: count }, () => '');
+    setInlineVariants(initialVariants);
+    setActiveVariantIndex(0);
+    const accVariants = [...initialVariants];
+
     try {
       await inlineAssist(
         section.id,
@@ -350,11 +360,17 @@ export function SectionEditor({
           selectedText,
           action,
           customInstruction,
+          customPromptId,
           modelConfigId: selectedModelConfigId,
+          variantCount: count,
         },
-        (chunk) => {
-          acc += chunk;
-          setInlineGeneratedText(acc);
+        (chunk, variantIndex) => {
+          const idx =
+            typeof variantIndex === 'number' && variantIndex >= 0 && variantIndex < count
+              ? variantIndex
+              : 0;
+          accVariants[idx] = (accVariants[idx] || '') + chunk;
+          setInlineVariants([...accVariants]);
         },
       );
     } catch (e) {
@@ -369,7 +385,8 @@ export function SectionEditor({
     setLocalBody(newBody);
     setIsInlineActive(false);
     setSelectedText('');
-    setInlineGeneratedText('');
+    setInlineVariants(['']);
+    setActiveVariantIndex(0);
     toast.success('選択範囲を書き換えました');
   };
 
@@ -383,7 +400,8 @@ export function SectionEditor({
       setLocalBody(newBody);
       setIsInlineActive(false);
       setSelectedText('');
-      setInlineGeneratedText('');
+      setInlineVariants(['']);
+      setActiveVariantIndex(0);
       toast.success('直後にテキストを挿入しました');
     }
   };
@@ -428,6 +446,7 @@ export function SectionEditor({
         onOpenProofread={() => void handleOpenProofread()}
         onOpenChat={() => handleOpenChat(false)}
         onOpenStyleGuide={() => setStyleGuideOpen(true)}
+        onOpenCustomPrompts={() => setCustomPromptManagerOpen(true)}
         onSave={() => void handleSave()}
       />
 
@@ -486,9 +505,10 @@ export function SectionEditor({
 
             {/* インラインAIアシスタントパネル */}
             {isInlineActive && (
-              <div className="absolute top-4 right-8 z-40 w-96 max-w-[calc(100%-4rem)]">
+              <div className="absolute top-4 right-8 z-40 w-[30rem] max-w-[calc(100%-4rem)]">
                 <InlineAIAssistant
                   selectedText={selectedText}
+                  novelId={novelId}
                   onApplyReplace={handleApplyInlineReplace}
                   onApplyInsertAfter={handleApplyInlineInsertAfter}
                   onCancel={() => {
@@ -496,12 +516,16 @@ export function SectionEditor({
                       cancelGeneration();
                     }
                     setIsInlineActive(false);
-                    setInlineGeneratedText('');
+                    setInlineVariants(['']);
+                    setActiveVariantIndex(0);
                   }}
                   onExecuteAssist={handleExecuteInlineAssist}
+                  onOpenPromptManager={() => setCustomPromptManagerOpen(true)}
                   isLoading={inlineAssisting}
                   startedAt={inlineAssisting ? generateStartedAt : null}
-                  generatedText={inlineGeneratedText}
+                  variants={inlineVariants}
+                  activeVariantIndex={activeVariantIndex}
+                  onSelectVariantIndex={setActiveVariantIndex}
                 />
               </div>
             )}
@@ -592,6 +616,11 @@ export function SectionEditor({
         initialStyleGuide={novel?.styleGuide}
         onSave={handleSaveStyleGuide}
         saving={updatingNovel}
+      />
+      <CustomPromptManagerModal
+        open={customPromptManagerOpen}
+        onClose={() => setCustomPromptManagerOpen(false)}
+        novelId={novelId}
       />
     </div>
   );

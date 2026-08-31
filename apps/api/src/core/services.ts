@@ -16,6 +16,7 @@ import { ForeshadowingDomainService } from './foreshadowing.service.js';
 import { LlmConfigDomainService } from './llm-config.service.js';
 import { EmbeddingConfigDomainService } from './embedding-config.service.js';
 import { ReindexDomainService } from './reindex.service.js';
+import { CustomPromptDomainService } from './custom-prompt.service.js';
 
 export interface DomainServices {
   novel: NovelDomainService;
@@ -35,6 +36,7 @@ export interface DomainServices {
   llmConfig: LlmConfigDomainService;
   embeddingConfig: EmbeddingConfigDomainService;
   reindex: ReindexDomainService;
+  customPrompt: CustomPromptDomainService;
 }
 
 export function createDomainServices(ctx: ServiceContext): DomainServices {
@@ -56,6 +58,7 @@ export function createDomainServices(ctx: ServiceContext): DomainServices {
     llmConfig: new LlmConfigDomainService(ctx),
     embeddingConfig: new EmbeddingConfigDomainService(ctx),
     reindex: new ReindexDomainService(ctx),
+    customPrompt: new CustomPromptDomainService(ctx),
   };
 }
 

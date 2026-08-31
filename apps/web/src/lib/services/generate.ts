@@ -159,17 +159,24 @@ export async function extractEntities(
   };
 }
 
+export interface InlineAssistChunk {
+  text: string;
+  variant: number;
+}
+
 export async function* inlineAssistSectionContent(
   sectionId: string,
   input: {
     selectedText: string;
-    action: 'expand' | 'shorten' | 'emotional' | 'dialogue' | 'paraphrase' | 'custom';
+    action: 'expand' | 'shorten' | 'emotional' | 'dialogue' | 'paraphrase' | 'custom' | 'template';
     customInstruction?: string;
+    customPromptId?: string | null;
     surroundingText?: string;
     modelConfigId?: string | null;
+    variantCount?: number;
   },
   signal?: AbortSignal,
-): AsyncIterable<string> {
+): AsyncIterable<InlineAssistChunk> {
   const res = await apiClient.sections[':id'].generate['inline-assist'].$post(
     {
       param: { id: sectionId },
@@ -177,8 +184,10 @@ export async function* inlineAssistSectionContent(
         selectedText: input.selectedText,
         action: input.action,
         customInstruction: input.customInstruction,
+        customPromptId: input.customPromptId || null,
         surroundingText: input.surroundingText,
         modelConfigId: input.modelConfigId || null,
+        variantCount: input.variantCount ?? 1,
       },
     },
     { init: { signal } },
@@ -210,7 +219,9 @@ export async function* inlineAssistSectionContent(
           try {
             const data = JSON.parse(trimmed.slice(6));
             if (data.done) return;
-            if (data.text) yield data.text;
+            if (data.text) {
+              yield { text: data.text, variant: data.variant ?? 0 };
+            }
           } catch {
             // ignore JSON parse error
           }

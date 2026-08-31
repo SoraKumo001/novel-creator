@@ -12,3 +12,4 @@ export * from './foreshadowings.js';
 export * from './llmConfigs.js';
 export * from './embeddingConfigs.js';
 export * from './analysisResults.js';
+export * from './customPrompts.js';

@@ -116,8 +116,10 @@ const sectionsRouter = new Hono<AppContext>()
           selectedText: body.selectedText,
           action: body.action,
           customInstruction: body.customInstruction,
+          customPromptId: body.customPromptId,
           surroundingText: body.surroundingText,
           modelConfigId: body.modelConfigId,
+          variantCount: body.variantCount,
         }),
       );
     },
