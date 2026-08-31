@@ -181,6 +181,7 @@ erDiagram
 | **`chat_sessions`**    | AI 創作相談チャット履歴     | `id` (PK), `novel_id`, `title`, `messages`                                               | チャットのやり取り（ユーザー発言・AI応答・ツール呼び出し引数/結果）を AI SDK Message 形式の JSONB 配列で永続化。 |
 | **`llm_instructions`** | LLM 指示の実行履歴          | `id` (PK), `novel_id`, `instruction_type`, `prompt`, `target_type`, `target_id`          | 過去に実行したプロンプトを記録し、UI 上（`PromptHistoryList`）での再利用や確認に活用。                           |
 | **`edit_histories`**   | 編集差分履歴（Undo/Diff用） | `id` (PK), `novel_id`, `target_type`, `target_id`, `before_text`, `after_text`, `prompt` | AI による一括変更や執筆の変更前・変更後を保存し、`HistoryDiffModal` で視覚的な差分確認・ロールバックを提供。     |
+| **`custom_prompts`**   | カスタムプロンプト設定      | `id` (PK), `novel_id`, `name`, `description`, `icon`, `category`, `user_prompt`, `order` | ユーザー定義のプロンプトテンプレート。作品専用および全作品共通のスコープ管理、変数展開に対応。                   |
 
 ---
 
