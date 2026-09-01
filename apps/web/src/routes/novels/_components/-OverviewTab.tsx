@@ -169,7 +169,7 @@ export function OverviewTab({
   const handleSaveTargetWords = (val: number) => {
     const clamped = Math.max(
       1000,
-      Math.min(1_000_000, isNaN(val) ? 100_000 : val)
+      Math.min(1_000_000, Number.isNaN(val) ? 100_000 : val)
     );
     setTargetWordCount(clamped);
     localStorage.setItem(

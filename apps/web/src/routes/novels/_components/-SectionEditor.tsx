@@ -157,7 +157,10 @@ export function SectionEditor({
   }, [handleSave]);
 
   const handleTargetWordsChange = (val: number) => {
-    const clamped = Math.max(100, Math.min(50_000, isNaN(val) ? 2000 : val));
+    const clamped = Math.max(
+      100,
+      Math.min(50_000, Number.isNaN(val) ? 2000 : val)
+    );
     setTargetWords(clamped);
     localStorage.setItem(
       `novel-creator:target-words:${section.id}`,

@@ -262,7 +262,6 @@ function StatusBadge({ item }: { item: ToolInvocationItem }) {
           <span>実行準備中...</span>
         </span>
       );
-    case "input-available":
     default:
       return (
         <span className="flex items-center gap-1 font-medium text-primary">
