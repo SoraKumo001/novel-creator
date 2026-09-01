@@ -6,6 +6,7 @@ export {
   createEmbeddingModel,
   createLanguageModelFromConfig,
   createEmbeddingModelFromConfig,
+  clearModelCache,
   testLLMConnection,
   testEmbeddingConnection,
   type LLMConfigInput,

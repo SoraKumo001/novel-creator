@@ -93,43 +93,82 @@ function resolveSettings(
 }
 
 /**
- * 指定プロバイダ・設定で LanguageModel を構築する。
+ * 言語モデルおよび埋め込みモデルのインスタンスキャッシュ。
+ * 同一設定（プロバイダ、モデルID、baseURL、apiKey）へのアクセス時に
+ * インスタンス（および内部の HTTP Keep-Alive コネクション）を再利用する。
+ */
+const languageModelCache = new Map<string, LanguageModel>();
+const embeddingModelCache = new Map<string, EmbeddingModel>();
+
+function makeCacheKey(
+  provider: LLMProviderType,
+  model: string,
+  settings: ProviderSettings,
+): string {
+  return `${provider}::${model}::${settings.baseURL ?? ''}::${settings.apiKey ?? ''}`;
+}
+
+/**
+ * キャッシュされた全モデルインスタンスをクリアする（テスト用・設定変更時用）。
+ */
+export function clearModelCache(): void {
+  languageModelCache.clear();
+  embeddingModelCache.clear();
+}
+
+/**
+ * 指定プロバイダ・設定で LanguageModel を構築（キャッシュが存在する場合は再利用）する。
  */
 export function createLanguageModel(
   provider: LLMProviderType,
   model: string,
   settings: ProviderSettings,
 ): LanguageModel {
+  const cacheKey = makeCacheKey(provider, model, settings);
+  const cached = languageModelCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  let instance: LanguageModel;
   switch (provider) {
     case 'openai': {
       const openai = createOpenAI(settings);
       // OpenAI / OpenAI互換エンドポイントともに Responses API（item_reference）ではなく
       // 互換性の高い Chat Completions API（.chat）を使用する
-      return openai.chat(model);
+      instance = openai.chat(model);
+      break;
     }
     case 'anthropic':
-      return createAnthropic(settings)(model);
+      instance = createAnthropic(settings)(model);
+      break;
     case 'ollama': {
       // Ollama / OllamaCloud は OpenAI 互換 API（Chat Completions）を提供するため .chat を使用する。
       const openai = createOpenAI(settings);
-      return openai.chat(model);
+      instance = openai.chat(model);
+      break;
     }
     case 'google':
-      return createGoogleGenerativeAI(settings)(model);
+      instance = createGoogleGenerativeAI(settings)(model);
+      break;
     case 'custom_openai': {
       // OpenRouter, Groq, LM Studio, vLLM などの OpenAI 互換エンドポイント（Chat Completions）
       const openai = createOpenAI(settings);
-      return openai.chat(model);
+      instance = openai.chat(model);
+      break;
     }
     default: {
       const exhaustive: never = provider;
       throw new Error(`Unsupported LLM provider: ${String(exhaustive)}`);
     }
   }
+
+  languageModelCache.set(cacheKey, instance);
+  return instance;
 }
 
 /**
- * 指定プロバイダ・設定で EmbeddingModel を構築する。
+ * 指定プロバイダ・設定で EmbeddingModel を構築（キャッシュが存在する場合は再利用）する。
  *
  * Anthropic は embedding 非対応のため OpenAI にフォールバックする。
  */
@@ -138,9 +177,17 @@ export function createEmbeddingModel(
   model: string,
   settings: ProviderSettings,
 ): EmbeddingModel {
+  const cacheKey = makeCacheKey(provider, model, settings);
+  const cached = embeddingModelCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  let instance: EmbeddingModel;
   switch (provider) {
     case 'openai':
-      return createOpenAI(settings).embedding(model);
+      instance = createOpenAI(settings).embedding(model);
+      break;
     case 'anthropic': {
       // Anthropic は embedding 非対応。OpenAI にフォールバックする。
       if (!settings.apiKey) {
@@ -149,19 +196,26 @@ export function createEmbeddingModel(
             'API キーが設定されていないため embedding は失敗する可能性があります。',
         );
       }
-      return createOpenAI(settings).embedding(model);
+      instance = createOpenAI(settings).embedding(model);
+      break;
     }
     case 'ollama':
-      return createOpenAI(settings).embedding(model);
+      instance = createOpenAI(settings).embedding(model);
+      break;
     case 'google':
-      return createGoogleGenerativeAI(settings).embedding(model);
+      instance = createGoogleGenerativeAI(settings).embedding(model);
+      break;
     case 'custom_openai':
-      return createOpenAI(settings).embedding(model);
+      instance = createOpenAI(settings).embedding(model);
+      break;
     default: {
       const exhaustive: never = provider;
       throw new Error(`Unsupported embedding provider: ${String(exhaustive)}`);
     }
   }
+
+  embeddingModelCache.set(cacheKey, instance);
+  return instance;
 }
 
 /**

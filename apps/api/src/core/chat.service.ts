@@ -377,11 +377,17 @@ export class ChatDomainService {
           .map((p) => (p as { text?: string }).text ?? '')
           .join('');
         try {
+          // 思考プロセス（reasoning）やツール呼び出しパーツ（tool-*）を含めた全 parts を保存
+          const savedParts =
+            responseMessage.parts && responseMessage.parts.length > 0
+              ? JSON.parse(JSON.stringify(responseMessage.parts))
+              : [{ type: 'text', text: fullText }];
+
           await this.ctx.db.insert(chatMessages).values({
             sessionId,
             role: 'assistant',
             content: fullText,
-            parts: [{ type: 'text', text: fullText }],
+            parts: savedParts,
           });
           await this.ctx.db
             .update(chatSessions)

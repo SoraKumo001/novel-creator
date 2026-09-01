@@ -400,7 +400,7 @@ describe('ChatDomainService - 分割された責務のユニットテスト', ()
         sessionId: SESSION_ID,
         role: 'assistant',
         content: 'テスト回答',
-        parts: [{ type: 'text', text: 'テスト回答' }],
+        parts: [{ type: 'text', text: 'テスト回答', state: 'done' }],
       });
 
       const sessionUpdate = updateCalls.find((c) => c.table === chatSessions);

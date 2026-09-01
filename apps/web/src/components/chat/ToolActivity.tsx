@@ -6,6 +6,7 @@ import { ChatProposalCard, type ProposalPayload } from './ChatProposalCard.js';
 /** ツールの日本語表示名マップ */
 const TOOL_LABELS: Record<string, string> = {
   getNovelInfo: '小説情報',
+  getStoryOutline: 'ストーリー構想取得',
   getCharacters: '人物取得',
   getSettings: '設定取得',
   getPlotAndChapters: 'プロット・章構成取得',
@@ -18,11 +19,13 @@ const TOOL_LABELS: Record<string, string> = {
   proposeAddForeshadowing: '伏線登録提案',
   proposeAddTimelineEvent: '年表追加提案',
   proposeUpdatePlot: 'プロット更新提案',
+  proposeUpdateStoryOutline: 'ストーリー構想更新提案',
 };
 
 /** ツール呼び出しの表示用アイコン */
 const TOOL_ICONS: Record<string, string> = {
   getNovelInfo: '📖',
+  getStoryOutline: '📑',
   getCharacters: '🎭',
   getSettings: '🌍',
   getPlotAndChapters: '📑',
@@ -35,6 +38,7 @@ const TOOL_ICONS: Record<string, string> = {
   proposeAddForeshadowing: '💡',
   proposeAddTimelineEvent: '💡',
   proposeUpdatePlot: '💡',
+  proposeUpdateStoryOutline: '💡',
 };
 
 /** AI SDK v7 のツールパーツ（静的 tool-<name> / 動的 dynamic-tool の両方） */
@@ -235,131 +239,255 @@ function StatusBadge({ item }: { item: ToolInvocationItem }) {
   }
 }
 
+export interface ReasoningItem {
+  text: string;
+  state?: 'streaming' | 'done';
+}
+
+/**
+ * UIMessage の parts 配列から思考プロセス（reasoning）を抽出する（純関数）。
+ * AI SDK v7 の parts: { type: 'reasoning', text: string, state?: 'streaming' | 'done' } に対応。
+ */
+export function extractReasoning(parts?: unknown[] | null): ReasoningItem | null {
+  if (!Array.isArray(parts) || parts.length === 0) return null;
+
+  const reasoningParts = parts.filter(
+    (p): p is { type: 'reasoning'; text: string; state?: 'streaming' | 'done' } =>
+      Boolean(
+        p &&
+        typeof p === 'object' &&
+        (p as { type?: unknown }).type === 'reasoning' &&
+        typeof (p as { text?: unknown }).text === 'string',
+      ),
+  );
+
+  if (reasoningParts.length === 0) return null;
+
+  const text = reasoningParts.map((p) => p.text || '').join('');
+  if (!text.trim()) return null;
+
+  const isStreaming = reasoningParts.some((p) => p.state === 'streaming');
+  return {
+    text,
+    state: isStreaming ? 'streaming' : 'done',
+  };
+}
+
+/**
+ * 思考プロセス（Reasoning）の表示用コンポーネント。
+ * ストリーミング中は自動展開でリアルタイムに思考内容を表示し、完了時は折りたたみトグル可能。
+ */
+export function ReasoningActivity({
+  reasoning,
+  defaultExpanded,
+}: {
+  reasoning: ReasoningItem | null;
+  defaultExpanded?: boolean;
+}) {
+  const isStreaming = reasoning?.state === 'streaming';
+  const [isOpen, setIsOpen] = useState<boolean>(() => defaultExpanded ?? isStreaming);
+
+  if (!reasoning || !reasoning.text.trim()) return null;
+
+  // ストリーミング中は常に開く（ユーザーが手動で閉じない限り）
+  const expanded = isStreaming || isOpen;
+
+  return (
+    <div className="mb-2 w-full rounded-xl border border-indigo-200/70 bg-indigo-50/50 text-[12px] shadow-xs backdrop-blur overflow-hidden transition dark:border-indigo-900/50 dark:bg-indigo-950/30">
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-indigo-950 dark:text-indigo-200 hover:bg-indigo-100/50 dark:hover:bg-indigo-900/30 transition cursor-pointer"
+      >
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          <span className={`text-sm shrink-0 ${isStreaming ? 'animate-pulse' : ''}`}>🧠</span>
+          <span className="font-semibold truncate">
+            {isStreaming ? 'AIパートナーが思考中...' : '思考プロセス'}
+          </span>
+          {!isStreaming && (
+            <span className="text-[10px] text-muted-foreground">
+              ({reasoning.text.length.toLocaleString()}文字)
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0 text-[11px]">
+          {isStreaming ? (
+            <span className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-medium">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-indigo-500 animate-ping" />
+              <span>推論中...</span>
+            </span>
+          ) : (
+            <span className="text-muted-foreground text-[10px]">
+              {expanded ? '閉じる' : '表示'}
+            </span>
+          )}
+
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${
+              expanded ? 'rotate-180' : ''
+            }`}
+          >
+            <path
+              fillRule="evenodd"
+              d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-indigo-200/50 bg-background/60 p-3 text-[11px] text-foreground/90 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto font-mono dark:border-indigo-900/40">
+          {reasoning.text}
+          {isStreaming && (
+            <span className="inline-block w-1.5 h-3.5 bg-indigo-500 ml-0.5 animate-pulse align-middle" />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface ToolActivityProps {
-  /** UIMessage の parts 配列（tool パーツのみ抽出して表示する） */
+  /** UIMessage の parts 配列（tool パーツおよび reasoning パーツを抽出して表示する） */
   parts?: unknown[] | null;
-  /** ストリーミング実行中かどうか（現状は state から導出するため未使用 / 将来用） */
+  /** ストリーミング実行中かどうか */
   isStreaming?: boolean;
 }
 
-export function ToolActivity({ parts, isStreaming: _isStreaming }: ToolActivityProps) {
+export function ToolActivity({ parts, isStreaming }: ToolActivityProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const invocations = extractToolInvocations(parts);
+  const reasoning = extractReasoning(parts);
 
-  if (invocations.length === 0) return null;
+  if (invocations.length === 0 && !reasoning) return null;
 
   return (
-    <div className="mb-2 space-y-1.5 w-full max-w-[88%]">
-      {invocations.map((inv) => {
-        const label = toolLabel(inv.toolName);
-        const icon = TOOL_ICONS[inv.toolName] ?? '⚙️';
-        const isExpanded = expandedId === inv.toolCallId;
-        const argsSummary = formatArgsSummary(inv.toolName, inv.input);
-        const hasInput = inv.input !== undefined && inv.input !== null;
-        const hasErrorText = !!inv.errorText;
+    <div className="mb-2 space-y-1.5 w-full">
+      {/* 思考プロセス（Reasoning）の表示 */}
+      {reasoning && <ReasoningActivity reasoning={reasoning} defaultExpanded={isStreaming} />}
 
-        // 展開可能な中身があるときだけアコーディオン化
-        const expandable = hasInput || inv.hasOutput || hasErrorText;
+      {/* ツール実行アクティビティの表示 */}
+      {invocations.length > 0 && (
+        <div className="space-y-1.5">
+          {invocations.map((inv) => {
+            const label = toolLabel(inv.toolName);
+            const icon = TOOL_ICONS[inv.toolName] ?? '⚙️';
+            const isExpanded = expandedId === inv.toolCallId;
+            const argsSummary = formatArgsSummary(inv.toolName, inv.input);
+            const hasInput = inv.input !== undefined && inv.input !== null;
+            const hasErrorText = !!inv.errorText;
 
-        return (
-          <div
-            key={inv.toolCallId}
-            className={`rounded-lg border text-[12px] shadow-xs backdrop-blur overflow-hidden transition ${
-              inv.state === 'output-error'
-                ? 'border-destructive/40 bg-destructive/5'
-                : 'border-border/70 bg-surface/80'
-            }`}
-          >
-            {/* ヘッダー / アコーディオン切り替えボタン */}
-            <button
-              type="button"
-              onClick={() => {
-                if (!expandable) return;
-                setExpandedId(isExpanded ? null : inv.toolCallId);
-              }}
-              className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-foreground transition ${
-                expandable ? 'hover:bg-surface-hover/80 cursor-pointer' : 'cursor-default'
-              }`}
-            >
-              <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <span className="text-sm shrink-0">{icon}</span>
-                <span className="font-medium truncate text-foreground">{label}</span>
+            // 展開可能な中身があるときだけアコーディオン化
+            const expandable = hasInput || inv.hasOutput || hasErrorText;
 
-                {argsSummary && (
-                  <span className="text-[11px] text-muted-foreground truncate max-w-40">
-                    ({argsSummary})
-                  </span>
-                )}
-              </div>
+            return (
+              <div
+                key={inv.toolCallId}
+                className={`rounded-lg border text-[12px] shadow-xs backdrop-blur overflow-hidden transition ${
+                  inv.state === 'output-error'
+                    ? 'border-destructive/40 bg-destructive/5'
+                    : 'border-border/70 bg-surface/80'
+                }`}
+              >
+                {/* ヘッダー / アコーディオン切り替えボタン */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!expandable) return;
+                    setExpandedId(isExpanded ? null : inv.toolCallId);
+                  }}
+                  className={`flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-foreground transition ${
+                    expandable ? 'hover:bg-surface-hover/80 cursor-pointer' : 'cursor-default'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                    <span className="text-sm shrink-0">{icon}</span>
+                    <span className="font-medium truncate text-foreground">{label}</span>
 
-              <div className="flex items-center gap-1.5 shrink-0 text-[11px]">
-                <StatusBadge item={inv} />
+                    {argsSummary && (
+                      <span className="text-[11px] text-muted-foreground truncate max-w-40">
+                        ({argsSummary})
+                      </span>
+                    )}
+                  </div>
 
-                {expandable && (
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${
-                      isExpanded ? 'rotate-180' : ''
-                    }`}
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                )}
-              </div>
-            </button>
+                  <div className="flex items-center gap-1.5 shrink-0 text-[11px]">
+                    <StatusBadge item={inv} />
 
-            {/* 詳細情報（アコーディオン展開時）: input / output を JSON プレビュー */}
-            {isExpanded && expandable && (
-              <div className="border-t border-border/50 bg-background/50 p-2.5 space-y-2 text-[11px] font-mono">
-                {hasInput && (
-                  <div>
-                    <span className="text-muted-foreground font-sans font-semibold">
-                      入力パラメータ:
-                    </span>
-                    <pre className="mt-1 max-h-32 overflow-auto rounded bg-surface p-2 text-foreground whitespace-pre-wrap">
-                      {toPreviewJson(inv.input)}
-                    </pre>
+                    {expandable && (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className={`w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ${
+                          isExpanded ? 'rotate-180' : ''
+                        }`}
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    )}
+                  </div>
+                </button>
+
+                {/* 詳細情報（アコーディオン展開時）: input / output を JSON プレビュー */}
+                {isExpanded && expandable && (
+                  <div className="border-t border-border/50 bg-background/50 p-2.5 space-y-2 text-[11px] font-mono">
+                    {hasInput && (
+                      <div>
+                        <span className="text-muted-foreground font-sans font-semibold">
+                          入力パラメータ:
+                        </span>
+                        <pre className="mt-1 max-h-32 overflow-auto rounded bg-surface p-2 text-foreground whitespace-pre-wrap">
+                          {toPreviewJson(inv.input)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {inv.hasOutput && (
+                      <div>
+                        <span className="text-muted-foreground font-sans font-semibold">
+                          実行結果:
+                        </span>
+                        <pre className="mt-1 max-h-40 overflow-auto rounded bg-surface p-2 text-foreground whitespace-pre-wrap">
+                          {toPreviewJson(inv.output)}
+                        </pre>
+                      </div>
+                    )}
+
+                    {hasErrorText && (
+                      <div>
+                        <span className="text-destructive font-sans font-semibold">エラー:</span>
+                        <pre className="mt-1 max-h-32 overflow-auto rounded bg-destructive/10 p-2 text-destructive whitespace-pre-wrap">
+                          {inv.errorText}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {inv.hasOutput && (
-                  <div>
-                    <span className="text-muted-foreground font-sans font-semibold">実行結果:</span>
-                    <pre className="mt-1 max-h-40 overflow-auto rounded bg-surface p-2 text-foreground whitespace-pre-wrap">
-                      {toPreviewJson(inv.output)}
-                    </pre>
-                  </div>
-                )}
-
-                {hasErrorText && (
-                  <div>
-                    <span className="text-destructive font-sans font-semibold">エラー:</span>
-                    <pre className="mt-1 max-h-32 overflow-auto rounded bg-destructive/10 p-2 text-destructive whitespace-pre-wrap">
-                      {inv.errorText}
-                    </pre>
-                  </div>
-                )}
+                {/* 提案ツール（Propose Tools）の承認カード（アコーディオンの開閉によらず常時表示） */}
+                {inv.hasOutput &&
+                  typeof inv.output === 'object' &&
+                  inv.output !== null &&
+                  (inv.output as { type?: string }).type === 'proposal' && (
+                    <div className="border-t border-indigo-100 bg-white/40 p-2 dark:border-indigo-900/30 dark:bg-slate-900/40">
+                      <ChatProposalCard proposal={inv.output as ProposalPayload} />
+                    </div>
+                  )}
               </div>
-            )}
-
-            {/* 提案ツール（Propose Tools）の承認カード（アコーディオンの開閉によらず常時表示） */}
-            {inv.hasOutput &&
-              typeof inv.output === 'object' &&
-              inv.output !== null &&
-              (inv.output as { type?: string }).type === 'proposal' && (
-                <div className="border-t border-indigo-100 bg-white/40 p-2 dark:border-indigo-900/30 dark:bg-slate-900/40">
-                  <ChatProposalCard proposal={inv.output as ProposalPayload} />
-                </div>
-              )}
-          </div>
-        );
-      })}
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

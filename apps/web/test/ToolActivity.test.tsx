@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
   ToolActivity,
+  extractReasoning,
   extractToolInvocations,
   toolLabel,
 } from '../src/components/chat/ToolActivity.js';
@@ -247,5 +248,51 @@ describe('ToolActivity コンポーネント', () => {
     ];
     render(<ToolActivity parts={parts} />);
     expect(screen.getByText('mysteryTool')).toBeInTheDocument();
+  });
+});
+
+describe('extractReasoning & ReasoningActivity', () => {
+  it('parts から思考プロセス（reasoning）を抽出できること', () => {
+    const parts = [
+      { type: 'step-start' },
+      { type: 'reasoning', text: 'ユーザーの要望を分析中。' },
+      { type: 'reasoning', text: '結末案を3パターン検討する。' },
+      { type: 'text', text: '回答本文' },
+    ];
+
+    const reasoning = extractReasoning(parts);
+    expect(reasoning).not.toBeNull();
+    expect(reasoning?.text).toBe('ユーザーの要望を分析中。結末案を3パターン検討する。');
+    expect(reasoning?.state).toBe('done');
+  });
+
+  it('reasoning パーツが存在しない場合は null を返すこと', () => {
+    const parts = [{ type: 'text', text: 'こんにちは' }];
+    expect(extractReasoning(parts)).toBeNull();
+    expect(extractReasoning([])).toBeNull();
+    expect(extractReasoning(null)).toBeNull();
+  });
+
+  it('ToolActivity で思考プロセスが存在する場合、思考パネルが表示されること', () => {
+    const parts = [
+      { type: 'reasoning', text: 'プロットの伏線との整合性を確認中...' },
+      { type: 'text', text: '以下が提案です。' },
+    ];
+
+    render(<ToolActivity parts={parts} />);
+    expect(screen.getByText('思考プロセス')).toBeInTheDocument();
+
+    // クリックで思考内容を展開
+    fireEvent.click(screen.getByRole('button', { name: /思考プロセス/ }));
+    expect(screen.getByText('プロットの伏線との整合性を確認中...')).toBeInTheDocument();
+  });
+
+  it('ストリーミング中の思考プロセスは自動展開され推論中バッジが表示されること', () => {
+    const parts = [{ type: 'reasoning', text: 'リアルタイムに推論中...', state: 'streaming' }];
+
+    render(<ToolActivity parts={parts} isStreaming={true} />);
+    expect(screen.getByText('AIパートナーが思考中...')).toBeInTheDocument();
+    expect(screen.getByText('推論中...')).toBeInTheDocument();
+    expect(screen.getByText('リアルタイムに推論中...')).toBeInTheDocument();
   });
 });

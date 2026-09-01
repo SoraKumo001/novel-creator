@@ -193,7 +193,7 @@ describe('Chat API', () => {
     };
     expect(assistantValues.role).toBe('assistant');
     expect(assistantValues.content).toBe('こんにちは！');
-    expect(assistantValues.parts).toEqual([{ type: 'text', text: 'こんにちは！' }]);
+    expect(assistantValues.parts).toEqual([{ type: 'text', text: 'こんにちは！', state: 'done' }]);
 
     // updatedAt が更新される
     expect(updateCalls.length).toBeGreaterThan(0);

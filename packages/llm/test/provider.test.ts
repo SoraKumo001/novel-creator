@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  clearModelCache,
+  createEmbeddingModel,
   createEmbeddingModelFromConfig,
   createEmbeddingProvider,
   createLanguageModel,
@@ -14,26 +16,41 @@ vi.mock('ai', () => ({
 }));
 
 vi.mock('@ai-sdk/openai', () => {
-  const chatFn = vi.fn().mockReturnValue({ modelId: 'mock-openai-chat' });
-  const embeddingFn = vi.fn().mockReturnValue({ modelId: 'mock-openai-embedding' });
-  const modelFn = vi.fn().mockReturnValue({ modelId: 'mock-openai-default' });
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (modelFn as any).chat = chatFn;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (modelFn as any).embedding = embeddingFn;
-  const createOpenAI = vi.fn().mockReturnValue(modelFn);
+  const createOpenAI = vi.fn().mockImplementation(() => {
+    const chatFn = vi
+      .fn()
+      .mockImplementation((model: string) => ({ modelId: `openai-chat:${model}` }));
+    const embeddingFn = vi
+      .fn()
+      .mockImplementation((model: string) => ({ modelId: `openai-emb:${model}` }));
+    const modelFn = vi
+      .fn()
+      .mockImplementation((model: string) => ({ modelId: `openai-default:${model}` }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (modelFn as any).chat = chatFn;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (modelFn as any).embedding = embeddingFn;
+    return modelFn;
+  });
   return { createOpenAI };
 });
 
 vi.mock('@ai-sdk/anthropic', () => {
-  const modelFn = vi.fn().mockReturnValue({ modelId: 'mock-anthropic' });
-  const createAnthropic = vi.fn().mockReturnValue(modelFn);
+  const createAnthropic = vi.fn().mockImplementation(() => {
+    return vi.fn().mockImplementation((model: string) => ({ modelId: `anthropic:${model}` }));
+  });
   return { createAnthropic };
 });
 
 vi.mock('@ai-sdk/google', () => {
-  const modelFn = vi.fn().mockReturnValue({ modelId: 'mock-google' });
-  const createGoogleGenerativeAI = vi.fn().mockReturnValue(modelFn);
+  const createGoogleGenerativeAI = vi.fn().mockImplementation(() => {
+    const modelFn = vi.fn().mockImplementation((model: string) => ({ modelId: `google:${model}` }));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (modelFn as any).embedding = vi
+      .fn()
+      .mockImplementation((model: string) => ({ modelId: `google-emb:${model}` }));
+    return modelFn;
+  });
   return { createGoogleGenerativeAI };
 });
 
@@ -43,9 +60,61 @@ async function importMockedOpenAI() {
 }
 
 describe('createLanguageModel', () => {
+  beforeEach(() => {
+    clearModelCache();
+    vi.clearAllMocks();
+  });
+
   it('openai プロバイダーは Chat Completions API (.chat) を呼び出すこと', () => {
     const model = createLanguageModel('openai', 'gpt-4o', { apiKey: 'key' });
-    expect(model).toEqual({ modelId: 'mock-openai-chat' });
+    expect(model).toEqual({ modelId: 'openai-chat:gpt-4o' });
+  });
+
+  it('同一設定で createLanguageModel を複数回呼んだ場合は同一インスタンスをキャッシュ再利用すること', async () => {
+    const { createAnthropic } = await import('@ai-sdk/anthropic');
+    const model1 = createLanguageModel('anthropic', 'claude-3-5-sonnet-20241022', {
+      apiKey: 'key-1',
+    });
+    const model2 = createLanguageModel('anthropic', 'claude-3-5-sonnet-20241022', {
+      apiKey: 'key-1',
+    });
+
+    expect(model1).toBe(model2);
+    // 初期化ファクトリは1回のみ呼ばれる
+    expect(createAnthropic).toHaveBeenCalledTimes(1);
+  });
+
+  it('設定（モデル名やキー）が異なる場合は別インスタンスを生成すること', async () => {
+    const { createAnthropic } = await import('@ai-sdk/anthropic');
+    const model1 = createLanguageModel('anthropic', 'claude-3-5-sonnet-20241022', {
+      apiKey: 'key-1',
+    });
+    const model2 = createLanguageModel('anthropic', 'claude-3-5-haiku-20241022', {
+      apiKey: 'key-1',
+    });
+
+    expect(createAnthropic).toHaveBeenCalledTimes(2);
+    expect(model1).not.toBe(model2);
+  });
+
+  it('clearModelCache を呼ぶとキャッシュが破棄され次回呼び出し時に再生成されること', async () => {
+    const { createAnthropic } = await import('@ai-sdk/anthropic');
+    createLanguageModel('anthropic', 'claude-3-5-sonnet-20241022', { apiKey: 'key-1' });
+    expect(createAnthropic).toHaveBeenCalledTimes(1);
+
+    clearModelCache();
+
+    createLanguageModel('anthropic', 'claude-3-5-sonnet-20241022', { apiKey: 'key-1' });
+    expect(createAnthropic).toHaveBeenCalledTimes(2);
+  });
+
+  it('createEmbeddingModel も同一設定でインスタンスをキャッシュ再利用すること', async () => {
+    const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
+    const emb1 = createEmbeddingModel('google', 'text-embedding-004', { apiKey: 'g-key' });
+    const emb2 = createEmbeddingModel('google', 'text-embedding-004', { apiKey: 'g-key' });
+
+    expect(emb1).toBe(emb2);
+    expect(createGoogleGenerativeAI).toHaveBeenCalledTimes(1);
   });
 
   it('openai プロバイダーで baseURL がある場合も Chat Completions API (.chat) を呼び出すこと', () => {
@@ -53,14 +122,14 @@ describe('createLanguageModel', () => {
       apiKey: 'key',
       baseURL: 'https://ollama.com/v1',
     });
-    expect(model).toEqual({ modelId: 'mock-openai-chat' });
+    expect(model).toEqual({ modelId: 'openai-chat:glm-5.3-flash' });
   });
 
   it('ollama プロバイダーの場合は Chat Completions API (.chat) を呼び出すこと', () => {
     const model = createLanguageModel('ollama', 'llama3', {
       baseURL: 'http://localhost:11434/v1',
     });
-    expect(model).toEqual({ modelId: 'mock-openai-chat' });
+    expect(model).toEqual({ modelId: 'openai-chat:llama3' });
   });
 
   it('custom_openai プロバイダーの場合は Chat Completions API (.chat) を呼び出すこと', () => {
@@ -68,17 +137,17 @@ describe('createLanguageModel', () => {
       baseURL: 'https://openrouter.ai/api/v1',
       apiKey: 'key',
     });
-    expect(model).toEqual({ modelId: 'mock-openai-chat' });
+    expect(model).toEqual({ modelId: 'openai-chat:custom-model' });
   });
 
   it('anthropic プロバイダーの場合は createAnthropic を呼び出すこと', () => {
     const model = createLanguageModel('anthropic', 'claude-3-5-sonnet-20241022', { apiKey: 'key' });
-    expect(model).toEqual({ modelId: 'mock-anthropic' });
+    expect(model).toEqual({ modelId: 'anthropic:claude-3-5-sonnet-20241022' });
   });
 
   it('google プロバイダーの場合は createGoogleGenerativeAI を呼び出すこと', () => {
     const model = createLanguageModel('google', 'gemini-1.5-pro', { apiKey: 'key' });
-    expect(model).toEqual({ modelId: 'mock-google' });
+    expect(model).toEqual({ modelId: 'google:gemini-1.5-pro' });
   });
 });
 

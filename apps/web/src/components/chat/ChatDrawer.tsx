@@ -503,8 +503,8 @@ export function ChatDrawer() {
                       <div className="whitespace-pre-wrap">{m.content}</div>
                     ) : (
                       <>
-                        {/* AI のツール呼び出し活動（v7 パーツから抽出。無ければ非表示） */}
-                        <ToolActivity parts={m.parts} />
+                        {/* AI のツール呼び出し活動 & 思考プロセス（v7 パーツから抽出。無ければ非表示） */}
+                        <ToolActivity parts={m.parts} isStreaming={false} />
                         {m.content && <MarkdownText content={m.content} />}
                       </>
                     )}
@@ -544,8 +544,8 @@ export function ChatDrawer() {
                       <span>AIパートナーが入力中...</span>
                     </div>
                     <div className="rounded-2xl rounded-bl-xs bg-surface-raised border border-primary/30 px-4 py-2.5 max-w-[88%] text-sm text-foreground shadow-xs">
-                      {/* ツール呼び出しはテキスト生成前でも随時表示する */}
-                      <ToolActivity parts={streamingParts} />
+                      {/* 思考プロセス & ツール呼び出しはテキスト生成前でもリアルタイムに表示 */}
+                      <ToolActivity parts={streamingParts} isStreaming={true} />
                       {streamingContent && <MarkdownText content={streamingContent} />}
                     </div>
                   </>
