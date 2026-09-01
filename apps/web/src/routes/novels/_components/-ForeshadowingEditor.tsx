@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Input } from '@/components/Input.js';
+import { Select } from '@/components/Select.js';
 import { useChapters } from '@/hooks/useChapters.js';
-import { useChat } from '@/hooks/useChat.js';
+import { useChatUI } from '@/context/ChatContext.js';
 import { useForeshadowings } from '@/hooks/useForeshadowings.js';
 import { useLlmInstructions } from '@/hooks/useLlmInstructions.js';
+import { useModalState } from '@/hooks/useModalResultState.js';
 import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import type { ForeshadowingStatus } from '@/lib/types.js';
@@ -19,7 +21,7 @@ interface ForeshadowingEditorProps {
 export function ForeshadowingEditor({ novelId, foreshadowingId }: ForeshadowingEditorProps) {
   const navigate = useNavigate();
   const toast = useToast();
-  const { openChat } = useChat();
+  const { openChat } = useChatUI();
   const { chapters } = useChapters(novelId);
   const {
     foreshadowings,
@@ -47,8 +49,9 @@ export function ForeshadowingEditor({ novelId, foreshadowingId }: ForeshadowingE
   const [resolvedSectionId, setResolvedSectionId] = useState<string>('');
   const [instruction, setInstruction] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [deleteInstructionId, setDeleteInstructionId] = useState<string | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  // 履歴削除確認ダイアログ（payload = 削除対象の指示ID）と履歴差分モーダル
+  const deleteConfirm = useModalState<string>();
+  const historyModal = useModalState();
 
   const isEdit = !!foreshadowingId;
   const loading = isEdit ? foreshadowingsLoading : false;
@@ -150,9 +153,10 @@ export function ForeshadowingEditor({ novelId, foreshadowingId }: ForeshadowingE
   }, [category, creating, title, updating, handleSave]);
 
   async function handleDeleteInstruction() {
-    if (!deleteInstructionId) return;
-    await deleteInstruction(deleteInstructionId);
-    setDeleteInstructionId(null);
+    const targetId = deleteConfirm.payload;
+    if (!targetId) return;
+    await deleteInstruction(targetId);
+    deleteConfirm.close();
   }
 
   function handleChatConsult() {
@@ -196,14 +200,14 @@ export function ForeshadowingEditor({ novelId, foreshadowingId }: ForeshadowingE
       onChatConsult={handleChatConsult}
       instructions={instructions}
       onApplyHistory={setInstruction}
-      onRequestDeleteInstruction={setDeleteInstructionId}
-      deleteInstructionId={deleteInstructionId}
-      onCloseDeleteInstruction={() => setDeleteInstructionId(null)}
+      onRequestDeleteInstruction={deleteConfirm.open}
+      deleteInstructionId={deleteConfirm.payload}
+      onCloseDeleteInstruction={deleteConfirm.close}
       onConfirmDeleteInstruction={handleDeleteInstruction}
       deletingInstruction={deletingInstruction}
-      historyOpen={historyOpen}
-      onOpenHistory={() => setHistoryOpen(true)}
-      onCloseHistory={() => setHistoryOpen(false)}
+      historyOpen={historyModal.isOpen}
+      onOpenHistory={historyModal.open}
+      onCloseHistory={historyModal.close}
       entityType="foreshadowing"
       currentContent={description}
       historyTitle={`伏線: ${title || '（タイトル未設定）'}`}
@@ -237,24 +241,24 @@ export function ForeshadowingEditor({ novelId, foreshadowingId }: ForeshadowingE
           <label className="mb-1 block text-xs font-semibold text-muted-foreground">
             ステータス
           </label>
-          <select
+          <Select
             value={status}
             onChange={(e) => setStatus(e.target.value as ForeshadowingStatus)}
-            className="w-full rounded-lg border border-border bg-surface p-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="unresolved">⏳ 未回収</option>
             <option value="resolved">✅ 回収済</option>
             <option value="abandoned">🚫 保留・破棄</option>
-          </select>
+          </Select>
         </div>
         <div>
           <label className="mb-1 block text-xs font-semibold text-muted-foreground">
             設置された節 (任意)
           </label>
-          <select
+          <Select
             value={placedSectionId}
             onChange={(e) => setPlacedSectionId(e.target.value)}
-            className="w-full rounded-lg border border-border bg-surface p-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="">未指定</option>
             {chapters.map((ch) => (
@@ -266,16 +270,16 @@ export function ForeshadowingEditor({ novelId, foreshadowingId }: ForeshadowingE
                 ))}
               </optgroup>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
           <label className="mb-1 block text-xs font-semibold text-muted-foreground">
             回収された節 (任意)
           </label>
-          <select
+          <Select
             value={resolvedSectionId}
             onChange={(e) => setResolvedSectionId(e.target.value)}
-            className="w-full rounded-lg border border-border bg-surface p-2 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="">未指定</option>
             {chapters.map((ch) => (
@@ -287,7 +291,7 @@ export function ForeshadowingEditor({ novelId, foreshadowingId }: ForeshadowingE
                 ))}
               </optgroup>
             ))}
-          </select>
+          </Select>
         </div>
       </div>
 

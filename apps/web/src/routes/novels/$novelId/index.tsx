@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ComponentType } from 'react';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import type { NovelExportData } from '@novel-creator/shared';
 import { Button } from '@/components/Button.js';
 import { ExportModal } from '@/components/ExportModal.js';
 import { Loading } from '@/components/Loading.js';
 import { MarkdownText } from '@/components/MarkdownText.js';
-import { useChat } from '@/hooks/useChat.js';
+import { useChatUI } from '@/context/ChatContext.js';
 import { useNovel } from '@/hooks/useNovel.js';
 import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
@@ -18,33 +18,59 @@ import { SettingsTab } from '../_components/-SettingsTab.js';
 import { TimelineTab } from '../_components/-TimelineTab.js';
 import { ForeshadowingTab } from '../_components/-ForeshadowingTab.js';
 
+/**
+ * タブ定義（単一の情報源）。
+ * タブID・表示順・ラベル・アイコン・ショートカット番号はすべてここから導出する
+ * （validateSearch のバリデーション・タブ一覧の描画・本文コンテンツの描画）。
+ * 表示順がそのまま Alt+N ショートカットの番号に対応する。
+ */
+const TAB_DEFS = [
+  { id: 'overview', label: '概要', icon: '📋', shortcut: '1' },
+  { id: 'characters', label: '人物', icon: '👥', shortcut: '2' },
+  { id: 'settings', label: '設定', icon: '🌍', shortcut: '3' },
+  { id: 'foreshadowing', label: '伏線', icon: '🚩', shortcut: '4' },
+  { id: 'timeline', label: 'タイムライン', icon: '⏱️', shortcut: '5' },
+  { id: 'plot', label: 'プロット', icon: '🗺️', shortcut: '6' },
+  { id: 'editor', label: '本文', icon: '✍️', shortcut: '7' },
+] as const;
+
+type TabId = (typeof TAB_DEFS)[number]['id'];
+
+/** タブID一覧（validateSearch のバリデーションに使用） */
+const TAB_IDS: readonly TabId[] = TAB_DEFS.map((t) => t.id);
+
+/** タブ本文コンテンツ（id → コンポーネント。描画はこのマップから導出する） */
+const TAB_CONTENT: Record<
+  TabId,
+  ComponentType<{
+    novel: NonNullable<ReturnType<typeof useNovel>['novel']>;
+    onRefresh: () => Promise<void>;
+  }>
+> = {
+  overview: OverviewTab,
+  characters: CharactersTab,
+  settings: SettingsTab,
+  foreshadowing: ForeshadowingTab,
+  timeline: TimelineTab,
+  plot: PlotTab,
+  editor: EditorTab,
+};
+
+/** 本文コンテンツをスクロールラッパーで包むタブ */
+const SCROLLABLE_TABS: ReadonlySet<TabId> = new Set<TabId>([
+  'overview',
+  'plot',
+  'timeline',
+  'foreshadowing',
+]);
+
 export const Route = createFileRoute('/novels/$novelId/')({
   validateSearch: (search: Record<string, unknown>) =>
     ({
-      tab: ([
-        'overview',
-        'settings',
-        'characters',
-        'plot',
-        'editor',
-        'timeline',
-        'foreshadowing',
-      ].includes(search.tab as string)
-        ? search.tab
-        : undefined) as TabId | undefined,
+      tab: (TAB_IDS.includes(search.tab as TabId) ? search.tab : undefined) as TabId | undefined,
     }) as { tab?: TabId },
   component: NovelDetailPage,
 });
-
-type TabId =
-  'overview' | 'settings' | 'characters' | 'plot' | 'editor' | 'timeline' | 'foreshadowing';
-
-interface TabItem {
-  id: TabId;
-  label: string;
-  icon: string;
-  shortcut: string;
-}
 
 function NovelDetailPage() {
   const { novelId } = Route.useParams();
@@ -52,7 +78,7 @@ function NovelDetailPage() {
   const { tab } = Route.useSearch();
   const activeTab: TabId = tab ?? 'overview';
   const navigate = useNavigate();
-  const { toggleChat } = useChat();
+  const { toggleChat } = useChatUI();
   const toast = useToast();
 
   const [exportOpen, setExportOpen] = useState(false);
@@ -73,17 +99,7 @@ function NovelDetailPage() {
     }
   }, [novelId, toast]);
 
-  const tabs: TabItem[] = [
-    { id: 'overview', label: '概要', icon: '📋', shortcut: '1' },
-    { id: 'characters', label: '人物', icon: '👥', shortcut: '2' },
-    { id: 'settings', label: '設定', icon: '🌍', shortcut: '3' },
-    { id: 'foreshadowing', label: '伏線', icon: '🚩', shortcut: '4' },
-    { id: 'timeline', label: 'タイムライン', icon: '⏱️', shortcut: '5' },
-    { id: 'plot', label: 'プロット', icon: '🗺️', shortcut: '6' },
-    { id: 'editor', label: '本文', icon: '✍️', shortcut: '7' },
-  ];
-
-  // グローバルショートカット: Alt+1~6 でタブ切り替え、Ctrl+J でチャット開閉
+  // グローバルショートカット: Alt+1 ~ Alt+{TAB_DEFS.length}（現在 7）でタブ切り替え、Ctrl+J でチャット開閉
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+J または Cmd+J でチャット開閉
@@ -93,12 +109,12 @@ function NovelDetailPage() {
         return;
       }
 
-      // Alt+1 ~ Alt+6 でタブ切り替え
+      // Alt+1 ~ Alt+{TAB_DEFS.length} でタブ切り替え（TAB_DEFS の表示順がそのまま番号）
       if (e.altKey && !e.ctrlKey && !e.metaKey) {
         const num = parseInt(e.key, 10);
-        if (num >= 1 && num <= tabs.length) {
+        if (num >= 1 && num <= TAB_DEFS.length) {
           e.preventDefault();
-          const targetTab = tabs[num - 1].id;
+          const targetTab = TAB_DEFS[num - 1].id;
           void navigate({
             to: '/novels/$novelId',
             params: { novelId },
@@ -110,7 +126,11 @@ function NovelDetailPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigate, novelId, tabs, toggleChat]);
+  }, [navigate, novelId, toggleChat]);
+
+  // 描画するタブ本文コンテンツとスクロールラッパーの要否（TAB_CONTENT / SCROLLABLE_TABS から導出）
+  const ActiveTabContent = TAB_CONTENT[activeTab];
+  const isScrollable = SCROLLABLE_TABS.has(activeTab);
 
   return (
     <div className="flex h-full w-full flex-col min-h-0 overflow-hidden">
@@ -146,7 +166,7 @@ function NovelDetailPage() {
 
           <nav className="mb-4 shrink-0 border-b border-border">
             <div className="flex gap-1 overflow-x-auto">
-              {tabs.map((t) => {
+              {TAB_DEFS.map((t) => {
                 const isActive = activeTab === t.id;
                 return (
                   <button
@@ -177,28 +197,12 @@ function NovelDetailPage() {
           </nav>
 
           <div className="min-h-0 flex-1 overflow-hidden">
-            {activeTab === 'overview' && (
+            {isScrollable ? (
               <div className="h-full overflow-y-auto pr-1">
-                <OverviewTab novel={novel} onRefresh={refetch} />
+                <ActiveTabContent novel={novel} onRefresh={refetch} />
               </div>
-            )}
-            {activeTab === 'settings' && <SettingsTab novel={novel} onRefresh={refetch} />}
-            {activeTab === 'characters' && <CharactersTab novel={novel} onRefresh={refetch} />}
-            {activeTab === 'plot' && (
-              <div className="h-full overflow-y-auto pr-1">
-                <PlotTab novel={novel} onRefresh={refetch} />
-              </div>
-            )}
-            {activeTab === 'editor' && <EditorTab novel={novel} onRefresh={refetch} />}
-            {activeTab === 'timeline' && (
-              <div className="h-full overflow-y-auto pr-1">
-                <TimelineTab novel={novel} onRefresh={refetch} />
-              </div>
-            )}
-            {activeTab === 'foreshadowing' && (
-              <div className="h-full overflow-y-auto pr-1">
-                <ForeshadowingTab novel={novel} onRefresh={refetch} />
-              </div>
+            ) : (
+              <ActiveTabContent novel={novel} onRefresh={refetch} />
             )}
           </div>
         </>

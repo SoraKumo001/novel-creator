@@ -1,4 +1,12 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UIMessage } from 'ai';
 import { fetchChatSession, fetchChatSessions, updateChatSession } from '@/lib/services/index.js';
@@ -75,7 +83,12 @@ export const QUICK_PROMPTS: QuickPrompt[] = [
   },
 ];
 
-export interface ChatContextValue {
+/**
+ * 低頻度 context: チャットの開閉・フォーカス・小説/セッション選択など操作系。
+ * ストリーミング中（チャンク毎の更新）でも value の参照が変わらないため、
+ * Nav / Layout / 各エディタなどの consumer はストリーミングの影響を受けない。
+ */
+export interface ChatUIContextValue {
   isOpen: boolean;
   openChat: (targetNovelId?: string | null, focus?: ChatFocusContext) => void;
   closeChat: () => void;
@@ -102,8 +115,15 @@ export interface ChatContextValue {
   deleteSession: (sessionId: string) => Promise<void>;
   updateSessionTitle: (sessionId: string, newTitle: string) => Promise<boolean>;
   refreshSessions: () => Promise<void>;
+  clearMessages: () => void;
+}
 
-  // メッセージ・ストリーミング関連
+/**
+ * 高頻度 context: メッセージ一覧とストリーミング状態。
+ * ストリーミング中はチャンク毎に value が新しくなるため、
+ * ここを購読する consumer は ChatDrawer（転写領域）など表示に直接関係するものに限定する。
+ */
+export interface ChatStreamingContextValue {
   messages: ChatMessage[];
   isStreaming: boolean;
   streamingContent: string;
@@ -115,12 +135,13 @@ export interface ChatContextValue {
   retryLastMessage: () => Promise<void>;
   clearError: () => void;
   abortStream: () => void;
-  clearMessages: () => void;
 }
 
-export const ChatContext = createContext<ChatContextValue | null>(null);
+export const ChatUIContext = createContext<ChatUIContextValue | null>(null);
+export const ChatStreamingContext = createContext<ChatStreamingContextValue | null>(null);
 
 export function ChatProvider({ children }: { children: ReactNode }) {
+  // --- 低頻度: 開閉・フォーカス・小説選択 ---
   const [isOpen, setIsOpen] = useState(false);
   const [selectedNovelId, setSelectedNovelIdState] = useState<string | null>(null);
   const [chatFocus, setChatFocus] = useState<ChatFocusContext | null>(null);
@@ -136,7 +157,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     queryKey: chatKeys.sessions(selectedNovelId ?? undefined),
     queryFn: () => fetchChatSessions(selectedNovelId ?? undefined),
   });
-  const sessions = sessionsQuery.data ?? [];
+  // `?? []` を素通しすると毎レンダー新配列になり低頻度 value のメモを無効化するためメモ化する
+  const sessions = useMemo(() => sessionsQuery.data ?? [], [sessionsQuery.data]);
   const loadingSessions = sessionsQuery.isLoading;
 
   // セッション一覧のリフレッシュ
@@ -144,7 +166,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     await queryClient.invalidateQueries({ queryKey: chatKeys.all });
   }, [queryClient]);
 
-  // メッセージ・ストリーミング状態機械（セッション自動作成・削除を含む）
+  // --- 高頻度: メッセージ・ストリーミング状態機械（セッション自動作成・削除を含む） ---
   const {
     currentSessionId,
     setCurrentSessionId,
@@ -154,16 +176,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     messages,
     setMessages,
     isStreaming,
-    setIsStreaming,
+    isStreamingRef,
     streamingContent,
-    setStreamingContent,
     streamingParts,
     error,
     setError,
     clearError,
     lastPrompt,
     retryLastMessage,
-    abortControllerRef,
+    abortStreamDiscard,
     createSession,
     deleteSession,
     sendMessage,
@@ -201,49 +222,35 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [setError, setMessages],
   );
 
-  // 新しい相談を開始（画面をクリアして新規作成待ち状態にする）
+  // 新しい相談を開始（画面をクリアして新規作成待ち状態にする）。
+  // 進行中のストリーミングは部分応答を破棄して中止する（abortStream と異なり
+  // 部分応答を done 化して確定しない。直後にメッセージを空にするため）。
   const startNewChat = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setIsStreaming(false);
-    setStreamingContent('');
+    void abortStreamDiscard();
     setCurrentSessionId(null);
     setMessages([]);
     setError(null);
-  }, [
-    abortControllerRef,
-    setCurrentSessionId,
-    setError,
-    setIsStreaming,
-    setMessages,
-    setStreamingContent,
-  ]);
+  }, [abortStreamDiscard, setCurrentSessionId, setError, setMessages]);
 
-  // セッション切り替え
+  // セッション切り替え。
+  // isStreaming は ref 経由で同期参照するため、ストリーミングの開始/終了でも
+  // このコールバックの同一性は変わらない（低頻度 value を安定させる）。
   const selectSession = useCallback(
     async (sessionId: string) => {
       if (sessionId === currentSessionIdRef.current) return;
-      if (isStreaming) {
-        if (abortControllerRef.current) {
-          abortControllerRef.current.abort();
-          abortControllerRef.current = null;
-        }
-        setIsStreaming(false);
-        setStreamingContent('');
+      if (isStreamingRef.current) {
+        // 切り替え先のメッセージで上書きするため、部分応答は確定せず破棄する
+        void abortStreamDiscard();
       }
       setCurrentSessionId(sessionId);
       await loadSessionMessages(sessionId);
     },
     [
-      abortControllerRef,
+      abortStreamDiscard,
       currentSessionIdRef,
-      isStreaming,
+      isStreamingRef,
       loadSessionMessages,
       setCurrentSessionId,
-      setIsStreaming,
-      setStreamingContent,
     ],
   );
 
@@ -302,57 +309,117 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setIsOpen((prev) => !prev);
   }, []);
 
-  const currentSession = sessions.find((s) => s.id === currentSessionId) ?? null;
+  const currentSession = useMemo(
+    () => sessions.find((s) => s.id === currentSessionId) ?? null,
+    [sessions, currentSessionId],
+  );
+
+  // 低頻度 value: 依存は useState/useRef 由来の値と安定した useCallback のみ。
+  // ストリーミング中にチャンクが流れても参照が変わらない。
+  const uiValue = useMemo<ChatUIContextValue>(
+    () => ({
+      isOpen,
+      openChat,
+      closeChat,
+      toggleChat,
+      chatFocus,
+      consumeFocus,
+      selectedNovelId,
+      setSelectedNovelId,
+
+      sessions,
+      currentSessionId,
+      currentSession,
+      selectedModelConfigId,
+      setSelectedModelConfigId,
+      loadingSessions,
+      loadingMessages,
+
+      startNewChat,
+      createSession,
+      selectSession,
+      deleteSession,
+      updateSessionTitle,
+      refreshSessions,
+      clearMessages,
+    }),
+    [
+      isOpen,
+      openChat,
+      closeChat,
+      toggleChat,
+      chatFocus,
+      consumeFocus,
+      selectedNovelId,
+      setSelectedNovelId,
+      sessions,
+      currentSessionId,
+      currentSession,
+      selectedModelConfigId,
+      setSelectedModelConfigId,
+      loadingSessions,
+      loadingMessages,
+      startNewChat,
+      createSession,
+      selectSession,
+      deleteSession,
+      updateSessionTitle,
+      refreshSessions,
+      clearMessages,
+    ],
+  );
+
+  // 高頻度 value: ストリーミング中はチャンク毎に新しくなる
+  const streamingValue = useMemo<ChatStreamingContextValue>(
+    () => ({
+      messages,
+      isStreaming,
+      streamingContent,
+      streamingParts,
+      error,
+      lastPrompt,
+      sendMessage,
+      retryLastMessage,
+      clearError,
+      abortStream,
+    }),
+    [
+      messages,
+      isStreaming,
+      streamingContent,
+      streamingParts,
+      error,
+      lastPrompt,
+      sendMessage,
+      retryLastMessage,
+      clearError,
+      abortStream,
+    ],
+  );
 
   return (
-    <ChatContext.Provider
-      value={{
-        isOpen,
-        openChat,
-        closeChat,
-        toggleChat,
-        chatFocus,
-        consumeFocus,
-        selectedNovelId,
-        setSelectedNovelId,
-
-        sessions,
-        currentSessionId,
-        currentSession,
-        selectedModelConfigId,
-        setSelectedModelConfigId,
-        loadingSessions,
-        loadingMessages,
-
-        startNewChat,
-        createSession,
-        selectSession,
-        deleteSession,
-        updateSessionTitle,
-        refreshSessions,
-
-        messages,
-        isStreaming,
-        streamingContent,
-        streamingParts,
-        error,
-        lastPrompt,
-        sendMessage,
-        retryLastMessage,
-        clearError,
-        abortStream,
-        clearMessages,
-      }}
-    >
-      {children}
-    </ChatContext.Provider>
+    <ChatUIContext.Provider value={uiValue}>
+      <ChatStreamingContext.Provider value={streamingValue}>
+        {children}
+      </ChatStreamingContext.Provider>
+    </ChatUIContext.Provider>
   );
 }
 
-export function useChat() {
-  const ctx = useContext(ChatContext);
+/** チャットの開閉・セッション選択などの操作系（低頻度）を取得する */
+export function useChatUI() {
+  const ctx = useContext(ChatUIContext);
   if (!ctx) {
-    throw new Error('useChat must be used within a ChatProvider');
+    throw new Error('useChatUI must be used within a ChatProvider');
+  }
+  return ctx;
+}
+
+/** メッセージ一覧・ストリーミング状態（高頻度）を取得する */
+export function useChatStreamingState() {
+  const ctx = useContext(ChatStreamingContext);
+  if (!ctx) {
+    throw new Error('useChatStreamingState must be used within a ChatProvider');
   }
   return ctx;
 }

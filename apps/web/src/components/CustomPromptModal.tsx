@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from './Button.js';
 import { Modal } from './Modal.js';
+import { Select } from './Select.js';
 import type {
   CreateCustomPromptInput,
   CustomPrompt,
@@ -189,18 +190,18 @@ export function CustomPromptModal({
 
           <div>
             <label className="block text-xs font-semibold text-foreground mb-1">利用カテゴリ</label>
-            <select
+            <Select
               value={category}
               onChange={(e) =>
                 setCategory(e.target.value as 'inline' | 'generation' | 'chat' | 'general')
               }
-              className="w-full rounded-lg border border-border bg-surface px-3 py-1.5 text-xs text-foreground focus:outline-none focus:border-primary"
+              className="w-full px-3 py-1.5 text-xs focus:outline-none focus:border-primary"
             >
               <option value="inline">インライン推敲 (選択範囲)</option>
               <option value="generation">本文・プロット生成</option>
               <option value="chat">創作相談チャット</option>
               <option value="general">汎用</option>
-            </select>
+            </Select>
           </div>
         </div>
 

@@ -1,7 +1,8 @@
-import { useChat } from '@/hooks/useChat.js';
+import { useChatStreamingState, useChatUI } from '@/context/ChatContext.js';
 
 export function ChatFloatingButton() {
-  const { isOpen, toggleChat, isStreaming } = useChat();
+  const { isOpen, toggleChat } = useChatUI();
+  const { isStreaming } = useChatStreamingState();
 
   if (isOpen) {
     return null; // チャットパネル展開中はボタンを隠す（またはパネル側で閉じる操作を行う）

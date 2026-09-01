@@ -11,8 +11,8 @@ vi.mock('../src/routes/novels/_components/-MonacoEditor.js', () => ({
   MonacoEditor: () => <div data-testid="monaco-editor" />,
 }));
 
-vi.mock('@/hooks/useChat.js', () => ({
-  useChat: () => ({
+vi.mock('@/context/ChatContext.js', () => ({
+  useChatUI: () => ({
     openChat: vi.fn(),
     isOpen: false,
   }),

@@ -2,8 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { Input } from '@/components/Input.js';
 import { useCharacters } from '@/hooks/useCharacters.js';
-import { useChat } from '@/hooks/useChat.js';
+import { useChatUI } from '@/context/ChatContext.js';
 import { useLlmInstructions } from '@/hooks/useLlmInstructions.js';
+import { useModalState } from '@/hooks/useModalResultState.js';
 import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import { MonacoEditor } from './-MonacoEditor.js';
@@ -17,7 +18,7 @@ interface CharacterEditorProps {
 export function CharacterEditor({ novelId, characterId }: CharacterEditorProps) {
   const navigate = useNavigate();
   const toast = useToast();
-  const { openChat } = useChat();
+  const { openChat } = useChatUI();
   const {
     characters,
     loading: charactersLoading,
@@ -44,8 +45,9 @@ export function CharacterEditor({ novelId, characterId }: CharacterEditorProps) 
   const [instruction, setInstruction] = useState('');
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [deleteInstructionId, setDeleteInstructionId] = useState<string | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
+  // 履歴削除確認ダイアログ（payload = 削除対象の指示ID）と履歴差分モーダル
+  const deleteConfirm = useModalState<string>();
+  const historyModal = useModalState();
 
   const isEdit = !!characterId;
   const loading = isEdit ? charactersLoading : false;
@@ -169,9 +171,10 @@ export function CharacterEditor({ novelId, characterId }: CharacterEditorProps) 
   }, [category, characterId, creating, description, isEdit, name, novelId, traitsText, updating]);
 
   async function handleDeleteInstruction() {
-    if (!deleteInstructionId) return;
-    await deleteInstruction(deleteInstructionId);
-    setDeleteInstructionId(null);
+    const targetId = deleteConfirm.payload;
+    if (!targetId) return;
+    await deleteInstruction(targetId);
+    deleteConfirm.close();
   }
 
   function applyHistory(text: string) {
@@ -220,14 +223,14 @@ export function CharacterEditor({ novelId, characterId }: CharacterEditorProps) 
       onChatConsult={handleChatConsult}
       instructions={instructions}
       onApplyHistory={applyHistory}
-      onRequestDeleteInstruction={setDeleteInstructionId}
-      deleteInstructionId={deleteInstructionId}
-      onCloseDeleteInstruction={() => setDeleteInstructionId(null)}
+      onRequestDeleteInstruction={deleteConfirm.open}
+      deleteInstructionId={deleteConfirm.payload}
+      onCloseDeleteInstruction={deleteConfirm.close}
       onConfirmDeleteInstruction={handleDeleteInstruction}
       deletingInstruction={deletingInstruction}
-      historyOpen={historyOpen}
-      onOpenHistory={() => setHistoryOpen(true)}
-      onCloseHistory={() => setHistoryOpen(false)}
+      historyOpen={historyModal.isOpen}
+      onOpenHistory={historyModal.open}
+      onCloseHistory={historyModal.close}
       entityType="character"
       currentContent={description}
       historyTitle={`人物: ${name || '（名称未設定）'}`}

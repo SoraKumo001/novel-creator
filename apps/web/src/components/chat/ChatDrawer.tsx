@@ -2,8 +2,13 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '@/components/Button.js';
 import { LLMModelSelector } from '@/components/LLMModelSelector.js';
 import { MarkdownText } from '@/components/MarkdownText.js';
-import { QUICK_PROMPTS, useChat, type QuickPrompt } from '@/hooks/useChat.js';
-import type { ChatFocusContext } from '@/context/ChatContext.js';
+import {
+  QUICK_PROMPTS,
+  useChatStreamingState,
+  useChatUI,
+  type ChatFocusContext,
+  type QuickPrompt,
+} from '@/context/ChatContext.js';
 import { useNovels } from '@/hooks/useNovels.js';
 import { usePinnedSessions } from '@/hooks/usePinnedSessions.js';
 import { useToast } from '@/hooks/useToast.js';
@@ -29,6 +34,7 @@ export function buildChatPrefill(focus: ChatFocusContext): string {
 }
 
 export function ChatDrawer() {
+  // 低頻度: 開閉・フォーカス・セッション選択などの操作系
   const {
     isOpen,
     closeChat,
@@ -46,6 +52,10 @@ export function ChatDrawer() {
     selectSession,
     deleteSession,
     updateSessionTitle,
+  } = useChatUI();
+
+  // 高頻度: メッセージ・ストリーミング状態
+  const {
     messages,
     isStreaming,
     streamingContent,
@@ -56,7 +66,7 @@ export function ChatDrawer() {
     retryLastMessage,
     clearError,
     abortStream,
-  } = useChat();
+  } = useChatStreamingState();
 
   const { novels } = useNovels();
   const toast = useToast();

@@ -1,10 +1,8 @@
 import { eq } from 'drizzle-orm';
-import type { LanguageModel } from 'ai';
 import {
   chapters,
   contents,
   foreshadowings,
-  llmConfigs,
   novels,
   sections,
   timelines,
@@ -14,7 +12,6 @@ import {
   analyzeSettingImpactPrompt,
   chapterSummary,
   contentGeneration,
-  createLanguageModelFromConfig,
   extractSettings,
   extractTimeline,
   generateJSON,
@@ -28,31 +25,37 @@ import {
   type InlineAssistAction,
 } from '@novel-creator/llm';
 import { searchContext } from '../rag.js';
+import { resolveLLMModel } from './model-resolver.js';
+import { mergeAsyncIterables } from './merge-async-iterables.js';
+import { fetchNovelStructureWithContents } from './novel-structure.js';
 import { assertFound, type ServiceContext } from './types.js';
+
+/**
+ * ストリームの各チャンクにバリアント番号をタグ付けする。
+ */
+async function* withVariant(
+  stream: AsyncIterable<string>,
+  variant: number,
+): AsyncGenerator<{ text: string; variant: number }> {
+  for await (const chunk of stream) {
+    yield { text: chunk, variant };
+  }
+}
+
+/**
+ * resolveSectionContext の戻り値。プロンプト組立に必要な行と、RAG 検索結果を
+ * プロンプトにそのまま渡せる形（改行連結済み文字列）にしたもの。
+ */
+interface SectionPromptContext {
+  section: typeof sections.$inferSelect;
+  chapter: typeof chapters.$inferSelect | null;
+  novel: typeof novels.$inferSelect | null;
+  characters: string;
+  settings: string;
+}
 
 export class GenerateDomainService {
   constructor(private readonly ctx: ServiceContext) {}
-
-  private async resolveModel(modelConfigId?: string | null): Promise<LanguageModel> {
-    if (modelConfigId) {
-      const [customConfig] = await this.ctx.db
-        .select()
-        .from(llmConfigs)
-        .where(eq(llmConfigs.id, modelConfigId));
-      if (customConfig) {
-        return createLanguageModelFromConfig(customConfig, this.ctx.env);
-      }
-    }
-    const [defaultConfig] = await this.ctx.db
-      .select()
-      .from(llmConfigs)
-      .where(eq(llmConfigs.isDefault, true));
-    if (defaultConfig) {
-      return createLanguageModelFromConfig(defaultConfig, this.ctx.env);
-    }
-
-    return this.ctx.llm;
-  }
 
   async generatePlot(novelId: string, modelConfigId?: string | null) {
     const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
@@ -75,7 +78,7 @@ export class GenerateDomainService {
       characters: context.characters,
     });
 
-    const llm = await this.resolveModel(modelConfigId);
+    const llm = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
     return generateJSON<{
       title: string;
       description: string;
@@ -182,7 +185,7 @@ export class GenerateDomainService {
       },
     );
 
-    const llm = await this.resolveModel(modelConfigId);
+    const llm = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
     for await (const chunk of streamText(llm, prompt)) {
       yield chunk;
     }
@@ -227,7 +230,16 @@ export class GenerateDomainService {
     };
   }
 
-  async proofreadContent(sectionId: string, customBody?: string, modelConfigId?: string | null) {
+  /**
+   * proofreadContent / inlineAssist 共通のコンテキスト解決。
+   * 節を取得して章・小説をたどり、小説が判明すれば RAG で関連キャラクター・設定を検索する。
+   * ragQuery は検索クエリ文字列を組み立てる関数（proofreadContent は本文と節タイトル、
+   * inlineAssist は選択テキストをクエリに使う）。
+   */
+  private async resolveSectionContext(
+    sectionId: string,
+    buildRagQuery: (section: typeof sections.$inferSelect) => string,
+  ): Promise<SectionPromptContext> {
     const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
     assertFound(section, 'Section not found');
 
@@ -239,6 +251,26 @@ export class GenerateDomainService {
       ? await this.ctx.db.select().from(novels).where(eq(novels.id, chapter.novelId))
       : [null];
 
+    const context = novel
+      ? await searchContext(
+          this.ctx.vectorStore,
+          this.ctx.embedding,
+          novel.id,
+          { query: buildRagQuery(section) },
+          this.ctx.env,
+        )
+      : { characters: [], settings: [] };
+
+    return {
+      section,
+      chapter: chapter ?? null,
+      novel: novel ?? null,
+      characters: context.characters.join('\n'),
+      settings: context.settings.join('\n'),
+    };
+  }
+
+  async proofreadContent(sectionId: string, customBody?: string, modelConfigId?: string | null) {
     let bodyText = customBody;
     if (bodyText === undefined) {
       const [content] = await this.ctx.db
@@ -248,15 +280,10 @@ export class GenerateDomainService {
       bodyText = content?.body ?? '';
     }
 
-    const context = novel
-      ? await searchContext(
-          this.ctx.vectorStore,
-          this.ctx.embedding,
-          novel.id,
-          { query: bodyText || section.title || '' },
-          this.ctx.env,
-        )
-      : { characters: [], settings: [] };
+    const { section, chapter, novel, characters, settings } = await this.resolveSectionContext(
+      sectionId,
+      (section) => bodyText || section.title || '',
+    );
 
     const prompt = proofreadPrompt({
       novelTitle: novel?.title,
@@ -264,12 +291,12 @@ export class GenerateDomainService {
       sectionTitle: section.title ?? undefined,
       sectionSummary: section.summary ?? undefined,
       styleGuide: novel?.styleGuide ?? undefined,
-      characters: context.characters.join('\n'),
-      settings: context.settings.join('\n'),
+      characters,
+      settings,
       body: bodyText,
     });
 
-    const llm = await this.resolveModel(modelConfigId);
+    const llm = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
     const result = await generateJSON<{
       score: number;
       critique: string;
@@ -298,25 +325,10 @@ export class GenerateDomainService {
       variantCount?: number;
     },
   ): AsyncIterable<{ text: string; variant: number }> {
-    const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
-    assertFound(section, 'Section not found');
-    const [chapter] = await this.ctx.db
-      .select()
-      .from(chapters)
-      .where(eq(chapters.id, section.chapterId));
-    const [novel] = chapter
-      ? await this.ctx.db.select().from(novels).where(eq(novels.id, chapter.novelId))
-      : [null];
-
-    const context = novel
-      ? await searchContext(
-          this.ctx.vectorStore,
-          this.ctx.embedding,
-          novel.id,
-          { query: input.selectedText },
-          this.ctx.env,
-        )
-      : { characters: [], settings: [] };
+    const { section, chapter, novel, characters, settings } = await this.resolveSectionContext(
+      sectionId,
+      () => input.selectedText,
+    );
 
     let action = input.action;
     let customTemplate: string | undefined;
@@ -333,58 +345,17 @@ export class GenerateDomainService {
     }
 
     const totalVariants = Math.max(1, Math.min(3, input.variantCount ?? 1));
-    const llm = await this.resolveModel(input.modelConfigId);
+    const llm = await resolveLLMModel(this.ctx, input.modelConfigId, 'throw');
 
-    // 単一生成の場合
-    if (totalVariants === 1) {
-      const prompt = inlineAssistPrompt({
+    const buildPrompt = (variantIndex: number) =>
+      inlineAssistPrompt({
         novelTitle: novel?.title,
         chapterTitle: chapter?.title,
         sectionTitle: section.title ?? undefined,
         sectionSummary: section.summary ?? undefined,
         styleGuide: novel?.styleGuide ?? undefined,
-        characters: context.characters.join('\n'),
-        settings: context.settings.join('\n'),
-        surroundingText: input.surroundingText,
-        selectedText: input.selectedText,
-        action,
-        customInstruction: input.customInstruction,
-        customTemplate,
-        variantIndex: 1,
-        totalVariants: 1,
-      });
-
-      for await (const chunk of streamText(llm, prompt)) {
-        yield { text: chunk, variant: 0 };
-      }
-      return;
-    }
-
-    // 複数バリエーション並列生成の場合
-    type VariantChunk = { text: string; variant: number } | { error: unknown } | null;
-    const queue: VariantChunk[] = [];
-    let resolveNext: (() => void) | null = null;
-    let activeTasks = totalVariants;
-
-    const pushItem = (item: VariantChunk) => {
-      queue.push(item);
-      if (resolveNext) {
-        const r = resolveNext;
-        resolveNext = null;
-        r();
-      }
-    };
-
-    for (let v = 0; v < totalVariants; v++) {
-      const variantIndex = v + 1;
-      const prompt = inlineAssistPrompt({
-        novelTitle: novel?.title,
-        chapterTitle: chapter?.title,
-        sectionTitle: section.title ?? undefined,
-        sectionSummary: section.summary ?? undefined,
-        styleGuide: novel?.styleGuide ?? undefined,
-        characters: context.characters.join('\n'),
-        settings: context.settings.join('\n'),
+        characters,
+        settings,
         surroundingText: input.surroundingText,
         selectedText: input.selectedText,
         action,
@@ -394,40 +365,21 @@ export class GenerateDomainService {
         totalVariants,
       });
 
-      (async () => {
-        try {
-          for await (const chunk of streamText(llm, prompt)) {
-            pushItem({ text: chunk, variant: v });
-          }
-        } catch (err) {
-          pushItem({ error: err });
-        } finally {
-          activeTasks--;
-          if (activeTasks === 0) {
-            pushItem(null); // 終了シグナル
-          }
-        }
-      })();
+    // 単一生成の場合
+    if (totalVariants === 1) {
+      for await (const chunk of streamText(llm, buildPrompt(1))) {
+        yield { text: chunk, variant: 0 };
+      }
+      return;
     }
 
-    while (true) {
-      if (queue.length === 0) {
-        await new Promise<void>((r) => {
-          resolveNext = r;
-        });
-      }
-
-      const item = queue.shift();
-      if (item === null) {
-        break;
-      }
-      if (item && 'error' in item) {
-        throw item.error;
-      }
-      if (item && 'text' in item) {
-        yield item;
-      }
+    // 複数バリエーション並列生成の場合（チャンクにバリアント番号を付けて到着順にマージする）
+    const streams: AsyncGenerator<{ text: string; variant: number }>[] = [];
+    for (let v = 0; v < totalVariants; v++) {
+      streams.push(withVariant(streamText(llm, buildPrompt(v + 1)), v));
     }
+
+    yield* mergeAsyncIterables(streams);
   }
 
   async generateStyleGuideDraft(novelId: string, modelConfigId?: string | null): Promise<string> {
@@ -451,7 +403,7 @@ export class GenerateDomainService {
       settings: context.settings,
     });
 
-    const llm = await this.resolveModel(modelConfigId);
+    const llm = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
     return generateText(llm, prompt);
   }
 
@@ -468,28 +420,17 @@ export class GenerateDomainService {
     const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
     assertFound(novel, 'Novel not found');
 
-    const chapterRows = await this.ctx.db
-      .select()
-      .from(chapters)
-      .where(eq(chapters.novelId, novelId))
-      .orderBy(chapters.order);
-
-    const chaptersWithSections = await Promise.all(
-      chapterRows.map(async (ch) => {
-        const secRows = await this.ctx.db
-          .select()
-          .from(sections)
-          .where(eq(sections.chapterId, ch.id))
-          .orderBy(sections.order);
-        return {
-          title: ch.title,
-          sections: secRows.map((s) => ({
-            title: s.title ?? `節 ${s.order}`,
-            summary: s.summary,
-          })),
-        };
-      }),
-    );
+    // 章・節の構造（本文は不要）を共通ヘルパで一括取得（従来の章ごとの節 SELECT を解消）
+    const structure = await fetchNovelStructureWithContents(this.ctx.db, [novelId], {
+      contentMode: 'none',
+    });
+    const chaptersWithSections = (structure.get(novelId) ?? []).map((node) => ({
+      title: node.chapter.title,
+      sections: node.sections.map(({ section }) => ({
+        title: section.title ?? `節 ${section.order}`,
+        summary: section.summary,
+      })),
+    }));
 
     const timelineRows = await this.ctx.db
       .select()
@@ -521,7 +462,7 @@ export class GenerateDomainService {
       })),
     });
 
-    const llm = await this.resolveModel(input.modelConfigId);
+    const llm = await resolveLLMModel(this.ctx, input.modelConfigId, 'throw');
     return generateJSON<{
       summary: string;
       impactLevel: 'low' | 'medium' | 'high';

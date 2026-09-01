@@ -7,7 +7,7 @@ import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
 import { Input } from '@/components/Input.js';
 import { Loading } from '@/components/Loading.js';
 import { useMarkdownEntityEditor } from '@/hooks/useMarkdownEntityEditor.js';
-import { useChat } from '@/hooks/useChat.js';
+import { useChatUI } from '@/context/ChatContext.js';
 import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import { MonacoEditor } from './-MonacoEditor.js';
@@ -93,7 +93,7 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
     findSectionAtLine,
   });
 
-  const { openChat } = useChat();
+  const { openChat } = useChatUI();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const toast = useToast();

@@ -176,6 +176,12 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
   // 公開 API 用の派生値
   const isStreaming = status === 'submitted' || status === 'streaming';
 
+  // isStreaming を同期参照するための ref。
+  // selectSession など UI 操作系のコールバックが依存に isStreaming を含めずに済み、
+  // コールバックの同一性（= 低頻度 context value の安定性）が保たれる。
+  const isStreamingRef = useRef(isStreaming);
+  isStreamingRef.current = isStreaming;
+
   // 画面に表示する確定済みメッセージ。
   // ストリーミング中のアシスタント部分応答は streamingContent 側で表示するため除外する。
   const messages: ChatMessage[] = useMemo(() => {
@@ -212,20 +218,6 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     if (!last || last.role !== 'assistant') return null;
     return last.parts;
   }, [uiMessages, isStreaming]);
-
-  // 下位コンポーネント（ChatContext 内）が abort のために参照する互換 shim。
-  // useChat の stop() を呼ぶ。
-  const stopFnRef = useRef<() => void>(() => {});
-  stopFnRef.current = () => {
-    void stop();
-  };
-  const abortControllerRef = useRef<{ abort: () => void } | null>(null);
-  abortControllerRef.current = { abort: () => stopFnRef.current() };
-
-  // 既存コンテキストからのリセット呼び出しに応える互換 no-op setter。
-  // 実ストリーミング状態は useChat の status から導出するため state は持たない。
-  const setIsStreaming = useCallback((_value: boolean) => {}, []);
-  const setStreamingContent = useCallback((_value: string) => {}, []);
 
   // 新規セッション作成
   const createSession = useCallback(
@@ -288,6 +280,15 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     );
   }, [setUiMessages, stop]);
 
+  // ストリーミング中断（部分応答を破棄する）。
+  // abortStream() と異なり部分応答を done 化しないため、state==='streaming' の
+  // text パーツを持つメッセージは messages から除外され続け、画面上から消える
+  // （= 破棄される）。セッション切り替えや新規チャット開始のように、
+  // 直後にメッセージ一覧を差し替える呼び出し側向けの中断手段。
+  const abortStreamDiscard = useCallback(async () => {
+    await stop();
+  }, [stop]);
+
   // メッセージ全消去（紐づくセッションごと削除する）
   const clearMessages = useCallback(() => {
     void abortStream();
@@ -339,29 +340,56 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     setError(null);
   }, []);
 
-  return {
-    currentSessionId,
-    setCurrentSessionId,
-    currentSessionIdRef,
-    selectedModelConfigId,
-    setSelectedModelConfigId: handleSetSelectedModelConfigId,
-    messages,
-    setMessages: setUiMessages,
-    isStreaming,
-    setIsStreaming,
-    streamingContent,
-    setStreamingContent,
-    streamingParts,
-    error,
-    setError,
-    clearError,
-    lastPrompt: lastPromptRef.current,
-    retryLastMessage,
-    abortControllerRef,
-    createSession,
-    deleteSession,
-    sendMessage,
-    abortStream,
-    clearMessages,
-  };
+  // 戻り値は ChatProvider から2つの context value に分配されるため
+  // メモ化してフィールド単位の同一性を保証する
+  return useMemo(
+    () => ({
+      currentSessionId,
+      setCurrentSessionId,
+      currentSessionIdRef,
+      selectedModelConfigId,
+      setSelectedModelConfigId: handleSetSelectedModelConfigId,
+      messages,
+      setMessages: setUiMessages,
+      isStreaming,
+      isStreamingRef,
+      streamingContent,
+      streamingParts,
+      error,
+      setError,
+      clearError,
+      lastPrompt: lastPromptRef.current,
+      retryLastMessage,
+      createSession,
+      deleteSession,
+      sendMessage,
+      abortStream,
+      abortStreamDiscard,
+      clearMessages,
+    }),
+    [
+      currentSessionId,
+      setCurrentSessionId,
+      currentSessionIdRef,
+      selectedModelConfigId,
+      handleSetSelectedModelConfigId,
+      messages,
+      setUiMessages,
+      isStreaming,
+      isStreamingRef,
+      streamingContent,
+      streamingParts,
+      error,
+      setError,
+      clearError,
+      lastPromptRef.current,
+      retryLastMessage,
+      createSession,
+      deleteSession,
+      sendMessage,
+      abortStream,
+      abortStreamDiscard,
+      clearMessages,
+    ],
+  );
 }

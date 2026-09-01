@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { chapters, characters, contents, novels, sections, settings } from '@novel-creator/db';
+import { characters, novels, settings } from '@novel-creator/db';
 import { generateEmbedding } from '@novel-creator/llm';
 import { eq } from 'drizzle-orm';
 import type { VectorRecord } from '@novel-creator/vector';
 import { EmbeddingConfigDomainService } from './embedding-config.service.js';
+import { fetchNovelStructureWithContents } from './novel-structure.js';
 import type { ServiceContext } from './types.js';
 
 export interface ReindexProgressEvent {
@@ -55,6 +56,12 @@ export class ReindexDomainService {
 
     // 3. 全小説のエンティティ（人物、設定、本文）を収集
     const allNovels = await this.ctx.db.select().from(novels);
+    // 章・節・本文を小説 ID 単位でバルク取得（従来の章ごと・節ごとの個別 SELECT を解消。
+    // 全小説対象でも chapters / sections / contents の 3 クエリで済む）
+    const structureMap = await fetchNovelStructureWithContents(
+      this.ctx.db,
+      allNovels.map((novel) => novel.id),
+    );
     const itemsToEmbed: EntityToEmbed[] = [];
 
     for (const novel of allNovels) {
@@ -106,25 +113,16 @@ export class ReindexDomainService {
         });
       }
 
-      // 章および節の本文
-      const chaps = await this.ctx.db.select().from(chapters).where(eq(chapters.novelId, novel.id));
-      for (const chap of chaps) {
-        const sects = await this.ctx.db
-          .select()
-          .from(sections)
-          .where(eq(sections.chapterId, chap.id));
-        for (const sect of sects) {
-          const [cnt] = await this.ctx.db
-            .select()
-            .from(contents)
-            .where(eq(contents.sectionId, sect.id));
-          if (cnt && cnt.body && cnt.body.trim()) {
+      // 章および節の本文（章・節・本文は structureMap にバルク取得済み）
+      for (const chapterNode of structureMap.get(novel.id) ?? []) {
+        for (const { section: sect, body: cntBody } of chapterNode.sections) {
+          if (cntBody && cntBody.trim()) {
             itemsToEmbed.push({
               id: randomUUID(),
               novelId: novel.id,
               entityType: 'content',
               entityId: sect.id,
-              content: cnt.body.trim(),
+              content: cntBody.trim(),
               title: `本文: ${sect.title || `第${sect.order}節`}`,
             });
           }

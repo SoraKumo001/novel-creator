@@ -10,6 +10,7 @@ import { Card, CardHeader } from '@/components/Card.js';
 import { ConfirmDialog } from '@/components/ConfirmDialog.js';
 import { EmptyState } from '@/components/EmptyState.js';
 import { Loading } from '@/components/Loading.js';
+import { Select } from '@/components/Select.js';
 import { IconButton, PencilIcon, PlusIcon, TrashIcon } from './-Icons.js';
 
 export interface EntityListTabConfig<
@@ -128,11 +129,11 @@ export function EntityListTab<
             <>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span>並び順:</span>
-                <select
+                <Select
                   aria-label="並び順"
                   value={sortOption}
                   onChange={(e) => handleSortChange(e.target.value as EntitySortOption)}
-                  className="rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs text-foreground focus:border-primary focus:outline-none"
+                  className="px-2.5 py-1.5 text-xs focus:border-primary focus:outline-none"
                 >
                   <option value="category-asc-name-asc">カテゴリ昇順・名前昇順</option>
                   <option value="category-asc-name-desc">カテゴリ昇順・名前降順</option>
@@ -140,7 +141,7 @@ export function EntityListTab<
                   <option value="category-desc-name-desc">カテゴリ降順・名前降順</option>
                   <option value="name-asc">名前昇順 (あ→ん)</option>
                   <option value="name-desc">名前降順 (ん→あ)</option>
-                </select>
+                </Select>
               </div>
 
               <Button onClick={config.onNew} leftIcon={<PlusIcon />}>

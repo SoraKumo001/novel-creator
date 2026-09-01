@@ -103,6 +103,20 @@ async function readAnalysisSse(
   }
 }
 
+/** 分析種別の判定ガード。RPC 推論型では string に落ちるため復元に使う。 */
+function isAnalysisType(v: string): v is AnalysisType {
+  return v === 'story-arc' || v === 'check-voice' || v === 'persona-review';
+}
+
+/**
+ * DB の jsonb に保存された多形 result ペイロードの判定ガード。
+ * 3 種類の result（StoryArcResult / CharacterVoiceCheckResult / MultiPersonaReviewResult）
+ * はいずれも JSON オブジェクト形式のため、オブジェクト性のみを検証する。
+ */
+function isAnalysisResult(v: unknown): v is AnalysisHistoryEntry['result'] {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
 /**
  * ストーリーアーク・テンション分析を実行する（SSE）。
  * complete イベントの result を解決する。
@@ -236,10 +250,23 @@ export async function listAnalysisResults(
   if (!res.ok) {
     throw await parseResponseError(res, '分析履歴の取得');
   }
-  return ((await res.json()) as unknown as AnalysisHistoryEntry[]).map((entry) => ({
-    ...entry,
-    createdAt: entry.createdAt ?? new Date(0).toISOString(),
-  }));
+  // result は analysisType に応じた多形 JSON（DB の jsonb）のため、RPC 推論型では JSONValue に
+  // 落ちる。analysisType / result は型ガードでドメイン型へ復元し、他のフィールドは推論型を
+  // そのまま使う。
+  return (await res.json()).map((entry) => {
+    if (!isAnalysisResult(entry.result)) {
+      throw new Error(`分析結果の形式が不正です（id: ${entry.id}）`);
+    }
+    if (!isAnalysisType(entry.analysisType)) {
+      throw new Error(`分析種別の形式が不正です（id: ${entry.id}）`);
+    }
+    return {
+      ...entry,
+      analysisType: entry.analysisType,
+      result: entry.result,
+      createdAt: entry.createdAt ?? new Date(0).toISOString(),
+    };
+  });
 }
 
 /**

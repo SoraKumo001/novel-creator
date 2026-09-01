@@ -1,4 +1,3 @@
-import { tool } from 'ai';
 import { z } from 'zod';
 import { eq } from 'drizzle-orm';
 import { chapters } from '@novel-creator/db';
@@ -11,9 +10,7 @@ import { SectionDomainService } from '../section.service.js';
 import { ForeshadowingDomainService } from '../foreshadowing.service.js';
 import { TimelineDomainService } from '../timeline.service.js';
 import { searchContext } from '../../rag.js';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const createTool = tool as any;
+import { scopedTool } from './scopedTool.js';
 
 // ===== トークン爆発防止のための truncation ヘルパー（pure function） =====
 
@@ -113,59 +110,47 @@ export function createReadTools(
   };
 
   return {
-    getNovelInfo: createTool({
+    getNovelInfo: scopedTool({
       description: '小説の基本情報（タイトル、あらすじ、概要）を取得します。',
       parameters: z.object({
         novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
       }),
-      execute: async ({ novelId }: { novelId?: string }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
-        }
-        try {
-          const detail = await novelService.getNovelDetail(targetId);
-          return {
-            id: detail.novel.id,
-            title: detail.novel.title,
-            description: detail.novel.description,
-            storyOutline: truncateText(detail.novel.storyOutline, 2000),
-            chapterCount: detail.chapters.length,
-            characterCount: detail.characters.length,
-            settingCount: detail.settings.length,
-            createdAt: detail.novel.createdAt,
-            updatedAt: detail.novel.updatedAt,
-          };
-        } catch {
-          return { error: '指定された小説が見つかりませんでした。' };
-        }
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: '指定された小説が見つかりませんでした。',
+      run: async (targetId) => {
+        const detail = await novelService.getNovelDetail(targetId);
+        return {
+          id: detail.novel.id,
+          title: detail.novel.title,
+          description: detail.novel.description,
+          storyOutline: truncateText(detail.novel.storyOutline, 2000),
+          chapterCount: detail.chapters.length,
+          characterCount: detail.characters.length,
+          settingCount: detail.settings.length,
+          createdAt: detail.novel.createdAt,
+          updatedAt: detail.novel.updatedAt,
+        };
       },
     }),
 
-    getStoryOutline: createTool({
+    getStoryOutline: scopedTool({
       description:
         '小説のストーリー構想（全体のあらすじ、序盤・中盤・今後の展開候補、結末、構想メモ）のマークダウン内容を取得します。構成や今後の展開・結末の相談時に参照してください。',
       parameters: z.object({
         novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
       }),
-      execute: async ({ novelId }: { novelId?: string }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
-        }
-        try {
-          const detail = await novelService.getNovelDetail(targetId);
-          return {
-            title: detail.novel.title,
-            storyOutline: detail.novel.storyOutline || '（ストーリー構想はまだ作成されていません）',
-          };
-        } catch {
-          return { error: 'ストーリー構想の取得に失敗しました。' };
-        }
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: 'ストーリー構想の取得に失敗しました。',
+      run: async (targetId) => {
+        const detail = await novelService.getNovelDetail(targetId);
+        return {
+          title: detail.novel.title,
+          storyOutline: detail.novel.storyOutline || '（ストーリー構想はまだ作成されていません）',
+        };
       },
     }),
 
-    getCharacters: createTool({
+    getCharacters: scopedTool({
       description:
         '小説に登場するキャラクター一覧または特定のキャラクターの詳細を取得します。名前やカテゴリで絞り込み可能です。',
       parameters: z.object({
@@ -173,52 +158,38 @@ export function createReadTools(
         name: z.string().optional().describe('検索するキャラクター名またはキーワード（部分一致）'),
         category: z.string().optional().describe('キャラクターカテゴリ（主要人物、敵役など）'),
       }),
-      execute: async ({
-        novelId,
-        name,
-        category,
-      }: {
-        novelId?: string;
-        name?: string;
-        category?: string;
-      }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: 'キャラクター情報の取得に失敗しました。',
+      run: async (targetId, { name, category }) => {
+        let list = await characterService.listCharacters(targetId);
+        if (name) {
+          const query = name.toLowerCase();
+          list = list.filter(
+            (c) =>
+              c.name.toLowerCase().includes(query) ||
+              (c.description && c.description.toLowerCase().includes(query)),
+          );
         }
-        try {
-          let list = await characterService.listCharacters(targetId);
-          if (name) {
-            const query = name.toLowerCase();
-            list = list.filter(
-              (c) =>
-                c.name.toLowerCase().includes(query) ||
-                (c.description && c.description.toLowerCase().includes(query)),
-            );
-          }
-          if (category) {
-            list = list.filter((c) => c.category === category);
-          }
-          return {
-            count: list.length,
-            ...(list.length > MAX_LIST_ITEMS
-              ? { truncated: truncationNotice(list.length, MAX_LIST_ITEMS) }
-              : {}),
-            characters: truncateList(list, MAX_LIST_ITEMS).items.map((c) => ({
-              id: c.id,
-              name: c.name,
-              category: c.category,
-              description: truncateText(c.description),
-              traits: c.traits,
-            })),
-          };
-        } catch {
-          return { error: 'キャラクター情報の取得に失敗しました。' };
+        if (category) {
+          list = list.filter((c) => c.category === category);
         }
+        return {
+          count: list.length,
+          ...(list.length > MAX_LIST_ITEMS
+            ? { truncated: truncationNotice(list.length, MAX_LIST_ITEMS) }
+            : {}),
+          characters: truncateList(list, MAX_LIST_ITEMS).items.map((c) => ({
+            id: c.id,
+            name: c.name,
+            category: c.category,
+            description: truncateText(c.description),
+            traits: c.traits,
+          })),
+        };
       },
     }),
 
-    getSettings: createTool({
+    getSettings: scopedTool({
       description:
         '小説の世界観・設定（用語、地理、魔法、組織、アイテム等）の一覧または特定設定の詳細を取得します。',
       parameters: z.object({
@@ -226,132 +197,106 @@ export function createReadTools(
         name: z.string().optional().describe('検索する設定名またはキーワード（部分一致）'),
         category: z.string().optional().describe('設定カテゴリ（世界観、地理、魔法体系など）'),
       }),
-      execute: async ({
-        novelId,
-        name,
-        category,
-      }: {
-        novelId?: string;
-        name?: string;
-        category?: string;
-      }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: '設定情報の取得に失敗しました。',
+      run: async (targetId, { name, category }) => {
+        let list = await settingService.listSettings(targetId);
+        if (name) {
+          const query = name.toLowerCase();
+          list = list.filter(
+            (s) =>
+              s.name.toLowerCase().includes(query) ||
+              (s.description && s.description.toLowerCase().includes(query)),
+          );
         }
-        try {
-          let list = await settingService.listSettings(targetId);
-          if (name) {
-            const query = name.toLowerCase();
-            list = list.filter(
-              (s) =>
-                s.name.toLowerCase().includes(query) ||
-                (s.description && s.description.toLowerCase().includes(query)),
-            );
-          }
-          if (category) {
-            list = list.filter((s) => s.category === category);
-          }
-          return {
-            count: list.length,
-            ...(list.length > MAX_LIST_ITEMS
-              ? { truncated: truncationNotice(list.length, MAX_LIST_ITEMS) }
-              : {}),
-            settings: truncateList(list, MAX_LIST_ITEMS).items.map((s) => ({
-              id: s.id,
-              name: s.name,
-              category: s.category,
-              description: truncateText(s.description),
-            })),
-          };
-        } catch {
-          return { error: '設定情報の取得に失敗しました。' };
+        if (category) {
+          list = list.filter((s) => s.category === category);
         }
+        return {
+          count: list.length,
+          ...(list.length > MAX_LIST_ITEMS
+            ? { truncated: truncationNotice(list.length, MAX_LIST_ITEMS) }
+            : {}),
+          settings: truncateList(list, MAX_LIST_ITEMS).items.map((s) => ({
+            id: s.id,
+            name: s.name,
+            category: s.category,
+            description: truncateText(s.description),
+          })),
+        };
       },
     }),
 
-    getPlotAndChapters: createTool({
+    getPlotAndChapters: scopedTool({
       description:
         '小説の全章（Chapter）および各節（Section）の構成、プロット・あらすじ一覧を取得します。',
       parameters: z.object({
         novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
       }),
-      execute: async ({ novelId }: { novelId?: string }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
-        }
-        try {
-          const chapterRows = await chapterService.listChapters(targetId);
-          const chapterTrunc = truncateList(chapterRows, MAX_STRUCTURE_ITEMS);
-          const chaptersWithSections = await Promise.all(
-            chapterTrunc.items.map(async (ch) => {
-              const sections = await sectionService.listSections(ch.id);
-              const sectionTrunc = truncateList(sections, MAX_STRUCTURE_ITEMS);
-              return {
-                id: ch.id,
-                title: ch.title,
-                order: ch.order,
-                summary: truncateText(ch.summary),
-                sections: sectionTrunc.items.map((sec) => ({
-                  id: sec.id,
-                  title: sec.title,
-                  order: sec.order,
-                  summary: truncateText(sec.summary),
-                })),
-                ...(sectionTrunc.notice ? { truncatedSections: sectionTrunc.notice } : {}),
-              };
-            }),
-          );
-          return {
-            chapterCount: chapterRows.length,
-            ...(chapterTrunc.notice ? { truncated: chapterTrunc.notice } : {}),
-            chapters: chaptersWithSections,
-          };
-        } catch {
-          return { error: '章・プロット情報の取得に失敗しました。' };
-        }
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: '章・プロット情報の取得に失敗しました。',
+      run: async (targetId) => {
+        const chapterRows = await chapterService.listChapters(targetId);
+        const chapterTrunc = truncateList(chapterRows, MAX_STRUCTURE_ITEMS);
+        const chaptersWithSections = await Promise.all(
+          chapterTrunc.items.map(async (ch) => {
+            const sections = await sectionService.listSections(ch.id);
+            const sectionTrunc = truncateList(sections, MAX_STRUCTURE_ITEMS);
+            return {
+              id: ch.id,
+              title: ch.title,
+              order: ch.order,
+              summary: truncateText(ch.summary),
+              sections: sectionTrunc.items.map((sec) => ({
+                id: sec.id,
+                title: sec.title,
+                order: sec.order,
+                summary: truncateText(sec.summary),
+              })),
+              ...(sectionTrunc.notice ? { truncatedSections: sectionTrunc.notice } : {}),
+            };
+          }),
+        );
+        return {
+          chapterCount: chapterRows.length,
+          ...(chapterTrunc.notice ? { truncated: chapterTrunc.notice } : {}),
+          chapters: chaptersWithSections,
+        };
       },
     }),
 
-    getSectionContent: createTool({
+    getSectionContent: scopedTool({
       description: '指定された節（Section）の本文テキストを取得します。',
       parameters: z.object({
         sectionId: z.string().describe('取得対象の節ID（Section ID）'),
       }),
-      execute: async ({ sectionId }: { sectionId: string }) => {
-        // バインドされた novelId にスコープを限定する（LLM による指定は受け付けない）。
-        const scopedNovelId = defaultNovelId || null;
-        if (!scopedNovelId) {
-          return { error: '対象の小説が指定されていません。' };
-        }
-        try {
-          const { section, content } = await sectionService.getSectionWithContent(sectionId);
-          // novelId スコープ判定: sections テーブルに novelId カラムはないため、
-          // 親章（chapters）の novelId がバインドされた小説と一致するかを確認する。
-          const [chapter] = await ctx.db
-            .select()
-            .from(chapters)
-            .where(eq(chapters.id, section.chapterId));
-          if (!isSectionInScope(scopedNovelId, chapter)) {
-            return {
-              error:
-                '指定された節が見つかりません（他の小説に属しているため、現在の相談対象からは参照できません）。',
-            };
-          }
+      // バインドされた novelId にスコープを限定する（LLM による指定は受け付けない）。
+      resolve: () => defaultNovelId || null,
+      errorMessage: '指定された節または本文が見つかりませんでした。',
+      run: async (scopedNovelId, { sectionId }) => {
+        const { section, content } = await sectionService.getSectionWithContent(sectionId);
+        // novelId スコープ判定: sections テーブルに novelId カラムはないため、
+        // 親章（chapters）の novelId がバインドされた小説と一致するかを確認する。
+        const [chapter] = await ctx.db
+          .select()
+          .from(chapters)
+          .where(eq(chapters.id, section.chapterId));
+        if (!isSectionInScope(scopedNovelId, chapter)) {
           return {
-            sectionId: section.id,
-            title: section.title,
-            summary: truncateText(section.summary),
-            content: content ? truncateText(content.body) : '（本文はまだ作成されていません）',
+            error:
+              '指定された節が見つかりません（他の小説に属しているため、現在の相談対象からは参照できません）。',
           };
-        } catch {
-          return { error: '指定された節または本文が見つかりませんでした。' };
         }
+        return {
+          sectionId: section.id,
+          title: section.title,
+          summary: truncateText(section.summary),
+          content: content ? truncateText(content.body) : '（本文はまだ作成されていません）',
+        };
       },
     }),
 
-    getForeshadowings: createTool({
+    getForeshadowings: scopedTool({
       description:
         '小説に登録されている伏線の一覧、進捗状況（未回収/回収済/破棄）、詳細説明を取得します。',
       parameters: z.object({
@@ -363,108 +308,84 @@ export function createReadTools(
             '伏線のステータスで絞り込み（unresolved: 未回収, resolved: 回収済, abandoned: 破棄）',
           ),
       }),
-      execute: async ({
-        novelId,
-        status,
-      }: {
-        novelId?: string;
-        status?: 'unresolved' | 'resolved' | 'abandoned';
-      }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: '伏線情報の取得に失敗しました。',
+      run: async (targetId, { status }) => {
+        let list = await foreshadowingService.getForeshadowingsByNovel(targetId);
+        if (status) {
+          list = list.filter((f) => f.status === status);
         }
-        try {
-          let list = await foreshadowingService.getForeshadowingsByNovel(targetId);
-          if (status) {
-            list = list.filter((f) => f.status === status);
-          }
-          const trunc = truncateList(list, MAX_STRUCTURE_ITEMS);
-          return {
-            count: list.length,
-            ...(trunc.notice ? { truncated: trunc.notice } : {}),
-            foreshadowings: trunc.items.map((f) => ({
-              id: f.id,
-              title: f.title,
-              status: f.status,
-              description: truncateText(f.description),
-              placedSectionId: f.placedSectionId,
-              resolvedSectionId: f.resolvedSectionId,
-              createdAt: f.createdAt,
-            })),
-          };
-        } catch {
-          return { error: '伏線情報の取得に失敗しました。' };
-        }
+        const trunc = truncateList(list, MAX_STRUCTURE_ITEMS);
+        return {
+          count: list.length,
+          ...(trunc.notice ? { truncated: trunc.notice } : {}),
+          foreshadowings: trunc.items.map((f) => ({
+            id: f.id,
+            title: f.title,
+            status: f.status,
+            description: truncateText(f.description),
+            placedSectionId: f.placedSectionId,
+            resolvedSectionId: f.resolvedSectionId,
+            createdAt: f.createdAt,
+          })),
+        };
       },
     }),
 
-    getTimelines: createTool({
+    getTimelines: scopedTool({
       description: '作中の時系列・年表イベントの一覧を取得します。',
       parameters: z.object({
         novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
       }),
-      execute: async ({ novelId }: { novelId?: string }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
-        }
-        try {
-          const list = await timelineService.listTimelines(targetId);
-          const trunc = truncateList(list, MAX_STRUCTURE_ITEMS);
-          return {
-            count: list.length,
-            ...(trunc.notice ? { truncated: trunc.notice } : {}),
-            timelines: trunc.items.map((t) => ({
-              id: t.id,
-              event: truncateText(t.event),
-              timestamp: t.timestamp,
-              order: t.order,
-              sectionId: t.sectionId,
-            })),
-          };
-        } catch {
-          return { error: 'タイムライン情報の取得に失敗しました。' };
-        }
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: 'タイムライン情報の取得に失敗しました。',
+      run: async (targetId) => {
+        const list = await timelineService.listTimelines(targetId);
+        const trunc = truncateList(list, MAX_STRUCTURE_ITEMS);
+        return {
+          count: list.length,
+          ...(trunc.notice ? { truncated: trunc.notice } : {}),
+          timelines: trunc.items.map((t) => ({
+            id: t.id,
+            event: truncateText(t.event),
+            timestamp: t.timestamp,
+            order: t.order,
+            sectionId: t.sectionId,
+          })),
+        };
       },
     }),
 
-    searchNovelKnowledge: createTool({
+    searchNovelKnowledge: scopedTool({
       description:
         '質問やキーワードに関連する小説情報（設定・人物・本文等）をセマンティック検索（ベクトル検索）します。',
       parameters: z.object({
         query: z.string().describe('検索キーワードまたは質問文'),
         novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
       }),
-      execute: async ({ query, novelId }: { query: string; novelId?: string }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
-        }
-        try {
-          const ragResult = await searchContext(
-            ctx.vectorStore,
-            ctx.embedding,
-            targetId,
-            { query },
-            ctx.env,
-          );
-          // セマンティック検索結果もカテゴリごとに件数上限を適用する（topK 超過に備える）。
-          const charTrunc = truncateList(ragResult.characters, MAX_SEARCH_ITEMS);
-          const settingTrunc = truncateList(ragResult.settings, MAX_SEARCH_ITEMS);
-          return {
-            ...(charTrunc.notice || settingTrunc.notice
-              ? {
-                  truncated:
-                    [charTrunc.notice, settingTrunc.notice].filter(Boolean).join(' / ') || null,
-                }
-              : {}),
-            characters: charTrunc.items.map((c) => truncateText(c)),
-            settings: settingTrunc.items.map((s) => truncateText(s)),
-          };
-        } catch {
-          return { error: '関連ナレッジの検索に失敗しました。' };
-        }
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: '関連ナレッジの検索に失敗しました。',
+      run: async (targetId, { query }) => {
+        const ragResult = await searchContext(
+          ctx.vectorStore,
+          ctx.embedding,
+          targetId,
+          { query },
+          ctx.env,
+        );
+        // セマンティック検索結果もカテゴリごとに件数上限を適用する（topK 超過に備える）。
+        const charTrunc = truncateList(ragResult.characters, MAX_SEARCH_ITEMS);
+        const settingTrunc = truncateList(ragResult.settings, MAX_SEARCH_ITEMS);
+        return {
+          ...(charTrunc.notice || settingTrunc.notice
+            ? {
+                truncated:
+                  [charTrunc.notice, settingTrunc.notice].filter(Boolean).join(' / ') || null,
+              }
+            : {}),
+          characters: charTrunc.items.map((c) => truncateText(c)),
+          settings: settingTrunc.items.map((s) => truncateText(s)),
+        };
       },
     }),
   };

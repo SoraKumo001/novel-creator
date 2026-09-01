@@ -1,22 +1,21 @@
 import { and, desc, eq } from 'drizzle-orm';
-import type { LanguageModel } from 'ai';
 import {
   analysisResults,
   chapters,
   characters,
   contents,
-  llmConfigs,
   novels,
   sections,
 } from '@novel-creator/db';
 import {
   analyzeStoryArcPrompt,
   checkCharacterVoicePrompt,
-  createLanguageModelFromConfig,
   generateJSON,
   multiPersonaReviewPrompt,
   type ReaderPersonaType,
 } from '@novel-creator/llm';
+import { resolveLLMModel } from './model-resolver.js';
+import { fetchNovelStructureWithContents } from './novel-structure.js';
 import { assertFound, type ServiceContext } from './types.js';
 
 export type AnalysisStreamEvent =
@@ -33,27 +32,6 @@ function sleep(ms: number): Promise<void> {
 
 export class AnalysisDomainService {
   constructor(private readonly ctx: ServiceContext) {}
-
-  private async resolveModel(modelConfigId?: string | null): Promise<LanguageModel> {
-    if (modelConfigId) {
-      const [customConfig] = await this.ctx.db
-        .select()
-        .from(llmConfigs)
-        .where(eq(llmConfigs.id, modelConfigId));
-      if (customConfig) {
-        return createLanguageModelFromConfig(customConfig, this.ctx.env);
-      }
-    }
-    const [defaultConfig] = await this.ctx.db
-      .select()
-      .from(llmConfigs)
-      .where(eq(llmConfigs.isDefault, true));
-    if (defaultConfig) {
-      return createLanguageModelFromConfig(defaultConfig, this.ctx.env);
-    }
-
-    return this.ctx.llm;
-  }
 
   /**
    * LLM 呼び出しをハートビートで包む。
@@ -89,28 +67,16 @@ export class AnalysisDomainService {
   /**
    * 小説全体の本文を章→節の順に結合して返す。
    * 各節の本文には「【章タイトル / 節タイトル】」のヘッダーを付ける。
+   * 章・節・本文は共通ヘルパでバルク取得する（N+1 解消）。
    */
   private async assembleWholeNovelBody(novelId: string): Promise<string> {
-    const chapterRows = await this.ctx.db
-      .select()
-      .from(chapters)
-      .where(eq(chapters.novelId, novelId))
-      .orderBy(chapters.order);
+    const structure = await fetchNovelStructureWithContents(this.ctx.db, [novelId]);
 
     const parts: string[] = [];
-    for (const ch of chapterRows) {
-      const secRows = await this.ctx.db
-        .select()
-        .from(sections)
-        .where(eq(sections.chapterId, ch.id))
-        .orderBy(sections.order);
-      for (const s of secRows) {
-        const [content] = await this.ctx.db
-          .select()
-          .from(contents)
-          .where(eq(contents.sectionId, s.id));
-        if (content?.body) {
-          parts.push(`【${ch.title} / ${s.title ?? `節 ${s.order}`}】\n${content.body}`);
+    for (const { chapter, sections: sectionNodes } of structure.get(novelId) ?? []) {
+      for (const { section, body } of sectionNodes) {
+        if (body) {
+          parts.push(`【${chapter.title} / ${section.title ?? `節 ${section.order}`}】\n${body}`);
         }
       }
     }
@@ -125,11 +91,13 @@ export class AnalysisDomainService {
     const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
     assertFound(novel, 'Novel not found');
 
-    const chapterRows = await this.ctx.db
-      .select()
-      .from(chapters)
-      .where(eq(chapters.novelId, novelId))
-      .orderBy(chapters.order);
+    // プロンプトには節本文の先頭 300 文字スニペットのみ使うため、
+    // DB 側で切り詰めたスニペット取得にして全文の過剰フェッチを避ける。
+    const structure = await fetchNovelStructureWithContents(this.ctx.db, [novelId], {
+      contentMode: 'snippet',
+      snippetLength: 300,
+    });
+    const chapterNodes = structure.get(novelId) ?? [];
 
     const chaptersWithSections: Array<{
       id: string;
@@ -144,45 +112,31 @@ export class AnalysisDomainService {
     let sectionCount = 0;
     let current = 0;
 
-    for (const ch of chapterRows) {
-      const secRows = await this.ctx.db
-        .select()
-        .from(sections)
-        .where(eq(sections.chapterId, ch.id))
-        .orderBy(sections.order);
-
-      const sectionsData: Array<{
-        id: string;
-        title: string;
-        summary: string | null;
-        contentSnippet?: string;
-      }> = [];
-      for (const s of secRows) {
-        const [content] = await this.ctx.db
-          .select()
-          .from(contents)
-          .where(eq(contents.sectionId, s.id));
-        const snippet = content?.body ? content.body.slice(0, 300) : undefined;
-        sectionsData.push({
-          id: s.id,
-          title: s.title ?? `節 ${s.order}`,
-          summary: s.summary,
-          contentSnippet: snippet,
-        });
-      }
+    for (const node of chapterNodes) {
+      const sectionsData = node.sections.map(({ section, body }) => ({
+        id: section.id,
+        title: section.title ?? `節 ${section.order}`,
+        summary: section.summary,
+        contentSnippet: body || undefined,
+      }));
 
       sectionCount += sectionsData.length;
       chaptersWithSections.push({
-        id: ch.id,
-        title: ch.title,
+        id: node.chapter.id,
+        title: node.chapter.title,
         sections: sectionsData,
       });
 
       current += 1;
-      yield { type: 'progress', stage: '章・節の本文を収集中', current, total: chapterRows.length };
+      yield {
+        type: 'progress',
+        stage: '章・節の本文を収集中',
+        current,
+        total: chapterNodes.length,
+      };
     }
 
-    if (chapterRows.length === 0 || sectionCount === 0) {
+    if (chapterNodes.length === 0 || sectionCount === 0) {
       throw new Error('章・節が登録されていないため分析できません');
     }
 
@@ -191,7 +145,7 @@ export class AnalysisDomainService {
       chapters: chaptersWithSections,
     });
 
-    const llm = await this.resolveModel(modelConfigId);
+    const llm = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
     const llmPromise = generateJSON<{
       summary: string;
       pacingCritique: string;
@@ -277,7 +231,7 @@ export class AnalysisDomainService {
       body: bodyText,
     });
 
-    const llm = await this.resolveModel(modelConfigId);
+    const llm = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
     const llmPromise = generateJSON<{
       summary: string;
       issues: Array<{
@@ -349,18 +303,18 @@ export class AnalysisDomainService {
       if (ch) {
         chapterTitle = ch.title;
         if (!bodyText) {
-          const secRows = await this.ctx.db
-            .select()
-            .from(sections)
-            .where(eq(sections.chapterId, ch.id))
-            .orderBy(sections.order);
+          // 章内の節本文をヘルパでバルク取得（従来の節ごとの個別 SELECT を解消）
+          const structure = await fetchNovelStructureWithContents(this.ctx.db, [ch.novelId]);
+          const chapterNode = (structure.get(ch.novelId) ?? []).find(
+            (candidate) => candidate.chapter.id === ch.id,
+          );
           const bodies: string[] = [];
-          for (const s of secRows) {
-            const [c] = await this.ctx.db
-              .select()
-              .from(contents)
-              .where(eq(contents.sectionId, s.id));
-            if (c?.body) bodies.push(`【${s.title ?? `節 ${s.order}`}】\n${c.body}`);
+          if (chapterNode) {
+            for (const { section, body } of chapterNode.sections) {
+              if (body) {
+                bodies.push(`【${section.title ?? `節 ${section.order}`}】\n${body}`);
+              }
+            }
           }
           bodyText = bodies.join('\n\n');
         }
@@ -381,7 +335,7 @@ export class AnalysisDomainService {
       text: bodyText,
     });
 
-    const llm = await this.resolveModel(input.modelConfigId);
+    const llm = await resolveLLMModel(this.ctx, input.modelConfigId, 'throw');
     const llmPromise = generateJSON<{
       overallImpression: string;
       reviews: Array<{

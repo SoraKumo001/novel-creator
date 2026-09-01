@@ -4,6 +4,7 @@ import { Button } from '@/components/Button.js';
 import { Card, CardHeader } from '@/components/Card.js';
 import { ConfirmDialog } from '@/components/ConfirmDialog.js';
 import { Loading } from '@/components/Loading.js';
+import { Select } from '@/components/Select.js';
 import { useExportNovel } from '@/hooks/useBackup.js';
 import { useNovels } from '@/hooks/useNovels.js';
 import { useRestoreNovel } from '@/hooks/useRestore.js';
@@ -133,11 +134,11 @@ export function BackupPage() {
                 >
                   小説を選択
                 </label>
-                <select
+                <Select
                   id="novel-select"
                   value={selectedNovelId}
                   onChange={(e) => setSelectedNovelId(e.target.value)}
-                  className="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  className="w-full px-3 py-2.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                 >
                   <option value="">選択してください</option>
                   {novels.map((novel) => (
@@ -145,7 +146,7 @@ export function BackupPage() {
                       {novel.title}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <Button

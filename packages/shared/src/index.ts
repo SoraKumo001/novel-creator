@@ -12,8 +12,13 @@ export {
   findSectionByLine,
   calculateEntityDiff,
   trimAndJoinLines,
+  writeMarkdownEntitySections,
 } from './markdownCore.js';
-export type { MarkdownCategoryNode, RawMarkdownSection } from './markdownCore.js';
+export type {
+  MarkdownCategoryNode,
+  RawMarkdownSection,
+  MarkdownEntitySectionWriterOptions,
+} from './markdownCore.js';
 export {
   serializeSettingsToMarkdown,
   parseSettingsMarkdown,

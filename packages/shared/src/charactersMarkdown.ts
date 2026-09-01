@@ -15,6 +15,7 @@ import {
   findSectionByLine,
   scanMarkdownSections,
   trimAndJoinLines,
+  writeMarkdownEntitySections,
   type MarkdownCategoryNode,
 } from './markdownCore.js';
 
@@ -74,46 +75,37 @@ export function serializeCharactersToMarkdown(
     return c !== 0 ? c : a.name.localeCompare(b.name, 'ja');
   });
 
-  const lines: string[] = [];
-  let currentCategory = '';
-
-  for (const c of sorted) {
-    const category = (c.category ?? '未分類').trim() || '未分類';
-    if (category !== currentCategory) {
-      if (lines.length > 0) lines.push('');
-      lines.push(`# ${category}`);
+  return writeMarkdownEntitySections(sorted, {
+    categoryOf: (c) => (c.category ?? '未分類').trim() || '未分類',
+    nameOf: (c) => c.name,
+    writeBody: (c, lines) => {
       lines.push('');
-      currentCategory = category;
-    }
-    lines.push(`## ${c.name}`);
-    lines.push('');
 
-    const desc = (c.description ?? '').trim();
-    if (desc) {
-      lines.push(desc);
-      lines.push('');
-    }
-
-    const traits = c.traits?.filter((t) => t.trim()) ?? [];
-    if (traits.length > 0) {
-      lines.push('### 特徴');
-      lines.push('');
-      for (const t of traits) {
-        lines.push(`- ${t}`);
+      const desc = (c.description ?? '').trim();
+      if (desc) {
+        lines.push(desc);
+        lines.push('');
       }
-      lines.push('');
-    }
 
-    const rel = relationshipsToText(c.relationships);
-    if (rel) {
-      lines.push('### 関係性');
-      lines.push('');
-      lines.push(rel);
-      lines.push('');
-    }
-  }
+      const traits = c.traits?.filter((t) => t.trim()) ?? [];
+      if (traits.length > 0) {
+        lines.push('### 特徴');
+        lines.push('');
+        for (const t of traits) {
+          lines.push(`- ${t}`);
+        }
+        lines.push('');
+      }
 
-  return lines.join('\n').replace(/\n+$/, '\n');
+      const rel = relationshipsToText(c.relationships);
+      if (rel) {
+        lines.push('### 関係性');
+        lines.push('');
+        lines.push(rel);
+        lines.push('');
+      }
+    },
+  });
 }
 
 /**

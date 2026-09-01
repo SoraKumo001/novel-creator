@@ -7,7 +7,9 @@ export const customPrompts = pgTable('custom_prompts', {
   name: text('name').notNull(),
   description: text('description'),
   icon: text('icon').default('🪄'),
-  category: text('category').notNull().default('inline'), // 'inline' | 'generation' | 'chat' | 'general'
+  category: text('category', { enum: ['inline', 'generation', 'chat', 'general'] })
+    .notNull()
+    .default('inline'),
   systemPrompt: text('system_prompt'),
   userPrompt: text('user_prompt').notNull(),
   order: integer('order').notNull().default(0),

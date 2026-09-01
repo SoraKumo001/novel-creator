@@ -13,6 +13,7 @@ import {
   findSectionByLine,
   scanMarkdownSections,
   trimAndJoinLines,
+  writeMarkdownEntitySections,
   type MarkdownCategoryNode,
 } from './markdownCore.js';
 
@@ -56,27 +57,18 @@ export function serializeSettingsToMarkdown(
     return c !== 0 ? c : a.name.localeCompare(b.name, 'ja');
   });
 
-  const lines: string[] = [];
-  let currentCategory = '';
-
-  for (const s of sorted) {
-    if (s.category !== currentCategory) {
-      if (lines.length > 0) lines.push('');
-      lines.push(`# ${s.category}`);
+  return writeMarkdownEntitySections(sorted, {
+    categoryOf: (s) => s.category,
+    nameOf: (s) => s.name,
+    writeBody: (s, lines) => {
       lines.push('');
-      currentCategory = s.category;
-    }
-    lines.push(`## ${s.name}`);
-    lines.push('');
-    const desc = (s.description ?? '').trim();
-    if (desc) {
-      lines.push(desc);
-    }
-    lines.push('');
-  }
-
-  // 末尾の空行を除去しつつ、改行で終端
-  return lines.join('\n').replace(/\n+$/, '\n');
+      const desc = (s.description ?? '').trim();
+      if (desc) {
+        lines.push(desc);
+      }
+      lines.push('');
+    },
+  });
 }
 
 /**

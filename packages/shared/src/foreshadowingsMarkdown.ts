@@ -13,6 +13,7 @@ import {
   calculateEntityDiff,
   findSectionByLine,
   scanMarkdownSections,
+  writeMarkdownEntitySections,
   type MarkdownCategoryNode,
 } from './markdownCore.js';
 import type { ForeshadowingStatus } from './schemas/entities.js';
@@ -77,32 +78,23 @@ export function serializeForeshadowingsToMarkdown(
     return c !== 0 ? c : a.title.localeCompare(b.title, 'ja');
   });
 
-  const lines: string[] = [];
-  let currentCategory = '';
-
-  for (const item of sorted) {
-    if (item.category !== currentCategory) {
-      if (lines.length > 0) lines.push('');
-      lines.push(`# ${item.category}`);
+  return writeMarkdownEntitySections(sorted, {
+    categoryOf: (item) => item.category,
+    nameOf: (item) => item.title,
+    writeBody: (item, lines) => {
+      // ステータス等のメタ情報を HTML コメントとして付与
+      const metaParts: string[] = [`status: ${item.status}`];
+      if (item.placedSectionId) metaParts.push(`placed: ${item.placedSectionId}`);
+      if (item.resolvedSectionId) metaParts.push(`resolved: ${item.resolvedSectionId}`);
+      lines.push(`<!-- ${metaParts.join(', ')} -->`);
       lines.push('');
-      currentCategory = item.category;
-    }
-    lines.push(`## ${item.title}`);
 
-    // ステータス等のメタ情報を HTML コメントとして付与
-    const metaParts: string[] = [`status: ${item.status}`];
-    if (item.placedSectionId) metaParts.push(`placed: ${item.placedSectionId}`);
-    if (item.resolvedSectionId) metaParts.push(`resolved: ${item.resolvedSectionId}`);
-    lines.push(`<!-- ${metaParts.join(', ')} -->`);
-    lines.push('');
-
-    if (item.description) {
-      lines.push(item.description);
-    }
-    lines.push('');
-  }
-
-  return lines.join('\n').replace(/\n+$/, '\n');
+      if (item.description) {
+        lines.push(item.description);
+      }
+      lines.push('');
+    },
+  });
 }
 
 /**

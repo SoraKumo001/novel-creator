@@ -5,6 +5,7 @@ import { EmptyState } from '@/components/EmptyState.js';
 import { Input } from '@/components/Input.js';
 import { Loading } from '@/components/Loading.js';
 import { Modal } from '@/components/Modal.js';
+import { Select } from '@/components/Select.js';
 import { Textarea } from '@/components/Textarea.js';
 import { useNovel } from '@/hooks/useNovel.js';
 import { useTimelines } from '@/hooks/useTimelines.js';
@@ -288,10 +289,10 @@ function TimelineFormModal({
             <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
               紐づける節 (任意)
             </label>
-            <select
+            <Select
               value={sectionId}
               onChange={(e) => setSectionId(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="w-full px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             >
               <option value="">なし</option>
               {chapters && chapters.length > 0
@@ -309,7 +310,7 @@ function TimelineFormModal({
                       {s.title || `節 ${s.order}`}
                     </option>
                   ))}
-            </select>
+            </Select>
           </div>
         )}
         {error && <p className="text-sm text-rose-500">{error}</p>}

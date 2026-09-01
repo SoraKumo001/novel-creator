@@ -1,5 +1,18 @@
 import { z } from 'zod';
+import { llmProviders } from '@novel-creator/shared';
 import { foreshadowingStatusSchema } from '@novel-creator/shared/schemas';
+import type {
+  NewChapter,
+  NewCharacter,
+  NewChatMessage,
+  NewChatSession,
+  NewContent,
+  NewLlmInstruction,
+  NewNovel,
+  NewSection,
+  NewSetting,
+  NewTimeline,
+} from '@novel-creator/db';
 
 // ---- novels ----
 export const createNovelSchema = z.object({
@@ -169,6 +182,11 @@ export const editForeshadowingDocumentSchema = z.object({
 // ---- バックアップ ----
 // バックアップの構造を緩く検証する。行レベルの厳密な検証は importNovel が行うため、
 // ここでは rdb.novel の存在と各テーブルの配列形状のみを保証する。
+// ワイヤ上の行は任意の JSON オブジェクトのため、ドメイン型（New* 行）へは
+// 型ガード（z.custom）で復元する。検証の緩さ（wire format）は従来どおり。
+const isRecordObject = (v: unknown): v is Record<string, unknown> =>
+  typeof v === 'object' && v !== null && !Array.isArray(v);
+
 export const backupBodySchema = z.object({
   meta: z.object({
     version: z.number(),
@@ -177,16 +195,16 @@ export const backupBodySchema = z.object({
     exportedAt: z.string().optional(),
   }),
   rdb: z.object({
-    novel: z.record(z.string(), z.unknown()),
-    chapters: z.array(z.record(z.string(), z.unknown())).optional(),
-    sections: z.array(z.record(z.string(), z.unknown())).optional(),
-    contents: z.array(z.record(z.string(), z.unknown())).optional(),
-    characters: z.array(z.record(z.string(), z.unknown())).optional(),
-    settings: z.array(z.record(z.string(), z.unknown())).optional(),
-    timelines: z.array(z.record(z.string(), z.unknown())).optional(),
-    llmInstructions: z.array(z.record(z.string(), z.unknown())).optional(),
-    chatSessions: z.array(z.record(z.string(), z.unknown())).optional(),
-    chatMessages: z.array(z.record(z.string(), z.unknown())).optional(),
+    novel: z.custom<NewNovel>(isRecordObject),
+    chapters: z.custom<NewChapter[]>(Array.isArray).optional(),
+    sections: z.custom<NewSection[]>(Array.isArray).optional(),
+    contents: z.custom<NewContent[]>(Array.isArray).optional(),
+    characters: z.custom<NewCharacter[]>(Array.isArray).optional(),
+    settings: z.custom<NewSetting[]>(Array.isArray).optional(),
+    timelines: z.custom<NewTimeline[]>(Array.isArray).optional(),
+    llmInstructions: z.custom<NewLlmInstruction[]>(Array.isArray).optional(),
+    chatSessions: z.custom<NewChatSession[]>(Array.isArray).optional(),
+    chatMessages: z.custom<NewChatMessage[]>(Array.isArray).optional(),
   }),
 });
 
@@ -314,7 +332,7 @@ export const extractChatEntitiesSchema = z.object({
 // ---- LLM 設定 ----
 export const createLlmConfigSchema = z.object({
   name: z.string().min(1),
-  provider: z.enum(['openai', 'anthropic', 'google', 'ollama', 'custom_openai']),
+  provider: z.enum(llmProviders),
   modelId: z.string().min(1),
   baseUrl: z.string().optional().nullable(),
   apiKey: z.string().optional().nullable(),
@@ -324,7 +342,7 @@ export const createLlmConfigSchema = z.object({
 
 export const updateLlmConfigSchema = z.object({
   name: z.string().min(1).optional(),
-  provider: z.enum(['openai', 'anthropic', 'google', 'ollama', 'custom_openai']).optional(),
+  provider: z.enum(llmProviders).optional(),
   modelId: z.string().min(1).optional(),
   baseUrl: z.string().optional().nullable(),
   apiKey: z.string().optional().nullable(),
@@ -333,7 +351,7 @@ export const updateLlmConfigSchema = z.object({
 });
 
 export const testLlmConfigSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'google', 'ollama', 'custom_openai']),
+  provider: z.enum(llmProviders),
   modelId: z.string().min(1),
   baseUrl: z.string().optional().nullable(),
   apiKey: z.string().optional().nullable(),
@@ -342,7 +360,7 @@ export const testLlmConfigSchema = z.object({
 // ---- Embedding 設定 ----
 export const createEmbeddingConfigSchema = z.object({
   name: z.string().min(1),
-  provider: z.enum(['openai', 'anthropic', 'google', 'ollama', 'custom_openai']),
+  provider: z.enum(llmProviders),
   modelId: z.string().min(1),
   dimensions: z.coerce.number().int().positive().default(1536),
   baseUrl: z.string().optional().nullable(),
@@ -353,7 +371,7 @@ export const createEmbeddingConfigSchema = z.object({
 
 export const updateEmbeddingConfigSchema = z.object({
   name: z.string().min(1).optional(),
-  provider: z.enum(['openai', 'anthropic', 'google', 'ollama', 'custom_openai']).optional(),
+  provider: z.enum(llmProviders).optional(),
   modelId: z.string().min(1).optional(),
   dimensions: z.coerce.number().int().positive().optional(),
   baseUrl: z.string().optional().nullable(),
@@ -363,7 +381,7 @@ export const updateEmbeddingConfigSchema = z.object({
 });
 
 export const testEmbeddingConfigSchema = z.object({
-  provider: z.enum(['openai', 'anthropic', 'google', 'ollama', 'custom_openai']),
+  provider: z.enum(llmProviders),
   modelId: z.string().min(1),
   dimensions: z.coerce.number().int().positive().optional(),
   baseUrl: z.string().optional().nullable(),
@@ -374,16 +392,18 @@ export const reindexBodySchema = z.object({
   embeddingConfigId: z.string().uuid().optional().nullable(),
 });
 
-export const generateContentBodySchema = z.object({
+/**
+ * modelConfigId のみをボディで受け取る生成系エンドポイント共通のスキーマ。
+ * （Hono RPC のクライアント型を変えないため、同一形状のスキーマはこれに統一する）
+ */
+export const modelConfigBodySchema = z.object({
   modelConfigId: z.string().uuid().optional().nullable(),
 });
+
+export const generateContentBodySchema = modelConfigBodySchema;
 
 export const proofreadBodySchema = z.object({
   body: z.string().optional(),
-  modelConfigId: z.string().uuid().optional().nullable(),
-});
-
-export const generatePlotBodySchema = z.object({
   modelConfigId: z.string().uuid().optional().nullable(),
 });
 
@@ -419,9 +439,7 @@ export const analyzeSettingImpactBodySchema = z.object({
   modelConfigId: z.string().uuid().optional().nullable(),
 });
 
-export const analyzeStoryArcBodySchema = z.object({
-  modelConfigId: z.string().uuid().optional().nullable(),
-});
+export const analyzeStoryArcBodySchema = modelConfigBodySchema;
 
 export const multiPersonaReviewBodySchema = z.object({
   sectionId: z.string().uuid().optional(),
@@ -430,9 +448,7 @@ export const multiPersonaReviewBodySchema = z.object({
   modelConfigId: z.string().uuid().optional().nullable(),
 });
 
-export const generateStyleGuideDraftBodySchema = z.object({
-  modelConfigId: z.string().uuid().optional().nullable(),
-});
+export const generateStyleGuideDraftBodySchema = modelConfigBodySchema;
 
 // ---- カスタムプロンプト ----
 export const promptCategorySchema = z.enum(['inline', 'generation', 'chat', 'general']);

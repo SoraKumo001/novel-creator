@@ -1,6 +1,7 @@
 // フロント用の型定義。
 // エンティティ型は @novel-creator/shared/schemas を単一情報源とし、
 // ここではビューモデルと入力型のみを定義する。
+import type { LLMProviderType } from '@novel-creator/shared';
 import type {
   Novel,
   Chapter,
@@ -332,7 +333,7 @@ export interface ProofreadResult {
 export interface LLMConfig {
   id: string;
   name: string;
-  provider: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  provider: LLMProviderType;
   modelId: string;
   baseUrl: string | null;
   apiKeyMasked: string | null;
@@ -345,7 +346,7 @@ export interface LLMConfig {
 
 export interface CreateLLMConfigInput {
   name: string;
-  provider: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  provider: LLMProviderType;
   modelId: string;
   baseUrl?: string | null;
   apiKey?: string | null;
@@ -355,7 +356,7 @@ export interface CreateLLMConfigInput {
 
 export interface UpdateLLMConfigInput {
   name?: string;
-  provider?: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  provider?: LLMProviderType;
   modelId?: string;
   baseUrl?: string | null;
   apiKey?: string | null;
@@ -364,7 +365,7 @@ export interface UpdateLLMConfigInput {
 }
 
 export interface TestConnectionInput {
-  provider: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  provider: LLMProviderType;
   modelId: string;
   baseUrl?: string | null;
   apiKey?: string | null;
@@ -381,7 +382,7 @@ export interface TestConnectionResult {
 export interface EmbeddingConfig {
   id: string;
   name: string;
-  provider: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  provider: LLMProviderType;
   modelId: string;
   dimensions: number;
   baseUrl: string | null;
@@ -395,7 +396,7 @@ export interface EmbeddingConfig {
 
 export interface CreateEmbeddingConfigInput {
   name: string;
-  provider: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  provider: LLMProviderType;
   modelId: string;
   dimensions?: number;
   baseUrl?: string | null;
@@ -406,7 +407,7 @@ export interface CreateEmbeddingConfigInput {
 
 export interface UpdateEmbeddingConfigInput {
   name?: string;
-  provider?: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  provider?: LLMProviderType;
   modelId?: string;
   dimensions?: number;
   baseUrl?: string | null;
@@ -416,7 +417,7 @@ export interface UpdateEmbeddingConfigInput {
 }
 
 export interface TestEmbeddingConnectionInput {
-  provider: 'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai';
+  provider: LLMProviderType;
   modelId: string;
   dimensions?: number;
   baseUrl?: string | null;

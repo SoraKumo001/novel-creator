@@ -1,11 +1,8 @@
 import { eq, desc } from 'drizzle-orm';
 import type { LanguageModel } from 'ai';
 import { llmConfigs, type LLMConfig, type NewLLMConfig } from '@novel-creator/db';
-import {
-  createLanguageModelFromConfig,
-  testLLMConnection,
-  type LLMConfigInput,
-} from '@novel-creator/llm';
+import { testLLMConnection, type LLMConfigInput } from '@novel-creator/llm';
+import { resolveLLMModel as resolveLLMModelShared } from './model-resolver.js';
 import { assertFound, ValidationError, type ServiceContext } from './types.js';
 
 export interface MaskedLLMConfig extends Omit<LLMConfig, 'apiKey'> {
@@ -155,28 +152,11 @@ export class LlmConfigDomainService {
     return testLLMConnection(input, this.ctx.env);
   }
 
+  /**
+   * 指定された設定（未指定・不明時はデフォルト設定、それも無ければ環境変数の LLM）から
+   * LanguageModel を解決する。共通リゾルバへの委譲（従来の id→miss→default 挙動を維持）。
+   */
   async resolveLanguageModel(modelConfigId?: string | null): Promise<LanguageModel> {
-    if (modelConfigId) {
-      const [config] = await this.ctx.db
-        .select()
-        .from(llmConfigs)
-        .where(eq(llmConfigs.id, modelConfigId));
-      if (config) {
-        return createLanguageModelFromConfig(config, this.ctx.env);
-      }
-    }
-
-    // デフォルト設定を探索
-    const [defaultConfig] = await this.ctx.db
-      .select()
-      .from(llmConfigs)
-      .where(eq(llmConfigs.isDefault, true));
-
-    if (defaultConfig) {
-      return createLanguageModelFromConfig(defaultConfig, this.ctx.env);
-    }
-
-    // DB に未登録なら環境変数のデフォルト LLM を使用
-    return this.ctx.llm;
+    return resolveLLMModelShared(this.ctx, modelConfigId, 'useDefault');
   }
 }

@@ -1,7 +1,6 @@
 import { parseResponseError } from '../errors.js';
 import { apiClient } from '../api-client.js';
 import type { ImportResult } from '../types.js';
-import type { BackupBody } from '@novel-creator/api';
 
 export async function exportNovelBackup(novelId: string): Promise<Response> {
   const res = await apiClient.backup.export.$post({
@@ -19,8 +18,9 @@ export async function exportNovelBackup(novelId: string): Promise<Response> {
 export async function importNovelBackup(data: unknown): Promise<ImportResult> {
   const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
   const res = await apiClient.backup.import.$post({
-    // API 側（backupBodySchema）が検証の権威。web 側は構造を緩く扱うため unknown 経由でブリッジする。
-    json: parsedData as unknown as BackupBody,
+    // バックアップ JSON は任意ファイル由来のため動的に parse する。
+    // 検証の権威は API 側（backupBodySchema）であり、ここでは構造を緩く扱う。
+    json: parsedData,
   });
   if (!res.ok) throw await parseResponseError(res, 'バックアップのインポート');
   const result = await res.json();

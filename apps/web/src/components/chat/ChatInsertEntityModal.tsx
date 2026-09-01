@@ -1,30 +1,27 @@
-import { useEffect, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { novelKeys } from '@/lib/queryKeys.js';
 import { AIProgressIndicator } from '@/components/AIProgressIndicator.js';
 import { Button } from '@/components/Button.js';
 import { Modal } from '@/components/Modal.js';
 import {
-  createChapter,
-  createCharacter,
-  createForeshadowing,
-  createSetting,
-  createTimeline,
   extractChatEntities,
   fetchChapters,
   fetchCharacters,
   fetchForeshadowings,
   fetchSettings,
   fetchTimelines,
-  updateChapter,
-  updateCharacter,
-  updateForeshadowing,
-  updateSetting,
-  updateTimeline,
 } from '@/lib/services/index.js';
 import { useToast } from '@/hooks/useToast.js';
-import { useEditableEntities } from '@/hooks/useEditableEntities.js';
-import type { Chapter, Character, Foreshadowing, Novel, Setting, Timeline } from '@/lib/types.js';
+import type {
+  Chapter,
+  Character,
+  ExtractedChatEntities,
+  Foreshadowing,
+  Novel,
+  Setting,
+  Timeline,
+} from '@/lib/types.js';
 import { ChatInsertCharacterTab } from './entity-insert/ChatInsertCharacterTab.js';
 import { ChatInsertSettingTab } from './entity-insert/ChatInsertSettingTab.js';
 import { ChatInsertForeshadowingTab } from './entity-insert/ChatInsertForeshadowingTab.js';
@@ -37,13 +34,34 @@ import {
   reconcileSetting,
   reconcileTimeline,
 } from './entity-insert/matching.js';
+import { useEntityCollection } from './entity-insert/useEntityCollection.js';
+import {
+  createCharacterHandlers,
+  createForeshadowingHandlers,
+  createPlotHandlers,
+  createSettingHandlers,
+  createTimelineHandlers,
+} from './entity-insert/collectionHandlers.js';
+import {
+  toEditableCharacter,
+  toEditableForeshadowing,
+  toEditablePlot,
+  toEditableSetting,
+  toEditableTimeline,
+} from './entity-insert/toEditable.js';
+import {
+  saveCharacters,
+  saveForeshadowings,
+  savePlots,
+  saveSettings,
+  saveTimelines,
+} from './entity-insert/saveEntities.js';
 import type {
   EditableCharacter,
   EditableForeshadowing,
   EditablePlot,
   EditableSetting,
   EditableTimeline,
-  EntityAction,
 } from './entity-insert/types.js';
 
 export type {
@@ -53,9 +71,27 @@ export type {
   EditableTimeline,
   EditablePlot,
   EntityAction,
-};
+} from './entity-insert/types.js';
 
 type ActiveTab = 'characters' | 'settings' | 'foreshadowings' | 'timelines' | 'plots';
+
+/** タブボタンの表示定義（出力される DOM は従来の個別記述と同一） */
+const INSERT_TABS: { key: ActiveTab; icon: string; label: string }[] = [
+  { key: 'characters', icon: '👤', label: '人物' },
+  { key: 'settings', icon: '🌍', label: '設定' },
+  { key: 'foreshadowings', icon: '🔍', label: '伏線' },
+  { key: 'timelines', icon: '⏳', label: '年表' },
+  { key: 'plots', icon: '📖', label: 'プロット' },
+];
+
+/** 「手動追加」ボタンのラベル定義（出力される DOM は従来の個別記述と同一） */
+const ADD_BUTTON_LABELS: Record<ActiveTab, string> = {
+  characters: '人物を手動追加',
+  settings: '設定を手動追加',
+  foreshadowings: '伏線を手動追加',
+  timelines: '出来事を手動追加',
+  plots: 'プロットを手動追加',
+};
 
 interface ChatInsertEntityModalProps {
   isOpen: boolean;
@@ -80,65 +116,59 @@ export function ChatInsertEntityModal({
   const [isExtracting, setIsExtracting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
+  const extractStartedAtRef = useRef<number>(Date.now());
 
-  const [existingCharacters, setExistingCharacters] = useState<Character[]>([]);
-  const [existingSettings, setExistingSettings] = useState<Setting[]>([]);
-  const [existingForeshadowings, setExistingForeshadowings] = useState<Foreshadowing[]>([]);
-  const [existingTimelines, setExistingTimelines] = useState<Timeline[]>([]);
-  const [existingChapters, setExistingChapters] = useState<Chapter[]>([]);
-  const [loadingExisting, setLoadingExisting] = useState(false);
+  const enabled = !!isOpen && !!targetNovelId;
 
-  // 非同期抽出処理や更新ハンドラから最新の既存データを即座に参照するための ref
-  const existingCharactersRef = useRef<Character[]>([]);
-  const existingSettingsRef = useRef<Setting[]>([]);
-  const existingForeshadowingsRef = useRef<Foreshadowing[]>([]);
-  const existingTimelinesRef = useRef<Timeline[]>([]);
-  const existingChaptersRef = useRef<Chapter[]>([]);
+  // --- コレクション層: 既存データ取得 + 抽出アイテム CRUD + マッチング更新 ---
+  const charactersCollection = useEntityCollection<EditableCharacter, Character>({
+    queryKey: novelKeys.characters(targetNovelId),
+    queryFn: () => fetchCharacters(targetNovelId),
+    enabled,
+    reconcile: reconcileCharacter,
+  });
 
-  const {
-    items: extractedCharacters,
-    setItems: setExtractedCharacters,
-    toggleItem: toggleCharacter,
-    updateItem: updateCharacterItem,
-    removeItem: removeCharacter,
-    addEmptyItem: addEmptyCharacter,
-  } = useEditableEntities<EditableCharacter>([]);
+  const settingsCollection = useEntityCollection<EditableSetting, Setting>({
+    queryKey: novelKeys.settings(targetNovelId),
+    queryFn: () => fetchSettings(targetNovelId),
+    enabled,
+    reconcile: reconcileSetting,
+  });
 
-  const {
-    items: extractedSettings,
-    setItems: setExtractedSettings,
-    toggleItem: toggleSetting,
-    updateItem: updateSettingItem,
-    removeItem: removeSetting,
-    addEmptyItem: addEmptySetting,
-  } = useEditableEntities<EditableSetting>([]);
+  const foreshadowingsCollection = useEntityCollection<EditableForeshadowing, Foreshadowing>({
+    queryKey: novelKeys.foreshadowings(targetNovelId),
+    queryFn: () => fetchForeshadowings(targetNovelId),
+    enabled,
+    reconcile: reconcileForeshadowing,
+  });
 
-  const {
-    items: extractedForeshadowings,
-    setItems: setExtractedForeshadowings,
-    toggleItem: toggleForeshadowing,
-    updateItem: updateForeshadowingItem,
-    removeItem: removeForeshadowing,
-    addEmptyItem: addEmptyForeshadowing,
-  } = useEditableEntities<EditableForeshadowing>([]);
+  const timelinesCollection = useEntityCollection<EditableTimeline, Timeline>({
+    queryKey: novelKeys.timelines(targetNovelId),
+    queryFn: () => fetchTimelines(targetNovelId),
+    enabled,
+    reconcile: reconcileTimeline,
+  });
 
-  const {
-    items: extractedTimelines,
-    setItems: setExtractedTimelines,
-    toggleItem: toggleTimeline,
-    updateItem: updateTimelineItem,
-    removeItem: removeTimeline,
-    addEmptyItem: addEmptyTimeline,
-  } = useEditableEntities<EditableTimeline>([]);
+  const plotsCollection = useEntityCollection<EditablePlot, Chapter>({
+    queryKey: novelKeys.chapters(targetNovelId),
+    queryFn: () => fetchChapters(targetNovelId),
+    enabled,
+    reconcile: reconcilePlot,
+  });
 
-  const {
-    items: extractedPlots,
-    setItems: setExtractedPlots,
-    toggleItem: togglePlot,
-    updateItem: updatePlotItem,
-    removeItem: removePlot,
-    addEmptyItem: addEmptyPlot,
-  } = useEditableEntities<EditablePlot>([]);
+  // --- エンティティごとの差分ロジック（手動追加・編集時のマッチング更新） ---
+  const characterHandlers = createCharacterHandlers(charactersCollection);
+  const settingHandlers = createSettingHandlers(settingsCollection);
+  const foreshadowingHandlers = createForeshadowingHandlers(foreshadowingsCollection);
+  const timelineHandlers = createTimelineHandlers(timelinesCollection);
+  const plotHandlers = createPlotHandlers(plotsCollection);
+
+  const loadingExisting =
+    charactersCollection.loading ||
+    settingsCollection.loading ||
+    foreshadowingsCollection.loading ||
+    timelinesCollection.loading ||
+    plotsCollection.loading;
 
   // 初期化・小説選択
   useEffect(() => {
@@ -153,110 +183,60 @@ export function ChatInsertEntityModal({
     }
   }, [isOpen, defaultNovelId, novels]);
 
-  // 選択中小説の既存データを取得
-  const charactersQuery = useQuery({
-    queryKey: novelKeys.characters(targetNovelId),
-    queryFn: () => fetchCharacters(targetNovelId),
-    enabled: !!isOpen && !!targetNovelId,
-  });
+  // LLM 抽出結果を各コレクションへ反映する（既存データとのマッチング + タブ自動選択）。
+  // 依存はすべて安定した関数のため、開閉や sourceText 変化時のみ再生成される。
+  const applyExtracted = useCallback(
+    (data: ExtractedChatEntities) => {
+      const chars = (data.characters || []).map((c, i) =>
+        charactersCollection.reconcileWithExisting(toEditableCharacter(c, i)),
+      );
+      const sets = (data.settings || []).map((s, i) =>
+        settingsCollection.reconcileWithExisting(toEditableSetting(s, i)),
+      );
+      const fores = (data.foreshadowings || []).map((f, i) =>
+        foreshadowingsCollection.reconcileWithExisting(toEditableForeshadowing(f, i)),
+      );
+      const times = (data.timelines || []).map((t, i) =>
+        timelinesCollection.reconcileWithExisting(toEditableTimeline(t, i)),
+      );
+      const plots = (data.plots || []).map((p, i) =>
+        plotsCollection.reconcileWithExisting(toEditablePlot(p, i)),
+      );
 
-  const settingsQuery = useQuery({
-    queryKey: novelKeys.settings(targetNovelId),
-    queryFn: () => fetchSettings(targetNovelId),
-    enabled: !!isOpen && !!targetNovelId,
-  });
+      charactersCollection.setItems(chars);
+      settingsCollection.setItems(sets);
+      foreshadowingsCollection.setItems(fores);
+      timelinesCollection.setItems(times);
+      plotsCollection.setItems(plots);
 
-  const foreshadowingsQuery = useQuery({
-    queryKey: novelKeys.foreshadowings(targetNovelId),
-    queryFn: () => fetchForeshadowings(targetNovelId),
-    enabled: !!isOpen && !!targetNovelId,
-  });
-
-  const timelinesQuery = useQuery({
-    queryKey: novelKeys.timelines(targetNovelId),
-    queryFn: () => fetchTimelines(targetNovelId),
-    enabled: !!isOpen && !!targetNovelId,
-  });
-
-  const chaptersQuery = useQuery({
-    queryKey: novelKeys.chapters(targetNovelId),
-    queryFn: () => fetchChapters(targetNovelId),
-    enabled: !!isOpen && !!targetNovelId,
-  });
-
-  // 取得データをローカル状態へ反映
-  useEffect(() => {
-    if (!isOpen || !targetNovelId) {
-      setExistingCharacters([]);
-      setExistingSettings([]);
-      setExistingForeshadowings([]);
-      setExistingTimelines([]);
-      setExistingChapters([]);
-      existingCharactersRef.current = [];
-      existingSettingsRef.current = [];
-      existingForeshadowingsRef.current = [];
-      existingTimelinesRef.current = [];
-      existingChaptersRef.current = [];
-      return;
-    }
-
-    const isLoading =
-      charactersQuery.isLoading ||
-      settingsQuery.isLoading ||
-      foreshadowingsQuery.isLoading ||
-      timelinesQuery.isLoading ||
-      chaptersQuery.isLoading;
-
-    if (isLoading) {
-      setLoadingExisting(true);
-      return;
-    }
-
-    const chars = charactersQuery.data ?? [];
-    const sets = settingsQuery.data ?? [];
-    const fores = foreshadowingsQuery.data ?? [];
-    const times = timelinesQuery.data ?? [];
-    const chaps = chaptersQuery.data ?? [];
-
-    setExistingCharacters(chars);
-    setExistingSettings(sets);
-    setExistingForeshadowings(fores);
-    setExistingTimelines(times);
-    setExistingChapters(chaps);
-    existingCharactersRef.current = chars;
-    existingSettingsRef.current = sets;
-    existingForeshadowingsRef.current = fores;
-    existingTimelinesRef.current = times;
-    existingChaptersRef.current = chaps;
-    setLoadingExisting(false);
-
-    // 既存データに基づいてマッチングを更新（重複時はデフォルト上書き更新）
-    setExtractedCharacters((prev) => prev.map((c) => reconcileCharacter(c, chars)));
-    setExtractedSettings((prev) => prev.map((s) => reconcileSetting(s, sets)));
-    setExtractedForeshadowings((prev) => prev.map((f) => reconcileForeshadowing(f, fores)));
-    setExtractedTimelines((prev) => prev.map((t) => reconcileTimeline(t, times)));
-    setExtractedPlots((prev) => prev.map((p) => reconcilePlot(p, chaps)));
-  }, [
-    isOpen,
-    targetNovelId,
-    charactersQuery.data,
-    settingsQuery.data,
-    foreshadowingsQuery.data,
-    timelinesQuery.data,
-    chaptersQuery.data,
-    charactersQuery.isLoading,
-    settingsQuery.isLoading,
-    foreshadowingsQuery.isLoading,
-    timelinesQuery.isLoading,
-    chaptersQuery.isLoading,
-    setExtractedCharacters,
-    setExtractedSettings,
-    setExtractedForeshadowings,
-    setExtractedTimelines,
-    setExtractedPlots,
-  ]);
-
-  const extractStartedAtRef = useRef<number>(Date.now());
+      // 抽出された項目があるタブを自動選択
+      if (chars.length > 0) {
+        setActiveTab('characters');
+      } else if (sets.length > 0) {
+        setActiveTab('settings');
+      } else if (fores.length > 0) {
+        setActiveTab('foreshadowings');
+      } else if (times.length > 0) {
+        setActiveTab('timelines');
+      } else if (plots.length > 0) {
+        setActiveTab('plots');
+      } else {
+        setActiveTab('characters');
+      }
+    },
+    [
+      charactersCollection.reconcileWithExisting,
+      charactersCollection.setItems,
+      settingsCollection.reconcileWithExisting,
+      settingsCollection.setItems,
+      foreshadowingsCollection.reconcileWithExisting,
+      foreshadowingsCollection.setItems,
+      timelinesCollection.reconcileWithExisting,
+      timelinesCollection.setItems,
+      plotsCollection.reconcileWithExisting,
+      plotsCollection.setItems,
+    ],
+  );
 
   // LLM抽出処理
   useEffect(() => {
@@ -268,78 +248,7 @@ export function ChatInsertEntityModal({
       extractStartedAtRef.current = Date.now();
       try {
         const data = await extractChatEntities(sourceText);
-
-        const chars: EditableCharacter[] = (data.characters || []).map((c, i) => {
-          const rawItem: EditableCharacter = {
-            ...c,
-            _id: `char-${Date.now()}-${i}`,
-            _selected: true,
-            traitsString: Array.isArray(c.traits) ? c.traits.join(', ') : '',
-            action: 'create',
-          };
-          return reconcileCharacter(rawItem, existingCharactersRef.current);
-        });
-
-        const sets: EditableSetting[] = (data.settings || []).map((s, i) => {
-          const rawItem: EditableSetting = {
-            ...s,
-            _id: `set-${Date.now()}-${i}`,
-            _selected: true,
-            action: 'create',
-          };
-          return reconcileSetting(rawItem, existingSettingsRef.current);
-        });
-
-        const fores: EditableForeshadowing[] = (data.foreshadowings || []).map((f, i) => {
-          const rawItem: EditableForeshadowing = {
-            ...f,
-            _id: `fore-${Date.now()}-${i}`,
-            _selected: true,
-            action: 'create',
-          };
-          return reconcileForeshadowing(rawItem, existingForeshadowingsRef.current);
-        });
-
-        const times: EditableTimeline[] = (data.timelines || []).map((t, i) => {
-          const rawItem: EditableTimeline = {
-            ...t,
-            _id: `time-${Date.now()}-${i}`,
-            _selected: true,
-            action: 'create',
-          };
-          return reconcileTimeline(rawItem, existingTimelinesRef.current);
-        });
-
-        const plots: EditablePlot[] = (data.plots || []).map((p, i) => {
-          const rawItem: EditablePlot = {
-            ...p,
-            _id: `plot-${Date.now()}-${i}`,
-            _selected: true,
-            action: 'create',
-          };
-          return reconcilePlot(rawItem, existingChaptersRef.current);
-        });
-
-        setExtractedCharacters(chars);
-        setExtractedSettings(sets);
-        setExtractedForeshadowings(fores);
-        setExtractedTimelines(times);
-        setExtractedPlots(plots);
-
-        // 抽出された項目があるタブを自動選択
-        if (chars.length > 0) {
-          setActiveTab('characters');
-        } else if (sets.length > 0) {
-          setActiveTab('settings');
-        } else if (fores.length > 0) {
-          setActiveTab('foreshadowings');
-        } else if (times.length > 0) {
-          setActiveTab('timelines');
-        } else if (plots.length > 0) {
-          setActiveTab('plots');
-        } else {
-          setActiveTab('characters');
-        }
+        applyExtracted(data);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'エンティティの抽出に失敗しました';
         setExtractError(msg);
@@ -349,159 +258,14 @@ export function ChatInsertEntityModal({
     };
 
     void runExtract();
-  }, [
-    isOpen,
-    sourceText,
-    setExtractedCharacters,
-    setExtractedSettings,
-    setExtractedForeshadowings,
-    setExtractedTimelines,
-    setExtractedPlots,
-  ]);
-
-  // 人物の操作ハンドラ
-  const handleToggleCharacter = toggleCharacter;
-  const handleRemoveCharacter = removeCharacter;
-  const handleAddEmptyCharacter = () => {
-    addEmptyCharacter(
-      {
-        name: '新しい登場人物',
-        category: '未分類',
-        description: '',
-        traits: [],
-        traitsString: '',
-        action: 'create',
-      },
-      'char-',
-    );
-  };
-
-  const handleUpdateCharacter = (id: string, field: keyof EditableCharacter, value: unknown) => {
-    updateCharacterItem(id, (c) => {
-      if (field === 'name') {
-        const updated = { ...c, name: String(value) };
-        return reconcileCharacter(updated, existingCharactersRef.current);
-      }
-      if (field === 'traitsString') {
-        const str = String(value);
-        const traits = str
-          .split(/[,、]/)
-          .map((t) => t.trim())
-          .filter(Boolean);
-        return { ...c, traitsString: str, traits };
-      }
-      return { ...c, [field]: value };
-    });
-  };
-
-  // 設定の操作ハンドラ
-  const handleToggleSetting = toggleSetting;
-  const handleRemoveSetting = removeSetting;
-  const handleAddEmptySetting = () => {
-    addEmptySetting(
-      {
-        name: '新しい設定',
-        category: '世界観',
-        description: '',
-        action: 'create',
-      },
-      'set-',
-    );
-  };
-
-  const handleUpdateSetting = (id: string, field: keyof EditableSetting, value: unknown) => {
-    updateSettingItem(id, (s) => {
-      if (field === 'name') {
-        const updated = { ...s, name: String(value) };
-        return reconcileSetting(updated, existingSettingsRef.current);
-      }
-      return { ...s, [field]: value };
-    });
-  };
-
-  // 伏線の操作ハンドラ
-  const handleToggleForeshadowing = toggleForeshadowing;
-  const handleRemoveForeshadowing = removeForeshadowing;
-  const handleAddEmptyForeshadowing = () => {
-    addEmptyForeshadowing(
-      {
-        title: '新しい伏線',
-        description: '',
-        status: 'unresolved',
-        action: 'create',
-      },
-      'fore-',
-    );
-  };
-
-  const handleUpdateForeshadowing = (
-    id: string,
-    field: keyof EditableForeshadowing,
-    value: unknown,
-  ) => {
-    updateForeshadowingItem(id, (f) => {
-      if (field === 'title') {
-        const updated = { ...f, title: String(value) };
-        return reconcileForeshadowing(updated, existingForeshadowingsRef.current);
-      }
-      return { ...f, [field]: value };
-    });
-  };
-
-  // タイムラインの操作ハンドラ
-  const handleToggleTimeline = toggleTimeline;
-  const handleRemoveTimeline = removeTimeline;
-  const handleAddEmptyTimeline = () => {
-    addEmptyTimeline(
-      {
-        event: '新しい出来事',
-        timestamp: '',
-        action: 'create',
-      },
-      'time-',
-    );
-  };
-
-  const handleUpdateTimeline = (id: string, field: keyof EditableTimeline, value: unknown) => {
-    updateTimelineItem(id, (t) => {
-      if (field === 'event') {
-        const updated = { ...t, event: String(value) };
-        return reconcileTimeline(updated, existingTimelinesRef.current);
-      }
-      return { ...t, [field]: value };
-    });
-  };
-
-  // プロットの操作ハンドラ
-  const handleTogglePlot = togglePlot;
-  const handleRemovePlot = removePlot;
-  const handleAddEmptyPlot = () => {
-    addEmptyPlot(
-      {
-        title: '新しい章',
-        summary: '',
-        action: 'create',
-      },
-      'plot-',
-    );
-  };
-
-  const handleUpdatePlot = (id: string, field: keyof EditablePlot, value: unknown) => {
-    updatePlotItem(id, (p) => {
-      if (field === 'title') {
-        const updated = { ...p, title: String(value) };
-        return reconcilePlot(updated, existingChaptersRef.current);
-      }
-      return { ...p, [field]: value };
-    });
-  };
+  }, [isOpen, sourceText, applyExtracted]);
 
   // 選択件数の集計
-  const selectedChars = extractedCharacters.filter((c) => c._selected && c.name.trim());
-  const selectedSets = extractedSettings.filter((s) => s._selected && s.name.trim());
-  const selectedFores = extractedForeshadowings.filter((f) => f._selected && f.title.trim());
-  const selectedTimes = extractedTimelines.filter((t) => t._selected && t.event.trim());
-  const selectedPlots = extractedPlots.filter((p) => p._selected && p.title.trim());
+  const selectedChars = charactersCollection.items.filter((c) => c._selected && c.name.trim());
+  const selectedSets = settingsCollection.items.filter((s) => s._selected && s.name.trim());
+  const selectedFores = foreshadowingsCollection.items.filter((f) => f._selected && f.title.trim());
+  const selectedTimes = timelinesCollection.items.filter((t) => t._selected && t.event.trim());
+  const selectedPlots = plotsCollection.items.filter((p) => p._selected && p.title.trim());
   const totalSelectedCount =
     selectedChars.length +
     selectedSets.length +
@@ -509,7 +273,8 @@ export function ChatInsertEntityModal({
     selectedTimes.length +
     selectedPlots.length;
 
-  // 保存処理（新規追加・上書き・マージ対応）
+  // 保存処理（新規追加・上書き・マージ対応）。
+  // エンティティごとの登録・更新ロジックは entity-insert/saveEntities.ts の小関数に委譲。
   const handleSaveToNovel = async () => {
     if (!targetNovelId) {
       toast.error('登録先の小説を選択してください');
@@ -521,171 +286,26 @@ export function ChatInsertEntityModal({
     }
 
     setIsSaving(true);
-    let createdCount = 0;
-    let updatedCount = 0;
 
     try {
-      // 1. 人物の登録・更新
-      for (const char of selectedChars) {
-        const trimmedName = char.name.trim();
-        const trimmedCategory = char.category.trim() || '未分類';
-        const trimmedDesc = char.description?.trim() || '';
+      const charCounts = await saveCharacters(targetNovelId, selectedChars);
+      const setCounts = await saveSettings(targetNovelId, selectedSets);
+      const foreCounts = await saveForeshadowings(targetNovelId, selectedFores);
+      const timeCounts = await saveTimelines(targetNovelId, selectedTimes);
+      const plotCounts = await savePlots(targetNovelId, selectedPlots);
 
-        const traitsList: string[] = Array.isArray(char.traits)
-          ? char.traits.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
-          : (char.traitsString || '')
-              .split(/[,、，]/)
-              .map((t) => t.trim())
-              .filter((t) => t.length > 0);
-
-        if (char.action === 'overwrite' && char.matchedExisting) {
-          await updateCharacter(char.matchedExisting.id, {
-            name: trimmedName,
-            category: trimmedCategory,
-            description: trimmedDesc || undefined,
-            traits: traitsList.length > 0 ? traitsList : undefined,
-          });
-          updatedCount++;
-        } else if (char.action === 'merge' && char.matchedExisting) {
-          const oldDesc = (char.matchedExisting.description || '').trim();
-          const mergedDesc = oldDesc ? `${oldDesc}\n\n【追記】\n${trimmedDesc}` : trimmedDesc;
-
-          const oldTraits = Array.isArray(char.matchedExisting.traits)
-            ? char.matchedExisting.traits
-            : [];
-          const mergedTraits = Array.from(new Set([...oldTraits, ...traitsList]));
-
-          await updateCharacter(char.matchedExisting.id, {
-            name: trimmedName,
-            category: trimmedCategory,
-            description: mergedDesc || undefined,
-            traits: mergedTraits.length > 0 ? mergedTraits : undefined,
-          });
-          updatedCount++;
-        } else {
-          await createCharacter(targetNovelId, {
-            name: trimmedName,
-            category: trimmedCategory,
-            description: trimmedDesc || undefined,
-            traits: traitsList.length > 0 ? traitsList : undefined,
-          });
-          createdCount++;
-        }
-      }
-
-      // 2. 設定の登録・更新
-      for (const set of selectedSets) {
-        const trimmedName = set.name.trim();
-        const trimmedCategory = set.category.trim() || '世界観';
-        const trimmedDesc = set.description?.trim() || '';
-
-        if (set.action === 'overwrite' && set.matchedExisting) {
-          await updateSetting(set.matchedExisting.id, {
-            name: trimmedName,
-            category: trimmedCategory,
-            description: trimmedDesc || undefined,
-          });
-          updatedCount++;
-        } else if (set.action === 'merge' && set.matchedExisting) {
-          const oldDesc = (set.matchedExisting.description || '').trim();
-          const mergedDesc = oldDesc ? `${oldDesc}\n\n【追記】\n${trimmedDesc}` : trimmedDesc;
-
-          await updateSetting(set.matchedExisting.id, {
-            name: trimmedName,
-            category: trimmedCategory,
-            description: mergedDesc || undefined,
-          });
-          updatedCount++;
-        } else {
-          await createSetting(targetNovelId, {
-            name: trimmedName,
-            category: trimmedCategory,
-            description: trimmedDesc || undefined,
-          });
-          createdCount++;
-        }
-      }
-
-      // 3. 伏線の登録・更新
-      for (const f of selectedFores) {
-        const trimmedTitle = f.title.trim();
-        const trimmedDesc = f.description?.trim() || '';
-
-        if (f.action === 'overwrite' && f.matchedExisting) {
-          await updateForeshadowing(f.matchedExisting.id, {
-            title: trimmedTitle,
-            description: trimmedDesc || undefined,
-            status: f.status,
-          });
-          updatedCount++;
-        } else if (f.action === 'merge' && f.matchedExisting) {
-          const oldDesc = (f.matchedExisting.description || '').trim();
-          const mergedDesc = oldDesc ? `${oldDesc}\n\n【追記】\n${trimmedDesc}` : trimmedDesc;
-          await updateForeshadowing(f.matchedExisting.id, {
-            title: trimmedTitle,
-            description: mergedDesc || undefined,
-            status: f.status,
-          });
-          updatedCount++;
-        } else {
-          await createForeshadowing(targetNovelId, {
-            title: trimmedTitle,
-            description: trimmedDesc || undefined,
-            status: f.status,
-          });
-          createdCount++;
-        }
-      }
-
-      // 4. タイムラインの登録・更新
-      for (const t of selectedTimes) {
-        const trimmedEvent = t.event.trim();
-        const trimmedTimestamp = t.timestamp?.trim() || undefined;
-
-        if (t.action === 'overwrite' && t.matchedExisting) {
-          await updateTimeline(t.matchedExisting.id, {
-            event: trimmedEvent,
-            timestamp: trimmedTimestamp,
-          });
-          updatedCount++;
-        } else {
-          await createTimeline(targetNovelId, {
-            event: trimmedEvent,
-            timestamp: trimmedTimestamp,
-          });
-          createdCount++;
-        }
-      }
-
-      // 5. プロット（章）の登録・更新
-      for (const p of selectedPlots) {
-        const trimmedTitle = p.title.trim();
-        const trimmedSummary = p.summary?.trim() || '';
-
-        if (p.action === 'overwrite' && p.matchedExisting) {
-          await updateChapter(p.matchedExisting.id, {
-            title: trimmedTitle,
-            summary: trimmedSummary || undefined,
-          });
-          updatedCount++;
-        } else if (p.action === 'merge' && p.matchedExisting) {
-          const oldSummary = (p.matchedExisting.summary || '').trim();
-          const mergedSummary = oldSummary
-            ? `${oldSummary}\n\n【追記】\n${trimmedSummary}`
-            : trimmedSummary;
-          await updateChapter(p.matchedExisting.id, {
-            title: trimmedTitle,
-            summary: mergedSummary || undefined,
-          });
-          updatedCount++;
-        } else {
-          await createChapter(targetNovelId, {
-            title: trimmedTitle,
-            summary: trimmedSummary || undefined,
-          });
-          createdCount++;
-        }
-      }
+      const createdCount =
+        charCounts.created +
+        setCounts.created +
+        foreCounts.created +
+        timeCounts.created +
+        plotCounts.created;
+      const updatedCount =
+        charCounts.updated +
+        setCounts.updated +
+        foreCounts.updated +
+        timeCounts.updated +
+        plotCounts.updated;
 
       // キャッシュの無効化
       await Promise.all([
@@ -709,6 +329,22 @@ export function ChatInsertEntityModal({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // タブごとの抽出件数と手動追加ハンドラ
+  const countByTab: Record<ActiveTab, number> = {
+    characters: charactersCollection.items.length,
+    settings: settingsCollection.items.length,
+    foreshadowings: foreshadowingsCollection.items.length,
+    timelines: timelinesCollection.items.length,
+    plots: plotsCollection.items.length,
+  };
+  const addEmptyByTab: Record<ActiveTab, () => void> = {
+    characters: characterHandlers.addEmpty,
+    settings: settingHandlers.addEmpty,
+    foreshadowings: foreshadowingHandlers.addEmpty,
+    timelines: timelineHandlers.addEmpty,
+    plots: plotHandlers.addEmpty,
   };
 
   return (
@@ -769,9 +405,9 @@ export function ChatInsertEntityModal({
 
           <div className="mt-2 flex flex-wrap items-center justify-between gap-1 border-t border-slate-200/80 pt-2 text-[11px] text-slate-500 dark:border-slate-700/60 dark:text-slate-400">
             <span>
-              登録済み: 人物 {existingCharacters.length} / 設定 {existingSettings.length} / 伏線{' '}
-              {existingForeshadowings.length} / 年表 {existingTimelines.length} / 章{' '}
-              {existingChapters.length}
+              登録済み: 人物 {charactersCollection.existing.length} / 設定{' '}
+              {settingsCollection.existing.length} / 伏線 {foreshadowingsCollection.existing.length}{' '}
+              / 年表 {timelinesCollection.existing.length} / 章 {plotsCollection.existing.length}
             </span>
             {loadingExisting && <span>(データ同期中...)</span>}
           </div>
@@ -804,176 +440,83 @@ export function ChatInsertEntityModal({
           <div>
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2 dark:border-slate-700">
               <div className="flex flex-wrap items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('characters')}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
-                    activeTab === 'characters'
-                      ? 'bg-indigo-600 text-white shadow'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  <span>👤 人物</span>
-                  <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
-                    {extractedCharacters.length}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('settings')}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
-                    activeTab === 'settings'
-                      ? 'bg-indigo-600 text-white shadow'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  <span>🌍 設定</span>
-                  <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
-                    {extractedSettings.length}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('foreshadowings')}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
-                    activeTab === 'foreshadowings'
-                      ? 'bg-indigo-600 text-white shadow'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  <span>🔍 伏線</span>
-                  <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
-                    {extractedForeshadowings.length}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('timelines')}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
-                    activeTab === 'timelines'
-                      ? 'bg-indigo-600 text-white shadow'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  <span>⏳ 年表</span>
-                  <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
-                    {extractedTimelines.length}
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('plots')}
-                  className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
-                    activeTab === 'plots'
-                      ? 'bg-indigo-600 text-white shadow'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
-                  }`}
-                >
-                  <span>📖 プロット</span>
-                  <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
-                    {extractedPlots.length}
-                  </span>
-                </button>
+                {INSERT_TABS.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-bold transition ${
+                      activeTab === tab.key
+                        ? 'bg-indigo-600 text-white shadow'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
+                    }`}
+                  >
+                    <span>
+                      {tab.icon} {tab.label}
+                    </span>
+                    <span className="rounded-full bg-white/20 px-1.5 py-0.2 text-[10px]">
+                      {countByTab[tab.key]}
+                    </span>
+                  </button>
+                ))}
               </div>
 
-              {activeTab === 'characters' && (
-                <button
-                  type="button"
-                  onClick={handleAddEmptyCharacter}
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-                >
-                  ＋ 人物を手動追加
-                </button>
-              )}
-              {activeTab === 'settings' && (
-                <button
-                  type="button"
-                  onClick={handleAddEmptySetting}
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-                >
-                  ＋ 設定を手動追加
-                </button>
-              )}
-              {activeTab === 'foreshadowings' && (
-                <button
-                  type="button"
-                  onClick={handleAddEmptyForeshadowing}
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-                >
-                  ＋ 伏線を手動追加
-                </button>
-              )}
-              {activeTab === 'timelines' && (
-                <button
-                  type="button"
-                  onClick={handleAddEmptyTimeline}
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-                >
-                  ＋ 出来事を手動追加
-                </button>
-              )}
-              {activeTab === 'plots' && (
-                <button
-                  type="button"
-                  onClick={handleAddEmptyPlot}
-                  className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
-                >
-                  ＋ プロットを手動追加
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={addEmptyByTab[activeTab]}
+                className="text-xs font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+              >
+                ＋ {ADD_BUTTON_LABELS[activeTab]}
+              </button>
             </div>
 
             {/* 人物リスト */}
             {activeTab === 'characters' && (
               <ChatInsertCharacterTab
-                characters={extractedCharacters}
-                onToggle={handleToggleCharacter}
-                onRemove={handleRemoveCharacter}
-                onUpdate={handleUpdateCharacter}
+                characters={charactersCollection.items}
+                onToggle={charactersCollection.toggleItem}
+                onRemove={charactersCollection.removeItem}
+                onUpdate={characterHandlers.update}
               />
             )}
 
             {/* 設定リスト */}
             {activeTab === 'settings' && (
               <ChatInsertSettingTab
-                settings={extractedSettings}
-                onToggle={handleToggleSetting}
-                onRemove={handleRemoveSetting}
-                onUpdate={handleUpdateSetting}
+                settings={settingsCollection.items}
+                onToggle={settingsCollection.toggleItem}
+                onRemove={settingsCollection.removeItem}
+                onUpdate={settingHandlers.update}
               />
             )}
 
             {/* 伏線リスト */}
             {activeTab === 'foreshadowings' && (
               <ChatInsertForeshadowingTab
-                foreshadowings={extractedForeshadowings}
-                onToggle={handleToggleForeshadowing}
-                onRemove={handleRemoveForeshadowing}
-                onUpdate={handleUpdateForeshadowing}
+                foreshadowings={foreshadowingsCollection.items}
+                onToggle={foreshadowingsCollection.toggleItem}
+                onRemove={foreshadowingsCollection.removeItem}
+                onUpdate={foreshadowingHandlers.update}
               />
             )}
 
             {/* 年表リスト */}
             {activeTab === 'timelines' && (
               <ChatInsertTimelineTab
-                timelines={extractedTimelines}
-                onToggle={handleToggleTimeline}
-                onRemove={handleRemoveTimeline}
-                onUpdate={handleUpdateTimeline}
+                timelines={timelinesCollection.items}
+                onToggle={timelinesCollection.toggleItem}
+                onRemove={timelinesCollection.removeItem}
+                onUpdate={timelineHandlers.update}
               />
             )}
 
             {/* プロットリスト */}
             {activeTab === 'plots' && (
               <ChatInsertPlotTab
-                plots={extractedPlots}
-                onToggle={handleTogglePlot}
-                onRemove={handleRemovePlot}
-                onUpdate={handleUpdatePlot}
+                plots={plotsCollection.items}
+                onToggle={plotsCollection.toggleItem}
+                onRemove={plotsCollection.removeItem}
+                onUpdate={plotHandlers.update}
               />
             )}
           </div>

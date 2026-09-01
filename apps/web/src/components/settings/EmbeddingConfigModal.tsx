@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/Button.js';
 import { Input } from '@/components/Input.js';
 import { Modal } from '@/components/Modal.js';
+import { Select } from '@/components/Select.js';
 import { Textarea } from '@/components/Textarea.js';
 import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
@@ -190,16 +191,16 @@ export function EmbeddingConfigModal({
           <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
             プロバイダ種別
           </label>
-          <select
+          <Select
             value={provider}
             onChange={(e) => setProvider(e.target.value as CreateEmbeddingConfigInput['provider'])}
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
+            className="w-full px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
           >
             <option value="openai">OpenAI (text-embedding-3-small/large)</option>
             <option value="google">Google (gemini-embedding-001)</option>
             <option value="ollama">Ollama (nomic-embed-text, bge-m3等)</option>
             <option value="custom_openai">OpenAI互換 エンドポイント</option>
-          </select>
+          </Select>
         </div>
 
         <div className="grid grid-cols-2 gap-3">

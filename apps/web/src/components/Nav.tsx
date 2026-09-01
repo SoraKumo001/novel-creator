@@ -1,9 +1,9 @@
 import { Link } from '@tanstack/react-router';
-import { useChat } from '@/hooks/useChat.js';
+import { useChatUI } from '@/context/ChatContext.js';
 import { useTheme, type ThemeMode } from '@/hooks/useTheme.js';
 
 export function Nav() {
-  const { toggleChat, isOpen } = useChat();
+  const { toggleChat, isOpen } = useChatUI();
   const { theme, setTheme } = useTheme();
 
   const themeOptions: { mode: ThemeMode; label: string; icon: string }[] = [

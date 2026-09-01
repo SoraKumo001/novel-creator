@@ -1,10 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { fn } from 'storybook/test';
 import { ChatFloatingButton } from './ChatFloatingButton';
-import { ChatContext } from '@/context/ChatContext.js';
-import type { ChatContextValue } from '@/context/ChatContext.js';
+import {
+  ChatStreamingContext,
+  ChatUIContext,
+  type ChatStreamingContextValue,
+  type ChatUIContextValue,
+} from '@/context/ChatContext.js';
 
-function makeChatValue(overrides: Partial<ChatContextValue>): ChatContextValue {
+function makeUIValue(overrides: Partial<ChatUIContextValue>): ChatUIContextValue {
   return {
     isOpen: false,
     openChat: fn(),
@@ -19,7 +23,6 @@ function makeChatValue(overrides: Partial<ChatContextValue>): ChatContextValue {
     sessions: [],
     currentSessionId: null,
     currentSession: null,
-
     loadingSessions: false,
     loadingMessages: false,
     startNewChat: fn(),
@@ -28,6 +31,15 @@ function makeChatValue(overrides: Partial<ChatContextValue>): ChatContextValue {
     deleteSession: fn(),
     updateSessionTitle: fn(),
     refreshSessions: fn(),
+    clearMessages: fn(),
+    ...overrides,
+  };
+}
+
+function makeStreamingValue(
+  overrides: Partial<ChatStreamingContextValue>,
+): ChatStreamingContextValue {
+  return {
     messages: [],
     isStreaming: false,
     streamingContent: '',
@@ -38,7 +50,6 @@ function makeChatValue(overrides: Partial<ChatContextValue>): ChatContextValue {
     retryLastMessage: fn(),
     clearError: fn(),
     abortStream: fn(),
-    clearMessages: fn(),
     ...overrides,
   };
 }
@@ -48,9 +59,11 @@ const meta = {
   tags: ['autodocs'],
   decorators: [
     (Story, { parameters }) => (
-      <ChatContext.Provider value={parameters.chatValue}>
-        <Story />
-      </ChatContext.Provider>
+      <ChatUIContext.Provider value={parameters.chatUIValue}>
+        <ChatStreamingContext.Provider value={parameters.chatStreamingValue}>
+          <Story />
+        </ChatStreamingContext.Provider>
+      </ChatUIContext.Provider>
     ),
   ],
 } satisfies Meta<typeof ChatFloatingButton>;
@@ -60,12 +73,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   parameters: {
-    chatValue: makeChatValue({ isOpen: false, isStreaming: false }),
+    chatUIValue: makeUIValue({ isOpen: false }),
+    chatStreamingValue: makeStreamingValue({ isStreaming: false }),
   },
 };
 
 export const Streaming: Story = {
   parameters: {
-    chatValue: makeChatValue({ isOpen: false, isStreaming: true }),
+    chatUIValue: makeUIValue({ isOpen: false }),
+    chatStreamingValue: makeStreamingValue({ isStreaming: true }),
   },
 };

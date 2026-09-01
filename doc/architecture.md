@@ -133,19 +133,19 @@ export const api = hc<AppType>('/');
 
 ### 3.3 AI SDK UI Message Stream & Agentic Tool Calling (チャット)
 
-創作相談チャット（Creative Chat）では、AI SDK 4.x の標準 **Data Stream Protocol (`toDataStreamResponse`)** を採用しています。
+創作相談チャット（Creative Chat）では、AI SDK の標準 **UI Message Stream (`toUIMessageStream` / `createUIMessageStreamResponse`)** を採用しています。
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Web as Web (useChat / ToolActivity)
-    participant API as API (/chat/sessions/:id/messages/stream)
+    participant Web as Web (useChatUI / useChatStreamingState / ToolActivity)
+    participant API as API (POST /api/chat)
     participant LLM as LLM (streamText)
-    participant Tools as Read Tools (Domain Services)
+    participant Tools as Read / Propose Tools (Domain Services)
 
     Web->>API: POST メッセージ (JSON)
     API->>API: ユーザー発言を DB 永続化
-    API->>LLM: streamText(messages, tools: createReadTools)
+    API->>LLM: streamText(messages, tools: createReadTools + createProposeTools)
     loop Tool Invocation
         LLM->>API: tool-call (例: getCharacters, searchNovelKnowledge)
         API-->>Web: Data Stream (tool-call event)

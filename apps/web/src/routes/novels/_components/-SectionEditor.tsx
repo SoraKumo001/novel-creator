@@ -13,8 +13,13 @@ import { useContent } from '@/hooks/useContent.js';
 
 import { useAnalysis } from '@/hooks/useAnalysis.js';
 import { useGenerate } from '@/hooks/useGenerate.js';
-import { useChat } from '@/hooks/useChat.js';
+import { useChatUI } from '@/context/ChatContext.js';
 import { useNovel } from '@/hooks/useNovel.js';
+import {
+  useHistoryViewState,
+  useModalResultState,
+  useModalState,
+} from '@/hooks/useModalResultState.js';
 import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
 import { countWords } from '@/lib/sse.js';
@@ -74,12 +79,6 @@ export function SectionEditor({
   } = useAnalysis();
 
   const { novel, updateNovel, updating: updatingNovel } = useNovel(novelId);
-  const [styleGuideOpen, setStyleGuideOpen] = useState(false);
-
-  const handleSaveStyleGuide = async (newGuide: string) => {
-    await updateNovel(novelId, { styleGuide: newGuide });
-    await onRefresh();
-  };
 
   const [localBody, setLocalBody] = useState('');
   const [savedBody, setSavedBody] = useState('');
@@ -90,36 +89,28 @@ export function SectionEditor({
   });
 
   // モーダル用ステート
-  const [extractResultOpen, setExtractResultOpen] = useState(false);
-  const [extracted, setExtracted] = useState<ExtractResult | null>(null);
-  const [historyOpen, setHistoryOpen] = useState(false);
-
-  const [verticalPreviewOpen, setVerticalPreviewOpen] = useState(false);
-
-  const [proofreadOpen, setProofreadOpen] = useState(false);
-  const [proofreadResult, setProofreadResult] = useState<ProofreadResult | null>(null);
+  const styleGuideModal = useModalState();
+  const extractResultModal = useModalResultState<ExtractResult>();
+  const historyModal = useModalState();
+  const verticalPreviewModal = useModalState();
+  const proofreadModal = useModalResultState<ProofreadResult>();
   const [proofreading, setProofreading] = useState(false);
+  const voiceCheckerModal = useModalResultState<CharacterVoiceCheckResult>();
+  const voiceHistory = useHistoryViewState();
+  const personaReviewModal = useModalResultState<MultiPersonaReviewResult>();
+  const personaHistory = useHistoryViewState();
+  const customPromptManagerModal = useModalState();
 
-  const [voiceCheckerOpen, setVoiceCheckerOpen] = useState(false);
-  const [voiceResult, setVoiceResult] = useState<CharacterVoiceCheckResult | null>(null);
-  const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [voiceHistoryView, setVoiceHistoryView] = useState(false);
-  const [voiceViewedAt, setVoiceViewedAt] = useState<string | null>(null);
-  const [voiceHistoryKey, setVoiceHistoryKey] = useState(0);
-
-  const [personaReviewOpen, setPersonaReviewOpen] = useState(false);
-  const [personaResult, setPersonaResult] = useState<MultiPersonaReviewResult | null>(null);
-  const [personaError, setPersonaError] = useState<string | null>(null);
-  const [personaHistoryView, setPersonaHistoryView] = useState(false);
-  const [personaViewedAt, setPersonaViewedAt] = useState<string | null>(null);
-  const [personaHistoryKey, setPersonaHistoryKey] = useState(0);
+  const handleSaveStyleGuide = async (newGuide: string) => {
+    await updateNovel(novelId, { styleGuide: newGuide });
+    await onRefresh();
+  };
 
   // インラインAI支援用ステート
   const [selectedText, setSelectedText] = useState('');
   const [inlineVariants, setInlineVariants] = useState<string[]>(['']);
   const [activeVariantIndex, setActiveVariantIndex] = useState(0);
   const [isInlineActive, setIsInlineActive] = useState(false);
-  const [customPromptManagerOpen, setCustomPromptManagerOpen] = useState(false);
 
   const toast = useToast();
 
@@ -198,8 +189,8 @@ export function SectionEditor({
   async function handleExtract() {
     if (!localBody.trim()) return;
     const result = await extract(section.id);
-    setExtracted(result);
-    setExtractResultOpen(true);
+    extractResultModal.setResult(result);
+    extractResultModal.open();
   }
 
   const proofreadAbortControllerRef = useRef<AbortController | null>(null);
@@ -210,7 +201,7 @@ export function SectionEditor({
       toast.error('校正する本文がありません');
       return;
     }
-    setProofreadOpen(true);
+    proofreadModal.open();
     setProofreading(true);
     const controller = new AbortController();
     proofreadAbortControllerRef.current = controller;
@@ -221,13 +212,13 @@ export function SectionEditor({
         selectedModelConfigId,
         controller.signal,
       );
-      setProofreadResult(res);
+      proofreadModal.setResult(res);
     } catch (e) {
       if ((e as Error)?.name === 'AbortError' || controller.signal.aborted) {
         return;
       }
       toast.error(toErrorMessage(e));
-      setProofreadOpen(false);
+      proofreadModal.close();
     } finally {
       setProofreading(false);
       proofreadAbortControllerRef.current = null;
@@ -240,7 +231,7 @@ export function SectionEditor({
       proofreadAbortControllerRef.current = null;
     }
     setProofreading(false);
-    setProofreadOpen(false);
+    proofreadModal.close();
   };
 
   // 口調チェッカーモーダル
@@ -249,21 +240,20 @@ export function SectionEditor({
       toast.error('チェックする本文がありません');
       return;
     }
-    setVoiceCheckerOpen(true);
-    setVoiceResult(null);
-    setVoiceError(null);
-    setVoiceHistoryView(false);
-    setVoiceViewedAt(null);
+    voiceCheckerModal.open();
+    voiceCheckerModal.setResult(null);
+    voiceCheckerModal.setError(null);
+    voiceHistory.resetHistoryView();
     try {
       const res = await runVoiceCheck(novelId, {
         body: localBody,
         modelConfigId: selectedModelConfigId,
       });
-      setVoiceResult(res);
-      setVoiceHistoryKey((k) => k + 1);
+      voiceCheckerModal.setResult(res);
+      voiceHistory.bumpHistoryKey();
     } catch (e) {
       if ((e as Error)?.name === 'AbortError') return;
-      setVoiceError(toErrorMessage(e));
+      voiceCheckerModal.setError(toErrorMessage(e));
     }
   };
 
@@ -273,42 +263,39 @@ export function SectionEditor({
       toast.error('レビュー対象の本文がありません');
       return;
     }
-    setPersonaReviewOpen(true);
-    setPersonaResult(null);
-    setPersonaError(null);
-    setPersonaHistoryView(false);
-    setPersonaViewedAt(null);
+    personaReviewModal.open();
+    personaReviewModal.setResult(null);
+    personaReviewModal.setError(null);
+    personaHistory.resetHistoryView();
     try {
       const res = await runPersonaReview(novelId, {
         sectionId: section.id,
         body: localBody,
         modelConfigId: selectedModelConfigId,
       });
-      setPersonaResult(res);
-      setPersonaHistoryKey((k) => k + 1);
+      personaReviewModal.setResult(res);
+      personaHistory.bumpHistoryKey();
     } catch (e) {
       if ((e as Error)?.name === 'AbortError') return;
-      setPersonaError(toErrorMessage(e));
+      personaReviewModal.setError(toErrorMessage(e));
     }
   };
 
   // 履歴から結果を読み込む
   const handleSelectVoiceHistory = (entry: AnalysisHistoryEntry) => {
     if (entry.analysisType !== 'check-voice') return;
-    setVoiceResult(entry.result as CharacterVoiceCheckResult);
-    setVoiceError(null);
-    setVoiceHistoryView(true);
-    setVoiceViewedAt(entry.createdAt);
+    voiceCheckerModal.setResult(entry.result as CharacterVoiceCheckResult);
+    voiceCheckerModal.setError(null);
+    voiceHistory.showHistory(entry.createdAt);
   };
   const handleSelectPersonaHistory = (entry: AnalysisHistoryEntry) => {
     if (entry.analysisType !== 'persona-review') return;
-    setPersonaResult(entry.result as MultiPersonaReviewResult);
-    setPersonaError(null);
-    setPersonaHistoryView(true);
-    setPersonaViewedAt(entry.createdAt);
+    personaReviewModal.setResult(entry.result as MultiPersonaReviewResult);
+    personaReviewModal.setError(null);
+    personaHistory.showHistory(entry.createdAt);
   };
 
-  const { openChat } = useChat();
+  const { openChat } = useChatUI();
 
   // チャット相談起動
   const handleOpenChat = useCallback(
@@ -439,14 +426,14 @@ export function SectionEditor({
         onModelConfigIdChange={handleModelChange}
         isZenMode={isZenMode}
         onToggleZenMode={onToggleZenMode}
-        onOpenHistory={() => setHistoryOpen(true)}
-        onOpenVerticalPreview={() => setVerticalPreviewOpen(true)}
+        onOpenHistory={historyModal.open}
+        onOpenVerticalPreview={verticalPreviewModal.open}
         onOpenVoiceChecker={() => void handleOpenVoiceChecker()}
         onOpenPersonaReview={() => void handleOpenPersonaReview()}
         onOpenProofread={() => void handleOpenProofread()}
         onOpenChat={() => handleOpenChat(false)}
-        onOpenStyleGuide={() => setStyleGuideOpen(true)}
-        onOpenCustomPrompts={() => setCustomPromptManagerOpen(true)}
+        onOpenStyleGuide={styleGuideModal.open}
+        onOpenCustomPrompts={customPromptManagerModal.open}
         onSave={() => void handleSave()}
       />
 
@@ -520,7 +507,7 @@ export function SectionEditor({
                     setActiveVariantIndex(0);
                   }}
                   onExecuteAssist={handleExecuteInlineAssist}
-                  onOpenPromptManager={() => setCustomPromptManagerOpen(true)}
+                  onOpenPromptManager={customPromptManagerModal.open}
                   isLoading={inlineAssisting}
                   startedAt={inlineAssisting ? generateStartedAt : null}
                   variants={inlineVariants}
@@ -542,13 +529,13 @@ export function SectionEditor({
       />
 
       <ExtractResultModal
-        isOpen={extractResultOpen}
-        onClose={() => setExtractResultOpen(false)}
-        result={extracted}
+        isOpen={extractResultModal.isOpen}
+        onClose={extractResultModal.close}
+        result={extractResultModal.result}
       />
       <HistoryDiffModal
-        isOpen={historyOpen}
-        onClose={() => setHistoryOpen(false)}
+        isOpen={historyModal.isOpen}
+        onClose={historyModal.close}
         novelId={novelId}
         entityType="content"
         entityId={section.id}
@@ -562,15 +549,15 @@ export function SectionEditor({
         }}
       />
       <VerticalPreviewModal
-        isOpen={verticalPreviewOpen}
-        onClose={() => setVerticalPreviewOpen(false)}
+        isOpen={verticalPreviewModal.isOpen}
+        onClose={verticalPreviewModal.close}
         title={section.title || `節 ${section.order}`}
         body={localBody}
       />
       <ProofreadModal
-        isOpen={proofreadOpen}
-        onClose={() => setProofreadOpen(false)}
-        result={proofreadResult}
+        isOpen={proofreadModal.isOpen}
+        onClose={proofreadModal.close}
+        result={proofreadModal.result}
         isLoading={proofreading}
         onCancel={handleCancelProofread}
         onApplyPolishedBody={(polished) => {
@@ -579,47 +566,47 @@ export function SectionEditor({
         }}
       />
       <CharacterVoiceCheckerModal
-        isOpen={voiceCheckerOpen}
-        onClose={() => setVoiceCheckerOpen(false)}
-        result={voiceResult}
+        isOpen={voiceCheckerModal.isOpen}
+        onClose={voiceCheckerModal.close}
+        result={voiceCheckerModal.result}
         progress={progress}
         running={running === 'check-voice'}
-        error={voiceError}
-        isHistoryView={voiceHistoryView}
-        viewedAt={voiceViewedAt}
+        error={voiceCheckerModal.error}
+        isHistoryView={voiceHistory.isHistoryView}
+        viewedAt={voiceHistory.viewedAt}
         novelId={novelId}
-        historyRefreshKey={voiceHistoryKey}
+        historyRefreshKey={voiceHistory.historyKey}
         onSelectHistory={handleSelectVoiceHistory}
         onRerun={() => void handleOpenVoiceChecker()}
         onCancel={cancelAnalysis}
         onApplyFix={handleApplyVoiceFix}
       />
       <MultiPersonaReviewModal
-        isOpen={personaReviewOpen}
-        onClose={() => setPersonaReviewOpen(false)}
-        result={personaResult}
+        isOpen={personaReviewModal.isOpen}
+        onClose={personaReviewModal.close}
+        result={personaReviewModal.result}
         progress={progress}
         running={running === 'persona-review'}
-        error={personaError}
-        isHistoryView={personaHistoryView}
-        viewedAt={personaViewedAt}
+        error={personaReviewModal.error}
+        isHistoryView={personaHistory.isHistoryView}
+        viewedAt={personaHistory.viewedAt}
         novelId={novelId}
-        historyRefreshKey={personaHistoryKey}
+        historyRefreshKey={personaHistory.historyKey}
         onSelectHistory={handleSelectPersonaHistory}
         onRerun={() => void handleOpenPersonaReview()}
         onCancel={cancelAnalysis}
       />
       <StyleGuideModal
-        isOpen={styleGuideOpen}
-        onClose={() => setStyleGuideOpen(false)}
+        isOpen={styleGuideModal.isOpen}
+        onClose={styleGuideModal.close}
         novelId={novelId}
         initialStyleGuide={novel?.styleGuide}
         onSave={handleSaveStyleGuide}
         saving={updatingNovel}
       />
       <CustomPromptManagerModal
-        open={customPromptManagerOpen}
-        onClose={() => setCustomPromptManagerOpen(false)}
+        open={customPromptManagerModal.isOpen}
+        onClose={customPromptManagerModal.close}
         novelId={novelId}
       />
     </div>

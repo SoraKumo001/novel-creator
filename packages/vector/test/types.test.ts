@@ -61,7 +61,7 @@ describe('PgVectorStore', () => {
   });
 
   it('upsert が呼び出されること', async () => {
-    const store = createPgVectorStore('postgres://mock');
+    const store = createPgVectorStore('postgres://mock', 1536);
     await store.upsert({
       id: '11111111-1111-4111-8111-111111111111',
       novelId: '22222222-2222-2222-2222-222222222222',
@@ -88,7 +88,7 @@ describe('PgVectorStore', () => {
       ],
       rowCount: 1,
     });
-    const store = createPgVectorStore('postgres://mock');
+    const store = createPgVectorStore('postgres://mock', 1536);
     const results = await store.search([0.1, 0.2, 0.3], {
       novelId: '22222222-2222-2222-2222-222222222222',
       topK: 5,
@@ -100,7 +100,7 @@ describe('PgVectorStore', () => {
   });
 
   it('delete が呼び出されること', async () => {
-    const store = createPgVectorStore('postgres://mock');
+    const store = createPgVectorStore('postgres://mock', 1536);
     await store.delete('11111111-1111-4111-8111-111111111111');
     expect(mockQuery).toHaveBeenCalled();
   });

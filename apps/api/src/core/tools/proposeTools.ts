@@ -1,9 +1,6 @@
-import { tool } from 'ai';
 import { z } from 'zod';
 import type { ServiceContext } from '../types.js';
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const createTool = tool as any;
+import { scopedTool } from './scopedTool.js';
 
 /**
  * 創作相談チャット用の小説設定提案ツール群（Propose Tools）。
@@ -20,7 +17,7 @@ export function createProposeTools(
   };
 
   return {
-    proposeCreateCharacter: createTool({
+    proposeCreateCharacter: scopedTool({
       description:
         '新しい登場人物（キャラクター）の登録をユーザーに提案します。会話の中で新しい人物が考案されたり固まった場合に使用してください。',
       parameters: z.object({
@@ -38,39 +35,23 @@ export function createProposeTools(
           .default([])
           .describe('特徴・キーワードの配列（例: ["銀髪", "冷静沈着", "炎魔法"]）'),
       }),
-      execute: async ({
-        novelId,
-        name,
-        category = '未分類',
-        description,
-        traits = [],
-      }: {
-        novelId?: string;
-        name: string;
-        category?: string;
-        description: string;
-        traits?: string[];
-      }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
-        }
-        return {
-          type: 'proposal',
-          proposalType: 'character',
-          novelId: targetId,
-          data: {
-            name,
-            category,
-            description,
-            traits,
-          },
-          summary: `登場人物「${name}」の設定登録提案`,
-        };
-      },
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: 'キャラクター登録提案の生成に失敗しました。',
+      run: (targetId, { name, category = '未分類', description, traits = [] }) => ({
+        type: 'proposal',
+        proposalType: 'character',
+        novelId: targetId,
+        data: {
+          name,
+          category,
+          description,
+          traits,
+        },
+        summary: `登場人物「${name}」の設定登録提案`,
+      }),
     }),
 
-    proposeCreateSetting: createTool({
+    proposeCreateSetting: scopedTool({
       description:
         '新しい世界観・設定（用語、地理、魔法体系、組織、アイテムなど）の登録をユーザーに提案します。会話の中で新しい設定が考案された場合に使用してください。',
       parameters: z.object({
@@ -83,36 +64,22 @@ export function createProposeTools(
           ),
         description: z.string().describe('設定の詳細説明や作中ルール'),
       }),
-      execute: async ({
-        novelId,
-        name,
-        category,
-        description,
-      }: {
-        novelId?: string;
-        name: string;
-        category: string;
-        description: string;
-      }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
-        }
-        return {
-          type: 'proposal',
-          proposalType: 'setting',
-          novelId: targetId,
-          data: {
-            name,
-            category,
-            description,
-          },
-          summary: `世界観設定「${name}」(${category})の登録提案`,
-        };
-      },
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: '設定登録提案の生成に失敗しました。',
+      run: (targetId, { name, category, description }) => ({
+        type: 'proposal',
+        proposalType: 'setting',
+        novelId: targetId,
+        data: {
+          name,
+          category,
+          description,
+        },
+        summary: `世界観設定「${name}」(${category})の登録提案`,
+      }),
     }),
 
-    proposeAddForeshadowing: createTool({
+    proposeAddForeshadowing: scopedTool({
       description:
         '新しい伏線の登録をユーザーに提案します。作中に散りばめる謎や回収計画が考案された場合に使用してください。',
       parameters: z.object({
@@ -125,36 +92,22 @@ export function createProposeTools(
           .default('unresolved')
           .describe('ステータス（通常は unresolved）'),
       }),
-      execute: async ({
-        novelId,
-        title,
-        description,
-        status = 'unresolved',
-      }: {
-        novelId?: string;
-        title: string;
-        description: string;
-        status?: 'unresolved' | 'resolved' | 'abandoned';
-      }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
-        }
-        return {
-          type: 'proposal',
-          proposalType: 'foreshadowing',
-          novelId: targetId,
-          data: {
-            title,
-            description,
-            status,
-          },
-          summary: `伏線「${title}」の登録提案`,
-        };
-      },
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: '伏線登録提案の生成に失敗しました。',
+      run: (targetId, { title, description, status = 'unresolved' }) => ({
+        type: 'proposal',
+        proposalType: 'foreshadowing',
+        novelId: targetId,
+        data: {
+          title,
+          description,
+          status,
+        },
+        summary: `伏線「${title}」の登録提案`,
+      }),
     }),
 
-    proposeAddTimelineEvent: createTool({
+    proposeAddTimelineEvent: scopedTool({
       description: '作中の時系列・年表への新しい出来事（イベント）の追加をユーザーに提案します。',
       parameters: z.object({
         novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
@@ -164,66 +117,42 @@ export function createProposeTools(
           .optional()
           .describe('作中時期や日時・順序を表す文字列（例: 帝都暦742年、物語開始直前など）'),
       }),
-      execute: async ({
-        novelId,
-        event,
-        timestamp,
-      }: {
-        novelId?: string;
-        event: string;
-        timestamp?: string;
-      }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
-        }
-        return {
-          type: 'proposal',
-          proposalType: 'timeline',
-          novelId: targetId,
-          data: {
-            event,
-            timestamp: timestamp || null,
-          },
-          summary: `年表イベント「${event}」の追加提案`,
-        };
-      },
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: '年表イベント追加提案の生成に失敗しました。',
+      run: (targetId, { event, timestamp }) => ({
+        type: 'proposal',
+        proposalType: 'timeline',
+        novelId: targetId,
+        data: {
+          event,
+          timestamp: timestamp || null,
+        },
+        summary: `年表イベント「${event}」の追加提案`,
+      }),
     }),
 
-    proposeUpdatePlot: createTool({
+    proposeUpdatePlot: scopedTool({
       description: '章のプロット・あらすじの作成または更新をユーザーに提案します。',
       parameters: z.object({
         novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
         chapterTitle: z.string().describe('章のタイトル（例: 第1章 旅立ち）'),
         summary: z.string().describe('提案する章のあらすじ・プロット内容'),
       }),
-      execute: async ({
-        novelId,
-        chapterTitle,
-        summary,
-      }: {
-        novelId?: string;
-        chapterTitle: string;
-        summary: string;
-      }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
-        }
-        return {
-          type: 'proposal',
-          proposalType: 'plot',
-          novelId: targetId,
-          data: {
-            chapterTitle,
-            summary,
-          },
-          summary: `章「${chapterTitle}」のプロット反映提案`,
-        };
-      },
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: 'プロット反映提案の生成に失敗しました。',
+      run: (targetId, { chapterTitle, summary }) => ({
+        type: 'proposal',
+        proposalType: 'plot',
+        novelId: targetId,
+        data: {
+          chapterTitle,
+          summary,
+        },
+        summary: `章「${chapterTitle}」のプロット反映提案`,
+      }),
     }),
 
-    proposeUpdateStoryOutline: createTool({
+    proposeUpdateStoryOutline: scopedTool({
       description:
         'ストーリー構想（全体のあらすじ、序盤、中盤、今後の展開、結末など）への追加・更新・ブラッシュアップをユーザーに提案します。会話で良いあらすじや結末案、展開案がまとまった際に使用してください。',
       parameters: z.object({
@@ -235,30 +164,18 @@ export function createProposeTools(
           ),
         content: z.string().describe('提案するマークダウン内容・あらすじ・結末テキスト'),
       }),
-      execute: async ({
-        novelId,
-        sectionName,
-        content,
-      }: {
-        novelId?: string;
-        sectionName: string;
-        content: string;
-      }) => {
-        const targetId = resolveNovelId(novelId);
-        if (!targetId) {
-          return { error: '対象の小説が指定されていません。' };
-        }
-        return {
-          type: 'proposal',
-          proposalType: 'story_outline',
-          novelId: targetId,
-          data: {
-            sectionName,
-            content,
-          },
-          summary: `ストーリー構想「${sectionName}」の更新提案`,
-        };
-      },
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      errorMessage: 'ストーリー構想更新提案の生成に失敗しました。',
+      run: (targetId, { sectionName, content }) => ({
+        type: 'proposal',
+        proposalType: 'story_outline',
+        novelId: targetId,
+        data: {
+          sectionName,
+          content,
+        },
+        summary: `ストーリー構想「${sectionName}」の更新提案`,
+      }),
     }),
   };
 }

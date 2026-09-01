@@ -1,9 +1,8 @@
 import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
-import { z } from 'zod';
 import type { AppContext } from '../../context.js';
 import { getServices } from '../../core/services.js';
+import { streamEvents } from '../../sse.js';
 import {
   analysisResultParamsSchema,
   analyzeSettingImpactBodySchema,
@@ -12,6 +11,7 @@ import {
   generateStyleGuideDraftBodySchema,
   idParamSchema,
   listAnalysisResultsQuerySchema,
+  modelConfigBodySchema,
   multiPersonaReviewBodySchema,
 } from '../../schemas/index.js';
 
@@ -20,10 +20,7 @@ export const novelAnalysisRouter = new Hono<AppContext>()
   .post(
     '/:id/generate/plot',
     zValidator('param', idParamSchema),
-    zValidator(
-      'json',
-      z.object({ modelConfigId: z.string().uuid().optional().nullable() }).optional(),
-    ),
+    zValidator('json', modelConfigBodySchema.optional()),
     async (c) => {
       const { id: novelId } = c.req.valid('param');
       const jsonBody = c.req.valid('json');
@@ -55,22 +52,14 @@ export const novelAnalysisRouter = new Hono<AppContext>()
       const { id: novelId } = c.req.valid('param');
       const jsonBody = c.req.valid('json');
 
-      return streamSSE(c, async (stream) => {
-        try {
-          for await (const ev of getServices(c).analysis.streamCheckVoice(
-            novelId,
-            jsonBody?.sectionId,
-            jsonBody?.body,
-            jsonBody?.modelConfigId,
-          )) {
-            await stream.writeSSE({ event: ev.type, data: JSON.stringify(ev) });
-          }
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          await stream.writeSSE({
-            event: 'error',
-            data: JSON.stringify({ type: 'error', message }),
-          });
+      return streamEvents(c, async (emit) => {
+        for await (const ev of getServices(c).analysis.streamCheckVoice(
+          novelId,
+          jsonBody?.sectionId,
+          jsonBody?.body,
+          jsonBody?.modelConfigId,
+        )) {
+          await emit(ev.type, ev);
         }
       });
     },
@@ -102,20 +91,12 @@ export const novelAnalysisRouter = new Hono<AppContext>()
       const { id: novelId } = c.req.valid('param');
       const jsonBody = c.req.valid('json');
 
-      return streamSSE(c, async (stream) => {
-        try {
-          for await (const ev of getServices(c).analysis.streamStoryArc(
-            novelId,
-            jsonBody?.modelConfigId,
-          )) {
-            await stream.writeSSE({ event: ev.type, data: JSON.stringify(ev) });
-          }
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          await stream.writeSSE({
-            event: 'error',
-            data: JSON.stringify({ type: 'error', message }),
-          });
+      return streamEvents(c, async (emit) => {
+        for await (const ev of getServices(c).analysis.streamStoryArc(
+          novelId,
+          jsonBody?.modelConfigId,
+        )) {
+          await emit(ev.type, ev);
         }
       });
     },
@@ -129,22 +110,14 @@ export const novelAnalysisRouter = new Hono<AppContext>()
       const { id: novelId } = c.req.valid('param');
       const jsonBody = c.req.valid('json');
 
-      return streamSSE(c, async (stream) => {
-        try {
-          for await (const ev of getServices(c).analysis.streamPersonaReview(novelId, {
-            sectionId: jsonBody?.sectionId,
-            chapterId: jsonBody?.chapterId,
-            customBody: jsonBody?.body,
-            modelConfigId: jsonBody?.modelConfigId,
-          })) {
-            await stream.writeSSE({ event: ev.type, data: JSON.stringify(ev) });
-          }
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          await stream.writeSSE({
-            event: 'error',
-            data: JSON.stringify({ type: 'error', message }),
-          });
+      return streamEvents(c, async (emit) => {
+        for await (const ev of getServices(c).analysis.streamPersonaReview(novelId, {
+          sectionId: jsonBody?.sectionId,
+          chapterId: jsonBody?.chapterId,
+          customBody: jsonBody?.body,
+          modelConfigId: jsonBody?.modelConfigId,
+        })) {
+          await emit(ev.type, ev);
         }
       });
     },

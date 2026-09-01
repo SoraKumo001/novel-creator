@@ -12,7 +12,7 @@ export async function fetchLLMConfigs(): Promise<LLMConfig[]> {
   const res = await apiClient['llm-configs'].$get();
   if (!res.ok) throw await parseResponseError(res, 'LLM設定一覧の取得');
   const data = await res.json();
-  return data as unknown as LLMConfig[];
+  return data;
 }
 
 export async function createLLMConfig(input: CreateLLMConfigInput): Promise<LLMConfig> {
@@ -29,7 +29,7 @@ export async function createLLMConfig(input: CreateLLMConfigInput): Promise<LLMC
   });
   if (!res.ok) throw await parseResponseError(res, 'LLM設定の作成');
   const data = await res.json();
-  return data as unknown as LLMConfig;
+  return data;
 }
 
 export async function updateLLMConfig(id: string, input: UpdateLLMConfigInput): Promise<LLMConfig> {
@@ -39,7 +39,7 @@ export async function updateLLMConfig(id: string, input: UpdateLLMConfigInput): 
   });
   if (!res.ok) throw await parseResponseError(res, 'LLM設定の更新');
   const data = await res.json();
-  return data as unknown as LLMConfig;
+  return data;
 }
 
 export async function deleteLLMConfig(id: string): Promise<void> {
@@ -55,7 +55,7 @@ export async function setDefaultLLMConfig(id: string): Promise<LLMConfig> {
   });
   if (!res.ok) throw await parseResponseError(res, 'デフォルトLLM設定の変更');
   const data = await res.json();
-  return data as unknown as LLMConfig;
+  return data;
 }
 
 export async function testLLMConfig(input: TestConnectionInput): Promise<TestConnectionResult> {
@@ -69,5 +69,5 @@ export async function testLLMConfig(input: TestConnectionInput): Promise<TestCon
   });
   if (!res.ok) throw await parseResponseError(res, 'LLM接続テスト');
   const data = await res.json();
-  return data as unknown as TestConnectionResult;
+  return data;
 }

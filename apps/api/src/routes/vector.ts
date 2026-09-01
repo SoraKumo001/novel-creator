@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
-import { streamSSE } from 'hono/streaming';
 import { zValidator } from '@hono/zod-validator';
 import type { AppContext } from '../context.js';
 import { getServices } from '../core/services.js';
+import { streamEvents } from '../sse.js';
 import { reindexBodySchema } from '../schemas/index.js';
 
 const vectorRouter = new Hono<AppContext>()
@@ -11,27 +11,18 @@ const vectorRouter = new Hono<AppContext>()
     const body = c.req.valid('json');
     const reindexService = getServices(c).reindex;
 
-    return streamSSE(c, async (stream) => {
-      try {
+    return streamEvents(
+      c,
+      async (emit) => {
         const result = await reindexService.reindexAll(body.embeddingConfigId, (progress) => {
-          void stream.writeSSE({
-            data: JSON.stringify(progress),
-            event: 'progress',
-          });
+          void emit('progress', progress);
         });
 
-        await stream.writeSSE({
-          data: JSON.stringify({ done: true, result }),
-          event: 'done',
-        });
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        await stream.writeSSE({
-          data: JSON.stringify({ error: message }),
-          event: 'error',
-        });
-      }
-    });
+        await emit('done', { done: true, result });
+      },
+      // reindex SSE のエラーペイロードは解析系と異なる { error } 形状を維持する
+      { buildErrorPayload: (message) => ({ error: message }) },
+    );
   });
 
 export default vectorRouter;

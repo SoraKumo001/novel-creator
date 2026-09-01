@@ -2,13 +2,20 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ChatProvider, useChat } from '../src/context/ChatContext.js';
+import { ChatProvider, useChatStreamingState, useChatUI } from '../src/context/ChatContext.js';
 import { buildChatPrefill } from '../src/components/chat/ChatDrawer.js';
 import { rowToUIMessage } from '../src/hooks/useChatStreaming.js';
 
 const mockFetch = vi.fn();
 
 let queryClient: QueryClient;
+
+/** テスト用に両 context の値をまとめて取得する（旧 useChat と同じ形状） */
+function useTestChat() {
+  const ui = useChatUI();
+  const streaming = useChatStreamingState();
+  return { ...ui, ...streaming };
+}
 
 function createChatWrapper() {
   return function Wrapper({ children }: { children: ReactNode }) {
@@ -61,9 +68,9 @@ beforeEach(() => {
   });
 });
 
-describe('ChatContext & useChat', () => {
+describe('ChatContext & useChatUI / useChatStreamingState', () => {
   it('初期状態で閉じていること、openChat/closeChat/toggleChat で状態が変化すること', () => {
-    const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
+    const { result } = renderHook(() => useTestChat(), { wrapper: createChatWrapper() });
 
     expect(result.current.isOpen).toBe(false);
     expect(result.current.messages).toEqual([]);
@@ -100,7 +107,7 @@ describe('ChatContext & useChat', () => {
     // 1回目: マウント時の一覧取得（空）
     mockFetch.mockResolvedValueOnce(jsonResponse([]));
 
-    const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
+    const { result } = renderHook(() => useTestChat(), { wrapper: createChatWrapper() });
 
     await waitFor(() => expect(result.current.loadingSessions).toBe(false));
 
@@ -120,7 +127,7 @@ describe('ChatContext & useChat', () => {
   });
 
   it('startNewChat で currentSessionId と messages がリセットされること', () => {
-    const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
+    const { result } = renderHook(() => useTestChat(), { wrapper: createChatWrapper() });
 
     act(() => {
       result.current.startNewChat();
@@ -132,7 +139,7 @@ describe('ChatContext & useChat', () => {
   });
 
   it('openChat に focus を渡すと chatFocus に保持され、consumeFocus でクリアされること', () => {
-    const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
+    const { result } = renderHook(() => useTestChat(), { wrapper: createChatWrapper() });
 
     expect(result.current.chatFocus).toBeNull();
 
@@ -159,7 +166,7 @@ describe('ChatContext & useChat', () => {
   });
 
   it('focus 未指定の openChat は chatFocus を変更しないこと', () => {
-    const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
+    const { result } = renderHook(() => useTestChat(), { wrapper: createChatWrapper() });
 
     act(() => {
       result.current.openChat('novel-123');
@@ -203,7 +210,7 @@ describe('ChatContext & useChat', () => {
         return jsonResponse([]);
       });
 
-    const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
+    const { result } = renderHook(() => useTestChat(), { wrapper: createChatWrapper() });
 
     await waitFor(() => expect(result.current.loadingSessions).toBe(false));
 
@@ -262,7 +269,7 @@ describe('ChatContext & useChat', () => {
         return jsonResponse([]);
       });
 
-    const { result } = renderHook(() => useChat(), { wrapper: createChatWrapper() });
+    const { result } = renderHook(() => useTestChat(), { wrapper: createChatWrapper() });
 
     await waitFor(() => expect(result.current.loadingSessions).toBe(false));
 

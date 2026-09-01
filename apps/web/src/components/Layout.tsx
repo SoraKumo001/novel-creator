@@ -3,7 +3,7 @@ import { useMatches } from '@tanstack/react-router';
 import { Nav } from './Nav.js';
 import { ChatDrawer } from './chat/ChatDrawer.js';
 import { ChatFloatingButton } from './chat/ChatFloatingButton.js';
-import { useChat } from '@/hooks/useChat.js';
+import { useChatUI } from '@/context/ChatContext.js';
 
 interface LayoutProps {
   children: ReactNode;
@@ -11,7 +11,7 @@ interface LayoutProps {
 
 function NovelRouteSync() {
   const matches = useMatches();
-  const { setSelectedNovelId, selectedNovelId } = useChat();
+  const { setSelectedNovelId, selectedNovelId } = useChatUI();
 
   useEffect(() => {
     let currentNovelId: string | null = null;

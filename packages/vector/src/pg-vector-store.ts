@@ -28,19 +28,22 @@ export const vectorEmbeddings = pgTable(
 export type VectorEmbedding = typeof vectorEmbeddings.$inferSelect;
 export type NewVectorEmbedding = typeof vectorEmbeddings.$inferInsert;
 
-export function createPgVectorStore(connectionString: string, dimensions = 3072): VectorStore {
+export function createPgVectorStore(connectionString: string, dimensions = 1536): VectorStore {
   const pool = new Pool({ connectionString });
   const db = drizzle(pool, { schema: { vectorEmbeddings } });
 
   let schemaReady: Promise<void> | null = null;
   function ensureSchema(): Promise<void> {
     if (!schemaReady) {
-      // ivfflat は2000次元まで、HNSW はそれ以上に対応
-      const indexType = dimensions > 2000 ? 'hnsw' : 'ivfflat';
-      const indexOptions =
-        indexType === 'hnsw' ? 'WITH (m = 16, ef_construction = 64)' : 'WITH (lists = 100)';
-      schemaReady = db
-        .execute(
+      schemaReady = (async () => {
+        // 既存テーブルの embedding 列の次元が要求次元と一致することを検証する。
+        // 不一致の場合は CREATE TABLE IF NOT EXISTS が何もせず、insert 時に初めて失敗するため、ここで早期に検出する。
+        await validateExistingTableDimension();
+        // ivfflat は2000次元まで、HNSW はそれ以上に対応
+        const indexType = dimensions > 2000 ? 'hnsw' : 'ivfflat';
+        const indexOptions =
+          indexType === 'hnsw' ? 'WITH (m = 16, ef_construction = 64)' : 'WITH (lists = 100)';
+        await db.execute(
           sql.raw(`
           CREATE TABLE IF NOT EXISTS vector_embeddings (
             id uuid PRIMARY KEY,
@@ -57,10 +60,45 @@ export function createPgVectorStore(connectionString: string, dimensions = 3072)
           CREATE INDEX IF NOT EXISTS vector_embeddings_embedding_idx
             ON vector_embeddings USING ${indexType} (embedding vector_cosine_ops) ${indexOptions};
         `),
-        )
-        .then(() => undefined);
+        );
+      })();
     }
     return schemaReady;
+  }
+
+  /**
+   * 既存テーブルの embedding 列の次元（atttypmod）を pg_catalog から取得し、
+   * 要求次元と一致しなければ明確なエラーを投げる。
+   * テーブルが存在しない場合は検証をスキップする（CREATE TABLE IF NOT EXISTS に任せる）。
+   */
+  async function validateExistingTableDimension(): Promise<void> {
+    // pgvector の vector(n) は pg_attribute.atttypmod に次元 n を格納する。
+    // to_regclass はテーブルが存在しない場合に NULL を返すため、新規作成時は安全にスキップできる。
+    const result = await db.execute(
+      sql.raw(`
+        SELECT a.atttypmod AS dimensions
+        FROM pg_attribute a
+        WHERE a.attrelid = to_regclass('vector_embeddings')
+          AND a.attname = 'embedding'
+          AND a.attnum > 0
+          AND NOT a.attisdropped
+        LIMIT 1
+      `),
+    );
+    const row = result.rows[0] as { dimensions?: unknown } | undefined;
+    if (!row || row.dimensions == null) return;
+
+    const existingDimensions = Number(row.dimensions);
+    if (existingDimensions !== dimensions) {
+      throw new Error(
+        `vector_embeddings テーブルの embedding 列の次元（${existingDimensions}）が` +
+          `要求された次元（${dimensions}）と一致しません。` +
+          '次元のソースは環境変数 EMBEDDING_DIMENSIONS のほか、DB の embedding 設定' +
+          '（embedding_configs テーブルの dimensions カラム）の場合もあります。' +
+          '環境変数または embedding 設定の dimensions を既存テーブルの次元に合わせるか、' +
+          'recreateSchema でテーブルを作り直してください。',
+      );
+    }
   }
 
   return {

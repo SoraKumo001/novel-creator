@@ -43,6 +43,56 @@ function buildSettings(baseURL?: string | null, apiKey?: string | null): Provide
 }
 
 /**
+ * 設定解決の対象種別。
+ * - 'llm': LLM 設定（LLM_* 環境変数のみフォールバック）
+ * - 'embedding': Embedding 設定（EMBEDDING_* を優先し、一致しない場合は LLM_* へフォールバック）
+ */
+type SettingsKind = 'llm' | 'embedding';
+
+/**
+ * fallbackEnv から指定フィールドのフォールバック値を解決する。
+ * プロバイダが一致する環境変数群のみ使用する。
+ */
+function resolveEnvValue(
+  env: Env,
+  kind: SettingsKind,
+  provider: LLMProviderType,
+  field: 'apiKey' | 'baseURL',
+): string | undefined {
+  if (kind === 'embedding' && env.EMBEDDING_PROVIDER === provider) {
+    return field === 'apiKey' ? env.EMBEDDING_API_KEY : env.EMBEDDING_BASE_URL;
+  }
+  if (env.LLM_PROVIDER === provider) {
+    return field === 'apiKey' ? env.LLM_API_KEY : env.LLM_BASE_URL;
+  }
+  return undefined;
+}
+
+/**
+ * config の apiKey / baseUrl を解決し、未設定のフィールドを fallbackEnv で補完して
+ * ProviderSettings を構築する。
+ */
+function resolveSettings(
+  config: { provider: LLMProviderType; baseUrl?: string | null; apiKey?: string | null },
+  fallbackEnv: Env | undefined,
+  kind: SettingsKind,
+): ProviderSettings {
+  let apiKey = config.apiKey ?? undefined;
+  let baseURL = config.baseUrl ?? undefined;
+
+  if (fallbackEnv) {
+    if (!apiKey) {
+      apiKey = resolveEnvValue(fallbackEnv, kind, config.provider, 'apiKey');
+    }
+    if (!baseURL) {
+      baseURL = resolveEnvValue(fallbackEnv, kind, config.provider, 'baseURL');
+    }
+  }
+
+  return buildSettings(baseURL, apiKey);
+}
+
+/**
  * 指定プロバイダ・設定で LanguageModel を構築する。
  */
 export function createLanguageModel(
@@ -122,23 +172,11 @@ export function createLanguageModelFromConfig(
   config: LLMConfigInput,
   fallbackEnv?: Env,
 ): LanguageModel {
-  let apiKey = config.apiKey ?? undefined;
-  let baseURL = config.baseUrl ?? undefined;
-
-  if (!apiKey && fallbackEnv) {
-    // プロバイダが一致する場合はプロバイダ固有の環境変数をフォールバック利用
-    if (fallbackEnv.LLM_PROVIDER === config.provider) {
-      apiKey = fallbackEnv.LLM_API_KEY;
-    }
-  }
-
-  if (!baseURL && fallbackEnv) {
-    if (fallbackEnv.LLM_PROVIDER === config.provider) {
-      baseURL = fallbackEnv.LLM_BASE_URL;
-    }
-  }
-
-  return createLanguageModel(config.provider, config.modelId, buildSettings(baseURL, apiKey));
+  return createLanguageModel(
+    config.provider,
+    config.modelId,
+    resolveSettings(config, fallbackEnv, 'llm'),
+  );
 }
 
 /**
@@ -154,13 +192,70 @@ export function createLLMProvider(env: Env): LanguageModel {
 
 /**
  * AI SDK の EmbeddingModel インスタンスを返す。
+ *
+ * baseURL は EMBEDDING_BASE_URL を優先し、未設定の場合は LLM_BASE_URL にフォールバックする
+ * （createEmbeddingModelFromConfig の config パスと対称な挙動）。
+ * EMBEDDING_BASE_URL を明示設定している場合の挙動は変わらない。
  */
 export function createEmbeddingProvider(env: Env): EmbeddingModel {
-  const provider = (env.EMBEDDING_PROVIDER ?? env.LLM_PROVIDER) as LLMProviderType;
+  const provider = env.EMBEDDING_PROVIDER ?? env.LLM_PROVIDER;
   const apiKey = env.EMBEDDING_API_KEY ?? env.LLM_API_KEY;
-  const baseURL = env.EMBEDDING_BASE_URL;
+  const baseURL = env.EMBEDDING_BASE_URL ?? env.LLM_BASE_URL;
 
   return createEmbeddingModel(provider, env.EMBEDDING_MODEL, buildSettings(baseURL, apiKey));
+}
+
+/**
+ * EmbeddingConfigInput から EmbeddingModel を生成する。
+ * API キーや baseURL が未設定の場合、fallbackEnv があればフォールバックする
+ * （EMBEDDING_* を優先し、プロバイダが一致しない場合は LLM_* へフォールバック）。
+ */
+export function createEmbeddingModelFromConfig(
+  config: EmbeddingConfigInput,
+  fallbackEnv?: Env,
+): EmbeddingModel {
+  return createEmbeddingModel(
+    config.provider,
+    config.modelId,
+    resolveSettings(config, fallbackEnv, 'embedding'),
+  );
+}
+
+/**
+ * modelOrConfig が config 入力（modelId プロパティを持つオブジェクト）かどうかを判定する。
+ * モデルインスタンス（LanguageModel / EmbeddingModel）は provider が自由文字列のため
+ * ConfigInput には割り当てられない。この性質を利用して各接続テスト関数内で
+ * config 入力とモデルインスタンスを狭め込む。
+ */
+type ConfigInput = LLMConfigInput | EmbeddingConfigInput;
+
+function isConfigInput(modelOrConfig: unknown): modelOrConfig is ConfigInput {
+  return typeof modelOrConfig === 'object' && modelOrConfig !== null && 'modelId' in modelOrConfig;
+}
+
+/**
+ * 接続テストの共通実装。callable は成功時のメッセージを返す。
+ * 失敗時は成否・レイテンシ・エラーメッセージを含む結果を返す。
+ */
+async function testConnection(callable: () => Promise<string>): Promise<TestConnectionResult> {
+  const startTime = Date.now();
+  try {
+    const message = await callable();
+    return {
+      success: true,
+      latencyMs: Date.now() - startTime,
+      message,
+    };
+  } catch (err) {
+    const latencyMs = Date.now() - startTime;
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      latencyMs,
+      message: `接続失敗: ${errorMessage}`,
+      error: errorMessage,
+    };
+  }
 }
 
 /**
@@ -170,65 +265,18 @@ export async function testLLMConnection(
   modelOrConfig: LanguageModel | LLMConfigInput,
   fallbackEnv?: Env,
 ): Promise<TestConnectionResult> {
-  const startTime = Date.now();
-  try {
-    let model: LanguageModel;
-    if (typeof modelOrConfig === 'object' && 'modelId' in modelOrConfig) {
-      model = createLanguageModelFromConfig(modelOrConfig as LLMConfigInput, fallbackEnv);
-    } else {
-      model = modelOrConfig as LanguageModel;
-    }
+  return testConnection(async () => {
+    const model = isConfigInput(modelOrConfig)
+      ? createLanguageModelFromConfig(modelOrConfig, fallbackEnv)
+      : modelOrConfig;
 
     const res = await aiGenerateText({
       model,
       prompt: 'ping',
     });
 
-    const latencyMs = Date.now() - startTime;
-    return {
-      success: true,
-      latencyMs,
-      message: res.text ? `接続成功: ${res.text.slice(0, 30)}` : '接続成功',
-    };
-  } catch (err) {
-    const latencyMs = Date.now() - startTime;
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    return {
-      success: false,
-      latencyMs,
-      message: `接続失敗: ${errorMessage}`,
-      error: errorMessage,
-    };
-  }
-}
-
-/**
- * EmbeddingConfigInput から EmbeddingModel を生成する。
- */
-export function createEmbeddingModelFromConfig(
-  config: EmbeddingConfigInput,
-  fallbackEnv?: Env,
-): EmbeddingModel {
-  let apiKey = config.apiKey ?? undefined;
-  let baseURL = config.baseUrl ?? undefined;
-
-  if (!apiKey && fallbackEnv) {
-    if (fallbackEnv.EMBEDDING_PROVIDER === config.provider && fallbackEnv.EMBEDDING_API_KEY) {
-      apiKey = fallbackEnv.EMBEDDING_API_KEY;
-    } else if (fallbackEnv.LLM_PROVIDER === config.provider && fallbackEnv.LLM_API_KEY) {
-      apiKey = fallbackEnv.LLM_API_KEY;
-    }
-  }
-
-  if (!baseURL && fallbackEnv) {
-    if (fallbackEnv.EMBEDDING_PROVIDER === config.provider && fallbackEnv.EMBEDDING_BASE_URL) {
-      baseURL = fallbackEnv.EMBEDDING_BASE_URL;
-    } else if (fallbackEnv.LLM_PROVIDER === config.provider && fallbackEnv.LLM_BASE_URL) {
-      baseURL = fallbackEnv.LLM_BASE_URL;
-    }
-  }
-
-  return createEmbeddingModel(config.provider, config.modelId, buildSettings(baseURL, apiKey));
+    return res.text ? `接続成功: ${res.text.slice(0, 30)}` : '接続成功';
+  });
 }
 
 /**
@@ -238,35 +286,16 @@ export async function testEmbeddingConnection(
   modelOrConfig: EmbeddingModel | EmbeddingConfigInput,
   fallbackEnv?: Env,
 ): Promise<TestConnectionResult> {
-  const startTime = Date.now();
-  try {
-    let model: EmbeddingModel;
-    if (typeof modelOrConfig === 'object' && 'modelId' in modelOrConfig) {
-      model = createEmbeddingModelFromConfig(modelOrConfig as EmbeddingConfigInput, fallbackEnv);
-    } else {
-      model = modelOrConfig as EmbeddingModel;
-    }
+  return testConnection(async () => {
+    const model = isConfigInput(modelOrConfig)
+      ? createEmbeddingModelFromConfig(modelOrConfig, fallbackEnv)
+      : modelOrConfig;
 
     const res = await aiEmbed({
       model,
       value: 'ping test for embedding dimension and connection',
     });
 
-    const latencyMs = Date.now() - startTime;
-    const dimensions = res.embedding.length;
-    return {
-      success: true,
-      latencyMs,
-      message: `接続成功 (検出次元数: ${dimensions})`,
-    };
-  } catch (err) {
-    const latencyMs = Date.now() - startTime;
-    const errorMessage = err instanceof Error ? err.message : String(err);
-    return {
-      success: false,
-      latencyMs,
-      message: `接続失敗: ${errorMessage}`,
-      error: errorMessage,
-    };
-  }
+    return `接続成功 (検出次元数: ${res.embedding.length})`;
+  });
 }

@@ -1,8 +1,6 @@
 import { desc, eq } from 'drizzle-orm';
-import type { LanguageModel } from 'ai';
-import { chapters, characters, llmConfigs, novels, settings } from '@novel-creator/db';
+import { chapters, characters, novels, settings } from '@novel-creator/db';
 import {
-  createLanguageModelFromConfig,
   editStoryOutlineDocument,
   editStoryOutlineSection,
   generateJSON,
@@ -11,30 +9,11 @@ import {
 } from '@novel-creator/llm';
 import { searchContext } from '../rag.js';
 import { insertEditHistory } from './history.service.js';
+import { resolveLLMModel } from './model-resolver.js';
 import { assertFound, ValidationError, type ServiceContext } from './types.js';
 
 export class NovelDomainService {
   constructor(private readonly ctx: ServiceContext) {}
-
-  private async resolveModel(modelConfigId?: string | null): Promise<LanguageModel> {
-    if (modelConfigId) {
-      const [customConfig] = await this.ctx.db
-        .select()
-        .from(llmConfigs)
-        .where(eq(llmConfigs.id, modelConfigId));
-      if (customConfig) {
-        return createLanguageModelFromConfig(customConfig, this.ctx.env);
-      }
-    }
-    const [defaultConfig] = await this.ctx.db
-      .select()
-      .from(llmConfigs)
-      .where(eq(llmConfigs.isDefault, true));
-    if (defaultConfig) {
-      return createLanguageModelFromConfig(defaultConfig, this.ctx.env);
-    }
-    return this.ctx.llm;
-  }
 
   async listNovels() {
     return this.ctx.db.select().from(novels).orderBy(desc(novels.createdAt));
@@ -176,7 +155,7 @@ export class NovelDomainService {
       entireOutlinePreview: params.markdown.slice(0, 3000),
     });
 
-    const llm = await this.resolveModel(params.modelConfigId);
+    const llm = await resolveLLMModel(this.ctx, params.modelConfigId, 'useDefault');
     return generateText(llm, prompt);
   }
 
@@ -213,7 +192,7 @@ export class NovelDomainService {
       settings: contextSettings,
     });
 
-    const llm = await this.resolveModel(params.modelConfigId);
+    const llm = await resolveLLMModel(this.ctx, params.modelConfigId, 'useDefault');
     return generateText(llm, prompt);
   }
 
@@ -250,7 +229,7 @@ export class NovelDomainService {
       settings: contextSettings,
     });
 
-    const llm = await this.resolveModel(params.modelConfigId);
+    const llm = await resolveLLMModel(this.ctx, params.modelConfigId, 'useDefault');
     return generateJSON<{
       title: string;
       description: string;

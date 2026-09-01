@@ -15,7 +15,7 @@ export async function fetchCustomPrompts(
   });
   if (!res.ok) throw await parseResponseError(res, 'カスタムプロンプト一覧の取得');
   const data = await res.json();
-  return data as unknown as CustomPrompt[];
+  return data;
 }
 
 export async function createCustomPrompt(input: CreateCustomPromptInput): Promise<CustomPrompt> {
@@ -33,7 +33,7 @@ export async function createCustomPrompt(input: CreateCustomPromptInput): Promis
   });
   if (!res.ok) throw await parseResponseError(res, 'カスタムプロンプトの作成');
   const data = await res.json();
-  return data as unknown as CustomPrompt;
+  return data;
 }
 
 export async function updateCustomPrompt(
@@ -46,7 +46,7 @@ export async function updateCustomPrompt(
   });
   if (!res.ok) throw await parseResponseError(res, 'カスタムプロンプトの更新');
   const data = await res.json();
-  return data as unknown as CustomPrompt;
+  return data;
 }
 
 export async function deleteCustomPrompt(id: string): Promise<void> {
@@ -60,5 +60,5 @@ export async function seedDefaultCustomPrompts(): Promise<CustomPrompt[]> {
   const res = await apiClient['custom-prompts'].seed.$post();
   if (!res.ok) throw await parseResponseError(res, 'デフォルトプリセットの復元');
   const data = await res.json();
-  return data as unknown as CustomPrompt[];
+  return data;
 }

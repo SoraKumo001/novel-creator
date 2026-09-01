@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/Button.js';
 import { Input } from '@/components/Input.js';
 import { Modal } from '@/components/Modal.js';
+import { Select } from '@/components/Select.js';
 import { Textarea } from '@/components/Textarea.js';
 import { useToast } from '@/hooks/useToast.js';
 import { toErrorMessage } from '@/lib/errors.js';
@@ -183,17 +184,17 @@ export function LLMConfigModal({
           <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
             プロバイダ種別
           </label>
-          <select
+          <Select
             value={provider}
             onChange={(e) => setProvider(e.target.value as CreateLLMConfigInput['provider'])}
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
+            className="w-full px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
           >
             <option value="openai">OpenAI (GPT-4o, o3-miniなど)</option>
             <option value="anthropic">Anthropic (Claude 3.7 Sonnet, Claude 3.5 Haikuなど)</option>
             <option value="google">Google (Gemini 2.5 Pro, Flashなど)</option>
             <option value="ollama">Ollama (ローカル/Cloud LLM)</option>
             <option value="custom_openai">OpenAI互換 (OpenRouter, Groq, vLLM等)</option>
-          </select>
+          </Select>
         </div>
 
         <Input

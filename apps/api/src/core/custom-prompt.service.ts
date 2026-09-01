@@ -83,7 +83,7 @@ const DEFAULT_PRESET_PROMPTS: Array<Omit<NewCustomPrompt, 'id' | 'createdAt' | '
 export class CustomPromptDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
-  async listPrompts(novelId?: string | null, category?: string) {
+  async listPrompts(novelId?: string | null, category?: CustomPrompt['category']) {
     const conditions = [];
 
     if (novelId) {

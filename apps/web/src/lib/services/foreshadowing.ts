@@ -6,24 +6,43 @@ import type {
   UpdateForeshadowingInput,
 } from '../types.js';
 
+/**
+ * RPC レスポンス（DB 行の JSON 形）をドメイン型 Foreshadowing へ変換する。
+ * category のフォールバック（未分類）と status のデフォルト（unresolved）はここに集約する。
+ */
+function toForeshadowing(item: {
+  id: string;
+  novelId: string;
+  title: string;
+  category?: string | null;
+  description?: string | null;
+  status?: Foreshadowing['status'] | null;
+  placedSectionId?: string | null;
+  resolvedSectionId?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}): Foreshadowing {
+  return {
+    id: item.id,
+    novelId: item.novelId,
+    title: item.title,
+    category: item.category ?? '未分類',
+    description: item.description ?? null,
+    status: item.status ?? 'unresolved',
+    placedSectionId: item.placedSectionId ?? null,
+    resolvedSectionId: item.resolvedSectionId ?? null,
+    createdAt: item.createdAt ? String(item.createdAt) : null,
+    updatedAt: item.updatedAt ? String(item.updatedAt) : null,
+  };
+}
+
 export async function fetchForeshadowings(novelId: string): Promise<Foreshadowing[]> {
   const res = await apiClient.foreshadowings.novel[':novelId'].$get({
     param: { novelId },
   });
   if (!res.ok) throw await parseResponseError(res, '伏線一覧の取得');
   const list = await res.json();
-  return list.map((item) => ({
-    id: item.id,
-    novelId: item.novelId,
-    title: item.title,
-    category: (item as unknown as { category?: string }).category ?? '未分類',
-    description: item.description ?? null,
-    status: (item.status as Foreshadowing['status']) ?? 'unresolved',
-    placedSectionId: item.placedSectionId ?? null,
-    resolvedSectionId: item.resolvedSectionId ?? null,
-    createdAt: item.createdAt ? String(item.createdAt) : null,
-    updatedAt: item.updatedAt ? String(item.updatedAt) : null,
-  }));
+  return list.map(toForeshadowing);
 }
 
 export async function getForeshadowing(id: string): Promise<Foreshadowing> {
@@ -32,18 +51,7 @@ export async function getForeshadowing(id: string): Promise<Foreshadowing> {
   });
   if (!res.ok) throw await parseResponseError(res, '伏線詳細の取得');
   const item = await res.json();
-  return {
-    id: item.id,
-    novelId: item.novelId,
-    title: item.title,
-    category: (item as unknown as { category?: string }).category ?? '未分類',
-    description: item.description ?? null,
-    status: (item.status as Foreshadowing['status']) ?? 'unresolved',
-    placedSectionId: item.placedSectionId ?? null,
-    resolvedSectionId: item.resolvedSectionId ?? null,
-    createdAt: item.createdAt ? String(item.createdAt) : null,
-    updatedAt: item.updatedAt ? String(item.updatedAt) : null,
-  };
+  return toForeshadowing(item);
 }
 
 export async function createForeshadowing(
@@ -63,18 +71,7 @@ export async function createForeshadowing(
   });
   if (!res.ok) throw await parseResponseError(res, '伏線の作成');
   const item = await res.json();
-  return {
-    id: item.id,
-    novelId: item.novelId,
-    title: item.title,
-    category: (item as unknown as { category?: string }).category ?? '未分類',
-    description: item.description ?? null,
-    status: (item.status as Foreshadowing['status']) ?? 'unresolved',
-    placedSectionId: item.placedSectionId ?? null,
-    resolvedSectionId: item.resolvedSectionId ?? null,
-    createdAt: item.createdAt ? String(item.createdAt) : null,
-    updatedAt: item.updatedAt ? String(item.updatedAt) : null,
-  };
+  return toForeshadowing(item);
 }
 
 export async function updateForeshadowing(
@@ -94,18 +91,7 @@ export async function updateForeshadowing(
   });
   if (!res.ok) throw await parseResponseError(res, '伏線の更新');
   const item = await res.json();
-  return {
-    id: item.id,
-    novelId: item.novelId,
-    title: item.title,
-    category: (item as unknown as { category?: string }).category ?? '未分類',
-    description: item.description ?? null,
-    status: (item.status as Foreshadowing['status']) ?? 'unresolved',
-    placedSectionId: item.placedSectionId ?? null,
-    resolvedSectionId: item.resolvedSectionId ?? null,
-    createdAt: item.createdAt ? String(item.createdAt) : null,
-    updatedAt: item.updatedAt ? String(item.updatedAt) : null,
-  };
+  return toForeshadowing(item);
 }
 
 export async function deleteForeshadowing(id: string): Promise<void> {
@@ -195,10 +181,5 @@ export async function generateForeshadowingDraft(
     },
   });
   if (!res.ok) throw await parseResponseError(res, '伏線ドラフトの生成');
-  return res.json() as Promise<{
-    category: string;
-    title: string;
-    description: string;
-    status: Foreshadowing['status'];
-  }>;
+  return res.json();
 }

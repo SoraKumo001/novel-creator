@@ -16,8 +16,8 @@ vi.mock('@/hooks/useToast.js', () => ({
   useToast: () => mockToast,
 }));
 
-vi.mock('@/hooks/useChat.js', () => ({
-  useChat: () => ({
+vi.mock('@/context/ChatContext.js', () => ({
+  useChatUI: () => ({
     openChat: vi.fn(),
   }),
 }));

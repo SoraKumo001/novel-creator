@@ -1,11 +1,10 @@
 import { eq, desc } from 'drizzle-orm';
-import type { EmbeddingModel } from 'ai';
 import { embeddingConfigs, type EmbeddingConfig, type NewEmbeddingConfig } from '@novel-creator/db';
+import { testEmbeddingConnection, type EmbeddingConfigInput } from '@novel-creator/llm';
 import {
-  createEmbeddingModelFromConfig,
-  testEmbeddingConnection,
-  type EmbeddingConfigInput,
-} from '@novel-creator/llm';
+  resolveEmbeddingModel as resolveEmbeddingModelShared,
+  type ResolvedEmbeddingModel,
+} from './model-resolver.js';
 import { assertFound, ValidationError, type ServiceContext } from './types.js';
 
 export interface MaskedEmbeddingConfig extends Omit<EmbeddingConfig, 'apiKey'> {
@@ -159,43 +158,11 @@ export class EmbeddingConfigDomainService {
     return testEmbeddingConnection(input, this.ctx.env);
   }
 
-  async resolveEmbeddingModel(embeddingConfigId?: string | null): Promise<{
-    model: EmbeddingModel;
-    dimensions: number;
-    config?: EmbeddingConfig;
-  }> {
-    if (embeddingConfigId) {
-      const [config] = await this.ctx.db
-        .select()
-        .from(embeddingConfigs)
-        .where(eq(embeddingConfigs.id, embeddingConfigId));
-      if (config) {
-        return {
-          model: createEmbeddingModelFromConfig(config, this.ctx.env),
-          dimensions: config.dimensions,
-          config,
-        };
-      }
-    }
-
-    // デフォルト設定を探索
-    const [defaultConfig] = await this.ctx.db
-      .select()
-      .from(embeddingConfigs)
-      .where(eq(embeddingConfigs.isDefault, true));
-
-    if (defaultConfig) {
-      return {
-        model: createEmbeddingModelFromConfig(defaultConfig, this.ctx.env),
-        dimensions: defaultConfig.dimensions,
-        config: defaultConfig,
-      };
-    }
-
-    // DB に未登録なら環境変数のデフォルト Embedding を使用
-    return {
-      model: this.ctx.embedding,
-      dimensions: this.ctx.env.EMBEDDING_DIMENSIONS ?? 1536,
-    };
+  /**
+   * 指定された設定（未指定・不明時はデフォルト設定、それも無ければ環境変数の Embedding）から
+   * モデルと次元数を解決する。共通リゾルバへの委譲（従来の id→miss→default 挙動を維持）。
+   */
+  async resolveEmbeddingModel(embeddingConfigId?: string | null): Promise<ResolvedEmbeddingModel> {
+    return resolveEmbeddingModelShared(this.ctx, embeddingConfigId, 'useDefault');
   }
 }

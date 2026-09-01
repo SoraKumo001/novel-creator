@@ -213,6 +213,50 @@ export function calculateEntityDiff<
   return { toCreate, toUpdate, toDelete, duplicateCount };
 }
 
+/** 共通 Markdown writer へのオプション定義 */
+export interface MarkdownEntitySectionWriterOptions<T> {
+  /** エンティティのカテゴリ（`# カテゴリ` 見出しに使う文字列）を返す */
+  categoryOf: (item: T) => string;
+  /** エンティティの名前（`## 名前` 見出しに使う文字列）を返す */
+  nameOf: (item: T) => string;
+  /** `## 名前` 見出し直後の本文行を lines に書き込む（エンティティ固有の処理） */
+  writeBody: (item: T, lines: string[]) => void;
+}
+
+/**
+ * ソート済みエンティティのリストを `# カテゴリ` / `## 名前` 構造のマークダウンに直列化する共通 writer。
+ *
+ * - 同一カテゴリのエンティティは連続配置し、カテゴリ見出しの重複を避ける
+ * - カテゴリ見出しが切り替わる直前に空行を挿入する
+ * - 末尾の空行を除去した上で改行で終端する
+ *
+ * ソートは呼び出し側で行うこと（カテゴリの正規化やソートキーがエンティティ固有のため）。
+ * エンティティ固有の本文（サブセクション等）は writeBody に委譲する。
+ */
+export function writeMarkdownEntitySections<T>(
+  sortedItems: T[],
+  options: MarkdownEntitySectionWriterOptions<T>,
+): string {
+  if (sortedItems.length === 0) return '';
+
+  const lines: string[] = [];
+  let currentCategory = '';
+
+  for (const item of sortedItems) {
+    const category = options.categoryOf(item);
+    if (category !== currentCategory) {
+      if (lines.length > 0) lines.push('');
+      lines.push(`# ${category}`);
+      lines.push('');
+      currentCategory = category;
+    }
+    lines.push(`## ${options.nameOf(item)}`);
+    options.writeBody(item, lines);
+  }
+
+  return lines.join('\n').replace(/\n+$/, '\n');
+}
+
 /**
  * 行配列の前後の空行を除去してテキストを結合するヘルパー
  */
