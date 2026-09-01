@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "build": "tsr generate && tsc -p tsconfig.json && vite build",
-    "build-storybook": "storybook build",
     "deploy": "vite build && wrangler pages deploy dist",
     "dev": "vite",
     "preview": "vite preview",
     "storybook": "storybook dev -p 6006",
+    "storybook:build": "storybook build",
     "test": "vitest run",
     "typecheck": "tsr generate && tsc -p tsconfig.json --noEmit"
   },
