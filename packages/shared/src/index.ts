@@ -86,9 +86,11 @@ export {
   scanStoryOutlineSectionRanges,
   findStoryOutlineSectionByLine,
   buildStoryOutlineCategoryTree,
+  applyStoryOutlineSectionUpdate,
   STORY_OUTLINE_TEMPLATES,
   type StoryOutlineSectionRange,
   type StoryOutlineCategoryNode,
   type StoryOutlineTemplate,
+  type StoryOutlineUpdateResult,
 } from './storyOutlineMarkdown.js';
 export * from './schemas/entities.js';

@@ -4,6 +4,7 @@ import {
   characters as charactersTable,
   contents as contentsTable,
   foreshadowings as foreshadowingsTable,
+  novels as novelsTable,
   sections as sectionsTable,
   settings as settingsTable,
   timelines as timelinesTable,
@@ -117,7 +118,14 @@ describe('isSectionInScope', () => {
 
 type Row = Record<string, unknown>;
 type TableName =
-  'characters' | 'settings' | 'chapters' | 'sections' | 'contents' | 'foreshadowings' | 'timelines';
+  | 'novels'
+  | 'characters'
+  | 'settings'
+  | 'chapters'
+  | 'sections'
+  | 'contents'
+  | 'foreshadowings'
+  | 'timelines';
 
 /**
  * chat.test.ts の createMockDb パターンを踏襲し、テーブル参照で select 結果を振り分けるモック DB。
@@ -126,6 +134,7 @@ type TableName =
  */
 function createMockDb(routes: Partial<Record<TableName, Row[]>>) {
   const tableMap: [unknown, Row[]][] = [
+    [novelsTable, routes.novels ?? []],
     [charactersTable, routes.characters ?? []],
     [settingsTable, routes.settings ?? []],
     [chaptersTable, routes.chapters ?? []],
@@ -482,6 +491,36 @@ describe('readTools', () => {
 
       expect(res.content.endsWith(TRUNCATION_SUFFIX)).toBe(true);
       expect(res.content.length).toBe(MAX_TEXT_LENGTH + TRUNCATION_SUFFIX.length);
+    });
+  });
+
+  describe('Date serialization and JSON safety', () => {
+    it('getNovelInfo の createdAt / updatedAt は文字列 (ISO) として返される', async () => {
+      const now = new Date('2026-09-01T12:00:00.000Z');
+      const tools = createReadTools(
+        createCtx(
+          createMockDb({
+            novels: [
+              {
+                id: NOVEL_ID,
+                title: 'テスト小説',
+                description: 'テスト概要',
+                storyOutline: '構想',
+                createdAt: now,
+                updatedAt: now,
+              },
+            ],
+          }),
+        ),
+        NOVEL_ID,
+      );
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await (tools.getNovelInfo as any).execute({});
+
+      expect(typeof res.createdAt).toBe('string');
+      expect(typeof res.updatedAt).toBe('string');
+      expect(res.createdAt).toBe('2026-09-01T12:00:00.000Z');
+      expect(res.updatedAt).toBe('2026-09-01T12:00:00.000Z');
     });
   });
 });

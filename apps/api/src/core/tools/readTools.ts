@@ -127,8 +127,14 @@ export function createReadTools(
           chapterCount: detail.chapters.length,
           characterCount: detail.characters.length,
           settingCount: detail.settings.length,
-          createdAt: detail.novel.createdAt,
-          updatedAt: detail.novel.updatedAt,
+          createdAt:
+            detail.novel.createdAt instanceof Date
+              ? detail.novel.createdAt.toISOString()
+              : (detail.novel.createdAt ?? null),
+          updatedAt:
+            detail.novel.updatedAt instanceof Date
+              ? detail.novel.updatedAt.toISOString()
+              : (detail.novel.updatedAt ?? null),
         };
       },
     }),
@@ -326,7 +332,8 @@ export function createReadTools(
             description: truncateText(f.description),
             placedSectionId: f.placedSectionId,
             resolvedSectionId: f.resolvedSectionId,
-            createdAt: f.createdAt,
+            createdAt:
+              f.createdAt instanceof Date ? f.createdAt.toISOString() : (f.createdAt ?? null),
           })),
         };
       },

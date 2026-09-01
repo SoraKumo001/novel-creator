@@ -99,6 +99,33 @@ export function EntityMarkdownEditor<TSection extends { category: string; name: 
   const toast = useToast();
   const runStartedAtRef = useRef<number>(Date.now());
 
+  // チャット画面でストーリー構想が更新された際のリアルタイム同期リスナー
+  useEffect(() => {
+    if (entityType !== 'story_outline_markdown') return;
+
+    const handleExternalUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        novelId: string;
+        markdown: string;
+        appliedSection?: string;
+      }>;
+      if (!customEvent.detail || customEvent.detail.novelId !== novelId) return;
+
+      const { markdown: newMarkdown, appliedSection } = customEvent.detail;
+      setMarkdown(newMarkdown);
+      setSavedMarkdown(newMarkdown);
+      clearDraft();
+      toast.success(
+        `チャットからの提案（${appliedSection || 'ストーリー構想'}）をエディタに同期しました`,
+      );
+    };
+
+    window.addEventListener('novel-creator:story-outline-updated', handleExternalUpdate);
+    return () => {
+      window.removeEventListener('novel-creator:story-outline-updated', handleExternalUpdate);
+    };
+  }, [clearDraft, entityType, novelId, setMarkdown, setSavedMarkdown, toast]);
+
   const handleOpenChat = useCallback(() => {
     if (selectedText.trim()) {
       openChat(novelId, {

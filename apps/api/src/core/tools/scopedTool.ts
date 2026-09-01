@@ -48,7 +48,10 @@ export function scopedTool<TSchema extends z.ZodType, TResult>(
         return { error: NOVEL_NOT_SPECIFIED_ERROR };
       }
       try {
-        return await config.run(novelId, params);
+        const result = await config.run(novelId, params);
+        // Date オブジェクトなどが AI SDK の ModelMessage (JSONValue) バリデーションエラーを引き起こさないよう、
+        // JSON シリアライズ可能なプレーンオブジェクトにサニタイズする
+        return JSON.parse(JSON.stringify(result));
       } catch {
         return { error: config.errorMessage };
       }

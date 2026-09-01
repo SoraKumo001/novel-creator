@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { applyStoryOutlineSectionUpdate } from '@novel-creator/shared';
 import { novelKeys } from '@/lib/queryKeys.js';
 import {
   createChapter,
@@ -74,20 +75,32 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
         await queryClient.invalidateQueries({ queryKey: novelKeys.chapters(novelId) });
       } else if (proposalType === 'story_outline') {
         const currentOutline = await fetchStoryOutline(novelId).catch(() => '');
-        const sectionHeader = `## ${data.sectionName || '提案内容'}`;
-        let updatedOutline = currentOutline.trim();
-        if (updatedOutline.includes(sectionHeader)) {
-          // 該当見出しが存在する場合は置換または追記
-          updatedOutline = updatedOutline.replace(
-            new RegExp(`(${sectionHeader}\\n)[\\s\\S]*?(?=\\n##|\\n#|$)`),
-            `$1${data.content}\n`,
+        const sectionName = data.sectionName || '全体あらすじ';
+        const content = data.content || '';
+        const mode = data.mode || 'replace';
+
+        const { updatedMarkdown, appliedSection } = applyStoryOutlineSectionUpdate(
+          currentOutline,
+          sectionName,
+          content,
+          mode,
+        );
+
+        await saveStoryOutline(novelId, updatedMarkdown);
+
+        // 開いているストーリー構想エディタ（Monaco Editor）へ即時反映イベントを発火
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('novel-creator:story-outline-updated', {
+              detail: {
+                novelId,
+                markdown: updatedMarkdown,
+                appliedSection,
+                mode,
+              },
+            }),
           );
-        } else {
-          updatedOutline = updatedOutline
-            ? `${updatedOutline}\n\n${sectionHeader}\n${data.content}\n`
-            : `${sectionHeader}\n${data.content}\n`;
         }
-        await saveStoryOutline(novelId, updatedOutline);
       }
 
       await queryClient.invalidateQueries({ queryKey: novelKeys.detail(novelId) });
@@ -251,13 +264,32 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
         )}
 
         {proposalType === 'story_outline' && (
-          <div className="space-y-1">
-            <div className="font-bold text-slate-900 dark:text-slate-100">
-              {data.sectionName || 'ストーリー構想案'}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-1.5">
+              <div className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <span>📝 {data.sectionName || '全体あらすじ'}</span>
+                {data.mode && data.mode !== 'replace' && (
+                  <span className="rounded bg-amber-100 px-1.5 py-0.2 text-[10px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                    {data.mode === 'append'
+                      ? '追記'
+                      : data.mode === 'prepend'
+                        ? '先頭挿入'
+                        : '全体置換'}
+                  </span>
+                )}
+              </div>
+              {data.reason && (
+                <span
+                  className="text-[10px] text-slate-500 truncate max-w-[160px]"
+                  title={data.reason}
+                >
+                  {data.reason}
+                </span>
+              )}
             </div>
-            <p className="line-clamp-4 text-[11px] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+            <div className="max-h-36 overflow-y-auto rounded bg-slate-50/90 p-2 font-mono text-[11px] text-slate-700 whitespace-pre-wrap dark:bg-slate-950/60 dark:text-slate-300 border border-slate-100 dark:border-slate-800">
               {data.content}
-            </p>
+            </div>
           </div>
         )}
       </div>

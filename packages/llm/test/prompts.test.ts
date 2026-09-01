@@ -181,6 +181,13 @@ describe('creativeChatSystemPrompt', () => {
     expect(creativeChatSystemPrompt({})).toContain('アプリ機能カタログ');
   });
 
+  it('ストーリー構想の読み取り・提案ツールがプロンプトに含まれること', () => {
+    const prompt = creativeChatSystemPrompt();
+    expect(prompt).toContain('getStoryOutline');
+    expect(prompt).toContain('proposeUpdateStoryOutline');
+    expect(prompt).toContain('ストーリー構想');
+  });
+
   it('機能カタログは700文字未満であること', () => {
     expect(APP_USAGE_GUIDE.length).toBeLessThan(700);
   });

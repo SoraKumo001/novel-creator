@@ -191,3 +191,123 @@ export const STORY_OUTLINE_TEMPLATES: StoryOutlineTemplate[] = [
 `,
   },
 ];
+
+/**
+ * セクション名マッチングのための正規化（記号・空白除去、小文字化）
+ */
+function normalizeSectionName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[#（）()【】[\]\s・&＆:：\-—_]/g, '')
+    .trim();
+}
+
+/**
+ * 検索キーワードがセクション名（またはその一部）に合致するか判定する
+ */
+function matchSection(targetName: string, query: string): boolean {
+  const normTarget = normalizeSectionName(targetName);
+  const normQuery = normalizeSectionName(query);
+  if (!normTarget || !normQuery) return false;
+  return (
+    normTarget.includes(normQuery) ||
+    normQuery.includes(normTarget) ||
+    targetName.toLowerCase().includes(query.toLowerCase())
+  );
+}
+
+export interface StoryOutlineUpdateResult {
+  updatedMarkdown: string;
+  appliedSection: string;
+  isNewSection: boolean;
+  mode: 'replace' | 'append' | 'prepend' | 'full_document';
+}
+
+/**
+ * ストーリー構想マークダウンに対してセクション単位または全体の更新を適用する。
+ *
+ * @param markdown 現在のストーリー構想マークダウン
+ * @param sectionName 対象セクション名（例: "全体あらすじ", "結末・エンディング", "起（序盤・導入）", "ドキュメント全体" など）
+ * @param newContent 反映する内容
+ * @param mode 更新モード ('replace' | 'append' | 'prepend' | 'full_document'、デフォルト: 'replace')
+ */
+export function applyStoryOutlineSectionUpdate(
+  markdown: string,
+  sectionName: string,
+  newContent: string,
+  mode: 'replace' | 'append' | 'prepend' | 'full_document' = 'replace',
+): StoryOutlineUpdateResult {
+  const trimmedMarkdown = (markdown ?? '').trim();
+  const trimmedContent = (newContent ?? '').trim();
+
+  // 1. ドキュメント全体置換の場合
+  const isFullDocument =
+    mode === 'full_document' ||
+    ['全体', 'ドキュメント全体', '構想全体', '全編', 'full', 'document', 'all'].includes(
+      sectionName.trim().toLowerCase(),
+    );
+
+  if (isFullDocument) {
+    return {
+      updatedMarkdown: trimmedContent,
+      appliedSection: 'ドキュメント全体',
+      isNewSection: false,
+      mode: 'full_document',
+    };
+  }
+
+  // 元のマークダウンが空の場合は新規作成
+  if (!trimmedMarkdown) {
+    const header = sectionName.startsWith('#') ? sectionName : `## ${sectionName}`;
+    return {
+      updatedMarkdown: `${header}\n${trimmedContent}\n`,
+      appliedSection: sectionName,
+      isNewSection: true,
+      mode,
+    };
+  }
+
+  const sections = scanStoryOutlineSectionRanges(markdown);
+  const lines = markdown.split('\n');
+
+  // 2. セクション名が一致するセクションを探索
+  // 完全一致優先、次に正規化部分一致
+  let matched = sections.find((s) => s.name === sectionName || s.category === sectionName);
+  if (!matched) {
+    matched = sections.find(
+      (s) => matchSection(s.name, sectionName) || matchSection(s.category, sectionName),
+    );
+  }
+
+  if (matched) {
+    // 既存セクションの本文を更新
+    const beforeLines = lines.slice(0, matched.startLine);
+    const afterLines = lines.slice(matched.endLine + 1);
+
+    let nextSectionBody = trimmedContent;
+    if (mode === 'append' && matched.content.trim()) {
+      nextSectionBody = `${matched.content.trim()}\n\n${trimmedContent}`;
+    } else if (mode === 'prepend' && matched.content.trim()) {
+      nextSectionBody = `${trimmedContent}\n\n${matched.content.trim()}`;
+    }
+
+    const updatedLines = [...beforeLines, nextSectionBody, ...afterLines];
+    return {
+      updatedMarkdown: updatedLines.join('\n'),
+      appliedSection: matched.name,
+      isNewSection: false,
+      mode,
+    };
+  }
+
+  // 3. 一致するセクションが見つからない場合は末尾に新セクションとして追記
+  const header = sectionName.startsWith('#') ? sectionName : `## ${sectionName}`;
+  const updatedMarkdown = `${trimmedMarkdown}\n\n${header}\n${trimmedContent}\n`;
+
+  return {
+    updatedMarkdown,
+    appliedSection: sectionName,
+    isNewSection: true,
+    mode,
+  };
+}

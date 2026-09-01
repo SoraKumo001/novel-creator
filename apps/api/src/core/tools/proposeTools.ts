@@ -154,27 +154,37 @@ export function createProposeTools(
 
     proposeUpdateStoryOutline: scopedTool({
       description:
-        'ストーリー構想（全体のあらすじ、序盤、中盤、今後の展開、結末など）への追加・更新・ブラッシュアップをユーザーに提案します。会話で良いあらすじや結末案、展開案がまとまった際に使用してください。',
+        'ストーリー構想（全体のあらすじ、起承転結、序盤・中盤・結末、今後の展開候補、構想メモなど）のマークダウンの追加・更新・ブラッシュアップをユーザーに提案します。あらすじの整理や展開・結末のアイデアが固まった際に積極的に使用してください。',
       parameters: z.object({
         novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
         sectionName: z
           .string()
           .describe(
-            '反映先セクションまたは見出し名（例: 全体あらすじ, 結末・エンディング, 今後の展開候補, 承（中盤・展開）など）',
+            '反映先セクション名または見出し名（例: "全体あらすじ", "結（結末・エンディング）", "起（序盤・導入）", "承（中盤・展開）", "転（転換点・クライマックス）", "今後の展開候補 & 分岐アイデア", "作品コンセプト & ログライン", "ドキュメント全体" など）',
           ),
-        content: z.string().describe('提案するマークダウン内容・あらすじ・結末テキスト'),
+        content: z.string().describe('反映するマークダウン形式の本文（箇条書きや文章）'),
+        mode: z
+          .enum(['replace', 'append', 'prepend', 'full_document'])
+          .optional()
+          .default('replace')
+          .describe(
+            '反映モード（replace: セクション全体を置換, append: 末尾に追記, prepend: 先頭に挿入, full_document: マークダウン全体を置換）',
+          ),
+        reason: z.string().optional().describe('この更新を提案する理由・変更ポイントの要約'),
       }),
       resolve: ({ novelId }) => resolveNovelId(novelId),
       errorMessage: 'ストーリー構想更新提案の生成に失敗しました。',
-      run: (targetId, { sectionName, content }) => ({
+      run: (targetId, { sectionName, content, mode = 'replace', reason }) => ({
         type: 'proposal',
         proposalType: 'story_outline',
         novelId: targetId,
         data: {
           sectionName,
           content,
+          mode,
+          reason: reason || null,
         },
-        summary: `ストーリー構想「${sectionName}」の更新提案`,
+        summary: `ストーリー構想「${sectionName}」の更新提案${reason ? `（${reason}）` : ''}`,
       }),
     }),
   };

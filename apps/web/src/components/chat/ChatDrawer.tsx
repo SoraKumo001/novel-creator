@@ -17,6 +17,7 @@ import { ChatSessionList } from './ChatSessionList.js';
 import { ToolActivity } from './ToolActivity.js';
 
 type DrawerWidth = 'normal' | 'wide' | 'full';
+type ChatLayoutMode = 'overlay' | 'docked';
 
 /** focus 情報から相談フォーカス用のプリフィルテキストを生成する（純関数・テスト可能） */
 export function buildChatPrefill(focus: ChatFocusContext): string {
@@ -74,6 +75,9 @@ export function ChatDrawer() {
   const [drawerWidth, setDrawerWidth] = useState<DrawerWidth>(() => {
     return (localStorage.getItem('novel-creator:chat-width') as DrawerWidth) || 'normal';
   });
+  const [layoutMode, setLayoutMode] = useState<ChatLayoutMode>(() => {
+    return (localStorage.getItem('novel-creator:chat-layout-mode') as ChatLayoutMode) || 'docked';
+  });
   const { pinnedIds, togglePin } = usePinnedSessions();
 
   const [input, setInput] = useState('');
@@ -87,6 +91,11 @@ export function ChatDrawer() {
   const handleWidthChange = (width: DrawerWidth) => {
     setDrawerWidth(width);
     localStorage.setItem('novel-creator:chat-width', width);
+  };
+
+  const handleLayoutModeChange = (mode: ChatLayoutMode) => {
+    setLayoutMode(mode);
+    localStorage.setItem('novel-creator:chat-layout-mode', mode);
   };
 
   // メッセージやストリーミング更新時に最下部にスクロール
@@ -196,18 +205,20 @@ export function ChatDrawer() {
 
   const currentNovel = novels.find((n) => n.id === selectedNovelId);
 
-  // 幅クラス
-  const widthClasses = {
-    normal: 'sm:w-[480px] md:w-[520px]',
-    wide: 'sm:w-[680px] md:w-[760px]',
-    full: 'w-full',
-  }[drawerWidth];
+  const isFull = drawerWidth === 'full';
+
+  // 幅クラス（標準 / ワイド）
+  const widthClasses =
+    drawerWidth === 'wide' ? 'sm:w-[680px] md:w-[760px]' : 'sm:w-[480px] md:w-[520px]';
+
+  const containerClasses = isFull
+    ? 'fixed inset-0 z-50 flex flex-col bg-surface shadow-2xl transition-all duration-200 w-screen h-screen'
+    : layoutMode === 'docked'
+      ? `relative z-20 flex flex-col h-full shrink-0 border-l border-border bg-surface shadow-md transition-all duration-200 max-md:fixed max-md:inset-y-0 max-md:right-0 max-md:z-50 w-full ${widthClasses}`
+      : `fixed inset-y-0 right-0 z-50 flex flex-col border-l border-border bg-surface shadow-2xl transition-all duration-200 w-full ${widthClasses}`;
 
   return (
-    <aside
-      aria-label="創作相談チャット"
-      className={`fixed inset-y-0 right-0 z-50 flex flex-col border-l border-border bg-surface shadow-2xl transition-all duration-300 ${widthClasses}`}
-    >
+    <aside aria-label="創作相談チャット" className={containerClasses}>
       {/* ヘッダー */}
       <header className="flex shrink-0 items-center justify-between border-b border-border bg-surface-raised/90 px-4 py-3 backdrop-blur">
         <div className="flex min-w-0 flex-1 items-center gap-2 mr-3">
@@ -241,69 +252,127 @@ export function ChatDrawer() {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
-          {/* 幅切り替えボタン */}
-          <div className="hidden sm:flex items-center rounded-lg border border-border bg-surface p-0.5 text-xs text-muted-foreground">
-            <button
-              type="button"
-              onClick={() => handleWidthChange('normal')}
-              className={`px-2 py-0.5 rounded transition ${
-                drawerWidth === 'normal'
-                  ? 'bg-primary text-primary-foreground font-semibold'
-                  : 'hover:text-foreground'
-              }`}
-              title="標準幅"
+        <div className="flex shrink-0 items-center gap-1">
+          {/* 配置モード切り替え（重ねる ⇔ 占有） */}
+          <button
+            type="button"
+            onClick={() => handleLayoutModeChange(layoutMode === 'docked' ? 'overlay' : 'docked')}
+            className={`rounded-lg border p-1.5 text-xs transition cursor-pointer ${
+              layoutMode === 'docked'
+                ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/20'
+                : 'border-border bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground'
+            }`}
+            title={
+              layoutMode === 'docked'
+                ? '右側エリアを占有中（クリックで重ねて表示に変更）'
+                : '重ねて表示中（クリックで右側エリアを占有して画面分割）'
+            }
+            aria-label="配置モード切り替え"
+          >
+            {layoutMode === 'docked' ? (
+              /* ドッキング中アイコン（右分割パネル） */
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="h-4 w-4"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M2 4.75A2.75 2.75 0 014.75 2h10.5A2.75 2.75 0 0118 4.75v10.5A2.75 2.75 0 0115.25 18H4.75A2.75 2.75 0 012 15.25V4.75zm10.5-.75H4.75c-.69 0-1.25.56-1.25 1.25v10.5c0 .69.56 1.25 1.25 1.25H12.5V4z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            ) : (
+              /* フローティング中アイコン（重ねる） */
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="h-4 w-4"
+              >
+                <path d="M3.25 4A2.25 2.25 0 001 6.25v7.5A2.25 2.25 0 003.25 16h7.5A2.25 2.25 0 0013 13.75v-7.5A2.25 2.25 0 0010.75 4h-7.5zM15 7.25a.75.75 0 00-1.5 0v6.5c0 .414-.336.75-.75.75h-6.5a.75.75 0 000 1.5h6.5A2.25 2.25 0 0015 13.75v-6.5z" />
+              </svg>
+            )}
+          </button>
+
+          {/* 幅切り替え（サイクル: 標準 -> ワイド -> 全画面） */}
+          <button
+            type="button"
+            onClick={() => {
+              const nextWidth: DrawerWidth =
+                drawerWidth === 'normal' ? 'wide' : drawerWidth === 'wide' ? 'full' : 'normal';
+              handleWidthChange(nextWidth);
+            }}
+            className="rounded-lg border border-border bg-surface p-1.5 text-xs text-muted-foreground transition hover:bg-surface-hover hover:text-foreground cursor-pointer flex items-center gap-1"
+            title={`チャット幅: ${
+              drawerWidth === 'normal'
+                ? '標準 (クリックでワイド幅へ)'
+                : drawerWidth === 'wide'
+                  ? 'ワイド (クリックで全画面へ)'
+                  : '全画面 (クリックで標準幅へ)'
+            }`}
+            aria-label="チャット幅切り替え"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="h-4 w-4"
             >
-              標準
-            </button>
-            <button
-              type="button"
-              onClick={() => handleWidthChange('wide')}
-              className={`px-2 py-0.5 rounded transition ${
-                drawerWidth === 'wide'
-                  ? 'bg-primary text-primary-foreground font-semibold'
-                  : 'hover:text-foreground'
-              }`}
-              title="ワイド幅"
-            >
-              ワイド
-            </button>
-            <button
-              type="button"
-              onClick={() => handleWidthChange('full')}
-              className={`px-2 py-0.5 rounded transition ${
-                drawerWidth === 'full'
-                  ? 'bg-primary text-primary-foreground font-semibold'
-                  : 'hover:text-foreground'
-              }`}
-              title="全画面"
-            >
-              全画面
-            </button>
-          </div>
+              <path
+                fillRule="evenodd"
+                d="M13.2 2.24a.75.75 0 00.04 1.06l2.1 1.95H11a.75.75 0 000 1.5h4.34l-2.1 1.95a.75.75 0 101.02 1.1l3.5-3.25a.75.75 0 000-1.1l-3.5-3.25a.75.75 0 00-1.06.04zm-6.4 15.52a.75.75 0 00-.04-1.06l-2.1-1.95H9a.75.75 0 000-1.5H4.66l2.1-1.95a.75.75 0 10-1.02-1.1l-3.5 3.25a.75.75 0 000 1.1l3.5 3.25a.75.75 0 001.06-.04z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span className="text-[10px] font-medium uppercase text-muted-foreground">
+              {drawerWidth === 'normal' ? '標準' : drawerWidth === 'wide' ? 'ワイド' : '全画面'}
+            </span>
+          </button>
 
           {/* 新規チャットボタン */}
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-border bg-surface px-2.5 py-1 text-xs font-medium text-primary shadow-xs transition hover:bg-primary/10"
+            className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs font-medium text-primary shadow-xs transition hover:bg-primary/10 cursor-pointer"
             title="新しい相談を始める"
           >
-            <span>＋ 新規</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="h-3.5 w-3.5"
+            >
+              <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
+            </svg>
+            <span className="text-xs">新規</span>
           </button>
 
           {/* 履歴一覧切り替えボタン */}
           <button
             type="button"
             onClick={() => setShowHistoryView((prev) => !prev)}
-            className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border px-2.5 py-1 text-xs font-medium shadow-xs transition ${
+            className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-medium shadow-xs transition cursor-pointer ${
               showHistoryView
                 ? 'border-primary bg-primary text-primary-foreground'
                 : 'border-border bg-surface text-foreground hover:bg-surface-hover'
             }`}
             title="相談履歴一覧"
           >
-            <span>履歴 ({sessions.length})</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="h-3.5 w-3.5"
+            >
+              <path
+                fillRule="evenodd"
+                d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span className="text-xs">{sessions.length}</span>
           </button>
 
           {/* 閉じるボタン */}
