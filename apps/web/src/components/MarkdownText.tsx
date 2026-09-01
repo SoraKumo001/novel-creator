@@ -1,16 +1,20 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
-import { renderMermaid } from '@/lib/mermaid.js';
+import DOMPurify from "dompurify";
+import { marked } from "marked";
+import { useEffect, useMemo, useRef } from "react";
+import { renderMermaid } from "@/lib/mermaid.js";
 
 interface MarkdownTextProps {
-  content: string;
   className?: string;
   /** 折り返し表示用のコンパクトスタイル。LLM 出力の小さなボックス内表示向け。 */
   compact?: boolean;
+  content: string;
 }
 
-export function MarkdownText({ content, className, compact }: MarkdownTextProps) {
+export function MarkdownText({
+  content,
+  className,
+  compact,
+}: MarkdownTextProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const html = useMemo(() => {
     const raw = marked.parse(content, { async: false, breaks: true }) as string;
@@ -19,15 +23,19 @@ export function MarkdownText({ content, className, compact }: MarkdownTextProps)
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
+    if (!el) {
+      return;
+    }
 
     // marked が出力した ```mermaid コードブロックをプレースホルダに差し替え
-    el.querySelectorAll('pre > code.language-mermaid').forEach((codeEl) => {
+    el.querySelectorAll("pre > code.language-mermaid").forEach((codeEl) => {
       const pre = codeEl.parentElement;
-      if (!pre) return;
-      const src = codeEl.textContent ?? '';
-      const div = document.createElement('div');
-      div.className = 'mermaid';
+      if (!pre) {
+        return;
+      }
+      const src = codeEl.textContent ?? "";
+      const div = document.createElement("div");
+      div.className = "mermaid";
       div.textContent = src;
       pre.replaceWith(div);
     });
@@ -41,7 +49,7 @@ export function MarkdownText({ content, className, compact }: MarkdownTextProps)
   return (
     <div
       ref={containerRef}
-      className={`prose prose-sm max-w-none dark:prose-invert ${className ?? ''} ${compact ? 'text-[11px] leading-relaxed prose-headings:hidden prose-strong:text-inherit' : ''}`}
+      className={`prose prose-sm dark:prose-invert max-w-none ${className ?? ""} ${compact ? "prose-headings:hidden prose-strong:text-inherit text-[11px] leading-relaxed" : ""}`}
       dangerouslySetInnerHTML={{ __html: html }}
     />
   );

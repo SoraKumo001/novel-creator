@@ -3,7 +3,8 @@
   "compilerOptions": {
     "rootDir": "src",
     "outDir": "dist",
-    "types": ["node"]
+    "types": ["node"],
+    "strictNullChecks": true
   },
   "include": ["src"],
   "exclude": ["src/worker.ts"]

@@ -1,11 +1,13 @@
-import { eq } from 'drizzle-orm';
-import { chapters, contents, sections } from '@novel-creator/db';
-import { insertEditHistory } from './history.service.js';
-import { assertFound, type ServiceContext } from './types.js';
+import { chapters, contents, sections } from "@novel-creator/db";
+import { eq } from "drizzle-orm";
+import { insertEditHistory } from "./history.service.js";
+import { assertFound, type ServiceContext } from "./types.js";
 
 export function countWords(text: string): number {
   const trimmed = text.trim();
-  if (!trimmed) return 0;
+  if (!trimmed) {
+    return 0;
+  }
   // 日本語は文字数、それ以外は空白区切りの単語数で概算する。
   const japanese = trimmed.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g);
   if (japanese && japanese.length > 0) {
@@ -22,24 +24,31 @@ export class ContentDomainService {
       .select()
       .from(contents)
       .where(eq(contents.sectionId, sectionId));
-    assertFound(row, 'Content not found');
+    assertFound(row, "Content not found");
     return row;
   }
 
-  async updateContent(sectionId: string, body: string, description: string = '手動保存') {
+  async updateContent(
+    sectionId: string,
+    body: string,
+    description = "手動保存"
+  ) {
     const wordCount = countWords(body);
     const [row] = await this.ctx.db
       .insert(contents)
-      .values({ sectionId, body, wordCount })
+      .values({ body, sectionId, wordCount })
       .onConflictDoUpdate({
+        set: { body, updatedAt: new Date(), wordCount },
         target: contents.sectionId,
-        set: { body, wordCount, updatedAt: new Date() },
       })
       .returning();
 
     // 履歴を記録
     try {
-      const [sec] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
+      const [sec] = await this.ctx.db
+        .select()
+        .from(sections)
+        .where(eq(sections.id, sectionId));
       if (sec) {
         const [ch] = await this.ctx.db
           .select()
@@ -47,18 +56,18 @@ export class ContentDomainService {
           .where(eq(chapters.id, sec.chapterId));
         if (ch) {
           await insertEditHistory(this.ctx.db, {
-            novelId: ch.novelId,
-            entityType: 'content',
-            entityId: sectionId,
-            title: sec.title || `節 ${sec.order}`,
             content: body,
             description,
+            entityId: sectionId,
+            entityType: "content",
+            novelId: ch.novelId,
+            title: sec.title || `節 ${sec.order}`,
             wordCount,
           });
         }
       }
     } catch (e) {
-      console.error('[history] failed to record content history', e);
+      console.error("[history] failed to record content history", e);
     }
 
     return row;

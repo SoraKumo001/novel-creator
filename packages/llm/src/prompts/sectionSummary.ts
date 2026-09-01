@@ -3,9 +3,9 @@
  */
 export function sectionSummary(
   chapter: { title: string; summary: string },
-  section: { title?: string; order: number },
+  section: { title?: string; order: number }
 ): string {
-  const sectionTitle = section.title ?? '（未設定）';
+  const sectionTitle = section.title ?? "（未設定）";
 
   return `あなたはプロの小説家です。章の中の特定の節について、概要を生成してください。
 

@@ -8,7 +8,8 @@
  */
 
 // 漢字にマッチする正規表現（CJK統合漢字・々・ヶ・etc）
-const KANJI_REGEX = /([\u4E00-\u9FFF\u3005\u3006\u303B\u30F6]+)《([^》\r\n]+)》/g;
+const KANJI_REGEX =
+  /([\u4E00-\u9FFF\u3005\u3006\u303B\u30F6]+)《([^》\r\n]+)》/g;
 // パイプ付きルビ（任意の文字列に対応）
 const PIPED_RUBY_REGEX = /[|｜]([^|｜《\r\n]+)《([^》\r\n]+)》/g;
 // 傍点（《《テキスト》》）
@@ -18,24 +19,32 @@ const EMPHASIS_REGEX = /《《([^》\r\n]+)》》/g;
  * ルビ・傍点記法をHTMLに変換します
  */
 export function parseRubyToHtml(text: string): string {
-  if (!text) return '';
+  if (!text) {
+    return "";
+  }
 
   let html = text;
 
   // 1. 傍点を先に変換（二重山括弧のため）
-  html = html.replace(EMPHASIS_REGEX, (_match, content: string) => {
-    return `<span class="emphasis-dots">${escapeHtml(content)}</span>`;
-  });
+  html = html.replace(
+    EMPHASIS_REGEX,
+    (_match, content: string) =>
+      `<span class="emphasis-dots">${escapeHtml(content)}</span>`
+  );
 
   // 2. パイプ付きルビの変換
-  html = html.replace(PIPED_RUBY_REGEX, (_match, rb: string, rt: string) => {
-    return `<ruby>${escapeHtml(rb)}<rt>${escapeHtml(rt)}</rt></ruby>`;
-  });
+  html = html.replace(
+    PIPED_RUBY_REGEX,
+    (_match, rb: string, rt: string) =>
+      `<ruby>${escapeHtml(rb)}<rt>${escapeHtml(rt)}</rt></ruby>`
+  );
 
   // 3. 漢字直後のルビの変換
-  html = html.replace(KANJI_REGEX, (_match, rb: string, rt: string) => {
-    return `<ruby>${escapeHtml(rb)}<rt>${escapeHtml(rt)}</rt></ruby>`;
-  });
+  html = html.replace(
+    KANJI_REGEX,
+    (_match, rb: string, rt: string) =>
+      `<ruby>${escapeHtml(rb)}<rt>${escapeHtml(rt)}</rt></ruby>`
+  );
 
   return html;
 }
@@ -44,12 +53,14 @@ export function parseRubyToHtml(text: string): string {
  * ルビや傍点の記法を除去してプレーンテキスト（本文のみ）にします
  */
 export function stripRuby(text: string): string {
-  if (!text) return '';
+  if (!text) {
+    return "";
+  }
 
   return text
-    .replace(EMPHASIS_REGEX, '$1')
-    .replace(PIPED_RUBY_REGEX, '$1')
-    .replace(KANJI_REGEX, '$1');
+    .replace(EMPHASIS_REGEX, "$1")
+    .replace(PIPED_RUBY_REGEX, "$1")
+    .replace(KANJI_REGEX, "$1");
 }
 
 /**
@@ -57,9 +68,9 @@ export function stripRuby(text: string): string {
  */
 function escapeHtml(str: string): string {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }

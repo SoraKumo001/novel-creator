@@ -1,25 +1,30 @@
-import type { Context } from 'hono';
-import { stream, streamSSE } from 'hono/streaming';
+import type { Context } from "hono";
+import { stream, streamSSE } from "hono/streaming";
 
-import type { AppContext } from './context.js';
-import { formatErrorMessage } from './middleware/error-handler.js';
+import type { AppContext } from "./context.js";
+import { formatErrorMessage } from "./middleware/error-handler.js";
 
 export type SSEChunk = string | { text: string; variant?: number };
 
 /**
  * テキストチャンクまたはバリエーション付きチャンクの AsyncIterable を SSE 形式でストリーミングするレスポンスを返す。
  */
-export function sseStream(c: Context<AppContext>, chunks: AsyncIterable<SSEChunk>): Response {
-  c.header('Content-Type', 'text/event-stream');
-  c.header('Cache-Control', 'no-cache');
-  c.header('Connection', 'keep-alive');
+export function sseStream(
+  c: Context<AppContext>,
+  chunks: AsyncIterable<SSEChunk>
+): Response {
+  c.header("Content-Type", "text/event-stream");
+  c.header("Cache-Control", "no-cache");
+  c.header("Connection", "keep-alive");
   return stream(c, async (s) => {
     for await (const chunk of chunks) {
-      if (typeof chunk === 'string') {
-        await s.write(`data: ${JSON.stringify({ text: chunk, variant: 0 })}\n\n`);
+      if (typeof chunk === "string") {
+        await s.write(
+          `data: ${JSON.stringify({ text: chunk, variant: 0 })}\n\n`
+        );
       } else {
         await s.write(
-          `data: ${JSON.stringify({ text: chunk.text, variant: chunk.variant ?? 0 })}\n\n`,
+          `data: ${JSON.stringify({ text: chunk.text, variant: chunk.variant ?? 0 })}\n\n`
         );
       }
     }
@@ -51,18 +56,19 @@ export interface StreamEventsOptions {
 export function streamEvents(
   c: Context<AppContext>,
   run: (emit: SSEEventEmitter) => Promise<void>,
-  opts: StreamEventsOptions = {},
+  opts: StreamEventsOptions = {}
 ): Response {
   const buildErrorPayload =
-    opts.buildErrorPayload ?? ((message: string) => ({ type: 'error', message }));
+    opts.buildErrorPayload ??
+    ((message: string) => ({ message, type: "error" }));
   return streamSSE(c, async (stream) => {
     const emit: SSEEventEmitter = async (event, data) => {
-      await stream.writeSSE({ event, data: JSON.stringify(data) });
+      await stream.writeSSE({ data: JSON.stringify(data), event });
     };
     try {
       await run(emit);
     } catch (err) {
-      await emit('error', buildErrorPayload(formatErrorMessage(err)));
+      await emit("error", buildErrorPayload(formatErrorMessage(err)));
     }
   });
 }

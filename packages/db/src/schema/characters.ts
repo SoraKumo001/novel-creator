@@ -1,18 +1,18 @@
-import { pgTable, uuid, text, jsonb, timestamp } from 'drizzle-orm/pg-core';
-import { novels } from './novels.js';
+import { jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { novels } from "./novels.js";
 
-export const characters = pgTable('characters', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  novelId: uuid('novel_id')
+export const characters = pgTable("characters", {
+  category: text("category").notNull().default("未分類"),
+  createdAt: timestamp("created_at").defaultNow(),
+  description: text("description"),
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  novelId: uuid("novel_id")
     .notNull()
-    .references(() => novels.id, { onDelete: 'cascade' }),
-  category: text('category').notNull().default('未分類'),
-  name: text('name').notNull(),
-  description: text('description'),
-  traits: jsonb('traits').$type<string[]>(),
-  relationships: jsonb('relationships'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+    .references(() => novels.id, { onDelete: "cascade" }),
+  relationships: jsonb("relationships"),
+  traits: jsonb("traits").$type<string[]>(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type Character = typeof characters.$inferSelect;

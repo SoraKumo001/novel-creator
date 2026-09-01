@@ -1,11 +1,15 @@
-import type { ForeshadowingStatus } from '@/lib/types.js';
-import type { EditableForeshadowing, EntityAction } from './types.js';
+import type { ForeshadowingStatus } from "@/lib/types.js";
+import type { EditableForeshadowing, EntityAction } from "./types.js";
 
 interface ChatInsertForeshadowingTabProps {
   foreshadowings: EditableForeshadowing[];
-  onToggle: (id: string) => void;
   onRemove: (id: string) => void;
-  onUpdate: (id: string, field: keyof EditableForeshadowing, value: unknown) => void;
+  onToggle: (id: string) => void;
+  onUpdate: (
+    id: string,
+    field: keyof EditableForeshadowing,
+    value: unknown
+  ) => void;
 }
 
 export function ChatInsertForeshadowingTab({
@@ -16,8 +20,9 @@ export function ChatInsertForeshadowingTab({
 }: ChatInsertForeshadowingTabProps) {
   if (foreshadowings.length === 0) {
     return (
-      <div className="py-8 text-center text-xs text-slate-400">
-        検出された伏線情報はありませんでした。「＋ 伏線を手動追加」から追加できます。
+      <div className="py-8 text-center text-slate-400 text-xs">
+        検出された伏線情報はありませんでした。「＋
+        伏線を手動追加」から追加できます。
       </div>
     );
   }
@@ -29,8 +34,8 @@ export function ChatInsertForeshadowingTab({
           key={f._id}
           className={`rounded-xl border p-3 transition ${
             f._selected
-              ? 'border-indigo-300 bg-indigo-50/40 dark:border-indigo-600/60 dark:bg-indigo-950/20'
-              : 'border-slate-200 bg-white opacity-60 dark:border-slate-700 dark:bg-slate-800'
+              ? "border-indigo-300 bg-indigo-50/40 dark:border-indigo-600/60 dark:bg-indigo-950/20"
+              : "border-slate-200 bg-white opacity-60 dark:border-slate-700 dark:bg-slate-800"
           }`}
         >
           <div className="flex items-start justify-between gap-3">
@@ -56,8 +61,14 @@ export function ChatInsertForeshadowingTab({
                     </label>
                     <select
                       value={f.action}
-                      onChange={(e) => onUpdate(f._id, 'action', e.target.value as EntityAction)}
-                      className="rounded border border-amber-300 bg-white px-2 py-0.5 text-xs text-slate-800 focus:outline-none dark:border-amber-700 dark:bg-slate-800 dark:text-slate-100"
+                      onChange={(e) =>
+                        onUpdate(
+                          f._id,
+                          "action",
+                          e.target.value as EntityAction
+                        )
+                      }
+                      className="rounded border border-amber-300 bg-white px-2 py-0.5 text-slate-800 text-xs focus:outline-none dark:border-amber-700 dark:bg-slate-800 dark:text-slate-100"
                     >
                       <option value="overwrite">上書き更新</option>
                       <option value="merge">追記マージ</option>
@@ -66,34 +77,38 @@ export function ChatInsertForeshadowingTab({
                   </div>
                 </div>
               ) : (
-                <div className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <div className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 font-bold text-[10px] text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                   ✨ 新規追加
                 </div>
               )}
 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <div className="sm:col-span-2">
-                  <label className="block text-[10px] font-semibold text-slate-500 uppercase">
+                  <label className="block font-semibold text-[10px] text-slate-500 uppercase">
                     伏線タイトル
                   </label>
                   <input
                     type="text"
                     value={f.title}
-                    onChange={(e) => onUpdate(f._id, 'title', e.target.value)}
+                    onChange={(e) => onUpdate(f._id, "title", e.target.value)}
                     placeholder="例: 古代のペンダントの謎"
-                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-slate-800 text-xs focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-slate-500 uppercase">
+                  <label className="block font-semibold text-[10px] text-slate-500 uppercase">
                     ステータス
                   </label>
                   <select
                     value={f.status}
                     onChange={(e) =>
-                      onUpdate(f._id, 'status', e.target.value as ForeshadowingStatus)
+                      onUpdate(
+                        f._id,
+                        "status",
+                        e.target.value as ForeshadowingStatus
+                      )
                     }
-                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-slate-800 text-xs focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                   >
                     <option value="unresolved">未回収</option>
                     <option value="resolved">回収済</option>
@@ -103,15 +118,17 @@ export function ChatInsertForeshadowingTab({
               </div>
 
               <div>
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase">
+                <label className="block font-semibold text-[10px] text-slate-500 uppercase">
                   詳細説明（真相・回収案）
                 </label>
                 <textarea
                   rows={2}
-                  value={f.description || ''}
-                  onChange={(e) => onUpdate(f._id, 'description', e.target.value)}
+                  value={f.description || ""}
+                  onChange={(e) =>
+                    onUpdate(f._id, "description", e.target.value)
+                  }
                   placeholder="伏線の詳細や回収方法のアイデア"
-                  className="w-full resize-none rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  className="w-full resize-none rounded border border-slate-300 bg-white px-2 py-1 text-slate-800 text-xs focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                 />
               </div>
             </div>
@@ -130,7 +147,11 @@ export function ChatInsertForeshadowingTab({
                 stroke="currentColor"
                 className="h-4 w-4"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>

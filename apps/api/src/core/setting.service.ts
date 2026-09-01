@@ -1,5 +1,4 @@
-import { and, eq } from 'drizzle-orm';
-import { settings } from '@novel-creator/db';
+import { settings } from "@novel-creator/db";
 import {
   createSettingDraft,
   editSetting,
@@ -7,22 +6,23 @@ import {
   editSettingSection,
   generateJSON,
   generateText,
-} from '@novel-creator/llm';
+} from "@novel-creator/llm";
 import {
   diffSettings,
   parseSettingsMarkdown,
   serializeSettingsToMarkdown,
-} from '@novel-creator/shared';
-import { searchContext, upsertEntityEmbedding } from '../rag.js';
-import { insertEditHistory } from './history.service.js';
-import { assertFound, ValidationError, type ServiceContext } from './types.js';
+} from "@novel-creator/shared";
+import { and, eq } from "drizzle-orm";
+import { searchContext, upsertEntityEmbedding } from "../rag.js";
+import { insertEditHistory } from "./history.service.js";
+import { assertFound, type ServiceContext, ValidationError } from "./types.js";
 
 export function settingToText(s: {
   category: string;
   name: string;
   description?: string | null;
 }): string {
-  return `[${s.category}] ${s.name}\n${s.description ?? ''}`;
+  return `[${s.category}] ${s.name}\n${s.description ?? ""}`;
 }
 
 export class SettingDomainService {
@@ -40,8 +40,11 @@ export class SettingDomainService {
   }
 
   async getSetting(id: string) {
-    const [setting] = await this.ctx.db.select().from(settings).where(eq(settings.id, id));
-    assertFound(setting, 'Setting not found');
+    const [setting] = await this.ctx.db
+      .select()
+      .from(settings)
+      .where(eq(settings.id, id));
+    assertFound(setting, "Setting not found");
     return setting;
   }
 
@@ -53,17 +56,17 @@ export class SettingDomainService {
     metadata?: Record<string, unknown>;
   }) {
     if (!data.name?.trim()) {
-      throw new ValidationError('Name is required');
+      throw new ValidationError("Name is required");
     }
 
     const [row] = await this.ctx.db
       .insert(settings)
       .values({
-        novelId: data.novelId,
         category: data.category,
-        name: data.name,
         description: data.description ?? null,
         metadata: data.metadata ?? {},
+        name: data.name,
+        novelId: data.novelId,
       })
       .returning();
 
@@ -71,10 +74,10 @@ export class SettingDomainService {
       this.ctx.vectorStore,
       this.ctx.embedding,
       row.novelId,
-      'setting',
+      "setting",
       row.id,
       settingToText(row),
-      this.ctx.env,
+      this.ctx.env
     );
 
     return row;
@@ -87,58 +90,63 @@ export class SettingDomainService {
       name?: string;
       description?: string | null;
       metadata?: Record<string, unknown>;
-    },
+    }
   ) {
     const [row] = await this.ctx.db
       .update(settings)
       .set({
-        ...(data.category !== undefined ? { category: data.category } : {}),
-        ...(data.name !== undefined ? { name: data.name } : {}),
-        ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.metadata !== undefined ? { metadata: data.metadata } : {}),
+        ...(data.category === undefined ? {} : { category: data.category }),
+        ...(data.name === undefined ? {} : { name: data.name }),
+        ...(data.description === undefined
+          ? {}
+          : { description: data.description }),
+        ...(data.metadata === undefined ? {} : { metadata: data.metadata }),
         updatedAt: new Date(),
       })
       .where(eq(settings.id, id))
       .returning();
-    assertFound(row, 'Setting not found');
+    assertFound(row, "Setting not found");
 
     try {
       await insertEditHistory(this.ctx.db, {
-        novelId: row.novelId,
-        entityType: 'setting',
-        entityId: row.id,
-        title: row.name,
         content: JSON.stringify({
           category: row.category,
+          description: row.description ?? "",
           name: row.name,
-          description: row.description ?? '',
         }),
-        description: '設定の更新',
+        description: "設定の更新",
+        entityId: row.id,
+        entityType: "setting",
+        novelId: row.novelId,
+        title: row.name,
       });
     } catch (e) {
-      console.error('[history] failed to record setting history', e);
+      console.error("[history] failed to record setting history", e);
     }
 
     await upsertEntityEmbedding(
       this.ctx.vectorStore,
       this.ctx.embedding,
       row.novelId,
-      'setting',
+      "setting",
       row.id,
       settingToText(row),
-      this.ctx.env,
+      this.ctx.env
     );
 
     return row;
   }
 
   async deleteSetting(id: string) {
-    const [row] = await this.ctx.db.delete(settings).where(eq(settings.id, id)).returning();
-    assertFound(row, 'Setting not found');
+    const [row] = await this.ctx.db
+      .delete(settings)
+      .where(eq(settings.id, id))
+      .returning();
+    assertFound(row, "Setting not found");
     try {
-      await this.ctx.vectorStore.deleteByEntity('setting', id);
+      await this.ctx.vectorStore.deleteByEntity("setting", id);
     } catch (err) {
-      console.error('[vector] failed to delete setting embedding', err);
+      console.error("[vector] failed to delete setting embedding", err);
     }
     return row;
   }
@@ -149,10 +157,10 @@ export class SettingDomainService {
     const prompt = editSetting(
       {
         category: setting.category,
-        name: setting.name,
         description: setting.description ?? undefined,
+        name: setting.name,
       },
-      instruction,
+      instruction
     );
 
     const result = await generateJSON<{
@@ -165,8 +173,8 @@ export class SettingDomainService {
       .update(settings)
       .set({
         category: result.category,
-        name: result.name,
         description: result.description,
+        name: result.name,
         updatedAt: new Date(),
       })
       .where(eq(settings.id, id))
@@ -176,10 +184,10 @@ export class SettingDomainService {
       this.ctx.vectorStore,
       this.ctx.embedding,
       row.novelId,
-      'setting',
+      "setting",
       row.id,
       settingToText(row),
-      this.ctx.env,
+      this.ctx.env
     );
 
     return row;
@@ -187,7 +195,7 @@ export class SettingDomainService {
 
   async generateDraft(
     query: string,
-    currentDraft?: { category: string; name: string; description?: string },
+    currentDraft?: { category: string; name: string; description?: string }
   ) {
     const prompt = createSettingDraft(query, currentDraft);
     return generateJSON<{
@@ -198,12 +206,18 @@ export class SettingDomainService {
   }
 
   async getMarkdown(novelId: string) {
-    const rows = await this.ctx.db.select().from(settings).where(eq(settings.novelId, novelId));
+    const rows = await this.ctx.db
+      .select()
+      .from(settings)
+      .where(eq(settings.novelId, novelId));
     return serializeSettingsToMarkdown(rows);
   }
 
   async saveMarkdown(novelId: string, markdown: string) {
-    const existing = await this.ctx.db.select().from(settings).where(eq(settings.novelId, novelId));
+    const existing = await this.ctx.db
+      .select()
+      .from(settings)
+      .where(eq(settings.novelId, novelId));
     const parsed = parseSettingsMarkdown(markdown);
     const diff = diffSettings(existing, parsed);
 
@@ -213,10 +227,10 @@ export class SettingDomainService {
         const [row] = await tx
           .insert(settings)
           .values({
-            novelId,
-            name: s.name,
             category: s.category,
             description: s.description,
+            name: s.name,
+            novelId,
           })
           .returning();
         createdIds.push(row.id);
@@ -244,10 +258,10 @@ export class SettingDomainService {
         this.ctx.vectorStore,
         this.ctx.embedding,
         novelId,
-        'setting',
+        "setting",
         createdIds[i],
         settingToText(s),
-        this.ctx.env,
+        this.ctx.env
       );
     }
     for (const u of diff.toUpdate) {
@@ -255,37 +269,40 @@ export class SettingDomainService {
         this.ctx.vectorStore,
         this.ctx.embedding,
         novelId,
-        'setting',
+        "setting",
         u.id,
         settingToText(u),
-        this.ctx.env,
+        this.ctx.env
       );
     }
     for (const id of diff.toDelete) {
-      await this.ctx.vectorStore.deleteByEntity('setting', id);
+      await this.ctx.vectorStore.deleteByEntity("setting", id);
     }
 
-    const updated = await this.ctx.db.select().from(settings).where(eq(settings.novelId, novelId));
+    const updated = await this.ctx.db
+      .select()
+      .from(settings)
+      .where(eq(settings.novelId, novelId));
 
     try {
       await insertEditHistory(this.ctx.db, {
-        novelId,
-        entityType: 'settings_markdown',
-        entityId: novelId,
-        title: '設定マークダウン',
         content: markdown,
         description: `マークダウン一括保存 (作成: ${diff.toCreate.length}, 更新: ${diff.toUpdate.length}, 削除: ${diff.toDelete.length})`,
+        entityId: novelId,
+        entityType: "settings_markdown",
+        novelId,
+        title: "設定マークダウン",
         wordCount: markdown.length,
       });
     } catch (e) {
-      console.error('[history] failed to record settings_markdown history', e);
+      console.error("[history] failed to record settings_markdown history", e);
     }
 
     return {
-      settings: updated,
       createdCount: diff.toCreate.length,
-      updatedCount: diff.toUpdate.length,
       deletedCount: diff.toDelete.length,
+      settings: updated,
+      updatedCount: diff.toUpdate.length,
     };
   }
 
@@ -301,33 +318,41 @@ export class SettingDomainService {
       this.ctx.embedding,
       data.novelId,
       { query: `${data.description} ${data.instruction}` },
-      this.ctx.env,
+      this.ctx.env
     );
 
     const prompt = editSettingSection(
-      { category: data.category, name: data.name, description: data.description },
+      {
+        category: data.category,
+        description: data.description,
+        name: data.name,
+      },
       data.instruction,
       {
-        settings: ragCtx.settings,
         characters: ragCtx.characters,
-      },
+        settings: ragCtx.settings,
+      }
     );
 
     return generateText(this.ctx.llm, prompt);
   }
 
-  async editSettingDocument(novelId: string, markdown: string, instruction: string) {
+  async editSettingDocument(
+    novelId: string,
+    markdown: string,
+    instruction: string
+  ) {
     const ragCtx = await searchContext(
       this.ctx.vectorStore,
       this.ctx.embedding,
       novelId,
       { query: instruction },
-      this.ctx.env,
+      this.ctx.env
     );
 
     const prompt = editSettingDocument(markdown, instruction, {
-      settings: ragCtx.settings,
       characters: ragCtx.characters,
+      settings: ragCtx.settings,
     });
 
     return generateText(this.ctx.llm, prompt);

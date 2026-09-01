@@ -1,14 +1,14 @@
-import { useQuery } from '@tanstack/react-query';
-import { toErrorMessage } from '@/lib/errors.js';
-import { sectionKeys } from '@/lib/queryKeys.js';
-import { fetchSection } from '@/lib/services/index.js';
-import type { SectionWithContent } from '@/lib/types.js';
+import { useQuery } from "@tanstack/react-query";
+import { toErrorMessage } from "@/lib/errors.js";
+import { sectionKeys } from "@/lib/queryKeys.js";
+import { fetchSection } from "@/lib/services/index.js";
+import type { SectionWithContent } from "@/lib/types.js";
 
 interface UseSectionReturn {
-  section: SectionWithContent | null;
-  loading: boolean;
   error: string | null;
+  loading: boolean;
   refetch: () => Promise<void>;
+  section: SectionWithContent | null;
 }
 
 export function useSection(sectionId: string): UseSectionReturn {

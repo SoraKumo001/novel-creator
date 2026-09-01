@@ -1,63 +1,69 @@
-import { useRef, type ReactNode } from 'react';
-import { useNavigate } from '@tanstack/react-router';
-import { AIProgressIndicator } from '@/components/AIProgressIndicator.js';
-import { Button } from '@/components/Button.js';
-import { Card, CardHeader } from '@/components/Card.js';
-import { ConfirmDialog } from '@/components/ConfirmDialog.js';
-import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
-import { Loading } from '@/components/Loading.js';
-import { Textarea } from '@/components/Textarea.js';
-import type { LlmInstruction } from '@/lib/types.js';
-import { PromptHistoryList } from './-PromptHistoryList.js';
+import { useNavigate } from "@tanstack/react-router";
+import { type ReactNode, useRef } from "react";
+import { AIProgressIndicator } from "@/components/AIProgressIndicator.js";
+import { Button } from "@/components/Button.js";
+import { Card, CardHeader } from "@/components/Card.js";
+import { ConfirmDialog } from "@/components/ConfirmDialog.js";
+import { HistoryDiffModal } from "@/components/HistoryDiffModal.js";
+import { Loading } from "@/components/Loading.js";
+import { Textarea } from "@/components/Textarea.js";
+import type { LlmInstruction } from "@/lib/types.js";
+import { PromptHistoryList } from "./-PromptHistoryList.js";
 
 interface EntityEditorShellProps {
-  novelId: string;
   // ヘッダー
   backLabel: string;
   backTab:
-    'overview' | 'settings' | 'characters' | 'plot' | 'editor' | 'timeline' | 'foreshadowing';
-  title: string;
-  isEdit: boolean;
+    | "overview"
+    | "settings"
+    | "characters"
+    | "plot"
+    | "editor"
+    | "timeline"
+    | "foreshadowing";
+  // 左カラム（フォーム）
+  children: ReactNode;
+  currentContent: string;
+  deleteInstructionId: string | null;
+  deletingInstruction: boolean;
   entityId?: string;
-  // 保存
-  onSave: () => void;
-  saveLoading: boolean;
-  saveDisabled: boolean;
+  entityType: string;
   // エラー / ローディング
   error: string | null;
-  loading: boolean;
-  loadingMessage: string;
-  // AIパネル
-  instruction: string;
-  onInstructionChange: (value: string) => void;
-  instructionPlaceholder: string;
-  onGenerate: () => void;
-  generateLoading: boolean;
   generateDisabled: boolean;
   generateLabel: string;
+  generateLoading: boolean;
+  // 履歴差分モーダル
+  historyOpen: boolean;
+  historyTitle: string;
+  // AIパネル
+  instruction: string;
+  instructionPlaceholder: string;
+  // プロンプト履歴
+  instructions: LlmInstruction[];
+  isEdit: boolean;
+  loading: boolean;
+  loadingMessage: string;
+  novelId: string;
+  onApplyHistory: (text: string) => void;
   /**
    * 「AIと相談(チャット)」ボタンのハンドラ。
    * 未指定時はボタン自体を非表示にする（後方互換）。
    */
   onChatConsult?: () => void;
-  // プロンプト履歴
-  instructions: LlmInstruction[];
-  onApplyHistory: (text: string) => void;
-  onRequestDeleteInstruction: (id: string) => void;
-  deleteInstructionId: string | null;
   onCloseDeleteInstruction: () => void;
-  onConfirmDeleteInstruction: () => void;
-  deletingInstruction: boolean;
-  // 履歴差分モーダル
-  historyOpen: boolean;
-  onOpenHistory: () => void;
   onCloseHistory: () => void;
-  entityType: string;
-  currentContent: string;
-  historyTitle: string;
+  onConfirmDeleteInstruction: () => void;
+  onGenerate: () => void;
+  onInstructionChange: (value: string) => void;
+  onOpenHistory: () => void;
+  onRequestDeleteInstruction: (id: string) => void;
   onRestoreSuccess: (restored: string) => void;
-  // 左カラム（フォーム）
-  children: ReactNode;
+  // 保存
+  onSave: () => void;
+  saveDisabled: boolean;
+  saveLoading: boolean;
+  title: string;
 }
 
 export function EntityEditorShell({
@@ -106,19 +112,21 @@ export function EntityEditorShell({
   }
   wasGenerateLoadingRef.current = generateLoading;
 
-  if (loading) return <Loading message={loadingMessage} />;
+  if (loading) {
+    return <Loading message={loadingMessage} />;
+  }
 
   return (
     <div className="flex h-full w-full flex-col space-y-4">
       {/* ナビゲーション & ヘッダー */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b pb-4">
         <div className="flex items-center gap-3">
           <Button
             variant="secondary"
             size="sm"
             onClick={() =>
               navigate({
-                to: '/novels/$novelId',
+                to: "/novels/$novelId",
                 params: { novelId },
                 search: { tab: backTab },
               })
@@ -143,7 +151,9 @@ export function EntityEditorShell({
             {backLabel}
           </Button>
           <div className="h-4 w-px bg-border" />
-          <h1 className="text-xl font-bold tracking-tight text-foreground">{title}</h1>
+          <h1 className="font-bold text-foreground text-xl tracking-tight">
+            {title}
+          </h1>
         </div>
 
         <div className="flex items-center gap-2">
@@ -170,23 +180,25 @@ export function EntityEditorShell({
       </div>
 
       {error && (
-        <div className="shrink-0 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+        <div className="shrink-0 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive text-sm">
           {error}
         </div>
       )}
 
       {/* 2カラム 画面領域フル活用レイアウト */}
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 lg:grid-cols-12 overflow-hidden pb-4">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-hidden pb-4 lg:grid-cols-12">
         {/* 左カラム: 基本情報 + Monaco エディタ (7/12) */}
         <div className="flex min-h-0 flex-col space-y-4 lg:col-span-7 xl:col-span-8">
           <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
             <CardHeader title="基本情報" />
-            <div className="flex min-h-0 flex-1 flex-col space-y-4 p-1">{children}</div>
+            <div className="flex min-h-0 flex-1 flex-col space-y-4 p-1">
+              {children}
+            </div>
           </Card>
         </div>
 
         {/* 右カラム: LLMで作成・編集 & 履歴 (5/12) */}
-        <div className="flex flex-col space-y-4 lg:col-span-5 xl:col-span-4 overflow-y-auto pr-1">
+        <div className="flex flex-col space-y-4 overflow-y-auto pr-1 lg:col-span-5 xl:col-span-4">
           <Card>
             <CardHeader title="AIで作成・編集" />
             <div className="space-y-4">

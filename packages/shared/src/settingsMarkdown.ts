@@ -11,31 +11,31 @@ import {
   buildMarkdownCategoryTree,
   calculateEntityDiff,
   findSectionByLine,
+  type MarkdownCategoryNode,
   scanMarkdownSections,
   trimAndJoinLines,
   writeMarkdownEntitySections,
-  type MarkdownCategoryNode,
-} from './markdownCore.js';
+} from "./markdownCore.js";
 
 /** マークダウン解析後の設定セクション。 */
 export interface ParsedSettingSection {
   category: string;
-  name: string;
   description: string;
+  name: string;
 }
 
 /** フォーカストラッキング用のセクション情報（行範囲付き）。 */
 export interface SettingSectionRange {
   category: string;
-  name: string;
-  /** `##` 見出し行の 0 始まり行番号。 */
-  headingLine: number;
-  /** 本文開始行（見出しの次行）の 0 始まり行番号。 */
-  startLine: number;
-  /** 本文終端行（次の見出しの前行、または文書末尾）の 0 始まり行番号（含む）。 */
-  endLine: number;
   /** セクション本文。 */
   description: string;
+  /** 本文終端行（次の見出しの前行、または文書末尾）の 0 始まり行番号（含む）。 */
+  endLine: number;
+  /** `##` 見出し行の 0 始まり行番号。 */
+  headingLine: number;
+  name: string;
+  /** 本文開始行（見出しの次行）の 0 始まり行番号。 */
+  startLine: number;
 }
 
 /** カテゴリごとのツリーノード。 */
@@ -48,25 +48,27 @@ export type SettingCategoryNode = MarkdownCategoryNode;
  * カテゴリ・名前の順で安定ソートする。
  */
 export function serializeSettingsToMarkdown(
-  settings: { category: string; name: string; description?: string | null }[],
+  settings: { category: string; name: string; description?: string | null }[]
 ): string {
-  if (settings.length === 0) return '';
+  if (settings.length === 0) {
+    return "";
+  }
 
   const sorted = [...settings].sort((a, b) => {
-    const c = a.category.localeCompare(b.category, 'ja');
-    return c !== 0 ? c : a.name.localeCompare(b.name, 'ja');
+    const c = a.category.localeCompare(b.category, "ja");
+    return c === 0 ? a.name.localeCompare(b.name, "ja") : c;
   });
 
   return writeMarkdownEntitySections(sorted, {
     categoryOf: (s) => s.category,
     nameOf: (s) => s.name,
     writeBody: (s, lines) => {
-      lines.push('');
-      const desc = (s.description ?? '').trim();
+      lines.push("");
+      const desc = (s.description ?? "").trim();
       if (desc) {
         lines.push(desc);
       }
-      lines.push('');
+      lines.push("");
     },
   });
 }
@@ -74,7 +76,9 @@ export function serializeSettingsToMarkdown(
 /**
  * マークダウン文書を解析して設定セクション配列を返す。
  */
-export function parseSettingsMarkdown(markdown: string): ParsedSettingSection[] {
+export function parseSettingsMarkdown(
+  markdown: string
+): ParsedSettingSection[] {
   const rawSections = scanMarkdownSections(markdown);
   const sections: ParsedSettingSection[] = [];
   const seen = new Set<string>();
@@ -85,8 +89,8 @@ export function parseSettingsMarkdown(markdown: string): ParsedSettingSection[] 
       seen.add(key);
       sections.push({
         category: raw.category,
-        name: raw.name,
         description: trimAndJoinLines(raw.bodyLines),
+        name: raw.name,
       });
     }
   }
@@ -103,11 +107,11 @@ export function getMarkdownSections(markdown: string): SettingSectionRange[] {
   const rawSections = scanMarkdownSections(markdown);
   return rawSections.map((raw) => ({
     category: raw.category,
-    name: raw.name,
-    headingLine: raw.headingLine,
-    startLine: raw.startLine,
-    endLine: raw.endLine,
     description: trimAndJoinLines(raw.bodyLines),
+    endLine: raw.endLine,
+    headingLine: raw.headingLine,
+    name: raw.name,
+    startLine: raw.startLine,
   }));
 }
 
@@ -123,7 +127,7 @@ export function buildSettingTree(markdown: string): SettingCategoryNode[] {
  */
 export function findSectionAtLine(
   markdown: string,
-  lineNumber: number,
+  lineNumber: number
 ): SettingSectionRange | null {
   const sections = getMarkdownSections(markdown);
   return findSectionByLine(sections, lineNumber);
@@ -133,29 +137,39 @@ export function findSectionAtLine(
  * 保存時の差分を計算する。
  */
 export interface SettingsDiff {
-  /** 新規作成すべき設定。 */
-  toCreate: ParsedSettingSection[];
-  /** 更新すべき設定（description が変化したもの）。 */
-  toUpdate: { id: string; category: string; name: string; description: string }[];
-  /** 削除すべき設定の id。 */
-  toDelete: string[];
   /** 同一 (category, name) で重複出現した件数。 */
   duplicateCount: number;
+  /** 新規作成すべき設定。 */
+  toCreate: ParsedSettingSection[];
+  /** 削除すべき設定の id。 */
+  toDelete: string[];
+  /** 更新すべき設定（description が変化したもの）。 */
+  toUpdate: {
+    id: string;
+    category: string;
+    name: string;
+    description: string;
+  }[];
 }
 
 export function diffSettings(
-  existing: { id: string; category: string; name: string; description?: string | null }[],
-  parsed: ParsedSettingSection[],
+  existing: {
+    id: string;
+    category: string;
+    name: string;
+    description?: string | null;
+  }[],
+  parsed: ParsedSettingSection[]
 ): SettingsDiff {
   return calculateEntityDiff(
     existing,
     parsed,
-    (ex, p) => (ex.description ?? '').trim() !== p.description.trim(),
+    (ex, p) => (ex.description ?? "").trim() !== p.description.trim(),
     (ex, p) => ({
-      id: ex.id,
       category: p.category,
-      name: p.name,
       description: p.description,
-    }),
+      id: ex.id,
+      name: p.name,
+    })
   );
 }

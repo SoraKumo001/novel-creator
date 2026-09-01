@@ -1,9 +1,15 @@
 {
+  "editor.defaultFormatter": "biomejs.biome",
+  "editor.formatOnPaste": true,
+  "editor.formatOnSave": true,
   "editor.codeActionsOnSave": {
-    "source.fixAll": "explicit",
-    "source.fixAll.eslint": "explicit"
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
   },
   "tailwindCSS.lint.suggestCanonicalClasses": "warning",
   "tailwindCSS.lint.recommendedVariantOrder": "warning",
-  "tailwindCSS.lint.cssConflict": "ignore"
+  "tailwindCSS.lint.cssConflict": "ignore",
+  "emmet.showExpandedAbbreviation": "never",
+  "js/ts.tsdk.path": "node_modules/typescript/lib",
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true
 }

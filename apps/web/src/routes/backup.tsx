@@ -1,18 +1,18 @@
-import { useState, useRef } from 'react';
-import { createFileRoute } from '@tanstack/react-router';
-import { Button } from '@/components/Button.js';
-import { Card, CardHeader } from '@/components/Card.js';
-import { ConfirmDialog } from '@/components/ConfirmDialog.js';
-import { Loading } from '@/components/Loading.js';
-import { Select } from '@/components/Select.js';
-import { useExportNovel } from '@/hooks/useBackup.js';
-import { useNovels } from '@/hooks/useNovels.js';
-import { useRestoreNovel } from '@/hooks/useRestore.js';
-import { useToast } from '@/hooks/useToast.js';
-import { toErrorMessage } from '@/lib/errors.js';
-import type { BackupData } from '@/lib/types.js';
+import { createFileRoute } from "@tanstack/react-router";
+import { useRef, useState } from "react";
+import { Button } from "@/components/Button.js";
+import { Card, CardHeader } from "@/components/Card.js";
+import { ConfirmDialog } from "@/components/ConfirmDialog.js";
+import { Loading } from "@/components/Loading.js";
+import { Select } from "@/components/Select.js";
+import { useExportNovel } from "@/hooks/useBackup.js";
+import { useNovels } from "@/hooks/useNovels.js";
+import { useRestoreNovel } from "@/hooks/useRestore.js";
+import { useToast } from "@/hooks/useToast.js";
+import { toErrorMessage } from "@/lib/errors.js";
+import type { BackupData } from "@/lib/types.js";
 
-export const Route = createFileRoute('/backup')({
+export const Route = createFileRoute("/backup")({
   component: BackupPage,
 });
 
@@ -22,7 +22,7 @@ export function BackupPage() {
   const { restoreNovel, restoring } = useRestoreNovel();
   const toast = useToast();
 
-  const [selectedNovelId, setSelectedNovelId] = useState('');
+  const [selectedNovelId, setSelectedNovelId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [parsed, setParsed] = useState<BackupData | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
@@ -30,22 +30,26 @@ export function BackupPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleExport() {
-    if (!selectedNovelId) return;
+    if (!selectedNovelId) {
+      return;
+    }
     try {
       const res = await exportNovel(selectedNovelId);
       const data = (await res.json()) as BackupData;
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
       const url = URL.createObjectURL(blob);
       const date = new Date().toISOString().slice(0, 10);
       const filename = `novel-backup-${selectedNovelId}-${date}.json`;
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success('バックアップを作成しました');
+      toast.success("バックアップを作成しました");
     } catch (e) {
       toast.error(toErrorMessage(e));
     }
@@ -56,7 +60,7 @@ export function BackupPage() {
     setParsed(null);
     setParseError(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   }
 
@@ -65,13 +69,15 @@ export function BackupPage() {
     setFile(f);
     setParsed(null);
     setParseError(null);
-    if (!f) return;
+    if (!f) {
+      return;
+    }
 
     try {
       const text = await f.text();
       const parsed = JSON.parse(text) as unknown;
       if (!isBackupData(parsed)) {
-        throw new Error('バックアップファイルの形式が正しくありません');
+        throw new Error("バックアップファイルの形式が正しくありません");
       }
       setParsed(parsed);
     } catch (e) {
@@ -80,11 +86,15 @@ export function BackupPage() {
   }
 
   async function handleRestore() {
-    if (!parsed) return;
+    if (!parsed) {
+      return;
+    }
     setConfirmOpen(false);
     try {
       await restoreNovel(parsed);
-      toast.success('リストアが完了しました。ベクトルデータの再生成をお忘れなく');
+      toast.success(
+        "リストアが完了しました。ベクトルデータの再生成をお忘れなく"
+      );
       resetFile();
     } catch (e) {
       toast.error(toErrorMessage(e));
@@ -92,15 +102,17 @@ export function BackupPage() {
   }
 
   const counts = parsed ? buildCounts(parsed) : null;
-  const restoreTitle = parsed?.meta?.novelTitle ?? '選択中の小説';
+  const restoreTitle = parsed?.meta?.novelTitle ?? "選択中の小説";
 
   return (
     <div className="mx-auto max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+        <h1 className="font-bold text-3xl text-foreground tracking-tight">
           バックアップ・リストア
         </h1>
-        <p className="mt-1 text-muted">小説単位でデータをJSONファイルに保存・復元します。</p>
+        <p className="mt-1 text-muted">
+          小説単位でデータをJSONファイルに保存・復元します。
+        </p>
       </div>
 
       <div className="space-y-6">
@@ -114,13 +126,13 @@ export function BackupPage() {
           {loadingNovels && <Loading message="読み込み中..." />}
 
           {!loadingNovels && novelsError && (
-            <div className="rounded-lg border border-danger-border bg-danger-subtle p-4 text-sm text-danger-subtle-fg">
+            <div className="rounded-lg border border-danger-border bg-danger-subtle p-4 text-danger-subtle-fg text-sm">
               {novelsError}
             </div>
           )}
 
           {!loadingNovels && !novelsError && novels.length === 0 && (
-            <div className="rounded-lg border border-border bg-surface-muted p-4 text-sm text-foreground-secondary">
+            <div className="rounded-lg border border-border bg-surface-muted p-4 text-foreground-secondary text-sm">
               小説がまだありません。新規作成してからバックアップしてください。
             </div>
           )}
@@ -130,7 +142,7 @@ export function BackupPage() {
               <div>
                 <label
                   htmlFor="novel-select"
-                  className="mb-1.5 block text-sm font-medium text-foreground-secondary"
+                  className="mb-1.5 block font-medium text-foreground-secondary text-sm"
                 >
                   小説を選択
                 </label>
@@ -181,7 +193,7 @@ export function BackupPage() {
             <div>
               <label
                 htmlFor="backup-file"
-                className="mb-1.5 block text-sm font-medium text-foreground-secondary"
+                className="mb-1.5 block font-medium text-foreground-secondary text-sm"
               >
                 バックアップファイル
               </label>
@@ -195,10 +207,12 @@ export function BackupPage() {
               />
               <label
                 htmlFor="backup-file"
-                className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 text-sm text-foreground transition hover:border-primary hover:bg-primary-subtle"
+                className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 text-foreground text-sm transition hover:border-primary hover:bg-primary-subtle"
               >
                 <UploadIcon className="h-5 w-5 text-muted" />
-                <span className="flex-1 truncate">{file ? file.name : 'JSONファイルを選択'}</span>
+                <span className="flex-1 truncate">
+                  {file ? file.name : "JSONファイルを選択"}
+                </span>
                 {file && (
                   <button
                     type="button"
@@ -217,24 +231,37 @@ export function BackupPage() {
                       stroke="currentColor"
                       className="h-4 w-4"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 )}
               </label>
-              {parseError && <p className="mt-1.5 text-xs text-rose-500">{parseError}</p>}
+              {parseError && (
+                <p className="mt-1.5 text-rose-500 text-xs">{parseError}</p>
+              )}
             </div>
 
             {parsed && counts && (
               <div className="rounded-lg border border-border bg-primary-subtle p-4">
-                <h4 className="mb-2 text-sm font-semibold text-primary-subtle-fg">
+                <h4 className="mb-2 font-semibold text-primary-subtle-fg text-sm">
                   バックアップ内容のプレビュー
                 </h4>
-                <div className="grid gap-2 text-sm text-foreground-secondary sm:grid-cols-2">
+                <div className="grid gap-2 text-foreground-secondary text-sm sm:grid-cols-2">
                   <PreviewRow label="タイトル" value={parsed.meta.novelTitle} />
-                  <PreviewRow label="エクスポート日" value={formatDate(parsed.meta.exportedAt)} />
+                  <PreviewRow
+                    label="エクスポート日"
+                    value={formatDate(parsed.meta.exportedAt)}
+                  />
                   {Object.entries(counts).map(([label, value]) => (
-                    <PreviewRow key={label} label={label} value={String(value)} />
+                    <PreviewRow
+                      key={label}
+                      label={label}
+                      value={String(value)}
+                    />
                   ))}
                 </div>
               </div>
@@ -268,25 +295,33 @@ export function BackupPage() {
 }
 
 function isBackupData(value: unknown): value is BackupData {
-  if (!value || typeof value !== 'object') return false;
+  if (!value || typeof value !== "object") {
+    return false;
+  }
   const v = value as Record<string, unknown>;
-  if (!v.meta || typeof v.meta !== 'object') return false;
+  if (!v.meta || typeof v.meta !== "object") {
+    return false;
+  }
   const meta = v.meta as Record<string, unknown>;
-  if (typeof meta.novelId !== 'string' || typeof meta.novelTitle !== 'string') return false;
-  if (!v.rdb || typeof v.rdb !== 'object' || Array.isArray(v.rdb)) return false;
+  if (typeof meta.novelId !== "string" || typeof meta.novelTitle !== "string") {
+    return false;
+  }
+  if (!v.rdb || typeof v.rdb !== "object" || Array.isArray(v.rdb)) {
+    return false;
+  }
   return true;
 }
 
 function buildCounts(data: BackupData): Record<string, number> {
   const labels: Record<string, string> = {
-    novels: '小説',
-    chapters: '章',
-    sections: '節',
-    contents: '本文',
-    characters: '人物',
-    settings: '設定',
-    timelines: 'タイムライン',
-    llmInstructions: 'LLM指示',
+    novels: "小説",
+    chapters: "章",
+    sections: "節",
+    contents: "本文",
+    characters: "人物",
+    settings: "設定",
+    timelines: "タイムライン",
+    llmInstructions: "LLM指示",
   };
 
   const result: Record<string, number> = {};
@@ -300,14 +335,16 @@ function buildCounts(data: BackupData): Record<string, number> {
 }
 
 function formatDate(value: string | null | undefined): string {
-  if (!value) return '未設定';
+  if (!value) {
+    return "未設定";
+  }
   try {
-    return new Date(value).toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+    return new Date(value).toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   } catch {
     return value;
@@ -350,7 +387,7 @@ function UploadIcon({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       strokeWidth={1.5}
       stroke="currentColor"
-      className={className ?? 'h-5 w-5'}
+      className={className ?? "h-5 w-5"}
     >
       <path
         strokeLinecap="round"
@@ -388,7 +425,7 @@ function WarningIcon({ className }: { className?: string }) {
       viewBox="0 0 24 24"
       strokeWidth={1.5}
       stroke="currentColor"
-      className={className ?? 'h-5 w-5'}
+      className={className ?? "h-5 w-5"}
     >
       <path
         strokeLinecap="round"

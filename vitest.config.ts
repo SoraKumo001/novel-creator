@@ -1,35 +1,35 @@
-import { defineConfig } from 'vitest/config';
-import path from 'node:path';
+import path from "node:path";
+import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
     projects: [
       {
         test: {
-          name: 'packages',
-          include: ['packages/*/test/**/*.test.ts'],
-          environment: 'node',
+          environment: "node",
+          include: ["packages/*/test/**/*.test.ts"],
+          name: "packages",
         },
       },
       {
         test: {
-          name: 'api',
-          include: ['apps/api/test/**/*.test.ts'],
-          environment: 'node',
+          environment: "node",
+          include: ["apps/api/test/**/*.test.ts"],
+          name: "api",
         },
       },
       {
-        test: {
-          name: 'web',
-          include: ['apps/web/test/**/*.test.{ts,tsx}'],
-          environment: 'jsdom',
-          globals: true,
-          setupFiles: ['./apps/web/test/setup.ts'],
-        },
         resolve: {
           alias: {
-            '@': path.resolve(import.meta.dirname, './apps/web/src'),
+            "@": path.resolve(import.meta.dirname, "./apps/web/src"),
           },
+        },
+        test: {
+          environment: "jsdom",
+          globals: true,
+          include: ["apps/web/test/**/*.test.{ts,tsx}"],
+          name: "web",
+          setupFiles: ["./apps/web/test/setup.ts"],
         },
       },
     ],

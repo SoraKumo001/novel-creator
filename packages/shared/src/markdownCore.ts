@@ -8,18 +8,18 @@
 /** カテゴリツリーのノード定義 */
 export interface MarkdownCategoryNode {
   category: string;
-  headingLine: number;
   children: { name: string; headingLine: number }[];
+  headingLine: number;
 }
 
 /** Markdown から抽出された未加工セクション */
 export interface RawMarkdownSection {
-  category: string;
-  name: string;
-  headingLine: number;
-  startLine: number;
-  endLine: number;
   bodyLines: string[];
+  category: string;
+  endLine: number;
+  headingLine: number;
+  name: string;
+  startLine: number;
 }
 
 /**
@@ -27,9 +27,9 @@ export interface RawMarkdownSection {
  * コードフェンス内の `#` / `##` は見出しとして扱わない。
  */
 export function scanMarkdownSections(markdown: string): RawMarkdownSection[] {
-  const lines = markdown.split('\n');
+  const lines = markdown.split("\n");
   const sections: RawMarkdownSection[] = [];
-  let currentCategory = '';
+  let currentCategory = "";
   let inFence = false;
   let i = 0;
 
@@ -87,12 +87,12 @@ export function scanMarkdownSections(markdown: string): RawMarkdownSection[] {
         }
 
         sections.push({
-          category: currentCategory,
-          name,
-          headingLine,
-          startLine,
-          endLine: Math.max(endLine, startLine - 1),
           bodyLines,
+          category: currentCategory,
+          endLine: Math.max(endLine, startLine - 1),
+          headingLine,
+          name,
+          startLine,
         });
       }
       i++;
@@ -108,8 +108,10 @@ export function scanMarkdownSections(markdown: string): RawMarkdownSection[] {
 /**
  * マークダウン文書からカテゴリツリーを構築する。
  */
-export function buildMarkdownCategoryTree(markdown: string): MarkdownCategoryNode[] {
-  const lines = markdown.split('\n');
+export function buildMarkdownCategoryTree(
+  markdown: string
+): MarkdownCategoryNode[] {
+  const lines = markdown.split("\n");
   const tree: MarkdownCategoryNode[] = [];
   let currentCategory: MarkdownCategoryNode | null = null;
   let inFence = false;
@@ -121,18 +123,24 @@ export function buildMarkdownCategoryTree(markdown: string): MarkdownCategoryNod
       inFence = !inFence;
       continue;
     }
-    if (inFence) continue;
+    if (inFence) {
+      continue;
+    }
 
     const h1 = /^#\s+(.+?)\s*$/.exec(line);
     if (h1) {
-      currentCategory = { category: h1[1].trim(), headingLine: i, children: [] };
+      currentCategory = {
+        category: h1[1].trim(),
+        children: [],
+        headingLine: i,
+      };
       tree.push(currentCategory);
       continue;
     }
 
     const h2 = /^##\s+(.+?)\s*$/.exec(line);
     if (h2 && currentCategory) {
-      currentCategory.children.push({ name: h2[1].trim(), headingLine: i });
+      currentCategory.children.push({ headingLine: i, name: h2[1].trim() });
     }
   }
 
@@ -142,10 +150,9 @@ export function buildMarkdownCategoryTree(markdown: string): MarkdownCategoryNod
 /**
  * 指定行番号を含むセクションを返す。
  */
-export function findSectionByLine<T extends { headingLine: number; endLine: number }>(
-  sections: T[],
-  lineNumber: number,
-): T | null {
+export function findSectionByLine<
+  T extends { headingLine: number; endLine: number },
+>(sections: T[], lineNumber: number): T | null {
   for (const s of sections) {
     if (lineNumber >= s.headingLine && lineNumber <= s.endLine) {
       return s;
@@ -166,7 +173,7 @@ export function calculateEntityDiff<
   existing: TExisting[],
   parsed: TParsed[],
   isChanged: (ex: TExisting, p: TParsed) => boolean,
-  buildUpdate: (ex: TExisting, p: TParsed) => TUpdate,
+  buildUpdate: (ex: TExisting, p: TParsed) => TUpdate
 ): {
   toCreate: TParsed[];
   toUpdate: TUpdate[];
@@ -175,14 +182,14 @@ export function calculateEntityDiff<
 } {
   const existingMap = new Map<string, TExisting>();
   for (const e of existing) {
-    const cat = (e.category ?? '未分類').trim() || '未分類';
+    const cat = (e.category ?? "未分類").trim() || "未分類";
     existingMap.set(`${cat}\u0000${e.name}`, e);
   }
 
   const parsedMap = new Map<string, TParsed>();
   let duplicateCount = 0;
   for (const p of parsed) {
-    const cat = (p.category ?? '未分類').trim() || '未分類';
+    const cat = (p.category ?? "未分類").trim() || "未分類";
     const key = `${cat}\u0000${p.name}`;
     if (parsedMap.has(key)) {
       duplicateCount++;
@@ -210,7 +217,7 @@ export function calculateEntityDiff<
     }
   }
 
-  return { toCreate, toUpdate, toDelete, duplicateCount };
+  return { duplicateCount, toCreate, toDelete, toUpdate };
 }
 
 /** 共通 Markdown writer へのオプション定義 */
@@ -235,26 +242,30 @@ export interface MarkdownEntitySectionWriterOptions<T> {
  */
 export function writeMarkdownEntitySections<T>(
   sortedItems: T[],
-  options: MarkdownEntitySectionWriterOptions<T>,
+  options: MarkdownEntitySectionWriterOptions<T>
 ): string {
-  if (sortedItems.length === 0) return '';
+  if (sortedItems.length === 0) {
+    return "";
+  }
 
   const lines: string[] = [];
-  let currentCategory = '';
+  let currentCategory = "";
 
   for (const item of sortedItems) {
     const category = options.categoryOf(item);
     if (category !== currentCategory) {
-      if (lines.length > 0) lines.push('');
+      if (lines.length > 0) {
+        lines.push("");
+      }
       lines.push(`# ${category}`);
-      lines.push('');
+      lines.push("");
       currentCategory = category;
     }
     lines.push(`## ${options.nameOf(item)}`);
     options.writeBody(item, lines);
   }
 
-  return lines.join('\n').replace(/\n+$/, '\n');
+  return lines.join("\n").replace(/\n+$/, "\n");
 }
 
 /**
@@ -262,11 +273,11 @@ export function writeMarkdownEntitySections<T>(
  */
 export function trimAndJoinLines(lines: string[]): string {
   const cloned = [...lines];
-  while (cloned.length > 0 && cloned[cloned.length - 1].trim() === '') {
+  while (cloned.length > 0 && cloned.at(-1)?.trim() === "") {
     cloned.pop();
   }
-  while (cloned.length > 0 && cloned[0].trim() === '') {
+  while (cloned.length > 0 && cloned[0].trim() === "") {
     cloned.shift();
   }
-  return cloned.join('\n');
+  return cloned.join("\n");
 }

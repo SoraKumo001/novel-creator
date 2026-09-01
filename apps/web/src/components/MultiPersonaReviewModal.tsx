@@ -1,31 +1,31 @@
-import { useRef, useState } from 'react';
-import { HistoryViewBanner } from './HistoryViewBanner.js';
-import { AnalysisHistoryPanel } from './AnalysisHistoryPanel.js';
-import { AnalysisProgressPanel } from './AnalysisProgressPanel.js';
-import { Button } from './Button.js';
-import { MarkdownText } from '@/components/MarkdownText.js';
-import { Modal } from './Modal.js';
-import type { AnalysisProgress } from '@/hooks/useAnalysis.js';
+import { useRef, useState } from "react";
+import { MarkdownText } from "@/components/MarkdownText.js";
+import type { AnalysisProgress } from "@/hooks/useAnalysis.js";
 import type {
   AnalysisHistoryEntry,
   MultiPersonaReviewResult,
   ReaderPersonaType,
-} from '@/lib/types.js';
+} from "@/lib/types.js";
+import { AnalysisHistoryPanel } from "./AnalysisHistoryPanel.js";
+import { AnalysisProgressPanel } from "./AnalysisProgressPanel.js";
+import { Button } from "./Button.js";
+import { HistoryViewBanner } from "./HistoryViewBanner.js";
+import { Modal } from "./Modal.js";
 
 interface MultiPersonaReviewModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  result: MultiPersonaReviewResult | null;
-  progress: AnalysisProgress | null;
-  running: boolean;
   error?: string | null;
-  isHistoryView?: boolean;
-  viewedAt?: string | null;
-  novelId: string;
   historyRefreshKey?: number;
-  onSelectHistory: (entry: AnalysisHistoryEntry) => void;
-  onRerun: () => void;
+  isHistoryView?: boolean;
+  isOpen: boolean;
+  novelId: string;
   onCancel: () => void;
+  onClose: () => void;
+  onRerun: () => void;
+  onSelectHistory: (entry: AnalysisHistoryEntry) => void;
+  progress: AnalysisProgress | null;
+  result: MultiPersonaReviewResult | null;
+  running: boolean;
+  viewedAt?: string | null;
 }
 
 const PERSONA_CONFIG: Record<
@@ -33,28 +33,28 @@ const PERSONA_CONFIG: Record<
   { icon: string; title: string; color: string; badge: string }
 > = {
   editor: {
-    icon: '👔',
-    title: '商業文芸・ラノベ編集者',
-    color: 'border-blue-500/30 bg-blue-500/5',
-    badge: 'bg-blue-500/10 text-blue-600',
+    icon: "👔",
+    title: "商業文芸・ラノベ編集者",
+    color: "border-blue-500/30 bg-blue-500/5",
+    badge: "bg-blue-500/10 text-blue-600",
   },
   casual: {
-    icon: '🍿',
-    title: '一般エンタメ読者',
-    color: 'border-emerald-500/30 bg-emerald-500/5',
-    badge: 'bg-emerald-500/10 text-emerald-600',
+    icon: "🍿",
+    title: "一般エンタメ読者",
+    color: "border-emerald-500/30 bg-emerald-500/5",
+    badge: "bg-emerald-500/10 text-emerald-600",
   },
   lore: {
-    icon: '🔍',
-    title: '世界観・設定考察派ファン',
-    color: 'border-purple-500/30 bg-purple-500/5',
-    badge: 'bg-purple-500/10 text-purple-600',
+    icon: "🔍",
+    title: "世界観・設定考察派ファン",
+    color: "border-purple-500/30 bg-purple-500/5",
+    badge: "bg-purple-500/10 text-purple-600",
   },
   critic: {
-    icon: '🖋️',
-    title: '辛口文芸評論家',
-    color: 'border-rose-500/30 bg-rose-500/5',
-    badge: 'bg-rose-500/10 text-rose-600',
+    icon: "🖋️",
+    title: "辛口文芸評論家",
+    color: "border-rose-500/30 bg-rose-500/5",
+    badge: "bg-rose-500/10 text-rose-600",
   },
 };
 
@@ -73,7 +73,8 @@ export function MultiPersonaReviewModal({
   onRerun,
   onCancel,
 }: MultiPersonaReviewModalProps) {
-  const [selectedPersona, setSelectedPersona] = useState<ReaderPersonaType>('editor');
+  const [selectedPersona, setSelectedPersona] =
+    useState<ReaderPersonaType>("editor");
   const startTimeRef = useRef<number>(Date.now());
   const wasRunningRef = useRef(false);
   if (running && !wasRunningRef.current) {
@@ -82,8 +83,8 @@ export function MultiPersonaReviewModal({
   wasRunningRef.current = running;
 
   const title = running
-    ? '模擬読者レビューを生成中…'
-    : '👥 複数ペルソナによる模擬読者・編集部レビュー';
+    ? "模擬読者レビューを生成中…"
+    : "👥 複数ペルソナによる模擬読者・編集部レビュー";
 
   return (
     <Modal
@@ -98,7 +99,9 @@ export function MultiPersonaReviewModal({
           </Button>
         ) : (
           <div className="flex w-full items-center justify-between gap-3">
-            <span className="text-[11px] text-muted-foreground">分析結果は自動保存されます</span>
+            <span className="text-[11px] text-muted-foreground">
+              分析結果は自動保存されます
+            </span>
             <Button variant="secondary" onClick={onClose}>
               閉じる
             </Button>
@@ -115,7 +118,7 @@ export function MultiPersonaReviewModal({
       ) : (
         <div className="space-y-4">
           {error && (
-            <div className="rounded-lg border border-danger-border bg-danger-subtle px-4 py-3 text-sm text-danger-subtle-fg flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-danger-border bg-danger-subtle px-4 py-3 text-danger-subtle-fg text-sm">
               <span>{error}</span>
               <Button size="sm" variant="secondary" onClick={onRerun}>
                 再試行
@@ -123,7 +126,9 @@ export function MultiPersonaReviewModal({
             </div>
           )}
 
-          {isHistoryView && result && <HistoryViewBanner createdAt={viewedAt ?? undefined} />}
+          {isHistoryView && result && (
+            <HistoryViewBanner createdAt={viewedAt ?? undefined} />
+          )}
 
           {result && (
             <ResultBody
@@ -157,14 +162,17 @@ function ResultBody({
   onSelectPersona: (p: ReaderPersonaType) => void;
 }) {
   const currentReview =
-    result.reviews.find((r) => r.persona === selectedPersona) ?? result.reviews[0];
-  const personaConfig = PERSONA_CONFIG[currentReview?.persona ?? 'editor'];
+    result.reviews.find((r) => r.persona === selectedPersona) ??
+    result.reviews[0];
+  const personaConfig = PERSONA_CONFIG[currentReview?.persona ?? "editor"];
 
   return (
     <>
       {/* 全体読後感 */}
-      <div className="rounded-xl border border-border bg-surface-raised p-4 space-y-1.5 text-xs">
-        <div className="font-bold text-foreground text-sm">📋 査読チーム総合インプレッション</div>
+      <div className="space-y-1.5 rounded-xl border border-border bg-surface-raised p-4 text-xs">
+        <div className="font-bold text-foreground text-sm">
+          📋 査読チーム総合インプレッション
+        </div>
         <MarkdownText
           compact
           content={result.overallImpression}
@@ -173,7 +181,7 @@ function ResultBody({
       </div>
 
       {/* ペルソナ選択タブ */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {result.reviews.map((rev) => {
           const config = PERSONA_CONFIG[rev.persona];
           const isSelected = rev.persona === selectedPersona;
@@ -182,20 +190,20 @@ function ResultBody({
               key={rev.persona}
               type="button"
               onClick={() => onSelectPersona(rev.persona)}
-              className={`flex flex-col items-start p-3 rounded-xl border transition text-left cursor-pointer ${
+              className={`flex cursor-pointer flex-col items-start rounded-xl border p-3 text-left transition ${
                 isSelected
-                  ? 'border-primary bg-primary/10 shadow-sm'
-                  : 'border-border bg-surface hover:bg-surface-raised'
+                  ? "border-primary bg-primary/10 shadow-sm"
+                  : "border-border bg-surface hover:bg-surface-raised"
               }`}
             >
-              <div className="flex items-center justify-between w-full">
+              <div className="flex w-full items-center justify-between">
                 <span className="text-lg">{config.icon}</span>
-                <span className="text-amber-500 text-xs font-bold">
-                  {'★'.repeat(rev.rating)}
-                  {'☆'.repeat(5 - rev.rating)}
+                <span className="font-bold text-amber-500 text-xs">
+                  {"★".repeat(rev.rating)}
+                  {"☆".repeat(5 - rev.rating)}
                 </span>
               </div>
-              <div className="font-bold text-foreground text-xs mt-1 truncate w-full">
+              <div className="mt-1 w-full truncate font-bold text-foreground text-xs">
                 {rev.personaName}
               </div>
             </button>
@@ -206,9 +214,9 @@ function ResultBody({
       {/* 選択されたペルソナの詳細レビューカード */}
       {currentReview && (
         <div
-          className={`rounded-xl border p-5 space-y-4 transition animate-in fade-in duration-200 ${personaConfig.color}`}
+          className={`fade-in animate-in space-y-4 rounded-xl border p-5 transition duration-200 ${personaConfig.color}`}
         >
-          <div className="space-y-1.5 border-b border-border/60 pb-3">
+          <div className="space-y-1.5 border-border/60 border-b pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="text-2xl">{personaConfig.icon}</span>
@@ -216,19 +224,20 @@ function ResultBody({
                   {currentReview.personaName} の講評
                 </span>
               </div>
-              <span className="text-amber-500 text-sm font-black">
-                {'★'.repeat(currentReview.rating)}
-                {'☆'.repeat(5 - currentReview.rating)} ({currentReview.rating} / 5 点)
+              <span className="font-black text-amber-500 text-sm">
+                {"★".repeat(currentReview.rating)}
+                {"☆".repeat(5 - currentReview.rating)} ({currentReview.rating} /
+                5 点)
               </span>
             </div>
-            <div className="font-semibold text-foreground text-xs italic bg-surface/80 p-2 rounded-lg border border-border/50">
+            <div className="rounded-lg border border-border/50 bg-surface/80 p-2 font-semibold text-foreground text-xs italic">
               &ldquo;{currentReview.catchphrase}&rdquo;
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 space-y-1">
-              <div className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+          <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2">
+            <div className="space-y-1 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+              <div className="flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400">
                 <span>✨ 良かった点・魅力</span>
               </div>
               <MarkdownText
@@ -238,8 +247,8 @@ function ResultBody({
               />
             </div>
 
-            <div className="rounded-lg border border-rose-500/20 bg-rose-500/5 p-3 space-y-1">
-              <div className="font-bold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+            <div className="space-y-1 rounded-lg border border-rose-500/20 bg-rose-500/5 p-3">
+              <div className="flex items-center gap-1 font-bold text-rose-600 dark:text-rose-400">
                 <span>💬 改善が望まれる点・懸念</span>
               </div>
               <MarkdownText
@@ -250,11 +259,15 @@ function ResultBody({
             </div>
           </div>
 
-          <div className="rounded-lg bg-surface border border-border p-3 text-xs space-y-1">
-            <div className="font-bold text-primary flex items-center gap-1">
+          <div className="space-y-1 rounded-lg border border-border bg-surface p-3 text-xs">
+            <div className="flex items-center gap-1 font-bold text-primary">
               <span>💡 このペルソナからのリライト助言:</span>
             </div>
-            <MarkdownText compact content={currentReview.advice} className="text-foreground" />
+            <MarkdownText
+              compact
+              content={currentReview.advice}
+              className="text-foreground"
+            />
           </div>
         </div>
       )}

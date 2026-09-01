@@ -1,17 +1,23 @@
-import type { EditablePlot, EntityAction } from './types.js';
+import type { EditablePlot, EntityAction } from "./types.js";
 
 interface ChatInsertPlotTabProps {
-  plots: EditablePlot[];
-  onToggle: (id: string) => void;
   onRemove: (id: string) => void;
+  onToggle: (id: string) => void;
   onUpdate: (id: string, field: keyof EditablePlot, value: unknown) => void;
+  plots: EditablePlot[];
 }
 
-export function ChatInsertPlotTab({ plots, onToggle, onRemove, onUpdate }: ChatInsertPlotTabProps) {
+export function ChatInsertPlotTab({
+  plots,
+  onToggle,
+  onRemove,
+  onUpdate,
+}: ChatInsertPlotTabProps) {
   if (plots.length === 0) {
     return (
-      <div className="py-8 text-center text-xs text-slate-400">
-        検出されたプロット・章構成案はありませんでした。「＋ プロットを手動追加」から追加できます。
+      <div className="py-8 text-center text-slate-400 text-xs">
+        検出されたプロット・章構成案はありませんでした。「＋
+        プロットを手動追加」から追加できます。
       </div>
     );
   }
@@ -23,8 +29,8 @@ export function ChatInsertPlotTab({ plots, onToggle, onRemove, onUpdate }: ChatI
           key={p._id}
           className={`rounded-xl border p-3 transition ${
             p._selected
-              ? 'border-indigo-300 bg-indigo-50/40 dark:border-indigo-600/60 dark:bg-indigo-950/20'
-              : 'border-slate-200 bg-white opacity-60 dark:border-slate-700 dark:bg-slate-800'
+              ? "border-indigo-300 bg-indigo-50/40 dark:border-indigo-600/60 dark:bg-indigo-950/20"
+              : "border-slate-200 bg-white opacity-60 dark:border-slate-700 dark:bg-slate-800"
           }`}
         >
           <div className="flex items-start justify-between gap-3">
@@ -50,8 +56,14 @@ export function ChatInsertPlotTab({ plots, onToggle, onRemove, onUpdate }: ChatI
                     </label>
                     <select
                       value={p.action}
-                      onChange={(e) => onUpdate(p._id, 'action', e.target.value as EntityAction)}
-                      className="rounded border border-amber-300 bg-white px-2 py-0.5 text-xs text-slate-800 focus:outline-none dark:border-amber-700 dark:bg-slate-800 dark:text-slate-100"
+                      onChange={(e) =>
+                        onUpdate(
+                          p._id,
+                          "action",
+                          e.target.value as EntityAction
+                        )
+                      }
+                      className="rounded border border-amber-300 bg-white px-2 py-0.5 text-slate-800 text-xs focus:outline-none dark:border-amber-700 dark:bg-slate-800 dark:text-slate-100"
                     >
                       <option value="overwrite">あらすじ上書き</option>
                       <option value="merge">あらすじ追記マージ</option>
@@ -60,34 +72,34 @@ export function ChatInsertPlotTab({ plots, onToggle, onRemove, onUpdate }: ChatI
                   </div>
                 </div>
               ) : (
-                <div className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <div className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 font-bold text-[10px] text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
                   ✨ 新しい章として追加
                 </div>
               )}
 
               <div>
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase">
+                <label className="block font-semibold text-[10px] text-slate-500 uppercase">
                   章 / 節タイトル
                 </label>
                 <input
                   type="text"
                   value={p.title}
-                  onChange={(e) => onUpdate(p._id, 'title', e.target.value)}
+                  onChange={(e) => onUpdate(p._id, "title", e.target.value)}
                   placeholder="例: 第1章 旅立ちの朝"
-                  className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-slate-800 text-xs focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-semibold text-slate-500 uppercase">
+                <label className="block font-semibold text-[10px] text-slate-500 uppercase">
                   プロット・あらすじ・展開案
                 </label>
                 <textarea
                   rows={3}
-                  value={p.summary || ''}
-                  onChange={(e) => onUpdate(p._id, 'summary', e.target.value)}
+                  value={p.summary || ""}
+                  onChange={(e) => onUpdate(p._id, "summary", e.target.value)}
                   placeholder="この章・節で起こるイベントやプロットの流れ"
-                  className="w-full resize-none rounded border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                  className="w-full resize-none rounded border border-slate-300 bg-white px-2 py-1 text-slate-800 text-xs focus:border-indigo-500 focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
                 />
               </div>
             </div>
@@ -106,7 +118,11 @@ export function ChatInsertPlotTab({ plots, onToggle, onRemove, onUpdate }: ChatI
                 stroke="currentColor"
                 className="h-4 w-4"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
               </svg>
             </button>
           </div>

@@ -1,19 +1,19 @@
-import { pgTable, uuid, text, integer, timestamp } from 'drizzle-orm/pg-core';
-import { novels } from './novels.js';
-import { sections } from './sections.js';
+import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { novels } from "./novels.js";
+import { sections } from "./sections.js";
 
-export const timelines = pgTable('timelines', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  novelId: uuid('novel_id')
+export const timelines = pgTable("timelines", {
+  createdAt: timestamp("created_at").defaultNow(),
+  event: text("event").notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  novelId: uuid("novel_id")
     .notNull()
-    .references(() => novels.id, { onDelete: 'cascade' }),
-  sectionId: uuid('section_id').references(() => sections.id, {
-    onDelete: 'set null',
+    .references(() => novels.id, { onDelete: "cascade" }),
+  order: integer("order").notNull(),
+  sectionId: uuid("section_id").references(() => sections.id, {
+    onDelete: "set null",
   }),
-  event: text('event').notNull(),
-  order: integer('order').notNull(),
-  timestamp: text('timestamp'),
-  createdAt: timestamp('created_at').defaultNow(),
+  timestamp: text("timestamp"),
 });
 
 export type Timeline = typeof timelines.$inferSelect;

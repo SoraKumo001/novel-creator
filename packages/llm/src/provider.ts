@@ -1,44 +1,51 @@
-import { embed as aiEmbed, generateText as aiGenerateText } from 'ai';
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createOpenAI } from '@ai-sdk/openai';
-import type { EmbeddingModel, LanguageModel } from 'ai';
-import type { Env, LLMProviderType } from '@novel-creator/shared';
+import { createAnthropic } from "@ai-sdk/anthropic";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
+import { createOpenAI } from "@ai-sdk/openai";
+import type { Env, LLMProviderType } from "@novel-creator/shared";
+import type { EmbeddingModel, LanguageModel } from "ai";
+import { embed as aiEmbed, generateText as aiGenerateText } from "ai";
 
 export interface ProviderSettings {
-  baseURL?: string;
   apiKey?: string;
+  baseURL?: string;
 }
 
 export interface LLMConfigInput {
-  provider: LLMProviderType;
-  modelId: string;
-  baseUrl?: string | null;
   apiKey?: string | null;
+  baseUrl?: string | null;
+  modelId: string;
+  provider: LLMProviderType;
 }
 
 export interface EmbeddingConfigInput {
-  provider: LLMProviderType;
-  modelId: string;
-  dimensions?: number | null;
-  baseUrl?: string | null;
   apiKey?: string | null;
+  baseUrl?: string | null;
+  dimensions?: number | null;
+  modelId: string;
+  provider: LLMProviderType;
 }
 
 export interface TestConnectionResult {
-  success: boolean;
+  error?: string;
   latencyMs: number;
   message: string;
-  error?: string;
+  success: boolean;
 }
 
 /**
  * プロバイダ設定を構築する。
  */
-function buildSettings(baseURL?: string | null, apiKey?: string | null): ProviderSettings {
+function buildSettings(
+  baseURL?: string | null,
+  apiKey?: string | null
+): ProviderSettings {
   const settings: ProviderSettings = {};
-  if (baseURL && baseURL.trim()) settings.baseURL = baseURL.trim();
-  if (apiKey && apiKey.trim()) settings.apiKey = apiKey.trim();
+  if (baseURL?.trim()) {
+    settings.baseURL = baseURL.trim();
+  }
+  if (apiKey?.trim()) {
+    settings.apiKey = apiKey.trim();
+  }
   return settings;
 }
 
@@ -47,7 +54,7 @@ function buildSettings(baseURL?: string | null, apiKey?: string | null): Provide
  * - 'llm': LLM 設定（LLM_* 環境変数のみフォールバック）
  * - 'embedding': Embedding 設定（EMBEDDING_* を優先し、一致しない場合は LLM_* へフォールバック）
  */
-type SettingsKind = 'llm' | 'embedding';
+type SettingsKind = "llm" | "embedding";
 
 /**
  * fallbackEnv から指定フィールドのフォールバック値を解決する。
@@ -57,13 +64,13 @@ function resolveEnvValue(
   env: Env,
   kind: SettingsKind,
   provider: LLMProviderType,
-  field: 'apiKey' | 'baseURL',
+  field: "apiKey" | "baseURL"
 ): string | undefined {
-  if (kind === 'embedding' && env.EMBEDDING_PROVIDER === provider) {
-    return field === 'apiKey' ? env.EMBEDDING_API_KEY : env.EMBEDDING_BASE_URL;
+  if (kind === "embedding" && env.EMBEDDING_PROVIDER === provider) {
+    return field === "apiKey" ? env.EMBEDDING_API_KEY : env.EMBEDDING_BASE_URL;
   }
   if (env.LLM_PROVIDER === provider) {
-    return field === 'apiKey' ? env.LLM_API_KEY : env.LLM_BASE_URL;
+    return field === "apiKey" ? env.LLM_API_KEY : env.LLM_BASE_URL;
   }
   return undefined;
 }
@@ -73,19 +80,23 @@ function resolveEnvValue(
  * ProviderSettings を構築する。
  */
 function resolveSettings(
-  config: { provider: LLMProviderType; baseUrl?: string | null; apiKey?: string | null },
+  config: {
+    provider: LLMProviderType;
+    baseUrl?: string | null;
+    apiKey?: string | null;
+  },
   fallbackEnv: Env | undefined,
-  kind: SettingsKind,
+  kind: SettingsKind
 ): ProviderSettings {
   let apiKey = config.apiKey ?? undefined;
   let baseURL = config.baseUrl ?? undefined;
 
   if (fallbackEnv) {
     if (!apiKey) {
-      apiKey = resolveEnvValue(fallbackEnv, kind, config.provider, 'apiKey');
+      apiKey = resolveEnvValue(fallbackEnv, kind, config.provider, "apiKey");
     }
     if (!baseURL) {
-      baseURL = resolveEnvValue(fallbackEnv, kind, config.provider, 'baseURL');
+      baseURL = resolveEnvValue(fallbackEnv, kind, config.provider, "baseURL");
     }
   }
 
@@ -103,9 +114,9 @@ const embeddingModelCache = new Map<string, EmbeddingModel>();
 function makeCacheKey(
   provider: LLMProviderType,
   model: string,
-  settings: ProviderSettings,
+  settings: ProviderSettings
 ): string {
-  return `${provider}::${model}::${settings.baseURL ?? ''}::${settings.apiKey ?? ''}`;
+  return `${provider}::${model}::${settings.baseURL ?? ""}::${settings.apiKey ?? ""}`;
 }
 
 /**
@@ -122,7 +133,7 @@ export function clearModelCache(): void {
 export function createLanguageModel(
   provider: LLMProviderType,
   model: string,
-  settings: ProviderSettings,
+  settings: ProviderSettings
 ): LanguageModel {
   const cacheKey = makeCacheKey(provider, model, settings);
   const cached = languageModelCache.get(cacheKey);
@@ -132,26 +143,26 @@ export function createLanguageModel(
 
   let instance: LanguageModel;
   switch (provider) {
-    case 'openai': {
+    case "openai": {
       const openai = createOpenAI(settings);
       // OpenAI / OpenAI互換エンドポイントともに Responses API（item_reference）ではなく
       // 互換性の高い Chat Completions API（.chat）を使用する
       instance = openai.chat(model);
       break;
     }
-    case 'anthropic':
+    case "anthropic":
       instance = createAnthropic(settings)(model);
       break;
-    case 'ollama': {
+    case "ollama": {
       // Ollama / OllamaCloud は OpenAI 互換 API（Chat Completions）を提供するため .chat を使用する。
       const openai = createOpenAI(settings);
       instance = openai.chat(model);
       break;
     }
-    case 'google':
+    case "google":
       instance = createGoogleGenerativeAI(settings)(model);
       break;
-    case 'custom_openai': {
+    case "custom_openai": {
       // OpenRouter, Groq, LM Studio, vLLM などの OpenAI 互換エンドポイント（Chat Completions）
       const openai = createOpenAI(settings);
       instance = openai.chat(model);
@@ -175,7 +186,7 @@ export function createLanguageModel(
 export function createEmbeddingModel(
   provider: LLMProviderType,
   model: string,
-  settings: ProviderSettings,
+  settings: ProviderSettings
 ): EmbeddingModel {
   const cacheKey = makeCacheKey(provider, model, settings);
   const cached = embeddingModelCache.get(cacheKey);
@@ -185,27 +196,27 @@ export function createEmbeddingModel(
 
   let instance: EmbeddingModel;
   switch (provider) {
-    case 'openai':
+    case "openai":
       instance = createOpenAI(settings).embedding(model);
       break;
-    case 'anthropic': {
+    case "anthropic": {
       // Anthropic は embedding 非対応。OpenAI にフォールバックする。
       if (!settings.apiKey) {
         console.warn(
-          '[llm] Anthropic は embedding 非対応のため OpenAI にフォールバックします。' +
-            'API キーが設定されていないため embedding は失敗する可能性があります。',
+          "[llm] Anthropic は embedding 非対応のため OpenAI にフォールバックします。" +
+            "API キーが設定されていないため embedding は失敗する可能性があります。"
         );
       }
       instance = createOpenAI(settings).embedding(model);
       break;
     }
-    case 'ollama':
+    case "ollama":
       instance = createOpenAI(settings).embedding(model);
       break;
-    case 'google':
+    case "google":
       instance = createGoogleGenerativeAI(settings).embedding(model);
       break;
-    case 'custom_openai':
+    case "custom_openai":
       instance = createOpenAI(settings).embedding(model);
       break;
     default: {
@@ -224,12 +235,12 @@ export function createEmbeddingModel(
  */
 export function createLanguageModelFromConfig(
   config: LLMConfigInput,
-  fallbackEnv?: Env,
+  fallbackEnv?: Env
 ): LanguageModel {
   return createLanguageModel(
     config.provider,
     config.modelId,
-    resolveSettings(config, fallbackEnv, 'llm'),
+    resolveSettings(config, fallbackEnv, "llm")
   );
 }
 
@@ -240,7 +251,7 @@ export function createLLMProvider(env: Env): LanguageModel {
   return createLanguageModel(
     env.LLM_PROVIDER,
     env.LLM_MODEL,
-    buildSettings(env.LLM_BASE_URL, env.LLM_API_KEY),
+    buildSettings(env.LLM_BASE_URL, env.LLM_API_KEY)
   );
 }
 
@@ -256,7 +267,11 @@ export function createEmbeddingProvider(env: Env): EmbeddingModel {
   const apiKey = env.EMBEDDING_API_KEY ?? env.LLM_API_KEY;
   const baseURL = env.EMBEDDING_BASE_URL ?? env.LLM_BASE_URL;
 
-  return createEmbeddingModel(provider, env.EMBEDDING_MODEL, buildSettings(baseURL, apiKey));
+  return createEmbeddingModel(
+    provider,
+    env.EMBEDDING_MODEL,
+    buildSettings(baseURL, apiKey)
+  );
 }
 
 /**
@@ -266,12 +281,12 @@ export function createEmbeddingProvider(env: Env): EmbeddingModel {
  */
 export function createEmbeddingModelFromConfig(
   config: EmbeddingConfigInput,
-  fallbackEnv?: Env,
+  fallbackEnv?: Env
 ): EmbeddingModel {
   return createEmbeddingModel(
     config.provider,
     config.modelId,
-    resolveSettings(config, fallbackEnv, 'embedding'),
+    resolveSettings(config, fallbackEnv, "embedding")
   );
 }
 
@@ -284,30 +299,36 @@ export function createEmbeddingModelFromConfig(
 type ConfigInput = LLMConfigInput | EmbeddingConfigInput;
 
 function isConfigInput(modelOrConfig: unknown): modelOrConfig is ConfigInput {
-  return typeof modelOrConfig === 'object' && modelOrConfig !== null && 'modelId' in modelOrConfig;
+  return (
+    typeof modelOrConfig === "object" &&
+    modelOrConfig !== null &&
+    "modelId" in modelOrConfig
+  );
 }
 
 /**
  * 接続テストの共通実装。callable は成功時のメッセージを返す。
  * 失敗時は成否・レイテンシ・エラーメッセージを含む結果を返す。
  */
-async function testConnection(callable: () => Promise<string>): Promise<TestConnectionResult> {
+async function testConnection(
+  callable: () => Promise<string>
+): Promise<TestConnectionResult> {
   const startTime = Date.now();
   try {
     const message = await callable();
     return {
-      success: true,
       latencyMs: Date.now() - startTime,
       message,
+      success: true,
     };
   } catch (err) {
     const latencyMs = Date.now() - startTime;
     const errorMessage = err instanceof Error ? err.message : String(err);
     return {
-      success: false,
+      error: errorMessage,
       latencyMs,
       message: `接続失敗: ${errorMessage}`,
-      error: errorMessage,
+      success: false,
     };
   }
 }
@@ -317,7 +338,7 @@ async function testConnection(callable: () => Promise<string>): Promise<TestConn
  */
 export async function testLLMConnection(
   modelOrConfig: LanguageModel | LLMConfigInput,
-  fallbackEnv?: Env,
+  fallbackEnv?: Env
 ): Promise<TestConnectionResult> {
   return testConnection(async () => {
     const model = isConfigInput(modelOrConfig)
@@ -326,10 +347,10 @@ export async function testLLMConnection(
 
     const res = await aiGenerateText({
       model,
-      prompt: 'ping',
+      prompt: "ping",
     });
 
-    return res.text ? `接続成功: ${res.text.slice(0, 30)}` : '接続成功';
+    return res.text ? `接続成功: ${res.text.slice(0, 30)}` : "接続成功";
   });
 }
 
@@ -338,7 +359,7 @@ export async function testLLMConnection(
  */
 export async function testEmbeddingConnection(
   modelOrConfig: EmbeddingModel | EmbeddingConfigInput,
-  fallbackEnv?: Env,
+  fallbackEnv?: Env
 ): Promise<TestConnectionResult> {
   return testConnection(async () => {
     const model = isConfigInput(modelOrConfig)
@@ -347,7 +368,7 @@ export async function testEmbeddingConnection(
 
     const res = await aiEmbed({
       model,
-      value: 'ping test for embedding dimension and connection',
+      value: "ping test for embedding dimension and connection",
     });
 
     return `接続成功 (検出次元数: ${res.embedding.length})`;

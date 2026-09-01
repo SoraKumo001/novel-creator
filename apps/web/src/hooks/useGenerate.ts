@@ -1,73 +1,84 @@
-import { useCallback, useRef, useState } from 'react';
-import { toErrorMessage } from '@/lib/errors.js';
+import { useCallback, useRef, useState } from "react";
+import { toErrorMessage } from "@/lib/errors.js";
 import {
   analyzeSettingImpact,
   extractEntities,
   generateChapterSummary,
   generatePlot,
   generateSectionSummary,
-} from '@/lib/services/index.js';
-import { streamGenerateContent, streamInlineAssist } from '@/lib/sse.js';
+} from "@/lib/services/index.js";
+import { streamGenerateContent, streamInlineAssist } from "@/lib/sse.js";
 import type {
   ExtractResult,
   GeneratedPlot,
   GeneratedSummary,
   InlineAssistInput,
   SettingImpactResult,
-} from '@/lib/types.js';
+} from "@/lib/types.js";
 
 export type GenerationType =
-  'plot' | 'summary' | 'content' | 'inline-assist' | 'impact' | 'extract';
+  | "plot"
+  | "summary"
+  | "content"
+  | "inline-assist"
+  | "impact"
+  | "extract";
 
 interface UseGenerateReturn {
-  generatingPlot: boolean;
-  generatingSummary: boolean;
-  generatingContent: boolean;
-  extracting: boolean;
-  inlineAssisting: boolean;
-  analyzingImpact: boolean;
   activeGeneration: GenerationType | null;
-  startedAt: number | null;
-  generatedChars: number;
-  generatedPlot: GeneratedPlot | null;
-  generatedSummary: GeneratedSummary | null;
-  streamError: string | null;
-  generatePlot: (
-    novelId: string,
-    modelConfigId?: string | null,
-    signal?: AbortSignal,
-  ) => Promise<GeneratedPlot>;
-  generateChapterSummary: (chapterId: string, signal?: AbortSignal) => Promise<GeneratedSummary>;
-  generateSectionSummary: (sectionId: string, signal?: AbortSignal) => Promise<GeneratedSummary>;
-  generateContent: (
-    sectionId: string,
-    onChunk: (text: string) => void,
-    modelConfigId?: string | null,
-    signal?: AbortSignal,
-  ) => Promise<void>;
-  inlineAssist: (
-    sectionId: string,
-    input: InlineAssistInput,
-    onChunk: (text: string, variant: number) => void,
-    signal?: AbortSignal,
-  ) => Promise<void>;
 
   analyzeImpact: (
     novelId: string,
     input: {
-      changeTarget: 'character' | 'setting';
+      changeTarget: "character" | "setting";
       targetName: string;
       beforeValue: string;
       afterValue: string;
       modelConfigId?: string | null;
     },
-    signal?: AbortSignal,
+    signal?: AbortSignal
   ) => Promise<SettingImpactResult>;
-  extract: (sectionId: string, signal?: AbortSignal) => Promise<ExtractResult>;
+  analyzingImpact: boolean;
   cancelGeneration: () => void;
+  extract: (sectionId: string, signal?: AbortSignal) => Promise<ExtractResult>;
+  extracting: boolean;
+  generateChapterSummary: (
+    chapterId: string,
+    signal?: AbortSignal
+  ) => Promise<GeneratedSummary>;
+  generateContent: (
+    sectionId: string,
+    onChunk: (text: string) => void,
+    modelConfigId?: string | null,
+    signal?: AbortSignal
+  ) => Promise<void>;
+  generatedChars: number;
+  generatedPlot: GeneratedPlot | null;
+  generatedSummary: GeneratedSummary | null;
+  generatePlot: (
+    novelId: string,
+    modelConfigId?: string | null,
+    signal?: AbortSignal
+  ) => Promise<GeneratedPlot>;
+  generateSectionSummary: (
+    sectionId: string,
+    signal?: AbortSignal
+  ) => Promise<GeneratedSummary>;
+  generatingContent: boolean;
+  generatingPlot: boolean;
+  generatingSummary: boolean;
+  inlineAssist: (
+    sectionId: string,
+    input: InlineAssistInput,
+    onChunk: (text: string, variant: number) => void,
+    signal?: AbortSignal
+  ) => Promise<void>;
+  inlineAssisting: boolean;
   resetGeneratedPlot: () => void;
   resetGeneratedSummary: () => void;
   resetStreamError: () => void;
+  startedAt: number | null;
+  streamError: string | null;
 }
 
 export function useGenerate(): UseGenerateReturn {
@@ -77,23 +88,32 @@ export function useGenerate(): UseGenerateReturn {
   const [extracting, setExtracting] = useState(false);
   const [inlineAssisting, setInlineAssisting] = useState(false);
   const [analyzingImpact, setAnalyzingImpact] = useState(false);
-  const [activeGeneration, setActiveGeneration] = useState<GenerationType | null>(null);
+  const [activeGeneration, setActiveGeneration] =
+    useState<GenerationType | null>(null);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [generatedChars, setGeneratedChars] = useState(0);
-  const [generatedPlot, setGeneratedPlot] = useState<GeneratedPlot | null>(null);
-  const [generatedSummary, setGeneratedSummary] = useState<GeneratedSummary | null>(null);
+  const [generatedPlot, setGeneratedPlot] = useState<GeneratedPlot | null>(
+    null
+  );
+  const [generatedSummary, setGeneratedSummary] =
+    useState<GeneratedSummary | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const createSignal = useCallback((externalSignal?: AbortSignal): AbortSignal => {
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    if (externalSignal) {
-      externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
-    }
-    return controller.signal;
-  }, []);
+  const createSignal = useCallback(
+    (externalSignal?: AbortSignal): AbortSignal => {
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+      if (externalSignal) {
+        externalSignal.addEventListener("abort", () => controller.abort(), {
+          once: true,
+        });
+      }
+      return controller.signal;
+    },
+    []
+  );
 
   const cancelGeneration = useCallback(() => {
     if (abortControllerRef.current) {
@@ -105,9 +125,13 @@ export function useGenerate(): UseGenerateReturn {
   }, []);
 
   const handleGeneratePlot = useCallback(
-    async (novelId: string, modelConfigId?: string | null, signal?: AbortSignal) => {
+    async (
+      novelId: string,
+      modelConfigId?: string | null,
+      signal?: AbortSignal
+    ) => {
       setGeneratingPlot(true);
-      setActiveGeneration('plot');
+      setActiveGeneration("plot");
       setStartedAt(Date.now());
       const sig = createSignal(signal);
       try {
@@ -120,13 +144,13 @@ export function useGenerate(): UseGenerateReturn {
         setStartedAt(null);
       }
     },
-    [createSignal],
+    [createSignal]
   );
 
   const handleGenerateChapterSummary = useCallback(
     async (chapterId: string, signal?: AbortSignal) => {
       setGeneratingSummary(true);
-      setActiveGeneration('summary');
+      setActiveGeneration("summary");
       setStartedAt(Date.now());
       const sig = createSignal(signal);
       try {
@@ -139,13 +163,13 @@ export function useGenerate(): UseGenerateReturn {
         setStartedAt(null);
       }
     },
-    [createSignal],
+    [createSignal]
   );
 
   const handleGenerateSectionSummary = useCallback(
     async (sectionId: string, signal?: AbortSignal) => {
       setGeneratingSummary(true);
-      setActiveGeneration('summary');
+      setActiveGeneration("summary");
       setStartedAt(Date.now());
       const sig = createSignal(signal);
       try {
@@ -158,7 +182,7 @@ export function useGenerate(): UseGenerateReturn {
         setStartedAt(null);
       }
     },
-    [createSignal],
+    [createSignal]
   );
 
   const generateContent = useCallback(
@@ -166,10 +190,10 @@ export function useGenerate(): UseGenerateReturn {
       sectionId: string,
       onChunk: (text: string) => void,
       modelConfigId?: string | null,
-      signal?: AbortSignal,
+      signal?: AbortSignal
     ) => {
       setGeneratingContent(true);
-      setActiveGeneration('content');
+      setActiveGeneration("content");
       setStartedAt(Date.now());
       setGeneratedChars(0);
       setStreamError(null);
@@ -181,9 +205,14 @@ export function useGenerate(): UseGenerateReturn {
       };
 
       try {
-        await streamGenerateContent(sectionId, countingOnChunk, modelConfigId, sig);
+        await streamGenerateContent(
+          sectionId,
+          countingOnChunk,
+          modelConfigId,
+          sig
+        );
       } catch (e) {
-        if (sig.aborted || (e instanceof Error && e.name === 'AbortError')) {
+        if (sig.aborted || (e instanceof Error && e.name === "AbortError")) {
           return;
         }
         setStreamError(toErrorMessage(e));
@@ -194,7 +223,7 @@ export function useGenerate(): UseGenerateReturn {
         setStartedAt(null);
       }
     },
-    [createSignal],
+    [createSignal]
   );
 
   const inlineAssist = useCallback(
@@ -202,10 +231,10 @@ export function useGenerate(): UseGenerateReturn {
       sectionId: string,
       input: InlineAssistInput,
       onChunk: (text: string, variant: number) => void,
-      signal?: AbortSignal,
+      signal?: AbortSignal
     ) => {
       setInlineAssisting(true);
-      setActiveGeneration('inline-assist');
+      setActiveGeneration("inline-assist");
       setStartedAt(Date.now());
       setGeneratedChars(0);
       setStreamError(null);
@@ -219,7 +248,7 @@ export function useGenerate(): UseGenerateReturn {
       try {
         await streamInlineAssist(sectionId, input, countingOnChunk, sig);
       } catch (e) {
-        if (sig.aborted || (e instanceof Error && e.name === 'AbortError')) {
+        if (sig.aborted || (e instanceof Error && e.name === "AbortError")) {
           return;
         }
         setStreamError(toErrorMessage(e));
@@ -230,23 +259,23 @@ export function useGenerate(): UseGenerateReturn {
         setStartedAt(null);
       }
     },
-    [createSignal],
+    [createSignal]
   );
 
   const analyzeImpact = useCallback(
     async (
       novelId: string,
       input: {
-        changeTarget: 'character' | 'setting';
+        changeTarget: "character" | "setting";
         targetName: string;
         beforeValue: string;
         afterValue: string;
         modelConfigId?: string | null;
       },
-      signal?: AbortSignal,
+      signal?: AbortSignal
     ) => {
       setAnalyzingImpact(true);
-      setActiveGeneration('impact');
+      setActiveGeneration("impact");
       setStartedAt(Date.now());
       const sig = createSignal(signal);
       try {
@@ -257,13 +286,13 @@ export function useGenerate(): UseGenerateReturn {
         setStartedAt(null);
       }
     },
-    [createSignal],
+    [createSignal]
   );
 
   const extract = useCallback(
     async (sectionId: string, signal?: AbortSignal) => {
       setExtracting(true);
-      setActiveGeneration('extract');
+      setActiveGeneration("extract");
       setStartedAt(Date.now());
       const sig = createSignal(signal);
       try {
@@ -274,7 +303,7 @@ export function useGenerate(): UseGenerateReturn {
         setStartedAt(null);
       }
     },
-    [createSignal],
+    [createSignal]
   );
 
   return {

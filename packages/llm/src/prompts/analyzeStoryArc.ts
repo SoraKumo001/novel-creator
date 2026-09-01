@@ -1,5 +1,4 @@
 export interface AnalyzeStoryArcContext {
-  novelTitle?: string;
   chapters: Array<{
     id: string;
     title: string;
@@ -10,13 +9,14 @@ export interface AnalyzeStoryArcContext {
       contentSnippet?: string;
     }>;
   }>;
+  novelTitle?: string;
 }
 
 export function analyzeStoryArcPrompt(context: AnalyzeStoryArcContext): string {
   let prompt = `あなたはプロのストーリーアナリスト・物語構造評論家です。
 与えられた小説の各章・各節の構成と内容を分析し、作品全体の「ドラマチック・アーク（物語の起伏）」を客観的にスコアリング・診断してください。
 
-■ 作品名: ${context.novelTitle ?? '未設定'}
+■ 作品名: ${context.novelTitle ?? "未設定"}
 
 ■ 章・節構成一覧:
 `;
@@ -25,8 +25,12 @@ export function analyzeStoryArcPrompt(context: AnalyzeStoryArcContext): string {
     prompt += `### 章: ${ch.title} (ID: ${ch.id})\n`;
     for (const sec of ch.sections) {
       prompt += `- 節: ${sec.title} (ID: ${sec.id})\n`;
-      if (sec.summary) prompt += `  概要: ${sec.summary}\n`;
-      if (sec.contentSnippet) prompt += `  本文冒頭/抜粋: ${sec.contentSnippet}\n`;
+      if (sec.summary) {
+        prompt += `  概要: ${sec.summary}\n`;
+      }
+      if (sec.contentSnippet) {
+        prompt += `  本文冒頭/抜粋: ${sec.contentSnippet}\n`;
+      }
     }
   }
 

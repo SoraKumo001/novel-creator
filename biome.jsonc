@@ -1,0 +1,127 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": [
+    "ultracite/biome/core",
+    "ultracite/biome/react",
+    "ultracite/biome/vitest"
+  ],
+  "files": {
+    "includes": ["!!**/drizzle", "!!**/packages/proto/src/gen"]
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "useSortedAttributes": "off",
+        "useSortedKeys": "off"
+      }
+    }
+  },
+  "javascript": {
+    "globals": [
+      "describe",
+      "it",
+      "expect",
+      "beforeEach",
+      "afterEach",
+      "beforeAll",
+      "afterAll",
+      "vi",
+      "React",
+      "NodeJS"
+    ]
+  },
+  "linter": {
+    "rules": {
+      "a11y": {
+        "noLabelWithoutControl": "warn",
+        "noNoninteractiveElementInteractions": "warn",
+        "noStaticElementInteractions": "warn",
+        "noSvgWithoutTitle": "warn",
+        "useAriaPropsSupportedByRole": "warn",
+        "useButtonType": "warn",
+        "useKeyWithClickEvents": "warn",
+        "useKeyWithMouseEvents": "warn",
+        "useSemanticElements": "warn"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "warn",
+        "noForEach": "off",
+        "noUselessConstructor": "off",
+        "noUselessFragments": "warn",
+        "noUselessSwitchCase": "warn",
+        "noUselessTernary": "warn",
+        "noUselessUndefined": "off",
+        "noVoid": "off",
+        "useArrowFunction": "off",
+        "useFlatMap": "warn",
+        "useLiteralKeys": "off",
+        "useOptionalChain": "warn",
+        "useSimplifiedLogicExpression": "off"
+      },
+      "correctness": {
+        "noUnsafeOptionalChaining": "warn",
+        "noUnusedFunctionParameters": "warn",
+        "useExhaustiveDependencies": "warn"
+      },
+      "performance": {
+        "noAwaitInLoops": "warn",
+        "noBarrelFile": "off",
+        "noJsxPropsBind": "off",
+        "noNamespaceImport": "off",
+        "useTopLevelRegex": "off"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "warn"
+      },
+      "style": {
+        "noCommonJs": "off",
+        "noEnum": "off",
+        "noExportedImports": "off",
+        "noIncrementDecrement": "off",
+        "noInferrableTypes": "off",
+        "noNegationElse": "off",
+        "noNestedTernary": "warn",
+        "noNonNullAssertion": "warn",
+        "noParameterProperties": "off",
+        "noShoutyConstants": "off",
+        "useArrayLiterals": "warn",
+        "useAtIndex": "warn",
+        "useBlockStatements": "warn",
+        "useCollapsedIf": "off",
+        "useConsistentArrayType": "off",
+        "useConsistentMethodSignatures": "off",
+        "useConsistentTypeDefinitions": "off",
+        "useConst": "warn",
+        "useDestructuring": "off",
+        "useExportType": "off",
+        "useFilenamingConvention": "off",
+        "useFragmentSyntax": "warn",
+        "useImportType": "off",
+        "useNodejsImportProtocol": "off",
+        "useSelfClosingElements": "warn",
+        "useShorthandAssign": "off",
+        "useShorthandFunctionType": "warn",
+        "useTemplate": "warn",
+        "useTrimStartEnd": "warn"
+      },
+      "suspicious": {
+        "noAlert": "warn",
+        "noArrayIndexKey": "warn",
+        "noDuplicateJsxProps": "warn",
+        "noEmptyBlockStatements": "off",
+        "noEmptySource": "warn",
+        "noEqualsToNull": "off",
+        "noEvolvingTypes": "off",
+        "noExplicitAny": "warn",
+        "noGlobalIsNan": "warn",
+        "noLeakedRender": "warn",
+        "noReactForwardRef": "off",
+        "noShadow": "warn",
+        "noShadowRestrictedNames": "warn",
+        "noThenProperty": "warn",
+        "noUnnecessaryConditions": "warn",
+        "useAwait": "warn"
+      }
+    }
+  }
+}

@@ -1,21 +1,19 @@
-import { randomUUID } from 'node:crypto';
-
-import type { EmbeddingModel } from 'ai';
-
-import { generateEmbedding } from '@novel-creator/llm';
-import type { Env } from '@novel-creator/shared';
-import type { VectorStore } from '@novel-creator/vector';
+import { randomUUID } from "node:crypto";
+import { generateEmbedding } from "@novel-creator/llm";
+import type { Env } from "@novel-creator/shared";
+import type { VectorStore } from "@novel-creator/vector";
+import type { EmbeddingModel } from "ai";
 
 export interface SearchContextOptions {
+  previousContent?: string;
   query: string;
   topK?: number;
-  previousContent?: string;
 }
 
 export interface SearchContextResult {
   characters: string[];
-  settings: string[];
   previousContent?: string;
+  settings: string[];
 }
 
 /**
@@ -23,9 +21,11 @@ export interface SearchContextResult {
  * Google の場合は outputDimensionality を指定して次元数を制御する。
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildEmbeddingProviderOptions(env: Env): Record<string, any> | undefined {
+function buildEmbeddingProviderOptions(
+  env: Env
+): Record<string, any> | undefined {
   const provider = env.EMBEDDING_PROVIDER ?? env.LLM_PROVIDER;
-  if (provider === 'google') {
+  if (provider === "google") {
     return { google: { outputDimensionality: env.EMBEDDING_DIMENSIONS } };
   }
   return undefined;
@@ -40,29 +40,31 @@ export async function searchContext(
   embedding: EmbeddingModel,
   novelId: string,
   options: SearchContextOptions,
-  env: Env,
+  env: Env
 ): Promise<SearchContextResult> {
   const topK = options.topK ?? 5;
   const providerOptions = buildEmbeddingProviderOptions(env);
-  const queryVector = await generateEmbedding(embedding, options.query, { providerOptions });
+  const queryVector = await generateEmbedding(embedding, options.query, {
+    providerOptions,
+  });
 
   const [characterResults, settingResults] = await Promise.all([
     vectorStore.search(queryVector, {
+      entityType: "character",
       novelId,
-      entityType: 'character',
       topK,
     }),
     vectorStore.search(queryVector, {
+      entityType: "setting",
       novelId,
-      entityType: 'setting',
       topK,
     }),
   ]);
 
   return {
     characters: characterResults.map((r) => r.content),
-    settings: settingResults.map((r) => r.content),
     previousContent: options.previousContent,
+    settings: settingResults.map((r) => r.content),
   };
 }
 
@@ -77,17 +79,19 @@ export async function upsertEntityEmbedding(
   entityType: string,
   entityId: string,
   content: string,
-  env: Env,
+  env: Env
 ): Promise<void> {
   const providerOptions = buildEmbeddingProviderOptions(env);
-  const vector = await generateEmbedding(embedding, content, { providerOptions });
+  const vector = await generateEmbedding(embedding, content, {
+    providerOptions,
+  });
   await vectorStore.deleteByEntity(entityType, entityId);
   await vectorStore.upsert({
-    id: randomUUID(),
-    novelId,
-    entityType,
-    entityId,
     content,
     embedding: vector,
+    entityId,
+    entityType,
+    id: randomUUID(),
+    novelId,
   });
 }

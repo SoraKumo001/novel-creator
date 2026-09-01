@@ -4,14 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "tsr generate && tsc -p tsconfig.json && vite build",
-    "preview": "vite preview",
+    "build-storybook": "storybook build",
     "deploy": "vite build && wrangler pages deploy dist",
-    "typecheck": "tsr generate && tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
+    "dev": "vite",
+    "preview": "vite preview",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "test": "vitest run",
+    "typecheck": "tsr generate && tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@ai-sdk/react": "4.0.87",

@@ -1,42 +1,43 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
-type ButtonSize = 'sm' | 'md' | 'lg';
+type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
+type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: ButtonVariant;
-  size?: ButtonSize;
   isLoading?: boolean;
   leftIcon?: ReactNode;
   rightIcon?: ReactNode;
+  size?: ButtonSize;
+  variant?: ButtonVariant;
 }
 
 const baseStyles =
-  'inline-flex items-center justify-center rounded-lg font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
+  "inline-flex items-center justify-center rounded-lg font-medium transition focus:outline-none focus:ring-2 focus:ring-offset-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-primary text-primary-foreground hover:bg-primary-hover focus:ring-primary',
+  primary:
+    "bg-primary text-primary-foreground hover:bg-primary-hover focus:ring-primary",
   secondary:
-    'bg-surface text-foreground border border-border hover:bg-surface-hover focus:ring-primary',
-  danger: 'bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500',
+    "bg-surface text-foreground border border-border hover:bg-surface-hover focus:ring-primary",
+  danger: "bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500",
   ghost:
-    'bg-transparent text-foreground-secondary hover:bg-surface-hover hover:text-foreground focus:ring-primary',
+    "bg-transparent text-foreground-secondary hover:bg-surface-hover hover:text-foreground focus:ring-primary",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-xs gap-1',
-  md: 'px-4 py-2 text-sm gap-1.5',
-  lg: 'px-5 py-2.5 text-base gap-2',
+  sm: "px-3 py-1.5 text-xs gap-1",
+  md: "px-4 py-2 text-sm gap-1.5",
+  lg: "px-5 py-2.5 text-base gap-2",
 };
 
 export function Button({
-  variant = 'primary',
-  size = 'md',
+  variant = "primary",
+  size = "md",
   isLoading = false,
   leftIcon,
   rightIcon,
   children,
-  className = '',
+  className = "",
   disabled,
   ...props
 }: ButtonProps) {

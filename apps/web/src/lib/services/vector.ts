@@ -1,5 +1,5 @@
-import { parseResponseError } from '../errors.js';
-import type { ReindexProgressEvent } from '../types.js';
+import { parseResponseError } from "../errors.js";
+import type { ReindexProgressEvent } from "../types.js";
 
 export async function streamReindex(
   options: {
@@ -8,50 +8,61 @@ export async function streamReindex(
     onDone: (result?: unknown) => void;
     onError: (error: string) => void;
   },
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<void> {
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000';
+  const baseUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "http://localhost:3000";
   const response = await fetch(`${baseUrl}/api/vector/reindex`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ embeddingConfigId: options.embeddingConfigId ?? null }),
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      embeddingConfigId: options.embeddingConfigId ?? null,
+    }),
     signal,
   });
 
   if (!response.ok) {
-    throw await parseResponseError(response, 'ベクトルの再インデックス開始');
+    throw await parseResponseError(response, "ベクトルの再インデックス開始");
   }
 
   const reader = response.body?.getReader();
-  if (!reader) throw new Error('ReadableStream not supported');
+  if (!reader) {
+    throw new Error("ReadableStream not supported");
+  }
 
   const decoder = new TextDecoder();
-  let buffer = '';
+  let buffer = "";
 
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        break;
+      }
 
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() ?? '';
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
 
-      let currentEvent = 'message';
+      let currentEvent = "message";
       for (const line of lines) {
-        if (line.startsWith('event:')) {
+        if (line.startsWith("event:")) {
           currentEvent = line.slice(6).trim();
-        } else if (line.startsWith('data:')) {
+        } else if (line.startsWith("data:")) {
           const dataStr = line.slice(5).trim();
-          if (!dataStr) continue;
+          if (!dataStr) {
+            continue;
+          }
           try {
             const data = JSON.parse(dataStr);
-            if (currentEvent === 'progress') {
+            if (currentEvent === "progress") {
               options.onProgress(data as ReindexProgressEvent);
-            } else if (currentEvent === 'done') {
+            } else if (currentEvent === "done") {
               options.onDone(data.result);
-            } else if (currentEvent === 'error') {
-              options.onError(data.error ?? 'Unknown reindexing error');
+            } else if (currentEvent === "error") {
+              options.onError(data.error ?? "Unknown reindexing error");
             }
           } catch {
             // JSON parse error

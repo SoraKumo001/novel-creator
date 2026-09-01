@@ -2,12 +2,12 @@ import {
   extractEntities,
   generateSectionContent,
   inlineAssistSectionContent,
-} from './services/generate.js';
-import type { InlineAssistInput } from './types.js';
+} from "./services/generate.js";
+import type { InlineAssistInput } from "./types.js";
 
 export interface SSEExtractResult {
-  timelines: { event: string; order: number; timestamp: string | null }[];
   settings: { category: string; name: string; description: string }[];
+  timelines: { event: string; order: number; timestamp: string | null }[];
 }
 
 /**
@@ -18,20 +18,30 @@ export async function streamGenerateContent(
   sectionId: string,
   onChunk: (text: string) => void,
   modelConfigId?: string | null,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<void> {
   try {
-    for await (const chunk of generateSectionContent(sectionId, modelConfigId, signal)) {
-      if (signal?.aborted) break;
+    for await (const chunk of generateSectionContent(
+      sectionId,
+      modelConfigId,
+      signal
+    )) {
+      if (signal?.aborted) {
+        break;
+      }
       if (chunk) {
         onChunk(chunk);
       }
     }
   } catch (err) {
-    if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+    if (
+      signal?.aborted ||
+      (err instanceof Error && err.name === "AbortError")
+    ) {
       return;
     }
-    const message = err instanceof Error ? err.message : 'Failed to generate content';
+    const message =
+      err instanceof Error ? err.message : "Failed to generate content";
     throw new Error(message, { cause: err });
   }
 }
@@ -43,20 +53,30 @@ export async function streamInlineAssist(
   sectionId: string,
   input: InlineAssistInput,
   onChunk: (text: string, variant: number) => void,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<void> {
   try {
-    for await (const chunk of inlineAssistSectionContent(sectionId, input, signal)) {
-      if (signal?.aborted) break;
+    for await (const chunk of inlineAssistSectionContent(
+      sectionId,
+      input,
+      signal
+    )) {
+      if (signal?.aborted) {
+        break;
+      }
       if (chunk && chunk.text) {
         onChunk(chunk.text, chunk.variant ?? 0);
       }
     }
   } catch (err) {
-    if (signal?.aborted || (err instanceof Error && err.name === 'AbortError')) {
+    if (
+      signal?.aborted ||
+      (err instanceof Error && err.name === "AbortError")
+    ) {
       return;
     }
-    const message = err instanceof Error ? err.message : 'Failed to inline assist';
+    const message =
+      err instanceof Error ? err.message : "Failed to inline assist";
     throw new Error(message, { cause: err });
   }
 }
@@ -69,7 +89,7 @@ export async function streamGenerateContentAuto(
   sectionId: string,
   onChunk: (text: string) => void,
   modelConfigId?: string | null,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<SSEExtractResult> {
   // 1. 本文ストリーミング
   await streamGenerateContent(sectionId, onChunk, modelConfigId, signal);
@@ -85,7 +105,7 @@ export async function streamGenerateContentAuto(
     settings: res.settings.map((s) => ({
       category: s.category,
       name: s.name,
-      description: s.description ?? '',
+      description: s.description ?? "",
     })),
   };
 }
@@ -95,7 +115,9 @@ export async function streamGenerateContentAuto(
  */
 export function countWords(text: string): number {
   const trimmed = text.trim();
-  if (!trimmed) return 0;
+  if (!trimmed) {
+    return 0;
+  }
   const japanese = trimmed.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g);
   if (japanese && japanese.length > 0) {
     return japanese.length;

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it } from "vitest";
 import {
   chapterSchema,
   characterSchema,
@@ -12,223 +12,226 @@ import {
   sectionSchema,
   settingSchema,
   timelineSchema,
-} from '../src/schemas/entities.js';
+} from "../src/schemas/entities.js";
 
-describe('entities schemas', () => {
-  it('Novel の完全なオブジェクトをパースできること', () => {
+describe("entities schemas", () => {
+  it("Novel の完全なオブジェクトをパースできること", () => {
     const result = novelSchema.parse({
-      id: 'n1',
-      title: 'タイトル',
-      description: '説明',
-      createdAt: '2026-01-01T00:00:00.000Z',
-      updatedAt: '2026-01-02T00:00:00.000Z',
+      createdAt: "2026-01-01T00:00:00.000Z",
+      description: "説明",
+      id: "n1",
+      title: "タイトル",
+      updatedAt: "2026-01-02T00:00:00.000Z",
     });
-    expect(result.title).toBe('タイトル');
+    expect(result.title).toBe("タイトル");
   });
 
-  it('Novel.description は null を受け付けること', () => {
+  it("Novel.description は null を受け付けること", () => {
     const result = novelSchema.parse({
-      id: 'n1',
-      title: 'タイトル',
-      description: null,
       createdAt: null,
+      description: null,
+      id: "n1",
+      title: "タイトル",
       updatedAt: null,
     });
     expect(result.description).toBeNull();
   });
 
-  it('Chapter / Section / Content の完全なオブジェクトをパースできること', () => {
+  it("Chapter / Section / Content の完全なオブジェクトをパースできること", () => {
     const chapter = chapterSchema.parse({
-      id: 'c1',
-      novelId: 'n1',
-      title: '第一章',
+      createdAt: null,
+      id: "c1",
+      novelId: "n1",
       order: 1,
       summary: null,
-      createdAt: null,
+      title: "第一章",
       updatedAt: null,
     });
     const section = sectionSchema.parse({
-      id: 's1',
-      chapterId: 'c1',
-      title: null,
-      order: 1,
-      summary: '要約',
+      chapterId: "c1",
       createdAt: null,
+      id: "s1",
+      order: 1,
+      summary: "要約",
+      title: null,
       updatedAt: null,
     });
     const content = contentSchema.parse({
-      id: 'ct1',
-      sectionId: 's1',
-      body: '本文',
-      wordCount: 100,
+      body: "本文",
       createdAt: null,
+      id: "ct1",
+      sectionId: "s1",
       updatedAt: null,
+      wordCount: 100,
     });
     expect(chapter.order).toBe(1);
     expect(section.title).toBeNull();
     expect(content.wordCount).toBe(100);
   });
 
-  it('Character.traits は null と string[] の両方を受け付けること', () => {
+  it("Character.traits は null と string[] の両方を受け付けること", () => {
     const withNull = characterSchema.parse({
-      id: 'ch1',
-      novelId: 'n1',
-      category: '主要人物',
-      name: '主人公',
-      description: null,
-      traits: null,
-      relationships: null,
+      category: "主要人物",
       createdAt: null,
+      description: null,
+      id: "ch1",
+      name: "主人公",
+      novelId: "n1",
+      relationships: null,
+      traits: null,
       updatedAt: null,
     });
     const withArray = characterSchema.parse({
-      id: 'ch1',
-      novelId: 'n1',
-      category: '主要人物',
-      name: '主人公',
-      description: null,
-      traits: ['勇敢', '冷静'],
-      relationships: null,
+      category: "主要人物",
       createdAt: null,
+      description: null,
+      id: "ch1",
+      name: "主人公",
+      novelId: "n1",
+      relationships: null,
+      traits: ["勇敢", "冷静"],
       updatedAt: null,
     });
     expect(withNull.traits).toBeNull();
-    expect(withArray.traits).toEqual(['勇敢', '冷静']);
+    expect(withArray.traits).toEqual(["勇敢", "冷静"]);
   });
 
-  it('Character.relationships は文字列とオブジェクトの両方を受け付けること', () => {
+  it("Character.relationships は文字列とオブジェクトの両方を受け付けること", () => {
     const asString = characterSchema.parse({
-      id: 'ch1',
-      novelId: 'n1',
-      category: '主要人物',
-      name: '主人公',
-      description: null,
-      traits: null,
-      relationships: 'ヒロインの幼馴染。',
+      category: "主要人物",
       createdAt: null,
+      description: null,
+      id: "ch1",
+      name: "主人公",
+      novelId: "n1",
+      relationships: "ヒロインの幼馴染。",
+      traits: null,
       updatedAt: null,
     });
     const asObject = characterSchema.parse({
-      id: 'ch1',
-      novelId: 'n1',
-      category: '主要人物',
-      name: '主人公',
-      description: null,
-      traits: null,
-      relationships: { hero: '主人公', heroine: 'ヒロイン' },
+      category: "主要人物",
       createdAt: null,
+      description: null,
+      id: "ch1",
+      name: "主人公",
+      novelId: "n1",
+      relationships: { hero: "主人公", heroine: "ヒロイン" },
+      traits: null,
       updatedAt: null,
     });
-    expect(asString.relationships).toBe('ヒロインの幼馴染。');
-    expect(asObject.relationships).toEqual({ hero: '主人公', heroine: 'ヒロイン' });
+    expect(asString.relationships).toBe("ヒロインの幼馴染。");
+    expect(asObject.relationships).toEqual({
+      hero: "主人公",
+      heroine: "ヒロイン",
+    });
   });
 
-  it('Setting / Timeline / Foreshadowing / LlmInstruction の完全なオブジェクトをパースできること', () => {
+  it("Setting / Timeline / Foreshadowing / LlmInstruction の完全なオブジェクトをパースできること", () => {
     const setting = settingSchema.parse({
-      id: 'st1',
-      novelId: 'n1',
-      category: '世界観',
-      name: '魔法体系',
-      description: null,
-      metadata: { type: 'magic' },
+      category: "世界観",
       createdAt: null,
+      description: null,
+      id: "st1",
+      metadata: { type: "magic" },
+      name: "魔法体系",
+      novelId: "n1",
       updatedAt: null,
     });
     const timeline = timelineSchema.parse({
-      id: 't1',
-      novelId: 'n1',
-      sectionId: null,
-      event: '事件',
-      order: 1,
-      timestamp: null,
       createdAt: null,
+      event: "事件",
+      id: "t1",
+      novelId: "n1",
+      order: 1,
+      sectionId: null,
+      timestamp: null,
     });
     const foreshadowing = foreshadowingSchema.parse({
-      id: 'f1',
-      novelId: 'n1',
-      title: '伏線',
+      createdAt: null,
       description: null,
-      status: 'unresolved',
+      id: "f1",
+      novelId: "n1",
       placedSectionId: null,
       resolvedSectionId: null,
-      createdAt: null,
+      status: "unresolved",
+      title: "伏線",
       updatedAt: null,
     });
     const llm = llmInstructionSchema.parse({
-      id: 'l1',
-      novelId: 'n1',
-      entityType: 'character',
-      instruction: '指示',
       createdAt: null,
+      entityType: "character",
+      id: "l1",
+      instruction: "指示",
+      novelId: "n1",
     });
-    expect(setting.metadata).toEqual({ type: 'magic' });
-    expect(timeline.event).toBe('事件');
-    expect(foreshadowing.status).toBe('unresolved');
-    expect(llm.entityType).toBe('character');
+    expect(setting.metadata).toEqual({ type: "magic" });
+    expect(timeline.event).toBe("事件");
+    expect(foreshadowing.status).toBe("unresolved");
+    expect(llm.entityType).toBe("character");
   });
 
-  it('Timeline は updatedAt を持たない（updatedAt なしでパースできる）こと', () => {
+  it("Timeline は updatedAt を持たない（updatedAt なしでパースできる）こと", () => {
     const result = timelineSchema.parse({
-      id: 't1',
-      novelId: 'n1',
-      sectionId: null,
-      event: '事件',
+      createdAt: null,
+      event: "事件",
+      id: "t1",
+      novelId: "n1",
       order: 1,
+      sectionId: null,
       timestamp: null,
-      createdAt: null,
     });
-    expect(result).not.toHaveProperty('updatedAt');
+    expect(result).not.toHaveProperty("updatedAt");
   });
 
-  it('foreshadowingStatusSchema は 3 値をすべて受け付けること', () => {
-    expect(foreshadowingStatusSchema.parse('unresolved')).toBe('unresolved');
-    expect(foreshadowingStatusSchema.parse('resolved')).toBe('resolved');
-    expect(foreshadowingStatusSchema.parse('abandoned')).toBe('abandoned');
+  it("foreshadowingStatusSchema は 3 値をすべて受け付けること", () => {
+    expect(foreshadowingStatusSchema.parse("unresolved")).toBe("unresolved");
+    expect(foreshadowingStatusSchema.parse("resolved")).toBe("resolved");
+    expect(foreshadowingStatusSchema.parse("abandoned")).toBe("abandoned");
   });
 
-  it('foreshadowingStatusSchema は不正な値を拒否すること', () => {
-    expect(() => foreshadowingStatusSchema.parse('invalid')).toThrow();
+  it("foreshadowingStatusSchema は不正な値を拒否すること", () => {
+    expect(() => foreshadowingStatusSchema.parse("invalid")).toThrow();
   });
 
-  it('ChatSession の完全なオブジェクトをパースできること', () => {
+  it("ChatSession の完全なオブジェクトをパースできること", () => {
     const result = chatSessionSchema.parse({
-      id: 'cs1',
-      novelId: null,
-      title: 'セッション',
       createdAt: null,
+      id: "cs1",
+      novelId: null,
+      title: "セッション",
       updatedAt: null,
     });
-    expect(result.title).toBe('セッション');
+    expect(result.title).toBe("セッション");
   });
 
-  it('ChatMessage は user / assistant ロールを受け付けること', () => {
+  it("ChatMessage は user / assistant ロールを受け付けること", () => {
     const user = chatMessageSchema.parse({
-      id: 'm1',
-      sessionId: 'cs1',
-      role: 'user',
-      content: 'こんにちは',
+      content: "こんにちは",
       createdAt: null,
+      id: "m1",
+      role: "user",
+      sessionId: "cs1",
     });
     const assistant = chatMessageSchema.parse({
-      id: 'm2',
-      sessionId: 'cs1',
-      role: 'assistant',
-      content: 'こんにちは',
+      content: "こんにちは",
       createdAt: null,
+      id: "m2",
+      role: "assistant",
+      sessionId: "cs1",
     });
-    expect(user.role).toBe('user');
-    expect(assistant.role).toBe('assistant');
+    expect(user.role).toBe("user");
+    expect(assistant.role).toBe("assistant");
   });
 
-  it('ChatMessage は system ロールを拒否すること', () => {
+  it("ChatMessage は system ロールを拒否すること", () => {
     expect(() =>
       chatMessageSchema.parse({
-        id: 'm1',
-        sessionId: 'cs1',
-        role: 'system',
-        content: 'システム',
+        content: "システム",
         createdAt: null,
-      }),
+        id: "m1",
+        role: "system",
+        sessionId: "cs1",
+      })
     ).toThrow();
   });
 });

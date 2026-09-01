@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState } from "react";
 
 /**
  * 編集可能なエンティティ（人物・設定など）のリスト CRUD を管理する汎用フック。
@@ -10,13 +10,17 @@ export interface EditableEntity {
   _selected: boolean;
 }
 
-export function useEditableEntities<T extends EditableEntity>(initial: T[] = []) {
+export function useEditableEntities<T extends EditableEntity>(
+  initial: T[] = []
+) {
   const [items, setItems] = useState<T[]>(initial);
 
   // 選択状態（_selected）を反転する。
   const toggleItem = useCallback((id: string) => {
     setItems((prev) =>
-      prev.map((item) => (item._id === id ? { ...item, _selected: !item._selected } : item)),
+      prev.map((item) =>
+        item._id === id ? { ...item, _selected: !item._selected } : item
+      )
     );
   }, []);
 
@@ -25,14 +29,18 @@ export function useEditableEntities<T extends EditableEntity>(initial: T[] = [])
     (id: string, updater: Partial<T> | ((item: T) => Partial<T> | T)) => {
       setItems((prev) =>
         prev.map((item) => {
-          if (item._id !== id) return item;
+          if (item._id !== id) {
+            return item;
+          }
           const patch =
-            typeof updater === 'function' ? (updater as (i: T) => Partial<T> | T)(item) : updater;
+            typeof updater === "function"
+              ? (updater as (i: T) => Partial<T> | T)(item)
+              : updater;
           return { ...item, ...patch };
-        }),
+        })
       );
     },
-    [],
+    []
   );
 
   // 指定 id の項目を削除する。
@@ -41,7 +49,7 @@ export function useEditableEntities<T extends EditableEntity>(initial: T[] = [])
   }, []);
 
   // 空の項目を末尾に追加する。id は idPrefix + タイムスタンプで生成する。
-  const addEmptyItem = useCallback((partial: Partial<T>, idPrefix = '') => {
+  const addEmptyItem = useCallback((partial: Partial<T>, idPrefix = "") => {
     setItems((prev) => [
       ...prev,
       {
@@ -58,5 +66,13 @@ export function useEditableEntities<T extends EditableEntity>(initial: T[] = [])
     setItems(initial);
   }, [initial]);
 
-  return { items, setItems, toggleItem, updateItem, removeItem, addEmptyItem, reset };
+  return {
+    items,
+    setItems,
+    toggleItem,
+    updateItem,
+    removeItem,
+    addEmptyItem,
+    reset,
+  };
 }

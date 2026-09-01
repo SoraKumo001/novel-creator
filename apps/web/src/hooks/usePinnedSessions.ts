@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState } from "react";
 
-const STORAGE_KEY = 'novel-creator:pinned-sessions';
+const STORAGE_KEY = "novel-creator:pinned-sessions";
 
 // ピン留めされた相談セッションのIDを管理するフック（localStorage に永続化）
 export function usePinnedSessions() {

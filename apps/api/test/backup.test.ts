@@ -1,126 +1,149 @@
-import { Hono } from 'hono';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { Hono } from "hono";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AppContext } from '../src/context.js';
-import { errorHandler } from '../src/middleware/error-handler.js';
-import backupRouter from '../src/routes/backup.js';
+import type { AppContext } from "../src/context.js";
+import { errorHandler } from "../src/middleware/error-handler.js";
+import backupRouter from "../src/routes/backup.js";
 
 // ---- DB モック ----
 interface MockDb {
-  select: ReturnType<typeof vi.fn>;
-  insert: ReturnType<typeof vi.fn>;
-  update: ReturnType<typeof vi.fn>;
   delete: ReturnType<typeof vi.fn>;
+  insert: ReturnType<typeof vi.fn>;
+  select: ReturnType<typeof vi.fn>;
   transaction: ReturnType<typeof vi.fn>;
+  update: ReturnType<typeof vi.fn>;
 }
 
 function createMockDb(): MockDb {
   const db = {
-    select: vi.fn(),
-    insert: vi.fn(),
-    update: vi.fn(),
     delete: vi.fn(),
+    insert: vi.fn(),
+    select: vi.fn(),
     transaction: vi.fn(),
+    update: vi.fn(),
   };
   return db;
 }
 
 // テスト用の Hono アプリを構築する。
 // db / vectorStore をモックに差し替え、backup ルーターとエラーハンドラのみを登録する。
-function createTestApp(db: MockDb, vectorStore: { deleteByNovel: ReturnType<typeof vi.fn> }) {
+function createTestApp(
+  db: MockDb,
+  vectorStore: { deleteByNovel: ReturnType<typeof vi.fn> }
+) {
   const app = new Hono<AppContext>();
-  app.use('*', async (c, next) => {
-    c.set('env', {} as never);
-    c.set('db', db as never);
-    c.set('llm', {} as never);
-    c.set('embedding', {} as never);
-    c.set('vectorStore', vectorStore as never);
+  app.use("*", async (c, next) => {
+    c.set("env", {} as never);
+    c.set("db", db as never);
+    c.set("llm", {} as never);
+    c.set("embedding", {} as never);
+    c.set("vectorStore", vectorStore as never);
     await next();
   });
   app.onError(errorHandler);
-  app.route('/api/backup', backupRouter);
+  app.route("/api/backup", backupRouter);
   return app;
 }
 
-const NOVEL_ID = '11111111-1111-4111-8111-111111111111';
-const CHAPTER_ID = '22222222-2222-4222-8222-222222222222';
-const SECTION_ID = '33333333-3333-4333-8333-333333333333';
+const NOVEL_ID = "11111111-1111-4111-8111-111111111111";
+const CHAPTER_ID = "22222222-2222-4222-8222-222222222222";
+const SECTION_ID = "33333333-3333-4333-8333-333333333333";
 
 function makeBackup() {
   return {
     meta: {
-      version: 1,
-      exportedAt: '2024-01-01T00:00:00.000Z',
+      exportedAt: "2024-01-01T00:00:00.000Z",
       novelId: NOVEL_ID,
-      novelTitle: 'テスト小説',
+      novelTitle: "テスト小説",
+      version: 1,
     },
     rdb: {
-      novel: { id: NOVEL_ID, title: 'テスト小説', description: null },
-      chapters: [{ id: CHAPTER_ID, novelId: NOVEL_ID, title: '第1章', order: 1, summary: null }],
-      sections: [{ id: SECTION_ID, chapterId: CHAPTER_ID, title: '節1', order: 1, summary: null }],
-      contents: [
+      chapters: [
         {
-          id: '44444444-4444-4444-8444-444444444444',
-          sectionId: SECTION_ID,
-          body: '本文',
-          wordCount: 2,
+          id: CHAPTER_ID,
+          novelId: NOVEL_ID,
+          order: 1,
+          summary: null,
+          title: "第1章",
         },
       ],
       characters: [
         {
-          id: '55555555-5555-4555-8555-555555555555',
-          novelId: NOVEL_ID,
-          category: '未分類',
-          name: 'キャラ',
+          category: "未分類",
           description: null,
-          traits: null,
+          id: "55555555-5555-4555-8555-555555555555",
+          name: "キャラ",
+          novelId: NOVEL_ID,
           relationships: null,
+          traits: null,
         },
       ],
-      settings: [
+      chatMessages: [
         {
-          id: '66666666-6666-4666-8666-666666666666',
-          novelId: NOVEL_ID,
-          category: '舞台',
-          name: '世界観',
-          description: null,
-          metadata: null,
+          content: "こんにちは",
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          role: "user",
+          sessionId: "99999999-9999-4999-8999-999999999999",
         },
       ],
-      timelines: [
+      chatSessions: [
         {
-          id: '77777777-7777-4777-8777-777777777777',
+          id: "99999999-9999-4999-8999-999999999999",
           novelId: NOVEL_ID,
-          sectionId: null,
-          event: '出来事',
-          order: 1,
-          timestamp: null,
+          title: "相談",
+        },
+      ],
+      contents: [
+        {
+          body: "本文",
+          id: "44444444-4444-4444-8444-444444444444",
+          sectionId: SECTION_ID,
+          wordCount: 2,
         },
       ],
       llmInstructions: [
         {
-          id: '88888888-8888-4888-8888-888888888888',
+          entityType: "character",
+          id: "88888888-8888-4888-8888-888888888888",
+          instruction: "指示",
           novelId: NOVEL_ID,
-          entityType: 'character',
-          instruction: '指示',
         },
       ],
-      chatSessions: [
-        { id: '99999999-9999-4999-8999-999999999999', novelId: NOVEL_ID, title: '相談' },
-      ],
-      chatMessages: [
+      novel: { description: null, id: NOVEL_ID, title: "テスト小説" },
+      sections: [
         {
-          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
-          sessionId: '99999999-9999-4999-8999-999999999999',
-          role: 'user',
-          content: 'こんにちは',
+          chapterId: CHAPTER_ID,
+          id: SECTION_ID,
+          order: 1,
+          summary: null,
+          title: "節1",
+        },
+      ],
+      settings: [
+        {
+          category: "舞台",
+          description: null,
+          id: "66666666-6666-4666-8666-666666666666",
+          metadata: null,
+          name: "世界観",
+          novelId: NOVEL_ID,
+        },
+      ],
+      timelines: [
+        {
+          event: "出来事",
+          id: "77777777-7777-4777-8777-777777777777",
+          novelId: NOVEL_ID,
+          order: 1,
+          sectionId: null,
+          timestamp: null,
         },
       ],
     },
   };
 }
 
-describe('backup export/import', () => {
+describe("backup export/import", () => {
   let db: MockDb;
   let vectorStore: { deleteByNovel: ReturnType<typeof vi.fn> };
 
@@ -129,7 +152,7 @@ describe('backup export/import', () => {
     vectorStore = { deleteByNovel: vi.fn().mockResolvedValue(undefined) };
   });
 
-  it('POST /api/backup/export?novelId=... → 200 でバックアップオブジェクトが返ること', async () => {
+  it("POST /api/backup/export?novelId=... → 200 でバックアップオブジェクトが返ること", async () => {
     const backup = makeBackup();
     const novel = backup.rdb.novel;
 
@@ -189,7 +212,9 @@ describe('backup export/import', () => {
       });
 
     const app = createTestApp(db, vectorStore);
-    const res = await app.request(`/api/backup/export?novelId=${NOVEL_ID}`, { method: 'POST' });
+    const res = await app.request(`/api/backup/export?novelId=${NOVEL_ID}`, {
+      method: "POST",
+    });
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.meta.version).toBe(1);
@@ -199,7 +224,7 @@ describe('backup export/import', () => {
     expect(body.rdb.contents).toHaveLength(1);
   });
 
-  it('POST /api/backup/export?novelId=... → novel 不在で 404 になること', async () => {
+  it("POST /api/backup/export?novelId=... → novel 不在で 404 になること", async () => {
     db.select.mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockResolvedValue([]),
@@ -207,25 +232,33 @@ describe('backup export/import', () => {
     });
 
     const app = createTestApp(db, vectorStore);
-    const res = await app.request(`/api/backup/export?novelId=${NOVEL_ID}`, { method: 'POST' });
+    const res = await app.request(`/api/backup/export?novelId=${NOVEL_ID}`, {
+      method: "POST",
+    });
     expect(res.status).toBe(404);
   });
 
-  it('POST /api/backup/import → 200 で復元され、孤立ベクトルが削除されること', async () => {
+  it("POST /api/backup/import → 200 で復元され、孤立ベクトルが削除されること", async () => {
     const backup = makeBackup();
 
     // tx をモックした transaction
     const mockTx = {
-      delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
-      insert: vi.fn().mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) }),
+      delete: vi
+        .fn()
+        .mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+      insert: vi
+        .fn()
+        .mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) }),
     };
-    db.transaction.mockImplementation((cb: (tx: unknown) => Promise<void>) => cb(mockTx));
+    db.transaction.mockImplementation((cb: (tx: unknown) => Promise<void>) =>
+      cb(mockTx)
+    );
 
     const app = createTestApp(db, vectorStore);
-    const res = await app.request('/api/backup/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await app.request("/api/backup/import", {
       body: JSON.stringify(backup),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
     expect(res.status).toBe(200);
     const body = await res.json();
@@ -238,12 +271,12 @@ describe('backup export/import', () => {
     expect(vectorStore.deleteByNovel).toHaveBeenCalledWith(NOVEL_ID);
   });
 
-  it('POST /api/backup/import → 不正なボディで 400 になること', async () => {
+  it("POST /api/backup/import → 不正なボディで 400 になること", async () => {
     const app = createTestApp(db, vectorStore);
-    const res = await app.request('/api/backup/import', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ foo: 'bar' }),
+    const res = await app.request("/api/backup/import", {
+      body: JSON.stringify({ foo: "bar" }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
     expect(res.status).toBe(400);
   });

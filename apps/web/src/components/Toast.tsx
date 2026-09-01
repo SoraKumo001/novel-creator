@@ -1,18 +1,25 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
-export type ToastType = 'success' | 'error' | 'loading';
+export type ToastType = "success" | "error" | "loading";
 
 export interface ToastItem {
   id: number;
-  type: ToastType;
   message: string;
+  type: ToastType;
 }
 
 interface ToastContextValue {
-  toasts: ToastItem[];
-  showToast: (type: ToastType, message: string) => void;
   dismissToast: (id: number) => void;
+  showToast: (type: ToastType, message: string) => void;
+  toasts: ToastItem[];
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -35,16 +42,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (type: ToastType, message: string) => {
       const id = nextId.current++;
       setToasts((prev) => [...prev, { id, type, message }]);
-      if (type !== 'loading') {
+      if (type !== "loading") {
         setTimeout(() => dismissToast(id), AUTO_DISMISS_MS);
       }
     },
-    [dismissToast],
+    [dismissToast]
   );
 
   const value = useMemo(
     () => ({ toasts, showToast, dismissToast }),
-    [toasts, showToast, dismissToast],
+    [toasts, showToast, dismissToast]
   );
 
   return (
@@ -62,18 +69,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 export function useToastContext(): ToastContextValue {
   const ctx = useContext(ToastContext);
   if (!ctx) {
-    throw new Error('useToast must be used within a ToastProvider');
+    throw new Error("useToast must be used within a ToastProvider");
   }
   return ctx;
 }
 
 const typeStyles: Record<ToastType, string> = {
   success:
-    'border-emerald-500/30 bg-surface/95 text-emerald-600 dark:text-emerald-400 shadow-xl border backdrop-blur-md ring-1 ring-emerald-500/20',
+    "border-emerald-500/30 bg-surface/95 text-emerald-600 dark:text-emerald-400 shadow-xl border backdrop-blur-md ring-1 ring-emerald-500/20",
   error:
-    'border-rose-500/30 bg-surface/95 text-rose-600 dark:text-rose-400 shadow-xl border backdrop-blur-md ring-1 ring-rose-500/20',
+    "border-rose-500/30 bg-surface/95 text-rose-600 dark:text-rose-400 shadow-xl border backdrop-blur-md ring-1 ring-rose-500/20",
   loading:
-    'border-border bg-surface/95 text-foreground shadow-xl border backdrop-blur-md ring-1 ring-primary/20',
+    "border-border bg-surface/95 text-foreground shadow-xl border backdrop-blur-md ring-1 ring-primary/20",
 };
 
 const typeIcons: Record<ToastType, ReactNode> = {
@@ -87,7 +94,11 @@ const typeIcons: Record<ToastType, ReactNode> = {
         stroke="currentColor"
         className="h-4 w-4"
       >
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4.5 12.75l6 6 9-13.5"
+        />
       </svg>
     </div>
   ),
@@ -143,15 +154,15 @@ function ToastViewport({
   onDismiss: (id: number) => void;
 }) {
   return (
-    <div className="pointer-events-none fixed bottom-6 right-6 z-100 flex w-88 max-w-[calc(100vw-3rem)] flex-col gap-2.5">
+    <div className="pointer-events-none fixed right-6 bottom-6 z-100 flex w-88 max-w-[calc(100vw-3rem)] flex-col gap-2.5">
       {toasts.map((toast) => (
         <div
           key={toast.id}
           role="status"
-          className={`pointer-events-auto flex items-center gap-3 rounded-xl p-3.5 text-xs font-medium shadow-2xl transition-all duration-300 animate-in fade-in slide-in-from-bottom-5 ${typeStyles[toast.type]}`}
+          className={`fade-in slide-in-from-bottom-5 pointer-events-auto flex animate-in items-center gap-3 rounded-xl p-3.5 font-medium text-xs shadow-2xl transition-all duration-300 ${typeStyles[toast.type]}`}
         >
           {typeIcons[toast.type]}
-          <div className="flex-1 wrap-break-word text-foreground font-semibold">
+          <div className="wrap-break-word flex-1 font-semibold text-foreground">
             {toast.message}
           </div>
           <button
@@ -167,7 +178,11 @@ function ToastViewport({
               stroke="currentColor"
               className="h-3.5 w-3.5"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>

@@ -1,22 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useEditableEntities, type EditableEntity } from '@/hooks/useEditableEntities.js';
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type EditableEntity,
+  useEditableEntities,
+} from "@/hooks/useEditableEntities.js";
 
 /** useEntityCollection に渡すエンティティごとの設定 */
-export interface UseEntityCollectionInput<TItem extends EditableEntity, TExisting> {
-  /** 対象小説の既存データを取得するクエリキー（targetNovelId を含むこと） */
-  queryKey: readonly unknown[];
-  queryFn: () => Promise<TExisting[]>;
+export interface UseEntityCollectionInput<
+  TItem extends EditableEntity,
+  TExisting,
+> {
   /** モーダルが開いている & 登録先小説が選択されている間のみ取得する */
   enabled: boolean;
+  queryFn: () => Promise<TExisting[]>;
+  /** 対象小説の既存データを取得するクエリキー（targetNovelId を含むこと） */
+  queryKey: readonly unknown[];
   /** 抽出アイテムを既存データと突き合わせて matchedExisting / action を最新化する純関数 */
   reconcile: (item: TItem, existing: readonly TExisting[]) => TItem;
 }
 
 /** useEntityCollection の戻り値（コレクション層の公開 API） */
-export type EntityCollection<TItem extends EditableEntity, TExisting> = ReturnType<
-  typeof useEntityCollection<TItem, TExisting>
->;
+export type EntityCollection<
+  TItem extends EditableEntity,
+  TExisting,
+> = ReturnType<typeof useEntityCollection<TItem, TExisting>>;
 
 /**
  * チャット反映モーダルのエンティティコレクション層。
@@ -53,7 +60,9 @@ export function useEntityCollection<TItem extends EditableEntity, TExisting>({
       existingRef.current = [];
       return;
     }
-    if (query.isLoading) return;
+    if (query.isLoading) {
+      return;
+    }
 
     const rows = query.data ?? [];
     setExisting(rows);
@@ -64,7 +73,7 @@ export function useEntityCollection<TItem extends EditableEntity, TExisting>({
   /** 最新の既存データと突き合わせる（ref 経由のため非同期処理内からも使用できる） */
   const reconcileWithExisting = useCallback(
     (item: TItem): TItem => reconcile(item, existingRef.current),
-    [reconcile],
+    [reconcile]
   );
 
   return {

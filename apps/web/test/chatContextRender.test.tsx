@@ -1,8 +1,12 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, renderHook, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { ChatProvider, useChatStreamingState, useChatUI } from '../src/context/ChatContext.js';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  ChatProvider,
+  useChatStreamingState,
+  useChatUI,
+} from "../src/context/ChatContext.js";
 
 /**
  * ChatContext 分割（低頻度 ChatUIContext / 高頻度 ChatStreamingContext）の構造テスト。
@@ -33,24 +37,24 @@ let queryClient: QueryClient;
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { "Content-Type": "application/json" },
   });
 }
 
 const createdSession = {
-  id: 'sess-1',
-  novelId: 'novel-1',
-  title: 'テストセッション',
+  id: "sess-1",
+  novelId: "novel-1",
+  title: "テストセッション",
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
 
 /** チャンクをテスト側のタイミングで送れるよう制御できる UI Message Stream */
 interface ControlledStream {
-  stream: ReadableStream<Uint8Array>;
-  sendTextStart: (id: string) => void;
-  sendTextDelta: (id: string, delta: string) => void;
   closeStream: (id: string) => void;
+  sendTextDelta: (id: string, delta: string) => void;
+  sendTextStart: (id: string) => void;
+  stream: ReadableStream<Uint8Array>;
 }
 
 function createControlledStream(): ControlledStream {
@@ -66,11 +70,11 @@ function createControlledStream(): ControlledStream {
   };
   return {
     stream,
-    sendTextStart: (id) => sendEvent({ type: 'text-start', id }),
-    sendTextDelta: (id, delta) => sendEvent({ type: 'text-delta', id, delta }),
+    sendTextStart: (id) => sendEvent({ type: "text-start", id }),
+    sendTextDelta: (id, delta) => sendEvent({ type: "text-delta", id, delta }),
     closeStream: (id) => {
-      sendEvent({ type: 'text-end', id });
-      sendEvent({ type: 'finish', finishReason: 'stop' });
+      sendEvent({ type: "text-end", id });
+      sendEvent({ type: "finish", finishReason: "stop" });
       controller?.close();
     },
   };
@@ -103,27 +107,33 @@ beforeEach(() => {
 
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
-  mockFetch.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = String(input);
-    const method = (init?.method ?? 'GET').toUpperCase();
-    if (url.endsWith('/api/chat')) {
-      return new Response(chatStream, {
-        status: 200,
-        headers: { 'Content-Type': 'text/event-stream' },
-      });
-    }
-    if (url.includes('/api/chat/sessions')) {
-      if (method === 'POST') {
-        return jsonResponse(createdSession, 201);
+  mockFetch.mockImplementation(
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const method = (init?.method ?? "GET").toUpperCase();
+      if (url.endsWith("/api/chat")) {
+        return new Response(chatStream, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
       }
-      sessionsFetchCount += 1;
-      if (sessionsFetchCount === 1) return jsonResponse([]);
-      if (sessionsFetchCount === 2) return jsonResponse([createdSession]);
-      // 3回目以降（finish 後の invalidate）はゲートして保留にする
-      return deferredSessionsResponse();
+      if (url.includes("/api/chat/sessions")) {
+        if (method === "POST") {
+          return jsonResponse(createdSession, 201);
+        }
+        sessionsFetchCount += 1;
+        if (sessionsFetchCount === 1) {
+          return jsonResponse([]);
+        }
+        if (sessionsFetchCount === 2) {
+          return jsonResponse([createdSession]);
+        }
+        // 3回目以降（finish 後の invalidate）はゲートして保留にする
+        return deferredSessionsResponse();
+      }
+      return jsonResponse([]);
     }
-    return jsonResponse([]);
-  });
+  );
 
   queryClient = new QueryClient({
     defaultOptions: {
@@ -151,8 +161,8 @@ function useTestHooks() {
   return { ui: useChatUI(), streaming: useChatStreamingState() };
 }
 
-describe('ChatContext split render counts', () => {
-  it('ストリーミング中の高頻度 context の更新では低頻度 context の consumer は再レンダーしないこと', async () => {
+describe("ChatContext split render counts", () => {
+  it("ストリーミング中の高頻度 context の更新では低頻度 context の consumer は再レンダーしないこと", async () => {
     const stream = createControlledStream();
     chatStream = stream.stream;
 
@@ -162,7 +172,7 @@ describe('ChatContext split render counts', () => {
 
     // 事前準備: セッションを作成し、送信時に自動作成が走らないようにする
     await act(async () => {
-      await result.current.ui.createSession('novel-1', 'テストセッション');
+      await result.current.ui.createSession("novel-1", "テストセッション");
     });
     await waitFor(() => expect(result.current.ui.sessions).toHaveLength(1));
 
@@ -172,36 +182,46 @@ describe('ChatContext split render counts', () => {
     // 送信開始（ストリームは未クローズのまま）
     let sendPromise: Promise<void> = Promise.resolve();
     await act(async () => {
-      sendPromise = result.current.streaming.sendMessage('ストリーミングのテスト');
+      sendPromise = result.current.streaming.sendMessage(
+        "ストリーミングのテスト"
+      );
     });
 
     // ユーザーメッセージ追加 → 高頻度側のみ再レンダー
-    await waitFor(() => expect(streamingRenderCount).toBeGreaterThan(streamingBaseline));
+    await waitFor(() =>
+      expect(streamingRenderCount).toBeGreaterThan(streamingBaseline)
+    );
     expect(uiRenderCount).toBe(uiBaseline);
 
     // 1チャンク目
     await act(async () => {
-      stream.sendTextStart('t1');
-      stream.sendTextDelta('t1', 'こん');
+      stream.sendTextStart("t1");
+      stream.sendTextDelta("t1", "こん");
     });
-    await waitFor(() => expect(result.current.streaming.streamingContent).toContain('こん'));
+    await waitFor(() =>
+      expect(result.current.streaming.streamingContent).toContain("こん")
+    );
     const afterFirstChunk = streamingRenderCount;
     expect(afterFirstChunk).toBeGreaterThan(streamingBaseline);
     expect(uiRenderCount).toBe(uiBaseline);
 
     // 2チャンク目
     await act(async () => {
-      stream.sendTextDelta('t1', '、世界');
+      stream.sendTextDelta("t1", "、世界");
     });
-    await waitFor(() => expect(result.current.streaming.streamingContent).toContain('、世界'));
+    await waitFor(() =>
+      expect(result.current.streaming.streamingContent).toContain("、世界")
+    );
     expect(streamingRenderCount).toBeGreaterThan(afterFirstChunk);
     expect(uiRenderCount).toBe(uiBaseline);
 
     // ストリーム完了（finish 後の sessions 再取得はゲート中 → 低頻度に影響しない）
     await act(async () => {
-      stream.closeStream('t1');
+      stream.closeStream("t1");
     });
-    await waitFor(() => expect(result.current.streaming.isStreaming).toBe(false));
+    await waitFor(() =>
+      expect(result.current.streaming.isStreaming).toBe(false)
+    );
     await sendPromise;
 
     expect(uiRenderCount).toBe(uiBaseline);
@@ -213,7 +233,7 @@ describe('ChatContext split render counts', () => {
     await waitFor(() => expect(releaseSessionsFetch).toBeNull());
   });
 
-  it('低頻度 context の更新では高頻度 context の consumer は再レンダーしないこと', async () => {
+  it("低頻度 context の更新では高頻度 context の consumer は再レンダーしないこと", async () => {
     const { result } = renderHook(useTestHooks, { wrapper: createWrapper() });
 
     await waitFor(() => expect(result.current.ui.loadingSessions).toBe(false));

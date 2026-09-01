@@ -1,13 +1,12 @@
-import { eq } from 'drizzle-orm';
 import {
   chapters,
   contents,
+  customPrompts,
   foreshadowings,
   novels,
   sections,
   timelines,
-  customPrompts,
-} from '@novel-creator/db';
+} from "@novel-creator/db";
 import {
   analyzeSettingImpactPrompt,
   chapterSummary,
@@ -15,27 +14,28 @@ import {
   extractSettings,
   extractTimeline,
   generateJSON,
-  generateText,
   generateStyleGuideDraftPrompt,
+  generateText,
+  type InlineAssistAction,
   inlineAssistPrompt,
   plotGeneration,
   proofreadPrompt,
   sectionSummary,
   streamText,
-  type InlineAssistAction,
-} from '@novel-creator/llm';
-import { searchContext } from '../rag.js';
-import { resolveLLMModel } from './model-resolver.js';
-import { mergeAsyncIterables } from './merge-async-iterables.js';
-import { fetchNovelStructureWithContents } from './novel-structure.js';
-import { assertFound, type ServiceContext } from './types.js';
+} from "@novel-creator/llm";
+import { eq } from "drizzle-orm";
+import { searchContext } from "../rag.js";
+import { mergeAsyncIterables } from "./merge-async-iterables.js";
+import { resolveLLMModel } from "./model-resolver.js";
+import { fetchNovelStructureWithContents } from "./novel-structure.js";
+import { assertFound, type ServiceContext } from "./types.js";
 
 /**
  * ストリームの各チャンクにバリアント番号をタグ付けする。
  */
 async function* withVariant(
   stream: AsyncIterable<string>,
-  variant: number,
+  variant: number
 ): AsyncGenerator<{ text: string; variant: number }> {
   for await (const chunk of stream) {
     yield { text: chunk, variant };
@@ -47,10 +47,10 @@ async function* withVariant(
  * プロンプトにそのまま渡せる形（改行連結済み文字列）にしたもの。
  */
 interface SectionPromptContext {
-  section: typeof sections.$inferSelect;
   chapter: typeof chapters.$inferSelect | null;
-  novel: typeof novels.$inferSelect | null;
   characters: string;
+  novel: typeof novels.$inferSelect | null;
+  section: typeof sections.$inferSelect;
   settings: string;
 }
 
@@ -58,27 +58,30 @@ export class GenerateDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
   async generatePlot(novelId: string, modelConfigId?: string | null) {
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
-    assertFound(novel, 'Novel not found');
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, novelId));
+    assertFound(novel, "Novel not found");
 
     const context = await searchContext(
       this.ctx.vectorStore,
       this.ctx.embedding,
       novelId,
       {
-        query: `${novel.title} ${novel.description ?? ''}`,
+        query: `${novel.title} ${novel.description ?? ""}`,
       },
-      this.ctx.env,
+      this.ctx.env
     );
 
     const prompt = plotGeneration({
-      title: novel.title,
-      description: novel.description ?? '',
-      settings: context.settings,
       characters: context.characters,
+      description: novel.description ?? "",
+      settings: context.settings,
+      title: novel.title,
     });
 
-    const llm = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
+    const llm = await resolveLLMModel(this.ctx, modelConfigId, "throw");
     return generateJSON<{
       title: string;
       description: string;
@@ -87,20 +90,31 @@ export class GenerateDomainService {
   }
 
   async generateChapterSummary(chapterId: string) {
-    const [chapter] = await this.ctx.db.select().from(chapters).where(eq(chapters.id, chapterId));
-    assertFound(chapter, 'Chapter not found');
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, chapter.novelId));
-    assertFound(novel, 'Novel not found');
+    const [chapter] = await this.ctx.db
+      .select()
+      .from(chapters)
+      .where(eq(chapters.id, chapterId));
+    assertFound(chapter, "Chapter not found");
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, chapter.novelId));
+    assertFound(novel, "Novel not found");
 
     const prompt = chapterSummary(
-      { title: novel.title, description: novel.description ?? '' },
-      { title: chapter.title, order: chapter.order, summary: chapter.summary ?? undefined },
+      { description: novel.description ?? "", title: novel.title },
+      {
+        order: chapter.order,
+        summary: chapter.summary ?? undefined,
+        title: chapter.title,
+      }
     );
 
-    const result = await generateJSON<{ title: string; order: number; summary: string }>(
-      this.ctx.llm,
-      prompt,
-    );
+    const result = await generateJSON<{
+      title: string;
+      order: number;
+      summary: string;
+    }>(this.ctx.llm, prompt);
 
     await this.ctx.db
       .update(chapters)
@@ -111,23 +125,27 @@ export class GenerateDomainService {
   }
 
   async generateSectionSummary(sectionId: string) {
-    const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
-    assertFound(section, 'Section not found');
+    const [section] = await this.ctx.db
+      .select()
+      .from(sections)
+      .where(eq(sections.id, sectionId));
+    assertFound(section, "Section not found");
     const [chapter] = await this.ctx.db
       .select()
       .from(chapters)
       .where(eq(chapters.id, section.chapterId));
-    assertFound(chapter, 'Chapter not found');
+    assertFound(chapter, "Chapter not found");
 
     const prompt = sectionSummary(
-      { title: chapter.title, summary: chapter.summary ?? '' },
-      { title: section.title ?? undefined, order: section.order },
+      { summary: chapter.summary ?? "", title: chapter.title },
+      { order: section.order, title: section.title ?? undefined }
     );
 
-    const result = await generateJSON<{ title: string; order: number; summary: string }>(
-      this.ctx.llm,
-      prompt,
-    );
+    const result = await generateJSON<{
+      title: string;
+      order: number;
+      summary: string;
+    }>(this.ctx.llm, prompt);
 
     await this.ctx.db
       .update(sections)
@@ -137,14 +155,20 @@ export class GenerateDomainService {
     return result;
   }
 
-  async *generateSectionContent(sectionId: string, modelConfigId?: string | null) {
-    const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
-    assertFound(section, 'Section not found');
+  async *generateSectionContent(
+    sectionId: string,
+    modelConfigId?: string | null
+  ) {
+    const [section] = await this.ctx.db
+      .select()
+      .from(sections)
+      .where(eq(sections.id, sectionId));
+    assertFound(section, "Section not found");
     const [chapter] = await this.ctx.db
       .select()
       .from(chapters)
       .where(eq(chapters.id, section.chapterId));
-    assertFound(chapter, 'Chapter not found');
+    assertFound(chapter, "Chapter not found");
 
     const previousSections = await this.ctx.db
       .select()
@@ -167,38 +191,44 @@ export class GenerateDomainService {
       this.ctx.embedding,
       chapter.novelId,
       {
-        query: `${section.title ?? ''} ${section.summary ?? ''}`,
         previousContent,
+        query: `${section.title ?? ""} ${section.summary ?? ""}`,
       },
-      this.ctx.env,
+      this.ctx.env
     );
 
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, chapter.novelId));
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, chapter.novelId));
 
     const prompt = contentGeneration(
-      { title: section.title ?? undefined, summary: section.summary ?? '' },
+      { summary: section.summary ?? "", title: section.title ?? undefined },
       {
-        previousContent: ragContext.previousContent,
         characters: ragContext.characters,
+        previousContent: ragContext.previousContent,
         settings: ragContext.settings,
         styleGuide: novel?.styleGuide,
-      },
+      }
     );
 
-    const llm = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
+    const llm = await resolveLLMModel(this.ctx, modelConfigId, "throw");
     for await (const chunk of streamText(llm, prompt)) {
       yield chunk;
     }
   }
 
   async extractEntities(sectionId: string) {
-    const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
-    assertFound(section, 'Section not found');
+    const [section] = await this.ctx.db
+      .select()
+      .from(sections)
+      .where(eq(sections.id, sectionId));
+    assertFound(section, "Section not found");
     const [content] = await this.ctx.db
       .select()
       .from(contents)
       .where(eq(contents.sectionId, sectionId));
-    if (!content || !content.body.trim()) {
+    if (!content?.body.trim()) {
       return { characters: [], settings: [], timelines: [] };
     }
 
@@ -207,25 +237,25 @@ export class GenerateDomainService {
     const [settingResult, timelineResult] = await Promise.all([
       generateJSON<{ name: string; category: string; description: string }[]>(
         this.ctx.llm,
-        extractSettings(body, []),
+        extractSettings(body, [])
       ).catch(() => []),
       generateJSON<{ time?: string; event: string; order: number }[]>(
         this.ctx.llm,
-        extractTimeline(body),
+        extractTimeline(body)
       ).catch(() => []),
     ]);
 
     return {
       characters: [],
       settings: (settingResult ?? []).map((s) => ({
-        name: s.name,
         category: s.category,
         description: s.description,
+        name: s.name,
       })),
       timelines: (timelineResult ?? []).map((t) => ({
         event: t.event,
-        timestamp: t.time ?? '',
         order: t.order,
+        timestamp: t.time ?? "",
       })),
     };
   }
@@ -238,17 +268,23 @@ export class GenerateDomainService {
    */
   private async resolveSectionContext(
     sectionId: string,
-    buildRagQuery: (section: typeof sections.$inferSelect) => string,
+    buildRagQuery: (section: typeof sections.$inferSelect) => string
   ): Promise<SectionPromptContext> {
-    const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, sectionId));
-    assertFound(section, 'Section not found');
+    const [section] = await this.ctx.db
+      .select()
+      .from(sections)
+      .where(eq(sections.id, sectionId));
+    assertFound(section, "Section not found");
 
     const [chapter] = await this.ctx.db
       .select()
       .from(chapters)
       .where(eq(chapters.id, section.chapterId));
     const [novel] = chapter
-      ? await this.ctx.db.select().from(novels).where(eq(novels.id, chapter.novelId))
+      ? await this.ctx.db
+          .select()
+          .from(novels)
+          .where(eq(novels.id, chapter.novelId))
       : [null];
 
     const context = novel
@@ -257,52 +293,63 @@ export class GenerateDomainService {
           this.ctx.embedding,
           novel.id,
           { query: buildRagQuery(section) },
-          this.ctx.env,
+          this.ctx.env
         )
       : { characters: [], settings: [] };
 
     return {
-      section,
       chapter: chapter ?? null,
+      characters: context.characters.join("\n"),
       novel: novel ?? null,
-      characters: context.characters.join('\n'),
-      settings: context.settings.join('\n'),
+      section,
+      settings: context.settings.join("\n"),
     };
   }
 
-  async proofreadContent(sectionId: string, customBody?: string, modelConfigId?: string | null) {
+  async proofreadContent(
+    sectionId: string,
+    customBody?: string,
+    modelConfigId?: string | null
+  ) {
     let bodyText = customBody;
     if (bodyText === undefined) {
       const [content] = await this.ctx.db
         .select()
         .from(contents)
         .where(eq(contents.sectionId, sectionId));
-      bodyText = content?.body ?? '';
+      bodyText = content?.body ?? "";
     }
 
-    const { section, chapter, novel, characters, settings } = await this.resolveSectionContext(
-      sectionId,
-      (section) => bodyText || section.title || '',
-    );
+    const { section, chapter, novel, characters, settings } =
+      await this.resolveSectionContext(
+        sectionId,
+        (section) => bodyText || section.title || ""
+      );
 
     const prompt = proofreadPrompt({
-      novelTitle: novel?.title,
-      chapterTitle: chapter?.title,
-      sectionTitle: section.title ?? undefined,
-      sectionSummary: section.summary ?? undefined,
-      styleGuide: novel?.styleGuide ?? undefined,
-      characters,
-      settings,
       body: bodyText,
+      chapterTitle: chapter?.title,
+      characters,
+      novelTitle: novel?.title,
+      sectionSummary: section.summary ?? undefined,
+      sectionTitle: section.title ?? undefined,
+      settings,
+      styleGuide: novel?.styleGuide ?? undefined,
     });
 
-    const llm = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
+    const llm = await resolveLLMModel(this.ctx, modelConfigId, "throw");
     const result = await generateJSON<{
       score: number;
       critique: string;
       advice: string;
       issues: Array<{
-        type: 'viewpoint' | 'typo' | 'grammar' | 'pacing' | 'consistency' | 'other';
+        type:
+          | "viewpoint"
+          | "typo"
+          | "grammar"
+          | "pacing"
+          | "consistency"
+          | "other";
         originalText: string;
         suggestion: string;
         reason: string;
@@ -323,12 +370,10 @@ export class GenerateDomainService {
       surroundingText?: string;
       modelConfigId?: string | null;
       variantCount?: number;
-    },
+    }
   ): AsyncIterable<{ text: string; variant: number }> {
-    const { section, chapter, novel, characters, settings } = await this.resolveSectionContext(
-      sectionId,
-      () => input.selectedText,
-    );
+    const { section, chapter, novel, characters, settings } =
+      await this.resolveSectionContext(sectionId, () => input.selectedText);
 
     let action = input.action;
     let customTemplate: string | undefined;
@@ -339,30 +384,30 @@ export class GenerateDomainService {
         .from(customPrompts)
         .where(eq(customPrompts.id, input.customPromptId));
       if (promptRecord) {
-        action = 'template';
+        action = "template";
         customTemplate = promptRecord.userPrompt;
       }
     }
 
     const totalVariants = Math.max(1, Math.min(3, input.variantCount ?? 1));
-    const llm = await resolveLLMModel(this.ctx, input.modelConfigId, 'throw');
+    const llm = await resolveLLMModel(this.ctx, input.modelConfigId, "throw");
 
     const buildPrompt = (variantIndex: number) =>
       inlineAssistPrompt({
-        novelTitle: novel?.title,
-        chapterTitle: chapter?.title,
-        sectionTitle: section.title ?? undefined,
-        sectionSummary: section.summary ?? undefined,
-        styleGuide: novel?.styleGuide ?? undefined,
-        characters,
-        settings,
-        surroundingText: input.surroundingText,
-        selectedText: input.selectedText,
         action,
+        chapterTitle: chapter?.title,
+        characters,
         customInstruction: input.customInstruction,
         customTemplate,
-        variantIndex,
+        novelTitle: novel?.title,
+        sectionSummary: section.summary ?? undefined,
+        sectionTitle: section.title ?? undefined,
+        selectedText: input.selectedText,
+        settings,
+        styleGuide: novel?.styleGuide ?? undefined,
+        surroundingText: input.surroundingText,
         totalVariants,
+        variantIndex,
       });
 
     // 単一生成の場合
@@ -382,54 +427,67 @@ export class GenerateDomainService {
     yield* mergeAsyncIterables(streams);
   }
 
-  async generateStyleGuideDraft(novelId: string, modelConfigId?: string | null): Promise<string> {
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
-    assertFound(novel, 'Novel not found');
+  async generateStyleGuideDraft(
+    novelId: string,
+    modelConfigId?: string | null
+  ): Promise<string> {
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, novelId));
+    assertFound(novel, "Novel not found");
 
     const context = await searchContext(
       this.ctx.vectorStore,
       this.ctx.embedding,
       novelId,
       {
-        query: `${novel.title} ${novel.description ?? ''}`,
+        query: `${novel.title} ${novel.description ?? ""}`,
       },
-      this.ctx.env,
+      this.ctx.env
     );
 
     const prompt = generateStyleGuideDraftPrompt({
-      novelTitle: novel.title,
-      description: novel.description,
       characters: context.characters,
+      description: novel.description,
+      novelTitle: novel.title,
       settings: context.settings,
     });
 
-    const llm = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
+    const llm = await resolveLLMModel(this.ctx, modelConfigId, "throw");
     return generateText(llm, prompt);
   }
 
   async analyzeSettingImpact(
     novelId: string,
     input: {
-      changeTarget: 'character' | 'setting';
+      changeTarget: "character" | "setting";
       targetName: string;
       beforeValue: string;
       afterValue: string;
       modelConfigId?: string | null;
-    },
+    }
   ) {
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
-    assertFound(novel, 'Novel not found');
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, novelId));
+    assertFound(novel, "Novel not found");
 
     // 章・節の構造（本文は不要）を共通ヘルパで一括取得（従来の章ごとの節 SELECT を解消）
-    const structure = await fetchNovelStructureWithContents(this.ctx.db, [novelId], {
-      contentMode: 'none',
-    });
+    const structure = await fetchNovelStructureWithContents(
+      this.ctx.db,
+      [novelId],
+      {
+        contentMode: "none",
+      }
+    );
     const chaptersWithSections = (structure.get(novelId) ?? []).map((node) => ({
-      title: node.chapter.title,
       sections: node.sections.map(({ section }) => ({
-        title: section.title ?? `節 ${section.order}`,
         summary: section.summary,
+        title: section.title ?? `節 ${section.order}`,
       })),
+      title: node.chapter.title,
     }));
 
     const timelineRows = await this.ctx.db
@@ -444,30 +502,30 @@ export class GenerateDomainService {
       .where(eq(foreshadowings.novelId, novelId));
 
     const prompt = analyzeSettingImpactPrompt({
-      novelTitle: novel.title,
-      changeTarget: input.changeTarget,
-      targetName: input.targetName,
-      beforeValue: input.beforeValue,
       afterValue: input.afterValue,
-      plots: novel.description ?? undefined,
+      beforeValue: input.beforeValue,
+      changeTarget: input.changeTarget,
       chapters: chaptersWithSections,
-      timelines: timelineRows.map((t) => ({
-        title: t.event,
-        era: t.timestamp,
-        description: t.event,
-      })),
       foreshadowings: foreshadowingRows.map((f) => ({
-        title: f.title,
         description: f.description,
+        title: f.title,
+      })),
+      novelTitle: novel.title,
+      plots: novel.description ?? undefined,
+      targetName: input.targetName,
+      timelines: timelineRows.map((t) => ({
+        description: t.event,
+        era: t.timestamp,
+        title: t.event,
       })),
     });
 
-    const llm = await resolveLLMModel(this.ctx, input.modelConfigId, 'throw');
+    const llm = await resolveLLMModel(this.ctx, input.modelConfigId, "throw");
     return generateJSON<{
       summary: string;
-      impactLevel: 'low' | 'medium' | 'high';
+      impactLevel: "low" | "medium" | "high";
       affectedItems: Array<{
-        targetType: 'plot' | 'section' | 'timeline' | 'foreshadowing';
+        targetType: "plot" | "section" | "timeline" | "foreshadowing";
         targetTitle: string;
         issue: string;
         suggestedFix: string;

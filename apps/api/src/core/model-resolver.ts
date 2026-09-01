@@ -1,13 +1,16 @@
-import { eq } from 'drizzle-orm';
-import type { EmbeddingModel, LanguageModel } from 'ai';
-import { createEmbeddingModelFromConfig, createLanguageModelFromConfig } from '@novel-creator/llm';
 import {
-  embeddingConfigs,
-  llmConfigs,
   type EmbeddingConfig,
+  embeddingConfigs,
   type LLMConfig,
-} from '@novel-creator/db';
-import { NotFoundError, type ServiceContext } from './types.js';
+  llmConfigs,
+} from "@novel-creator/db";
+import {
+  createEmbeddingModelFromConfig,
+  createLanguageModelFromConfig,
+} from "@novel-creator/llm";
+import type { EmbeddingModel, LanguageModel } from "ai";
+import { eq } from "drizzle-orm";
+import { NotFoundError, type ServiceContext } from "./types.js";
 
 /**
  * modelConfigId / embeddingConfigId で指定された設定が見つからなかった場合の挙動ポリシー。
@@ -17,19 +20,19 @@ import { NotFoundError, type ServiceContext } from './types.js';
  * - 'useDefault': デフォルト設定（未登録なら ctx のモデル）へフォールバックする。
  *   内部・システム的な解決で従来の id→miss→default 挙動を維持したい場合に指定する。
  */
-export type ResolveMissingPolicy = 'throw' | 'useDefault';
+export type ResolveMissingPolicy = "throw" | "useDefault";
 
 interface ModelResolutionSpec<TConfig, TResult> {
   /** 設定が見つからない場合のエラーメッセージに使う設定名（例: 'LLM Config'）。 */
   configLabel: string;
+  /** DB に設定が一切登録されていない場合のフォールバック。 */
+  fallback(ctx: ServiceContext): TResult;
   /** 指定 ID の設定行を取得する。見つからなければ undefined。 */
   findById(ctx: ServiceContext, id: string): Promise<TConfig | undefined>;
   /** デフォルト設定行を取得する。見つからなければ undefined。 */
   findDefault(ctx: ServiceContext): Promise<TConfig | undefined>;
   /** 設定行からモデル（または解決結果）を生成する。 */
   toResult(config: TConfig, ctx: ServiceContext): TResult;
-  /** DB に設定が一切登録されていない場合のフォールバック。 */
-  fallback(ctx: ServiceContext): TResult;
 }
 
 /**
@@ -40,14 +43,14 @@ async function resolveFromConfigTable<TConfig, TResult>(
   ctx: ServiceContext,
   configId: string | null | undefined,
   onMissing: ResolveMissingPolicy,
-  spec: ModelResolutionSpec<TConfig, TResult>,
+  spec: ModelResolutionSpec<TConfig, TResult>
 ): Promise<TResult> {
   if (configId) {
     const config = await spec.findById(ctx, configId);
     if (config) {
       return spec.toResult(config, ctx);
     }
-    if (onMissing === 'throw') {
+    if (onMissing === "throw") {
       throw new NotFoundError(spec.configLabel, configId);
     }
   }
@@ -69,31 +72,40 @@ async function resolveFromConfigTable<TConfig, TResult>(
 export async function resolveLLMModel(
   ctx: ServiceContext,
   modelConfigId?: string | null,
-  onMissing: ResolveMissingPolicy = 'throw',
+  onMissing: ResolveMissingPolicy = "throw"
 ): Promise<LanguageModel> {
-  return resolveFromConfigTable<LLMConfig, LanguageModel>(ctx, modelConfigId, onMissing, {
-    configLabel: 'LLM Config',
-    async findById(context, id) {
-      const [config] = await context.db.select().from(llmConfigs).where(eq(llmConfigs.id, id));
-      return config;
-    },
-    async findDefault(context) {
-      const [config] = await context.db
-        .select()
-        .from(llmConfigs)
-        .where(eq(llmConfigs.isDefault, true));
-      return config;
-    },
-    toResult: (config, context) => createLanguageModelFromConfig(config, context.env),
-    fallback: (context) => context.llm,
-  });
+  return resolveFromConfigTable<LLMConfig, LanguageModel>(
+    ctx,
+    modelConfigId,
+    onMissing,
+    {
+      configLabel: "LLM Config",
+      fallback: (context) => context.llm,
+      async findById(context, id) {
+        const [config] = await context.db
+          .select()
+          .from(llmConfigs)
+          .where(eq(llmConfigs.id, id));
+        return config;
+      },
+      async findDefault(context) {
+        const [config] = await context.db
+          .select()
+          .from(llmConfigs)
+          .where(eq(llmConfigs.isDefault, true));
+        return config;
+      },
+      toResult: (config, context) =>
+        createLanguageModelFromConfig(config, context.env),
+    }
+  );
 }
 
 /** resolveEmbeddingModel の戻り値。DB 設定から解決した場合は元の設定行も返す。 */
 export interface ResolvedEmbeddingModel {
-  model: EmbeddingModel;
-  dimensions: number;
   config?: EmbeddingConfig;
+  dimensions: number;
+  model: EmbeddingModel;
 }
 
 /**
@@ -109,14 +121,18 @@ export interface ResolvedEmbeddingModel {
 export async function resolveEmbeddingModel(
   ctx: ServiceContext,
   embeddingConfigId?: string | null,
-  onMissing: ResolveMissingPolicy = 'throw',
+  onMissing: ResolveMissingPolicy = "throw"
 ): Promise<ResolvedEmbeddingModel> {
   return resolveFromConfigTable<EmbeddingConfig, ResolvedEmbeddingModel>(
     ctx,
     embeddingConfigId,
     onMissing,
     {
-      configLabel: 'Embedding Config',
+      configLabel: "Embedding Config",
+      fallback: (context) => ({
+        dimensions: context.env.EMBEDDING_DIMENSIONS ?? 1536,
+        model: context.embedding,
+      }),
       async findById(context, id) {
         const [config] = await context.db
           .select()
@@ -132,14 +148,10 @@ export async function resolveEmbeddingModel(
         return config;
       },
       toResult: (config, context) => ({
-        model: createEmbeddingModelFromConfig(config, context.env),
-        dimensions: config.dimensions,
         config,
+        dimensions: config.dimensions,
+        model: createEmbeddingModelFromConfig(config, context.env),
       }),
-      fallback: (context) => ({
-        model: context.embedding,
-        dimensions: context.env.EMBEDDING_DIMENSIONS ?? 1536,
-      }),
-    },
+    }
   );
 }

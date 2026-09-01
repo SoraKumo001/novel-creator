@@ -1,9 +1,9 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Tag } from './Tag';
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { Tag } from "./Tag";
 
 const meta = {
   component: Tag,
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 } satisfies Meta<typeof Tag>;
 
 export default meta;
@@ -11,13 +11,13 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    children: 'Fantasy',
+    children: "Fantasy",
   },
 };
 
 export const Multiple: Story = {
   args: {
-    children: 'Fantasy',
+    children: "Fantasy",
   },
   render: () => (
     <div className="flex flex-wrap gap-2">

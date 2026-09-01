@@ -5,23 +5,23 @@
 import {
   buildMarkdownCategoryTree,
   findSectionByLine,
-  scanMarkdownSections,
   type MarkdownCategoryNode,
-} from './markdownCore.js';
+  scanMarkdownSections,
+} from "./markdownCore.js";
 
 /** フォーカストラッキング用のストーリー構想セクション情報（行範囲付き）。 */
 export interface StoryOutlineSectionRange {
   category: string;
-  title: string;
-  name: string;
-  /** `#` または `##` 見出し行の 0 始まり行番号。 */
-  headingLine: number;
-  /** 本文開始行（見出しの次行）の 0 始まり行番号。 */
-  startLine: number;
-  /** 本文終端行（次の見出しの前行、または文書末尾）の 0 始まり行番号（含む）。 */
-  endLine: number;
   /** セクション本文。 */
   content: string;
+  /** 本文終端行（次の見出しの前行、または文書末尾）の 0 始まり行番号（含む）。 */
+  endLine: number;
+  /** `#` または `##` 見出し行の 0 始まり行番号。 */
+  headingLine: number;
+  name: string;
+  /** 本文開始行（見出しの次行）の 0 始まり行番号。 */
+  startLine: number;
+  title: string;
 }
 
 /** ツリーノード。 */
@@ -30,23 +30,27 @@ export type StoryOutlineCategoryNode = MarkdownCategoryNode;
 /**
  * マークダウン文書を走査し、行範囲情報を含むセクション配列を返す。
  */
-export function scanStoryOutlineSectionRanges(markdown: string): StoryOutlineSectionRange[] {
+export function scanStoryOutlineSectionRanges(
+  markdown: string
+): StoryOutlineSectionRange[] {
   const rawSections = scanMarkdownSections(markdown);
   return rawSections.map((raw) => {
     const cleanBodyLines = [...raw.bodyLines];
-    while (cleanBodyLines.length > 0 && cleanBodyLines[0].trim() === '') cleanBodyLines.shift();
-    while (cleanBodyLines.length > 0 && cleanBodyLines[cleanBodyLines.length - 1].trim() === '') {
+    while (cleanBodyLines.length > 0 && cleanBodyLines[0].trim() === "") {
+      cleanBodyLines.shift();
+    }
+    while (cleanBodyLines.length > 0 && cleanBodyLines.at(-1)?.trim() === "") {
       cleanBodyLines.pop();
     }
 
     return {
       category: raw.category,
-      title: raw.name,
-      name: raw.name,
-      headingLine: raw.headingLine,
-      startLine: raw.startLine,
+      content: cleanBodyLines.join("\n"),
       endLine: raw.endLine,
-      content: cleanBodyLines.join('\n'),
+      headingLine: raw.headingLine,
+      name: raw.name,
+      startLine: raw.startLine,
+      title: raw.name,
     };
   });
 }
@@ -56,7 +60,7 @@ export function scanStoryOutlineSectionRanges(markdown: string): StoryOutlineSec
  */
 export function findStoryOutlineSectionByLine(
   markdown: string,
-  lineNumber: number,
+  lineNumber: number
 ): StoryOutlineSectionRange | null {
   const ranges = scanStoryOutlineSectionRanges(markdown);
   return findSectionByLine(ranges, lineNumber);
@@ -65,7 +69,9 @@ export function findStoryOutlineSectionByLine(
 /**
  * マークダウンからカテゴリ構造ツリーを構築する。
  */
-export function buildStoryOutlineCategoryTree(markdown: string): StoryOutlineCategoryNode[] {
+export function buildStoryOutlineCategoryTree(
+  markdown: string
+): StoryOutlineCategoryNode[] {
   return buildMarkdownCategoryTree(markdown);
 }
 
@@ -73,17 +79,18 @@ export function buildStoryOutlineCategoryTree(markdown: string): StoryOutlineCat
  * ストーリー構想のプリセットテンプレート一覧
  */
 export interface StoryOutlineTemplate {
+  description: string;
   id: string;
   name: string;
-  description: string;
   template: string;
 }
 
 export const STORY_OUTLINE_TEMPLATES: StoryOutlineTemplate[] = [
   {
-    id: 'standard_kishotenketsu',
-    name: '起承転結・標準テンプレート',
-    description: '王道構成。全体のログラインから導入、中盤の展開、結末までを網羅',
+    description:
+      "王道構成。全体のログラインから導入、中盤の展開、結末までを網羅",
+    id: "standard_kishotenketsu",
+    name: "起承転結・標準テンプレート",
     template: `# 作品コンセプト & ログライン
 - **ログライン（1行要約）**:
 - **テーマ**:
@@ -118,9 +125,10 @@ export const STORY_OUTLINE_TEMPLATES: StoryOutlineTemplate[] = [
 `,
   },
   {
-    id: 'three_act_structure',
-    name: '三幕構成テンプレート',
-    description: 'ハリウッド映画やエンタメ小説の標準。設定・対立・解決の3フェーズ',
+    description:
+      "ハリウッド映画やエンタメ小説の標準。設定・対立・解決の3フェーズ",
+    id: "three_act_structure",
+    name: "三幕構成テンプレート",
     template: `# コンセプト & ログライン
 - **ログライン**:
 - **主眼・メッセージ**:
@@ -154,9 +162,10 @@ export const STORY_OUTLINE_TEMPLATES: StoryOutlineTemplate[] = [
 `,
   },
   {
-    id: 'web_novel_serialized',
-    name: 'Web小説・連載向け構成テンプレート',
-    description: '序盤の強い引き、テンポの良い中盤、読者を惹きつける引きとクライマックス',
+    description:
+      "序盤の強い引き、テンポの良い中盤、読者を惹きつける引きとクライマックス",
+    id: "web_novel_serialized",
+    name: "Web小説・連載向け構成テンプレート",
     template: `# タイトル案 & キャッチコピー
 - **キャッチコピー**:
 - **あらすじ（Web掲載用）**:
@@ -198,7 +207,7 @@ export const STORY_OUTLINE_TEMPLATES: StoryOutlineTemplate[] = [
 function normalizeSectionName(name: string): string {
   return name
     .toLowerCase()
-    .replace(/[#（）()【】[\]\s・&＆:：\-—_]/g, '')
+    .replace(/[#（）()【】[\]\s・&＆:：\-—_]/g, "")
     .trim();
 }
 
@@ -208,7 +217,9 @@ function normalizeSectionName(name: string): string {
 function matchSection(targetName: string, query: string): boolean {
   const normTarget = normalizeSectionName(targetName);
   const normQuery = normalizeSectionName(query);
-  if (!normTarget || !normQuery) return false;
+  if (!(normTarget && normQuery)) {
+    return false;
+  }
   return (
     normTarget.includes(normQuery) ||
     normQuery.includes(normTarget) ||
@@ -217,10 +228,10 @@ function matchSection(targetName: string, query: string): boolean {
 }
 
 export interface StoryOutlineUpdateResult {
-  updatedMarkdown: string;
   appliedSection: string;
   isNewSection: boolean;
-  mode: 'replace' | 'append' | 'prepend' | 'full_document';
+  mode: "replace" | "append" | "prepend" | "full_document";
+  updatedMarkdown: string;
 }
 
 /**
@@ -235,47 +246,59 @@ export function applyStoryOutlineSectionUpdate(
   markdown: string,
   sectionName: string,
   newContent: string,
-  mode: 'replace' | 'append' | 'prepend' | 'full_document' = 'replace',
+  mode: "replace" | "append" | "prepend" | "full_document" = "replace"
 ): StoryOutlineUpdateResult {
-  const trimmedMarkdown = (markdown ?? '').trim();
-  const trimmedContent = (newContent ?? '').trim();
+  const trimmedMarkdown = (markdown ?? "").trim();
+  const trimmedContent = (newContent ?? "").trim();
 
   // 1. ドキュメント全体置換の場合
   const isFullDocument =
-    mode === 'full_document' ||
-    ['全体', 'ドキュメント全体', '構想全体', '全編', 'full', 'document', 'all'].includes(
-      sectionName.trim().toLowerCase(),
-    );
+    mode === "full_document" ||
+    [
+      "全体",
+      "ドキュメント全体",
+      "構想全体",
+      "全編",
+      "full",
+      "document",
+      "all",
+    ].includes(sectionName.trim().toLowerCase());
 
   if (isFullDocument) {
     return {
-      updatedMarkdown: trimmedContent,
-      appliedSection: 'ドキュメント全体',
+      appliedSection: "ドキュメント全体",
       isNewSection: false,
-      mode: 'full_document',
+      mode: "full_document",
+      updatedMarkdown: trimmedContent,
     };
   }
 
   // 元のマークダウンが空の場合は新規作成
   if (!trimmedMarkdown) {
-    const header = sectionName.startsWith('#') ? sectionName : `## ${sectionName}`;
+    const header = sectionName.startsWith("#")
+      ? sectionName
+      : `## ${sectionName}`;
     return {
-      updatedMarkdown: `${header}\n${trimmedContent}\n`,
       appliedSection: sectionName,
       isNewSection: true,
       mode,
+      updatedMarkdown: `${header}\n${trimmedContent}\n`,
     };
   }
 
   const sections = scanStoryOutlineSectionRanges(markdown);
-  const lines = markdown.split('\n');
+  const lines = markdown.split("\n");
 
   // 2. セクション名が一致するセクションを探索
   // 完全一致優先、次に正規化部分一致
-  let matched = sections.find((s) => s.name === sectionName || s.category === sectionName);
+  let matched = sections.find(
+    (s) => s.name === sectionName || s.category === sectionName
+  );
   if (!matched) {
     matched = sections.find(
-      (s) => matchSection(s.name, sectionName) || matchSection(s.category, sectionName),
+      (s) =>
+        matchSection(s.name, sectionName) ||
+        matchSection(s.category, sectionName)
     );
   }
 
@@ -285,29 +308,31 @@ export function applyStoryOutlineSectionUpdate(
     const afterLines = lines.slice(matched.endLine + 1);
 
     let nextSectionBody = trimmedContent;
-    if (mode === 'append' && matched.content.trim()) {
+    if (mode === "append" && matched.content.trim()) {
       nextSectionBody = `${matched.content.trim()}\n\n${trimmedContent}`;
-    } else if (mode === 'prepend' && matched.content.trim()) {
+    } else if (mode === "prepend" && matched.content.trim()) {
       nextSectionBody = `${trimmedContent}\n\n${matched.content.trim()}`;
     }
 
     const updatedLines = [...beforeLines, nextSectionBody, ...afterLines];
     return {
-      updatedMarkdown: updatedLines.join('\n'),
       appliedSection: matched.name,
       isNewSection: false,
       mode,
+      updatedMarkdown: updatedLines.join("\n"),
     };
   }
 
   // 3. 一致するセクションが見つからない場合は末尾に新セクションとして追記
-  const header = sectionName.startsWith('#') ? sectionName : `## ${sectionName}`;
+  const header = sectionName.startsWith("#")
+    ? sectionName
+    : `## ${sectionName}`;
   const updatedMarkdown = `${trimmedMarkdown}\n\n${header}\n${trimmedContent}\n`;
 
   return {
-    updatedMarkdown,
     appliedSection: sectionName,
     isNewSection: true,
     mode,
+    updatedMarkdown,
   };
 }

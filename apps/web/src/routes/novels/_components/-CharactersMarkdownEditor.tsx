@@ -1,17 +1,18 @@
-import { useCallback } from 'react';
 import {
   buildCharacterTree,
+  type CharacterSectionRange,
   findCharacterAtLine,
   getCharacterSections,
-  type CharacterSectionRange,
-} from '@novel-creator/shared';
-import type { SaveCharactersMarkdownResult } from '@/lib/types.js';
-import { EntityMarkdownEditor } from './-EntityMarkdownEditor.js';
+} from "@novel-creator/shared";
+import { useCallback } from "react";
+import type { SaveCharactersMarkdownResult } from "@/lib/types.js";
+import { EntityMarkdownEditor } from "./-EntityMarkdownEditor.js";
 
 interface CharactersMarkdownEditorProps {
-  novelId: string;
-  fetchCharactersMarkdown: () => Promise<string>;
-  saveCharactersMarkdown: (markdown: string) => Promise<SaveCharactersMarkdownResult>;
+  editCharacterDocument: (input: {
+    markdown: string;
+    instruction: string;
+  }) => Promise<string>;
   editCharacterSection: (input: {
     category: string;
     name: string;
@@ -20,10 +21,14 @@ interface CharactersMarkdownEditorProps {
     relationships: string;
     instruction: string;
   }) => Promise<string>;
-  editCharacterDocument: (input: { markdown: string; instruction: string }) => Promise<string>;
-  savingMarkdown: boolean;
-  editingSection: boolean;
   editingDocument: boolean;
+  editingSection: boolean;
+  fetchCharactersMarkdown: () => Promise<string>;
+  novelId: string;
+  saveCharactersMarkdown: (
+    markdown: string
+  ) => Promise<SaveCharactersMarkdownResult>;
+  savingMarkdown: boolean;
 }
 
 export function CharactersMarkdownEditor({
@@ -48,11 +53,14 @@ export function CharactersMarkdownEditor({
     }) => {
       const sections = getCharacterSections(markdown);
       const target = sections.find(
-        (s) => s.category === activeSection.category && s.name === activeSection.name,
+        (s) =>
+          s.category === activeSection.category && s.name === activeSection.name
       );
 
       if (!target) {
-        throw new Error(`人物「${activeSection.name}」のセクションが見つかりません`);
+        throw new Error(
+          `人物「${activeSection.name}」のセクションが見つかりません`
+        );
       }
 
       const nextSummary = await editCharacterSection({
@@ -64,19 +72,23 @@ export function CharactersMarkdownEditor({
         instruction,
       });
 
-      const lines = markdown.split('\n');
+      const lines = markdown.split("\n");
       const before = lines.slice(0, target.startLine);
       const after = lines.slice(target.endLine + 1);
-      return [...before, nextSummary.trim(), ...after].join('\n');
+      return [...before, nextSummary.trim(), ...after].join("\n");
     },
-    [editCharacterSection],
+    [editCharacterSection]
   );
 
   const handleEditDocument = useCallback(
-    async ({ markdown, instruction }: { markdown: string; instruction: string }) => {
-      return editCharacterDocument({ markdown, instruction });
-    },
-    [editCharacterDocument],
+    async ({
+      markdown,
+      instruction,
+    }: {
+      markdown: string;
+      instruction: string;
+    }) => editCharacterDocument({ markdown, instruction }),
+    [editCharacterDocument]
   );
 
   return (
@@ -97,7 +109,7 @@ export function CharactersMarkdownEditor({
       sectionPlaceholder={(active: CharacterSectionRange | null) =>
         active
           ? `「${active.name}」への指示（例: 目的を復讐に変更して）`
-          : 'カーソルを人物セクション内に置いてください'
+          : "カーソルを人物セクション内に置いてください"
       }
       documentPlaceholder="全体への指示（例: 敵対組織の幹部を2名追加して）"
     />

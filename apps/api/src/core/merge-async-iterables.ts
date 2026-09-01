@@ -13,7 +13,7 @@
  *   以降のアイテムは破棄される（未処理の rejection は発生しない）。
  */
 export async function* mergeAsyncIterables<T>(
-  sources: readonly AsyncIterable<T>[],
+  sources: readonly AsyncIterable<T>[]
 ): AsyncGenerator<T> {
   if (sources.length === 0) {
     return;
@@ -61,10 +61,10 @@ export async function* mergeAsyncIterables<T>(
     if (item === null) {
       break;
     }
-    if (item && 'error' in item) {
+    if (item && "error" in item) {
       throw item.error;
     }
-    if (item && 'value' in item) {
+    if (item && "value" in item) {
       yield item.value;
     }
   }

@@ -1,6 +1,10 @@
-import { asc, eq } from 'drizzle-orm';
-import { chapters, sections } from '@novel-creator/db';
-import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
+import { chapters, sections } from "@novel-creator/db";
+import { asc, eq } from "drizzle-orm";
+import {
+  NotFoundError,
+  type ServiceContext,
+  ValidationError,
+} from "./types.js";
 
 export class ChapterDomainService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -15,7 +19,10 @@ export class ChapterDomainService {
 
   async listChaptersWithSections(novelId: string) {
     const chapterRows = await this.listChapters(novelId);
-    const sectionRows = await this.ctx.db.select().from(sections).orderBy(asc(sections.order));
+    const sectionRows = await this.ctx.db
+      .select()
+      .from(sections)
+      .orderBy(asc(sections.order));
 
     return chapterRows.map((ch) => ({
       ...ch,
@@ -24,9 +31,12 @@ export class ChapterDomainService {
   }
 
   async getChapterWithSections(id: string) {
-    const rows = await this.ctx.db.select().from(chapters).where(eq(chapters.id, id));
+    const rows = await this.ctx.db
+      .select()
+      .from(chapters)
+      .where(eq(chapters.id, id));
     if (rows.length === 0) {
-      throw new NotFoundError('Chapter', id);
+      throw new NotFoundError("Chapter", id);
     }
     const chapter = rows[0];
     const secRows = await this.ctx.db
@@ -48,7 +58,7 @@ export class ChapterDomainService {
     summary?: string | null;
   }) {
     if (!data.title?.trim()) {
-      throw new ValidationError('Chapter title cannot be empty');
+      throw new ValidationError("Chapter title cannot be empty");
     }
 
     let order = data.order;
@@ -61,9 +71,9 @@ export class ChapterDomainService {
       .insert(chapters)
       .values({
         novelId: data.novelId,
-        title: data.title.trim(),
         order,
         summary: data.summary ?? null,
+        title: data.title.trim(),
       })
       .returning();
 
@@ -72,33 +82,36 @@ export class ChapterDomainService {
 
   async updateChapter(
     id: string,
-    data: { title?: string; order?: number; summary?: string | null },
+    data: { title?: string; order?: number; summary?: string | null }
   ) {
     if (data.title !== undefined && !data.title.trim()) {
-      throw new ValidationError('Chapter title cannot be empty');
+      throw new ValidationError("Chapter title cannot be empty");
     }
 
     const updated = await this.ctx.db
       .update(chapters)
       .set({
-        ...(data.title !== undefined ? { title: data.title.trim() } : {}),
-        ...(data.order !== undefined ? { order: data.order } : {}),
-        ...(data.summary !== undefined ? { summary: data.summary } : {}),
+        ...(data.title === undefined ? {} : { title: data.title.trim() }),
+        ...(data.order === undefined ? {} : { order: data.order }),
+        ...(data.summary === undefined ? {} : { summary: data.summary }),
       })
       .where(eq(chapters.id, id))
       .returning();
 
     if (updated.length === 0) {
-      throw new NotFoundError('Chapter', id);
+      throw new NotFoundError("Chapter", id);
     }
     return updated[0];
   }
 
   async deleteChapter(id: string) {
-    const deleted = await this.ctx.db.delete(chapters).where(eq(chapters.id, id)).returning();
+    const deleted = await this.ctx.db
+      .delete(chapters)
+      .where(eq(chapters.id, id))
+      .returning();
 
     if (deleted.length === 0) {
-      throw new NotFoundError('Chapter', id);
+      throw new NotFoundError("Chapter", id);
     }
     return deleted[0];
   }

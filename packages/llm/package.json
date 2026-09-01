@@ -3,14 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     }
   },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -21,10 +21,10 @@
     "@ai-sdk/openai": "^4.0.51",
     "ai": "7.0.84"
   },
-  "peerDependencies": {
-    "@novel-creator/shared": "workspace:*"
-  },
   "devDependencies": {
     "@types/node": "^26.4.0"
+  },
+  "peerDependencies": {
+    "@novel-creator/shared": "workspace:*"
   }
 }

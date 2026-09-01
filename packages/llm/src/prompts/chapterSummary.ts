@@ -3,9 +3,9 @@
  */
 export function chapterSummary(
   novel: { title: string; description: string },
-  chapter: { title: string; order: number; summary?: string },
+  chapter: { title: string; order: number; summary?: string }
 ): string {
-  const existingSummary = chapter.summary ?? '（未設定）';
+  const existingSummary = chapter.summary ?? "（未設定）";
 
   return `あなたはプロの小説家です。小説の特定の章について、詳細な概要を生成してください。
 

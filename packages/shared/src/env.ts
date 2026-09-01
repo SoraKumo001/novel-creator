@@ -1,32 +1,38 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-import { llmProviders } from './constants.js';
+import { llmProviders } from "./constants.js";
 
 export const envSchema = z.object({
-  DATABASE_URL: z.string().default('postgres://novel:novel@localhost:5433/novel'),
-
-  // --- LLM (テキスト生成) ---
-  // プロバイダ選択肢は constants.ts の llmProviders に統一（custom_openai を含む）
-  LLM_PROVIDER: z.enum(llmProviders).default('openai'),
-  LLM_API_KEY: z.string().optional(),
-  LLM_MODEL: z.string().default('gpt-4o-mini'),
-  LLM_BASE_URL: z.string().optional(),
+  DATABASE_URL: z
+    .string()
+    .default("postgres://novel:novel@localhost:5433/novel"),
+  EMBEDDING_API_KEY: z.string().optional(),
+  EMBEDDING_BASE_URL: z.string().optional(),
+  EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(1536),
+  EMBEDDING_MODEL: z.string().default("text-embedding-3-small"),
 
   // --- Embedding (ベクトル生成) ---
   // 未設定の場合は LLM_* の設定をフォールバック使用する。
   EMBEDDING_PROVIDER: z.enum(llmProviders).optional(),
-  EMBEDDING_API_KEY: z.string().optional(),
-  EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
-  EMBEDDING_BASE_URL: z.string().optional(),
-  EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(1536),
+  LLM_API_KEY: z.string().optional(),
+  LLM_BASE_URL: z.string().optional(),
+  LLM_MODEL: z.string().default("gpt-4o-mini"),
 
-  VECTOR_STORE_PROVIDER: z.enum(['pgvector', 'vectorize']).default('pgvector'),
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  // --- LLM (テキスト生成) ---
+  // プロバイダ選択肢は constants.ts の llmProviders に統一（custom_openai を含む）
+  LLM_PROVIDER: z.enum(llmProviders).default("openai"),
+  NODE_ENV: z
+    .enum(["development", "production", "test"])
+    .default("development"),
+
+  VECTOR_STORE_PROVIDER: z.enum(["pgvector", "vectorize"]).default("pgvector"),
 });
 
 export type Env = z.infer<typeof envSchema>;
 
-export function parseEnv(source: Record<string, string | undefined> = process.env): Env {
+export function parseEnv(
+  source: Record<string, string | undefined> = process.env
+): Env {
   return envSchema.parse(source);
 }
 
@@ -40,7 +46,7 @@ export function parseEnv(source: Record<string, string | undefined> = process.en
 export function parseEnvFromBindings(bindings: Record<string, unknown>): Env {
   const source: Record<string, string | undefined> = {};
   for (const [key, value] of Object.entries(bindings)) {
-    if (typeof value === 'string' || value === undefined) {
+    if (typeof value === "string" || value === undefined) {
       source[key] = value;
     }
   }

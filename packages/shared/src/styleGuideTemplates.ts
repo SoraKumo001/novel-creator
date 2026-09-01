@@ -3,26 +3,23 @@
  */
 
 export interface StyleGuideTemplate {
-  id: string;
-  name: string;
-  description: string;
   category?: string;
   content: string;
+  description: string;
+  id: string;
+  name: string;
 }
 
 export interface StyleGuideSnippet {
-  id: string;
-  name: string;
-  category: 'viewpoint' | 'tone' | 'rules' | 'ng' | 'direction';
+  category: "viewpoint" | "tone" | "rules" | "ng" | "direction";
   categoryLabel: string;
   content: string;
+  id: string;
+  name: string;
 }
 
 export const STYLE_GUIDE_TEMPLATES: StyleGuideTemplate[] = [
   {
-    id: 'light_novel_first',
-    name: '王道ライトノベル（一人称・俺）',
-    description: '軽快なテンポで読みやすく、心情描写やツッコミが活きる一人称スタイル',
     content: `# 視点・人称
 - 視点: 主人公の一人称視点
 - 視点人物: 主人公
@@ -43,11 +40,12 @@ export const STYLE_GUIDE_TEMPLATES: StyleGuideTemplate[] = [
 - 視点人物以外の心情を地の文で断定的に描写しない（「〜のように見えた」「〜そうだった」と推測表現にする）。
 - 現代スラングやネット用語の過度な使用は避ける。
 - 説明的な地の文が長くなりすぎないようにする。`,
+    description:
+      "軽快なテンポで読みやすく、心情描写やツッコミが活きる一人称スタイル",
+    id: "light_novel_first",
+    name: "王道ライトノベル（一人称・俺）",
   },
   {
-    id: 'fantasy_third',
-    name: '本格ハイファンタジー（三人称一元視点）',
-    description: '世界観の重厚さと臨場感を両立させた三人称視点スタイル',
     content: `# 視点
 - 三人称一元視点（各シーンの主役キャラクターに寄り添う）
 - シーンの途中で視点人物を切り替えない（視点ブレの防止）。
@@ -65,11 +63,11 @@ export const STYLE_GUIDE_TEMPLATES: StyleGuideTemplate[] = [
 # NG・禁止事項
 - 視点人物が知り得ない事象を客観的に解説しない（神の視点の混入を防ぐ）。
 - メタ的な発言や解説を地の文に含めない。`,
+    description: "世界観の重厚さと臨場感を両立させた三人称視点スタイル",
+    id: "fantasy_third",
+    name: "本格ハイファンタジー（三人称一元視点）",
   },
   {
-    id: 'web_novel_fast',
-    name: 'Web小説・異世界転生（ハイテンポ・引き重視）',
-    description: 'スマートフォンでのスクロール読書に適したハイテンポ＆引き重視スタイル',
     content: `# 視点・人称
 - 視点: 主人公の一人称視点
 - 一人称: 「俺」（または「私」）
@@ -87,11 +85,12 @@ export const STYLE_GUIDE_TEMPLATES: StyleGuideTemplate[] = [
 # 作法
 - 三点リーダー（……）やダッシュ（――）は2連で使用する。
 - ルビは \`｜親文字《るび》\` 形式を使用する。`,
+    description:
+      "スマートフォンでのスクロール読書に適したハイテンポ＆引き重視スタイル",
+    id: "web_novel_fast",
+    name: "Web小説・異世界転生（ハイテンポ・引き重視）",
   },
   {
-    id: 'modern_first',
-    name: '現代文芸・青春日常（一人称・私/僕）',
-    description: '叙情的な心理描写と繊細な情景描写を重視した一人称スタイル',
     content: `# 視点・人称
 - 視点: 主人公の一人称視点
 - 一人称: 「私」（または「僕」）
@@ -106,11 +105,11 @@ export const STYLE_GUIDE_TEMPLATES: StyleGuideTemplate[] = [
 - 三点リーダー（……）は2連で使用する。
 - 漢字とひらがなのバランスに配慮し、柔らかい読み味を保つ。
 - 会話文末の句点は付けない。`,
+    description: "叙情的な心理描写と繊細な情景描写を重視した一人称スタイル",
+    id: "modern_first",
+    name: "現代文芸・青春日常（一人称・私/僕）",
   },
   {
-    id: 'literary_third',
-    name: '純文学・文芸調（三人称・心理情景描写）',
-    description: '深みのある心理描写と文学的な表現力を追求する三人称スタイル',
     content: `# 視点
 - 三人称（客観的描写と心理描写の高度な調和）
 
@@ -122,166 +121,169 @@ export const STYLE_GUIDE_TEMPLATES: StyleGuideTemplate[] = [
 # 作法・ルール
 - 漢字の閉じ・開き（表記統一）を厳密に行う。
 - 助詞の重なりや文末表現の単調さを避け、リズミカルな散文を志向する。`,
+    description: "深みのある心理描写と文学的な表現力を追求する三人称スタイル",
+    id: "literary_third",
+    name: "純文学・文芸調（三人称・心理情景描写）",
   },
 ];
 
 export const STYLE_GUIDE_SNIPPETS: StyleGuideSnippet[] = [
   // 視点・人称
   {
-    id: 'snippet_pov_first_ore',
-    name: '一人称（俺 / 主人公）',
-    category: 'viewpoint',
-    categoryLabel: '視点・人称',
+    category: "viewpoint",
+    categoryLabel: "視点・人称",
     content: `## 視点・人称
 - 視点: 主人公の一人称視点
 - 一人称: 「俺」
 - 視点人物が見聞き・推測した事象のみを描写する。`,
+    id: "snippet_pov_first_ore",
+    name: "一人称（俺 / 主人公）",
   },
   {
-    id: 'snippet_pov_first_watashi',
-    name: '一人称（私 / 僕）',
-    category: 'viewpoint',
-    categoryLabel: '視点・人称',
+    category: "viewpoint",
+    categoryLabel: "視点・人称",
     content: `## 視点・人称
 - 視点: 主人公の一人称視点
 - 一人称: 「私」（または「僕」）
 - 心理描写・独白を大切にし、客観的事実と主観的解釈を書き分ける。`,
+    id: "snippet_pov_first_watashi",
+    name: "一人称（私 / 僕）",
   },
   {
-    id: 'snippet_pov_third_limited',
-    name: '三人称一元視点（主役密着）',
-    category: 'viewpoint',
-    categoryLabel: '視点・人称',
+    category: "viewpoint",
+    categoryLabel: "視点・人称",
     content: `## 視点
 - 視点: 三人称一元視点（シーンごとに特定のキャラクターに密着）
 - 視点人物以外の心情は「〜そうに見えた」等の推測表現にとどめる。`,
+    id: "snippet_pov_third_limited",
+    name: "三人称一元視点（主役密着）",
   },
   {
-    id: 'snippet_pov_third_multi',
-    name: '三人称多視点（群像劇）',
-    category: 'viewpoint',
-    categoryLabel: '視点・人称',
+    category: "viewpoint",
+    categoryLabel: "視点・人称",
     content: `## 視点
 - 視点: 三人称多視点（群像劇）
 - 節（またはシーン）の区切りで視点主を明瞭にし、1つのシーン内での視点混在は避ける。`,
+    id: "snippet_pov_third_multi",
+    name: "三人称多視点（群像劇）",
   },
 
   // 文体・トーン
   {
-    id: 'snippet_tone_da_dearu',
-    name: 'だ・である調（常体）',
-    category: 'tone',
-    categoryLabel: '文体・トーン',
+    category: "tone",
+    categoryLabel: "文体・トーン",
     content: `## 文体・文末
 - 基本文体: 「だ・である」調（常体）。
 - 「〜だった」「〜であった」「〜した」の単調な3連続を避ける。`,
+    id: "snippet_tone_da_dearu",
+    name: "だ・である調（常体）",
   },
   {
-    id: 'snippet_tone_desu_masu',
-    name: 'です・ます調（敬体 / 語りかけ）',
-    category: 'tone',
-    categoryLabel: '文体・トーン',
+    category: "tone",
+    categoryLabel: "文体・トーン",
     content: `## 文体・文末
 - 基本文体: 「です・ます」調（敬体）。
 - 読者に語りかけるような親しみやすいトーンを維持する。`,
+    id: "snippet_tone_desu_masu",
+    name: "です・ます調（敬体 / 語りかけ）",
   },
   {
-    id: 'snippet_tone_light',
-    name: '軽快・コメディタッチ',
-    category: 'tone',
-    categoryLabel: '文体・トーン',
+    category: "tone",
+    categoryLabel: "文体・トーン",
     content: `## トーン
 - 軽快でテンポのよいコメディ調。
 - リズミカルな会話と切れ味のあるツッコミ・リアクションを重視する。`,
+    id: "snippet_tone_light",
+    name: "軽快・コメディタッチ",
   },
   {
-    id: 'snippet_tone_serious_dark',
-    name: '重厚・シリアス・ダーク',
-    category: 'tone',
-    categoryLabel: '文体・トーン',
+    category: "tone",
+    categoryLabel: "文体・トーン",
     content: `## トーン
 - 重厚かつ緊迫感のあるシリアストーン。
 - 危機感や葛藤、生々しい空気感をリアルに描写する。`,
+    id: "snippet_tone_serious_dark",
+    name: "重厚・シリアス・ダーク",
   },
 
   // 作法・表記統一
   {
-    id: 'snippet_rules_standard_japanese',
-    name: '小説標準作法（三点リーダー・会話文末）',
-    category: 'rules',
-    categoryLabel: '作法・表記',
+    category: "rules",
+    categoryLabel: "作法・表記",
     content: `## 小説作法ルール
 - 三点リーダー（……）およびダッシュ（――）は必ず2マス分（2連）で使用する。
 - 会話文（「」）の末尾には句点（。）を付けない。
 - カギ括弧の前後は不自然な空行を作らない。`,
+    id: "snippet_rules_standard_japanese",
+    name: "小説標準作法（三点リーダー・会話文末）",
   },
   {
-    id: 'snippet_rules_ruby',
-    name: 'ルビ・傍点記法ルール',
-    category: 'rules',
-    categoryLabel: '作法・表記',
+    category: "rules",
+    categoryLabel: "作法・表記",
     content: `## 特殊記法ルール
 - ルビは \`｜親文字《るび》\` 形式で記載する（例: \`｜真紅の魔剣《クリムゾンブレード》\`）。
 - 傍点・強調は \`《《強調文字》》\` 形式で記載する。`,
+    id: "snippet_rules_ruby",
+    name: "ルビ・傍点記法ルール",
   },
   {
-    id: 'snippet_rules_kanji_hiragana',
-    name: '漢字・ひらがな使い分け（開き・閉じ）',
-    category: 'rules',
-    categoryLabel: '作法・表記',
+    category: "rules",
+    categoryLabel: "作法・表記",
     content: `## 表記統一（開き・閉じ）
 - 「〜と言う」→「〜という」（形式名詞はひらがな）
 - 「〜の様に」→「〜のように」
 - 「〜して見る」→「〜してみる」（補助動詞はひらがな）
 - 「子供」→「子ども」`,
+    id: "snippet_rules_kanji_hiragana",
+    name: "漢字・ひらがな使い分け（開き・閉じ）",
   },
 
   // NG・禁止事項
   {
-    id: 'snippet_ng_pov_drift',
-    name: '視点ブレ・神の視点混入の禁止',
-    category: 'ng',
-    categoryLabel: 'NG・禁止事項',
+    category: "ng",
+    categoryLabel: "NG・禁止事項",
     content: `## 禁止事項（視点ブレ防止）
 - 一人称視点において、視点人物が見ていない場所の出来事や他人の内心を断定的に書かない。
 - 他人の感情は仕草、表情、声色から推測する形で描写する。`,
+    id: "snippet_ng_pov_drift",
+    name: "視点ブレ・神の視点混入の禁止",
   },
   {
-    id: 'snippet_ng_slang',
-    name: '現代俗語・ネットスラングの禁止',
-    category: 'ng',
-    categoryLabel: 'NG・禁止事項',
+    category: "ng",
+    categoryLabel: "NG・禁止事項",
     content: `## 禁止事項
 - 世界観に合わない現代スラングやネットスラング、過度な流行語の使用は禁止。
 - 比喩表現も世界観に存在する概念を用いて行う。`,
+    id: "snippet_ng_slang",
+    name: "現代俗語・ネットスラングの禁止",
   },
   {
-    id: 'snippet_ng_infodump',
-    name: '長大な説明セリフ（説明口調）の禁止',
-    category: 'ng',
-    categoryLabel: 'NG・禁止事項',
+    category: "ng",
+    categoryLabel: "NG・禁止事項",
     content: `## 禁止事項
 - 設定や世界観を登場人物に長々と説明させる「説明セリフ」は避ける。
 - 会話や行動の文脈の中で自然に情報が開示されるようにする。`,
+    id: "snippet_ng_infodump",
+    name: "長大な説明セリフ（説明口調）の禁止",
   },
 
   // 描写・演出方針
   {
-    id: 'snippet_direction_action',
-    name: 'バトル・アクション描写方針',
-    category: 'direction',
-    categoryLabel: '描写・演出方針',
+    category: "direction",
+    categoryLabel: "描写・演出方針",
     content: `## バトル・アクション描写方針
 - 短いセンテンスでスピード感と衝撃を表現する。
 - 技名や動作だけでなく、体勢、武器の衝突音、周囲の破壊描写を交える。
 - 体言止めや動詞先行の切れ味ある文を活用する。`,
+    id: "snippet_direction_action",
+    name: "バトル・アクション描写方針",
   },
   {
-    id: 'snippet_direction_emotion',
-    name: '心理・感情描写方針（身体反応重視）',
-    category: 'direction',
-    categoryLabel: '描写・演出方針',
+    category: "direction",
+    categoryLabel: "描写・演出方針",
     content: `## 感情描写方針
 - 「悲しかった」「怒った」と直接書かず、喉の渇き、拳の震え、心拍の上昇などの身体反応や仕草で表現する。`,
+    id: "snippet_direction_emotion",
+    name: "心理・感情描写方針（身体反応重視）",
   },
 ];

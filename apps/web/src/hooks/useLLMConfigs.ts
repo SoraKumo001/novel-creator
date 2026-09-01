@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toErrorMessage } from '@/lib/errors.js';
-import { llmConfigKeys } from '@/lib/queryKeys.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toErrorMessage } from "@/lib/errors.js";
+import { llmConfigKeys } from "@/lib/queryKeys.js";
 import {
   createLLMConfig,
   deleteLLMConfig,
@@ -8,31 +8,31 @@ import {
   setDefaultLLMConfig,
   testLLMConfig,
   updateLLMConfig,
-} from '@/lib/services/index.js';
+} from "@/lib/services/index.js";
 import type {
   CreateLLMConfigInput,
   LLMConfig,
   TestConnectionInput,
   TestConnectionResult,
   UpdateLLMConfigInput,
-} from '@/lib/types.js';
+} from "@/lib/types.js";
 
 interface UseLLMConfigsReturn {
   configs: LLMConfig[];
-  defaultConfig: LLMConfig | undefined;
-  loading: boolean;
-  error: string | null;
-  refetch: () => Promise<void>;
   createConfig: (input: CreateLLMConfigInput) => Promise<LLMConfig>;
-  updateConfig: (id: string, input: UpdateLLMConfigInput) => Promise<LLMConfig>;
-  deleteConfig: (id: string) => Promise<void>;
-  setDefaultConfig: (id: string) => Promise<LLMConfig>;
-  testConnection: (input: TestConnectionInput) => Promise<TestConnectionResult>;
   creating: boolean;
-  updating: boolean;
+  defaultConfig: LLMConfig | undefined;
+  deleteConfig: (id: string) => Promise<void>;
   deleting: boolean;
+  error: string | null;
+  loading: boolean;
+  refetch: () => Promise<void>;
+  setDefaultConfig: (id: string) => Promise<LLMConfig>;
   settingDefault: boolean;
+  testConnection: (input: TestConnectionInput) => Promise<TestConnectionResult>;
   testing: boolean;
+  updateConfig: (id: string, input: UpdateLLMConfigInput) => Promise<LLMConfig>;
+  updating: boolean;
 }
 
 export function useLLMConfigs(): UseLLMConfigsReturn {
@@ -50,23 +50,27 @@ export function useLLMConfigs(): UseLLMConfigsReturn {
 
   const createMutation = useMutation({
     mutationFn: (input: CreateLLMConfigInput) => createLLMConfig(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: llmConfigKeys.all }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: llmConfigKeys.all }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateLLMConfigInput }) =>
       updateLLMConfig(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: llmConfigKeys.all }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: llmConfigKeys.all }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteLLMConfig(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: llmConfigKeys.all }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: llmConfigKeys.all }),
   });
 
   const setDefaultMutation = useMutation({
     mutationFn: (id: string) => setDefaultLLMConfig(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: llmConfigKeys.all }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: llmConfigKeys.all }),
   });
 
   const testMutation = useMutation({

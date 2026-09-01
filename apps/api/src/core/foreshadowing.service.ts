@@ -1,21 +1,25 @@
-import { eq } from 'drizzle-orm';
-import { foreshadowings, novels, type NewForeshadowing } from '@novel-creator/db';
+import {
+  foreshadowings,
+  type NewForeshadowing,
+  novels,
+} from "@novel-creator/db";
 import {
   createForeshadowingDraft,
   editForeshadowingDocument,
   editForeshadowingSection,
   generateJSON,
   generateText,
-} from '@novel-creator/llm';
+} from "@novel-creator/llm";
 import {
   diffForeshadowings,
   parseForeshadowingsMarkdown,
   serializeForeshadowingsToMarkdown,
-} from '@novel-creator/shared';
-import type { ForeshadowingStatus } from '@novel-creator/shared/schemas';
-import { searchContext, upsertEntityEmbedding } from '../rag.js';
-import { insertEditHistory } from './history.service.js';
-import { assertFound, ValidationError, type ServiceContext } from './types.js';
+} from "@novel-creator/shared";
+import type { ForeshadowingStatus } from "@novel-creator/shared/schemas";
+import { eq } from "drizzle-orm";
+import { searchContext, upsertEntityEmbedding } from "../rag.js";
+import { insertEditHistory } from "./history.service.js";
+import { assertFound, type ServiceContext, ValidationError } from "./types.js";
 
 export function foreshadowingToText(f: {
   category: string;
@@ -23,7 +27,7 @@ export function foreshadowingToText(f: {
   description?: string | null;
   status: string;
 }): string {
-  return `[${f.category}] 伏線: ${f.title} (${f.status})\n${f.description ?? ''}`;
+  return `[${f.category}] 伏線: ${f.title} (${f.status})\n${f.description ?? ""}`;
 }
 
 export class ForeshadowingDomainService {
@@ -38,32 +42,38 @@ export class ForeshadowingDomainService {
   }
 
   async getForeshadowing(id: string) {
-    const [item] = await this.ctx.db.select().from(foreshadowings).where(eq(foreshadowings.id, id));
-    assertFound(item, 'Foreshadowing not found');
+    const [item] = await this.ctx.db
+      .select()
+      .from(foreshadowings)
+      .where(eq(foreshadowings.id, id));
+    assertFound(item, "Foreshadowing not found");
     return item;
   }
 
   async createForeshadowing(
     novelId: string,
-    input: Omit<NewForeshadowing, 'id' | 'novelId' | 'createdAt' | 'updatedAt'>,
+    input: Omit<NewForeshadowing, "id" | "novelId" | "createdAt" | "updatedAt">
   ) {
     if (!input.title?.trim()) {
-      throw new ValidationError('Title is required');
+      throw new ValidationError("Title is required");
     }
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
-    assertFound(novel, 'Novel not found');
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, novelId));
+    assertFound(novel, "Novel not found");
 
     const [created] = await this.ctx.db
       .insert(foreshadowings)
       .values({
-        novelId,
-        title: input.title.trim(),
-        category: (input.category ?? '').trim() || '未分類',
+        category: (input.category ?? "").trim() || "未分類",
+        createdAt: new Date(),
         description: input.description ?? null,
-        status: input.status ?? 'unresolved',
+        novelId,
         placedSectionId: input.placedSectionId,
         resolvedSectionId: input.resolvedSectionId,
-        createdAt: new Date(),
+        status: input.status ?? "unresolved",
+        title: input.title.trim(),
         updatedAt: new Date(),
       })
       .returning();
@@ -72,10 +82,10 @@ export class ForeshadowingDomainService {
       this.ctx.vectorStore,
       this.ctx.embedding,
       created.novelId,
-      'foreshadowing',
+      "foreshadowing",
       created.id,
       foreshadowingToText(created),
-      this.ctx.env,
+      this.ctx.env
     );
 
     return created;
@@ -83,25 +93,33 @@ export class ForeshadowingDomainService {
 
   async updateForeshadowing(
     id: string,
-    input: Partial<Omit<NewForeshadowing, 'id' | 'novelId' | 'createdAt' | 'updatedAt'>>,
+    input: Partial<
+      Omit<NewForeshadowing, "id" | "novelId" | "createdAt" | "updatedAt">
+    >
   ) {
     const [existing] = await this.ctx.db
       .select()
       .from(foreshadowings)
       .where(eq(foreshadowings.id, id));
-    assertFound(existing, 'Foreshadowing not found');
+    assertFound(existing, "Foreshadowing not found");
 
     const [updated] = await this.ctx.db
       .update(foreshadowings)
       .set({
-        ...(input.title !== undefined ? { title: input.title.trim() } : {}),
-        ...(input.category !== undefined ? { category: input.category.trim() || '未分類' } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-        ...(input.status !== undefined ? { status: input.status } : {}),
-        ...(input.placedSectionId !== undefined ? { placedSectionId: input.placedSectionId } : {}),
-        ...(input.resolvedSectionId !== undefined
-          ? { resolvedSectionId: input.resolvedSectionId }
-          : {}),
+        ...(input.title === undefined ? {} : { title: input.title.trim() }),
+        ...(input.category === undefined
+          ? {}
+          : { category: input.category.trim() || "未分類" }),
+        ...(input.description === undefined
+          ? {}
+          : { description: input.description }),
+        ...(input.status === undefined ? {} : { status: input.status }),
+        ...(input.placedSectionId === undefined
+          ? {}
+          : { placedSectionId: input.placedSectionId }),
+        ...(input.resolvedSectionId === undefined
+          ? {}
+          : { resolvedSectionId: input.resolvedSectionId }),
         updatedAt: new Date(),
       })
       .where(eq(foreshadowings.id, id))
@@ -109,32 +127,32 @@ export class ForeshadowingDomainService {
 
     try {
       await insertEditHistory(this.ctx.db, {
-        novelId: existing.novelId,
-        entityType: 'foreshadowing',
-        entityId: id,
-        title: updated.title,
         content: JSON.stringify({
           category: updated.category,
-          title: updated.title,
-          description: updated.description ?? '',
-          status: updated.status,
+          description: updated.description ?? "",
           placedSectionId: updated.placedSectionId,
           resolvedSectionId: updated.resolvedSectionId,
+          status: updated.status,
+          title: updated.title,
         }),
-        description: '伏線の更新',
+        description: "伏線の更新",
+        entityId: id,
+        entityType: "foreshadowing",
+        novelId: existing.novelId,
+        title: updated.title,
       });
     } catch (e) {
-      console.error('[history] failed to record foreshadowing history', e);
+      console.error("[history] failed to record foreshadowing history", e);
     }
 
     await upsertEntityEmbedding(
       this.ctx.vectorStore,
       this.ctx.embedding,
       updated.novelId,
-      'foreshadowing',
+      "foreshadowing",
       updated.id,
       foreshadowingToText(updated),
-      this.ctx.env,
+      this.ctx.env
     );
 
     return updated;
@@ -145,7 +163,7 @@ export class ForeshadowingDomainService {
       .select()
       .from(foreshadowings)
       .where(eq(foreshadowings.id, id));
-    assertFound(existing, 'Foreshadowing not found');
+    assertFound(existing, "Foreshadowing not found");
 
     const [deleted] = await this.ctx.db
       .delete(foreshadowings)
@@ -153,9 +171,9 @@ export class ForeshadowingDomainService {
       .returning();
 
     try {
-      await this.ctx.vectorStore.deleteByEntity('foreshadowing', id);
+      await this.ctx.vectorStore.deleteByEntity("foreshadowing", id);
     } catch (err) {
-      console.error('[vector] failed to delete foreshadowing embedding', err);
+      console.error("[vector] failed to delete foreshadowing embedding", err);
     }
 
     return deleted;
@@ -163,7 +181,12 @@ export class ForeshadowingDomainService {
 
   async generateDraft(
     query: string,
-    currentDraft?: { category?: string; title: string; description?: string; status?: string },
+    currentDraft?: {
+      category?: string;
+      title: string;
+      description?: string;
+      status?: string;
+    }
   ) {
     const prompt = createForeshadowingDraft(query, currentDraft);
     return generateJSON<{
@@ -196,13 +219,13 @@ export class ForeshadowingDomainService {
         const [row] = await tx
           .insert(foreshadowings)
           .values({
-            novelId,
-            title: item.title,
             category: item.category,
             description: item.description,
-            status: item.status,
+            novelId,
             placedSectionId: item.placedSectionId,
             resolvedSectionId: item.resolvedSectionId,
+            status: item.status,
+            title: item.title,
           })
           .returning();
         createdIds.push(row.id);
@@ -212,12 +235,12 @@ export class ForeshadowingDomainService {
         await tx
           .update(foreshadowings)
           .set({
-            title: u.title,
             category: u.category,
             description: u.description,
-            status: u.status,
             placedSectionId: u.placedSectionId,
             resolvedSectionId: u.resolvedSectionId,
+            status: u.status,
+            title: u.title,
             updatedAt: new Date(),
           })
           .where(eq(foreshadowings.id, u.id));
@@ -234,10 +257,10 @@ export class ForeshadowingDomainService {
         this.ctx.vectorStore,
         this.ctx.embedding,
         novelId,
-        'foreshadowing',
+        "foreshadowing",
         createdIds[i],
         foreshadowingToText(f),
-        this.ctx.env,
+        this.ctx.env
       );
     }
 
@@ -246,18 +269,18 @@ export class ForeshadowingDomainService {
         this.ctx.vectorStore,
         this.ctx.embedding,
         novelId,
-        'foreshadowing',
+        "foreshadowing",
         u.id,
         foreshadowingToText(u),
-        this.ctx.env,
+        this.ctx.env
       );
     }
 
     for (const id of diff.toDelete) {
       try {
-        await this.ctx.vectorStore.deleteByEntity('foreshadowing', id);
+        await this.ctx.vectorStore.deleteByEntity("foreshadowing", id);
       } catch (err) {
-        console.error('[vector] failed to delete foreshadowing embedding', err);
+        console.error("[vector] failed to delete foreshadowing embedding", err);
       }
     }
 
@@ -265,22 +288,25 @@ export class ForeshadowingDomainService {
     if (previousMarkdown !== markdown) {
       try {
         await insertEditHistory(this.ctx.db, {
-          novelId,
-          entityType: 'foreshadowings_document',
-          entityId: novelId,
-          title: '伏線マークダウン一括編集',
           content: markdown,
-          description: '手動マークダウン編集',
+          description: "手動マークダウン編集",
+          entityId: novelId,
+          entityType: "foreshadowings_document",
+          novelId,
+          title: "伏線マークダウン一括編集",
         });
       } catch (e) {
-        console.error('[history] failed to record foreshadowing doc history', e);
+        console.error(
+          "[history] failed to record foreshadowing doc history",
+          e
+        );
       }
     }
 
     return {
       created: diff.toCreate.length,
-      updated: diff.toUpdate.length,
       deleted: diff.toDelete.length,
+      updated: diff.toUpdate.length,
     };
   }
 
@@ -291,25 +317,28 @@ export class ForeshadowingDomainService {
       this.ctx.embedding,
       novelId,
       { query: instruction },
-      this.ctx.env,
+      this.ctx.env
     );
     const prompt = editForeshadowingDocument(currentMarkdown, instruction, {
-      settings: ragCtx.settings,
       characters: ragCtx.characters,
+      settings: ragCtx.settings,
     });
     const generated = await generateText(this.ctx.llm, prompt);
 
     try {
       await insertEditHistory(this.ctx.db, {
-        novelId,
-        entityType: 'foreshadowings_document',
-        entityId: novelId,
-        title: '伏線マークダウンAI編集',
         content: generated,
         description: `AIによる編集: ${instruction}`,
+        entityId: novelId,
+        entityType: "foreshadowings_document",
+        novelId,
+        title: "伏線マークダウンAI編集",
       });
     } catch (e) {
-      console.error('[history] failed to record foreshadowing doc AI history', e);
+      console.error(
+        "[history] failed to record foreshadowing doc AI history",
+        e
+      );
     }
 
     return { markdown: generated };
@@ -317,19 +346,24 @@ export class ForeshadowingDomainService {
 
   async editForeshadowingSection(
     novelId: string,
-    section: { category: string; title: string; description: string; status?: string },
-    instruction: string,
+    section: {
+      category: string;
+      title: string;
+      description: string;
+      status?: string;
+    },
+    instruction: string
   ) {
     const ragCtx = await searchContext(
       this.ctx.vectorStore,
       this.ctx.embedding,
       novelId,
       { query: `${section.description} ${instruction}` },
-      this.ctx.env,
+      this.ctx.env
     );
     const prompt = editForeshadowingSection(section, instruction, {
-      settings: ragCtx.settings,
       characters: ragCtx.characters,
+      settings: ragCtx.settings,
     });
     const generated = await generateText(this.ctx.llm, prompt);
 

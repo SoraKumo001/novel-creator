@@ -1,32 +1,33 @@
-import { useState } from 'react';
-import { Link } from '@tanstack/react-router';
-import { useChatUI } from '@/context/ChatContext.js';
-import { useTheme, type ThemeMode } from '@/hooks/useTheme.js';
+import { Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { useChatUI } from "@/context/ChatContext.js";
+import { type ThemeMode, useTheme } from "@/hooks/useTheme.js";
 
 export function Nav() {
   const { toggleChat, isOpen } = useChatUI();
   const { theme, setTheme } = useTheme();
 
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
-    return localStorage.getItem('novel-creator:nav-collapsed') === 'true';
-  });
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(
+    () => localStorage.getItem("novel-creator:nav-collapsed") === "true"
+  );
 
   const toggleCollapsed = () => {
     setIsCollapsed((prev) => {
       const next = !prev;
-      localStorage.setItem('novel-creator:nav-collapsed', String(next));
+      localStorage.setItem("novel-creator:nav-collapsed", String(next));
       return next;
     });
   };
 
   const themeOptions: { mode: ThemeMode; label: string; icon: string }[] = [
-    { mode: 'light', label: 'ライト', icon: '☀️' },
-    { mode: 'dark', label: 'ダーク', icon: '🌙' },
-    { mode: 'system', label: '自動', icon: '💻' },
+    { mode: "light", label: "ライト", icon: "☀️" },
+    { mode: "dark", label: "ダーク", icon: "🌙" },
+    { mode: "system", label: "自動", icon: "💻" },
   ];
 
   const cycleTheme = () => {
-    const nextMode: ThemeMode = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
+    const nextMode: ThemeMode =
+      theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
     setTheme(nextMode);
   };
 
@@ -34,18 +35,18 @@ export function Nav() {
     <aside
       aria-label="メインナビゲーション"
       aria-expanded={!isCollapsed}
-      className={`flex h-full shrink-0 flex-col border-r border-border bg-surface transition-all duration-200 ${
-        isCollapsed ? 'w-16' : 'w-56'
+      className={`flex h-full shrink-0 flex-col border-border border-r bg-surface transition-all duration-200 ${
+        isCollapsed ? "w-16" : "w-56"
       }`}
     >
       {/* ヘッダー & ロゴ */}
       <div
-        className={`p-3 flex items-center ${isCollapsed ? 'justify-center' : 'justify-between'}`}
+        className={`flex items-center p-3 ${isCollapsed ? "justify-center" : "justify-between"}`}
       >
         <Link
           to="/"
           className={`flex items-center gap-2 overflow-hidden ${
-            isCollapsed ? 'justify-center px-0' : 'px-2'
+            isCollapsed ? "justify-center px-0" : "px-2"
           }`}
           title="Novel Creator ホーム"
         >
@@ -66,7 +67,7 @@ export function Nav() {
             </svg>
           </div>
           {!isCollapsed && (
-            <span className="text-base font-bold tracking-tight text-foreground whitespace-nowrap truncate">
+            <span className="truncate whitespace-nowrap font-bold text-base text-foreground tracking-tight">
               Novel Creator
             </span>
           )}
@@ -77,7 +78,7 @@ export function Nav() {
           <button
             type="button"
             onClick={toggleCollapsed}
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground transition cursor-pointer"
+            className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
             title="メニューを縮小"
             aria-label="メニューを縮小"
           >
@@ -89,7 +90,11 @@ export function Nav() {
               stroke="currentColor"
               className="h-4 w-4"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15.75 19.5L8.25 12l7.5-7.5"
+              />
             </svg>
           </button>
         )}
@@ -101,7 +106,7 @@ export function Nav() {
           <button
             type="button"
             onClick={toggleCollapsed}
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground transition cursor-pointer"
+            className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
             title="メニューを展開"
             aria-label="メニューを展開"
           >
@@ -113,21 +118,25 @@ export function Nav() {
               stroke="currentColor"
               className="h-4 w-4"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M8.25 4.5l7.5 7.5-7.5 7.5"
+              />
             </svg>
           </button>
         </div>
       )}
 
       {/* ナビゲーションリンク */}
-      <nav className={`flex-1 space-y-1 py-2 ${isCollapsed ? 'px-2' : 'px-3'}`}>
+      <nav className={`flex-1 space-y-1 py-2 ${isCollapsed ? "px-2" : "px-3"}`}>
         <Link
           to="/novels"
-          className={`group flex items-center rounded-lg text-sm font-medium text-foreground-secondary transition hover:bg-surface-hover hover:text-foreground ${
-            isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
+          className={`group flex items-center rounded-lg font-medium text-foreground-secondary text-sm transition hover:bg-surface-hover hover:text-foreground ${
+            isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
           }`}
           activeProps={{
-            className: 'bg-primary-subtle text-primary-subtle-fg',
+            className: "bg-primary-subtle text-primary-subtle-fg",
           }}
           title="小説一覧"
         >
@@ -151,12 +160,12 @@ export function Nav() {
         <button
           type="button"
           onClick={toggleChat}
-          className={`group flex w-full items-center rounded-lg text-sm font-medium transition cursor-pointer ${
-            isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
+          className={`group flex w-full cursor-pointer items-center rounded-lg font-medium text-sm transition ${
+            isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
           } ${
             isOpen
-              ? 'bg-primary-subtle text-primary-subtle-fg'
-              : 'text-foreground-secondary hover:bg-surface-hover hover:text-foreground'
+              ? "bg-primary-subtle text-primary-subtle-fg"
+              : "text-foreground-secondary hover:bg-surface-hover hover:text-foreground"
           }`}
           title="AI創作相談（Ctrl+J）"
         >
@@ -167,7 +176,7 @@ export function Nav() {
             strokeWidth={1.5}
             stroke="currentColor"
             className={`h-5 w-5 shrink-0 transition ${
-              isOpen ? 'text-primary' : 'text-muted group-hover:text-foreground'
+              isOpen ? "text-primary" : "text-muted group-hover:text-foreground"
             }`}
           >
             <path
@@ -180,16 +189,16 @@ export function Nav() {
         </button>
 
         <div className="pt-2 pb-1">
-          <div className="border-t border-border" />
+          <div className="border-border border-t" />
         </div>
 
         <Link
           to="/settings"
-          className={`group flex items-center rounded-lg text-sm font-medium text-foreground-secondary transition hover:bg-surface-hover hover:text-foreground ${
-            isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
+          className={`group flex items-center rounded-lg font-medium text-foreground-secondary text-sm transition hover:bg-surface-hover hover:text-foreground ${
+            isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
           }`}
           activeProps={{
-            className: 'bg-primary-subtle text-primary-subtle-fg',
+            className: "bg-primary-subtle text-primary-subtle-fg",
           }}
           title="LLM設定"
         >
@@ -217,11 +226,11 @@ export function Nav() {
 
         <Link
           to="/backup"
-          className={`group flex items-center rounded-lg text-sm font-medium text-foreground-secondary transition hover:bg-surface-hover hover:text-foreground ${
-            isCollapsed ? 'justify-center p-2.5' : 'gap-3 px-3 py-2.5'
+          className={`group flex items-center rounded-lg font-medium text-foreground-secondary text-sm transition hover:bg-surface-hover hover:text-foreground ${
+            isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
           }`}
           activeProps={{
-            className: 'bg-primary-subtle text-primary-subtle-fg',
+            className: "bg-primary-subtle text-primary-subtle-fg",
           }}
           title="バックアップ"
         >
@@ -244,18 +253,24 @@ export function Nav() {
       </nav>
 
       {/* テーマ切り替え & フッター */}
-      <div className="border-t border-border p-2 space-y-2">
+      <div className="space-y-2 border-border border-t p-2">
         {isCollapsed ? (
           <div className="flex justify-center">
             <button
               type="button"
               onClick={cycleTheme}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface-raised text-sm text-muted-foreground hover:text-foreground transition cursor-pointer shadow-xs"
+              className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-border bg-surface-raised text-muted-foreground text-sm shadow-xs transition hover:text-foreground"
               title={`テーマ切り替え（現在: ${
-                theme === 'light' ? 'ライト' : theme === 'dark' ? 'ダーク' : '自動'
+                theme === "light"
+                  ? "ライト"
+                  : theme === "dark"
+                    ? "ダーク"
+                    : "自動"
               }）`}
             >
-              <span>{theme === 'light' ? '☀️' : theme === 'dark' ? '🌙' : '💻'}</span>
+              <span>
+                {theme === "light" ? "☀️" : theme === "dark" ? "🌙" : "💻"}
+              </span>
             </button>
           </div>
         ) : (
@@ -268,10 +283,10 @@ export function Nav() {
                     key={opt.mode}
                     type="button"
                     onClick={() => setTheme(opt.mode)}
-                    className={`flex flex-1 items-center justify-center gap-1 rounded py-1 transition cursor-pointer ${
+                    className={`flex flex-1 cursor-pointer items-center justify-center gap-1 rounded py-1 transition ${
                       isSelected
-                        ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                        : 'text-muted-foreground hover:text-foreground'
+                        ? "bg-primary font-semibold text-primary-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                     title={`${opt.label}モードに切り替え`}
                   >
@@ -281,7 +296,7 @@ export function Nav() {
                 );
               })}
             </div>
-            <div className="px-1 text-[11px] text-muted-foreground text-center">
+            <div className="px-1 text-center text-[11px] text-muted-foreground">
               <p>物語を創り、世界を紡ぐ。</p>
             </div>
           </>

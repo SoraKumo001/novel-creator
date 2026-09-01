@@ -1,17 +1,17 @@
-import { inArray, sql } from 'drizzle-orm';
 import {
+  type Chapter,
   chapters,
   contents,
-  sections,
-  type Chapter,
   type Database,
   type Section,
-} from '@novel-creator/db';
+  sections,
+} from "@novel-creator/db";
+import { inArray, sql } from "drizzle-orm";
 
 /** 1 節分のノード。body は contentMode に応じた本文（全文 / スニペット）。本文未作成の場合は null。 */
 export interface SectionNode {
-  section: Section;
   body: string | null;
+  section: Section;
 }
 
 /** 1 章分のノード。sections は節 order 昇順で整列済み。 */
@@ -26,7 +26,7 @@ export interface ChapterNode {
  * - 'snippet': DB 側で left(body, snippetLength) に切り詰めて取得し、転送量を削減する。
  * - 'none': 本文を取得しない（body は常に null、contents へのクエリを発行しない）。
  */
-export type ContentFetchMode = 'full' | 'snippet' | 'none';
+export type ContentFetchMode = "full" | "snippet" | "none";
 
 export interface FetchNovelStructureOptions {
   contentMode?: ContentFetchMode;
@@ -47,9 +47,9 @@ export interface FetchNovelStructureOptions {
 export async function fetchNovelStructureWithContents(
   db: Database,
   novelIds: readonly string[],
-  options: FetchNovelStructureOptions = {},
+  options: FetchNovelStructureOptions = {}
 ): Promise<Map<string, ChapterNode[]>> {
-  const contentMode = options.contentMode ?? 'full';
+  const contentMode = options.contentMode ?? "full";
   const snippetLength = options.snippetLength ?? 300;
 
   const result = new Map<string, ChapterNode[]>();
@@ -95,8 +95,8 @@ export async function fetchNovelStructureWithContents(
     .where(
       inArray(
         sections.chapterId,
-        chapterRows.map((chapter) => chapter.id),
-      ),
+        chapterRows.map((chapter) => chapter.id)
+      )
     );
 
   const sectionNodesByChapter = new Map<string, SectionNode[]>();
@@ -106,7 +106,7 @@ export async function fetchNovelStructureWithContents(
       nodes = [];
       sectionNodesByChapter.set(section.chapterId, nodes);
     }
-    nodes.push({ section, body: null });
+    nodes.push({ body: null, section });
   }
   for (const nodes of sectionNodesByChapter.values()) {
     // 節 order 昇順（安定ソートにより同一 order は DB の返却順を維持）
@@ -116,7 +116,7 @@ export async function fetchNovelStructureWithContents(
     node.sections = sectionNodesByChapter.get(node.chapter.id) ?? [];
   }
 
-  if (contentMode === 'none') {
+  if (contentMode === "none") {
     return result;
   }
 
@@ -127,12 +127,12 @@ export async function fetchNovelStructureWithContents(
   }
 
   const bodyBySectionId = new Map<string, string>();
-  if (contentMode === 'snippet') {
+  if (contentMode === "snippet") {
     // 本文全文を転送せず、DB 側で先頭 snippetLength 文字に切り詰める。
     const rows = await db
       .select({
-        sectionId: contents.sectionId,
         body: sql<string>`left(${contents.body}, ${snippetLength})`,
+        sectionId: contents.sectionId,
       })
       .from(contents)
       .where(inArray(contents.sectionId, sectionIds));
@@ -140,7 +140,10 @@ export async function fetchNovelStructureWithContents(
       bodyBySectionId.set(row.sectionId, row.body);
     }
   } else {
-    const rows = await db.select().from(contents).where(inArray(contents.sectionId, sectionIds));
+    const rows = await db
+      .select()
+      .from(contents)
+      .where(inArray(contents.sectionId, sectionIds));
     for (const row of rows) {
       bodyBySectionId.set(row.sectionId, row.body);
     }

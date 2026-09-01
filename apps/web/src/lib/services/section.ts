@@ -1,10 +1,16 @@
-import { parseResponseError } from '../errors.js';
-import { apiClient } from '../api-client.js';
-import type { Section, SectionWithContent, UpdateSectionInput } from '../types.js';
+import { apiClient } from "../api-client.js";
+import { parseResponseError } from "../errors.js";
+import type {
+  Section,
+  SectionWithContent,
+  UpdateSectionInput,
+} from "../types.js";
 
 export async function fetchSection(id: string): Promise<SectionWithContent> {
-  const res = await apiClient.sections[':id'].$get({ param: { id } });
-  if (!res.ok) throw await parseResponseError(res, '節詳細の取得');
+  const res = await apiClient.sections[":id"].$get({ param: { id } });
+  if (!res.ok) {
+    throw await parseResponseError(res, "節詳細の取得");
+  }
   const data = await res.json();
   return {
     id: data.id,
@@ -27,8 +33,11 @@ export async function fetchSection(id: string): Promise<SectionWithContent> {
   };
 }
 
-export async function updateSection(id: string, input: UpdateSectionInput): Promise<Section> {
-  const res = await apiClient.sections[':id'].$put({
+export async function updateSection(
+  id: string,
+  input: UpdateSectionInput
+): Promise<Section> {
+  const res = await apiClient.sections[":id"].$put({
     param: { id },
     json: {
       title: input.title,
@@ -36,7 +45,9 @@ export async function updateSection(id: string, input: UpdateSectionInput): Prom
       summary: input.summary,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, '節の更新');
+  if (!res.ok) {
+    throw await parseResponseError(res, "節の更新");
+  }
   const row = await res.json();
   return {
     id: row.id,
@@ -50,6 +61,8 @@ export async function updateSection(id: string, input: UpdateSectionInput): Prom
 }
 
 export async function deleteSection(id: string): Promise<void> {
-  const res = await apiClient.sections[':id'].$delete({ param: { id } });
-  if (!res.ok) throw await parseResponseError(res, '節の削除');
+  const res = await apiClient.sections[":id"].$delete({ param: { id } });
+  if (!res.ok) {
+    throw await parseResponseError(res, "節の削除");
+  }
 }

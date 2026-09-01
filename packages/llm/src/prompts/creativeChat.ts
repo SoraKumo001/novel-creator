@@ -2,15 +2,15 @@
  * 小説創作相談チャット用のシステムプロンプトを構築する。
  */
 export interface CreativeChatContext {
+  additionalContext?: string[];
+  characters?: string[];
   novel?: {
     title: string;
     description?: string | null;
     styleGuide?: string | null;
   };
   settings?: string[];
-  characters?: string[];
   styleGuide?: string | null;
-  additionalContext?: string[];
 }
 
 // アプリ機能カタログ（出典: doc/features-and-workflows.md — 内容を更新する際はそちらも参照のこと）
@@ -22,7 +22,9 @@ export const APP_USAGE_GUIDE = `- 基本の流れ: ①概要 (Alt+1: 執筆ス�
 - 整合性・分析: 口調・一人称ブレチェック、設定影響分析、伏線・時系列管理、感情アーク図、4ペルソナ模擬査読
 - 校正・履歴・出力: AI校正、編集差分履歴・復元、全文エクスポート（txt/markdown）`;
 
-export function creativeChatSystemPrompt(context?: CreativeChatContext): string {
+export function creativeChatSystemPrompt(
+  context?: CreativeChatContext
+): string {
   const parts: string[] = [];
 
   parts.push(`あなたはプロの小説編集者・創作パートナーAIです。
@@ -39,26 +41,28 @@ export function creativeChatSystemPrompt(context?: CreativeChatContext): string 
   if (context?.novel) {
     parts.push(`\n# 現在相談中の小説情報
 - タイトル: ${context.novel.title}
-- あらすじ・概要: ${context.novel.description || '（未設定）'}`);
+- あらすじ・概要: ${context.novel.description || "（未設定）"}`);
 
     const guide = context.styleGuide || context.novel.styleGuide;
-    if (guide && guide.trim()) {
-      parts.push(`\n# 登録済みの執筆スタイル・文体ガイドライン\n${guide.trim()}`);
+    if (guide?.trim()) {
+      parts.push(
+        `\n# 登録済みの執筆スタイル・文体ガイドライン\n${guide.trim()}`
+      );
     }
 
     if (context.settings && context.settings.length > 0) {
       parts.push(`\n# 登録済みの世界観・設定情報
-${context.settings.map((s) => `- ${s}`).join('\n')}`);
+${context.settings.map((s) => `- ${s}`).join("\n")}`);
     }
 
     if (context.characters && context.characters.length > 0) {
       parts.push(`\n# 登録済みの登場人物情報
-${context.characters.map((c) => `- ${c}`).join('\n')}`);
+${context.characters.map((c) => `- ${c}`).join("\n")}`);
     }
 
     if (context.additionalContext && context.additionalContext.length > 0) {
       parts.push(`\n# 関連する追加コンテキスト
-${context.additionalContext.map((c) => `- ${c}`).join('\n')}`);
+${context.additionalContext.map((c) => `- ${c}`).join("\n")}`);
     }
   } else {
     parts.push(`\n# コンテキスト
@@ -128,5 +132,5 @@ ${APP_USAGE_GUIDE}`);
 - 人物・設定の具体的な提案をしているときのみこのフォーマットを使用してください。雑談や漠然とした相談では強制しないでください。
 - 提案した内容は、ユーザーが「📥 設定・人物へ取り込む」ボタンから小説データに適用できます（この旨を軽く添えると親切です。必須ではありません）。`);
 
-  return parts.join('\n');
+  return parts.join("\n");
 }

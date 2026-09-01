@@ -1,9 +1,9 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Loading } from './Loading';
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { Loading } from "./Loading";
 
 const meta = {
   component: Loading,
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 } satisfies Meta<typeof Loading>;
 
 export default meta;
@@ -15,25 +15,25 @@ export const Default: Story = {
 
 export const WithLabel: Story = {
   args: {
-    message: 'Loading...',
+    message: "Loading...",
   },
 };
 
 export const Small: Story = {
   args: {
-    size: 'sm',
+    size: "sm",
   },
 };
 
 export const Large: Story = {
   args: {
-    size: 'lg',
+    size: "lg",
   },
 };
 
 export const FullScreen: Story = {
   args: {
     fullScreen: true,
-    message: '生成中...',
+    message: "生成中...",
   },
 };

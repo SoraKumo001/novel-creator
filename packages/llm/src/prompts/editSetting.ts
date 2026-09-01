@@ -3,9 +3,9 @@
  */
 export function editSetting(
   setting: { category: string; name: string; description?: string },
-  instruction: string,
+  instruction: string
 ): string {
-  const description = setting.description ?? '（未設定）';
+  const description = setting.description ?? "（未設定）";
 
   return `あなたは小説の設定を管理する編集者です。以下の設定情報を、指示に従って編集してください。
 

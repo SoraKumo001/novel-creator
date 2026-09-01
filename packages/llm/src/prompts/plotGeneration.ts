@@ -8,11 +8,11 @@ export function plotGeneration(novel: {
   characters?: string[];
 }): string {
   const settings = novel.settings?.length
-    ? novel.settings.map((s) => `- ${s}`).join('\n')
-    : '（指定なし）';
+    ? novel.settings.map((s) => `- ${s}`).join("\n")
+    : "（指定なし）";
   const characters = novel.characters?.length
-    ? novel.characters.map((c) => `- ${c}`).join('\n')
-    : '（指定なし）';
+    ? novel.characters.map((c) => `- ${c}`).join("\n")
+    : "（指定なし）";
 
   return `あなたはプロの小説家です。以下の情報に基づいて、小説の全体プロットと章立てを生成してください。
 

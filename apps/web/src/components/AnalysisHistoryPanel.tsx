@@ -1,28 +1,31 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useToast } from '@/hooks/useToast.js';
-import { toErrorMessage } from '@/lib/errors.js';
-import { deleteAnalysisResult, listAnalysisResults } from '@/lib/services/analysis.js';
-import type { AnalysisHistoryEntry, AnalysisType } from '@/lib/types.js';
-import { ConfirmDialog } from './ConfirmDialog.js';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useToast } from "@/hooks/useToast.js";
+import { toErrorMessage } from "@/lib/errors.js";
+import {
+  deleteAnalysisResult,
+  listAnalysisResults,
+} from "@/lib/services/analysis.js";
+import type { AnalysisHistoryEntry, AnalysisType } from "@/lib/types.js";
+import { ConfirmDialog } from "./ConfirmDialog.js";
 
 interface AnalysisHistoryPanelProps {
-  novelId: string;
   analysisType: AnalysisType;
   /** 親モーダルが開いているか。開いたタイミングで履歴を取得する。 */
   isOpen: boolean;
-  /** 新しい解析が完了した等で履歴を再取得したいときにインクリメントする。 */
-  refreshKey?: number;
-  /** 保存済み結果を選んだときのコールバック。 */
-  onSelect: (entry: AnalysisHistoryEntry) => void;
+  novelId: string;
   /** 「再実行」が押されたときのコールバック。 */
   onRerun: () => void;
+  /** 保存済み結果を選んだときのコールバック。 */
+  onSelect: (entry: AnalysisHistoryEntry) => void;
+  /** 新しい解析が完了した等で履歴を再取得したいときにインクリメントする。 */
+  refreshKey?: number;
 }
 
 /** 1分ごとに相対時刻表示を更新するためのフック。 */
 function useNowMinute(): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 60000);
+    const id = setInterval(() => setNow(Date.now()), 60_000);
     return () => clearInterval(id);
   }, []);
   return now;
@@ -33,16 +36,24 @@ function useNowMinute(): number {
  */
 function formatFriendlyTime(iso: string, now: number): string {
   const time = new Date(iso).getTime();
-  if (Number.isNaN(time)) return '';
+  if (Number.isNaN(time)) {
+    return "";
+  }
   const diffMs = now - time;
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'たった今';
-  if (diffMin < 60) return `${diffMin}分前`;
+  const diffMin = Math.floor(diffMs / 60_000);
+  if (diffMin < 1) {
+    return "たった今";
+  }
+  if (diffMin < 60) {
+    return `${diffMin}分前`;
+  }
   const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24 && diffMs < 24 * 3600000) return `${diffHour}時間前`;
+  if (diffHour < 24 && diffMs < 24 * 3_600_000) {
+    return `${diffHour}時間前`;
+  }
   const d = new Date(time);
-  const hh = String(d.getHours()).padStart(2, '0');
-  const mm = String(d.getMinutes()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
   return `${d.getMonth() + 1}月${d.getDate()}日 ${hh}:${mm}`;
 }
 
@@ -62,7 +73,9 @@ export function AnalysisHistoryPanel({
   const [expanded, setExpanded] = useState(true);
   const [entries, setEntries] = useState<AnalysisHistoryEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [deleteTarget, setDeleteTarget] = useState<AnalysisHistoryEntry | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<AnalysisHistoryEntry | null>(
+    null
+  );
   const [deleting, setDeleting] = useState(false);
   const requestSeq = useRef(0);
   const now = useNowMinute();
@@ -77,7 +90,7 @@ export function AnalysisHistoryPanel({
       }
     } catch (e) {
       // 履歴取得失敗は致命的ではないので静かに扱う
-      console.error('分析履歴の取得に失敗しました', e);
+      console.error("分析履歴の取得に失敗しました", e);
       if (requestSeq.current === seq) {
         setEntries([]);
       }
@@ -90,12 +103,16 @@ export function AnalysisHistoryPanel({
 
   // モーダルが開いたとき・新規実行後に履歴を取得
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
     void load();
   }, [isOpen, load, refreshKey]);
 
   const handleDelete = async () => {
-    if (!deleteTarget) return;
+    if (!deleteTarget) {
+      return;
+    }
     setDeleting(true);
     try {
       await deleteAnalysisResult(novelId, deleteTarget.id);
@@ -117,14 +134,14 @@ export function AnalysisHistoryPanel({
         aria-expanded={expanded}
         className="flex w-full items-center justify-between px-3.5 py-2.5 text-left"
       >
-        <span className="flex items-center gap-2 text-xs font-semibold text-foreground">
+        <span className="flex items-center gap-2 font-semibold text-foreground text-xs">
           <span>履歴</span>
-          <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] font-semibold text-muted-foreground border border-border">
+          <span className="rounded-full border border-border bg-surface px-2 py-0.5 font-semibold text-[10px] text-muted-foreground">
             {entries.length} 件
           </span>
         </span>
         <span
-          className={`text-muted-foreground transition-transform duration-150 ${expanded ? 'rotate-180' : ''}`}
+          className={`text-muted-foreground transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}
           aria-hidden="true"
         >
           ▾
@@ -132,14 +149,16 @@ export function AnalysisHistoryPanel({
       </button>
 
       {expanded && (
-        <div className="space-y-2 border-t border-border/60 px-3.5 py-3">
+        <div className="space-y-2 border-border/60 border-t px-3.5 py-3">
           {/* 再実行 */}
           <div className="flex items-center justify-between gap-2">
-            <p className="text-[11px] text-muted-foreground">過去の保存済み結果を確認できます。</p>
+            <p className="text-[11px] text-muted-foreground">
+              過去の保存済み結果を確認できます。
+            </p>
             <button
               type="button"
               onClick={onRerun}
-              className="shrink-0 rounded-md border border-primary/40 bg-primary/5 px-2.5 py-1 text-[11px] font-semibold text-primary transition hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary"
+              className="shrink-0 rounded-md border border-primary/40 bg-primary/5 px-2.5 py-1 font-semibold text-[11px] text-primary transition hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary"
             >
               新しく実行
             </button>
@@ -147,9 +166,11 @@ export function AnalysisHistoryPanel({
 
           {/* 一覧 */}
           {loading ? (
-            <p className="py-4 text-center text-xs text-muted-foreground">読み込み中…</p>
+            <p className="py-4 text-center text-muted-foreground text-xs">
+              読み込み中…
+            </p>
           ) : entries.length === 0 ? (
-            <p className="py-4 text-center text-xs text-muted-foreground">
+            <p className="py-4 text-center text-muted-foreground text-xs">
               保存された分析結果はまだありません
             </p>
           ) : (
@@ -163,7 +184,7 @@ export function AnalysisHistoryPanel({
                       className="min-w-0 flex-1 text-left"
                       title="この結果を表示"
                     >
-                      <span className="text-foreground-secondary font-semibold">
+                      <span className="font-semibold text-foreground-secondary">
                         {formatFriendlyTime(entry.createdAt, now)}
                       </span>
                     </button>

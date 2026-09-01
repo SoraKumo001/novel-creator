@@ -1,29 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { AIProgressIndicator } from '@/components/AIProgressIndicator.js';
-import { Loading } from '@/components/Loading.js';
-import { HistoryDiffModal } from '@/components/HistoryDiffModal.js';
-import { ProofreadModal } from '@/components/ProofreadModal.js';
-import { VerticalPreviewModal } from '@/components/VerticalPreviewModal.js';
-import { CharacterVoiceCheckerModal } from '@/components/CharacterVoiceCheckerModal.js';
-import { MultiPersonaReviewModal } from '@/components/MultiPersonaReviewModal.js';
-import { StyleGuideModal } from '@/components/StyleGuideModal.js';
-import { InlineAIAssistant } from '@/components/InlineAIAssistant.js';
-import { CustomPromptManagerModal } from '@/components/CustomPromptManagerModal.js';
-import { useContent } from '@/hooks/useContent.js';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AIProgressIndicator } from "@/components/AIProgressIndicator.js";
+import { CharacterVoiceCheckerModal } from "@/components/CharacterVoiceCheckerModal.js";
+import { CustomPromptManagerModal } from "@/components/CustomPromptManagerModal.js";
+import { HistoryDiffModal } from "@/components/HistoryDiffModal.js";
+import { InlineAIAssistant } from "@/components/InlineAIAssistant.js";
+import { Loading } from "@/components/Loading.js";
+import { MultiPersonaReviewModal } from "@/components/MultiPersonaReviewModal.js";
+import { ProofreadModal } from "@/components/ProofreadModal.js";
+import { StyleGuideModal } from "@/components/StyleGuideModal.js";
+import { VerticalPreviewModal } from "@/components/VerticalPreviewModal.js";
+import { useChatUI } from "@/context/ChatContext.js";
 
-import { useAnalysis } from '@/hooks/useAnalysis.js';
-import { useGenerate } from '@/hooks/useGenerate.js';
-import { useChatUI } from '@/context/ChatContext.js';
-import { useNovel } from '@/hooks/useNovel.js';
+import { useAnalysis } from "@/hooks/useAnalysis.js";
+import { useContent } from "@/hooks/useContent.js";
+import { useGenerate } from "@/hooks/useGenerate.js";
 import {
   useHistoryViewState,
   useModalResultState,
   useModalState,
-} from '@/hooks/useModalResultState.js';
-import { useToast } from '@/hooks/useToast.js';
-import { toErrorMessage } from '@/lib/errors.js';
-import { countWords } from '@/lib/sse.js';
-import { proofreadSectionContent } from '@/lib/services/index.js';
+} from "@/hooks/useModalResultState.js";
+import { useNovel } from "@/hooks/useNovel.js";
+import { useToast } from "@/hooks/useToast.js";
+import { toErrorMessage } from "@/lib/errors.js";
+import { proofreadSectionContent } from "@/lib/services/index.js";
+import { countWords } from "@/lib/sse.js";
 import type {
   AnalysisHistoryEntry,
   CharacterVoiceCheckResult,
@@ -32,19 +32,19 @@ import type {
   MultiPersonaReviewResult,
   ProofreadResult,
   Section,
-} from '@/lib/types.js';
-import { MonacoEditor } from './-MonacoEditor.js';
-import { EditorToolbar } from './-EditorToolbar.js';
-import { GenerateContentPanel } from './-GenerateContentPanel.js';
-import { ExtractResultModal } from './-ExtractResultModal.js';
+} from "@/lib/types.js";
+import { EditorToolbar } from "./-EditorToolbar.js";
+import { ExtractResultModal } from "./-ExtractResultModal.js";
+import { GenerateContentPanel } from "./-GenerateContentPanel.js";
+import { MonacoEditor } from "./-MonacoEditor.js";
 
 interface SectionEditorProps {
-  novelId: string;
-  section: Section;
-  onRefresh: () => Promise<void>;
-  onUpdateTitle: (newTitle: string) => Promise<void>;
   isZenMode: boolean;
+  novelId: string;
+  onRefresh: () => Promise<void>;
   onToggleZenMode: () => void;
+  onUpdateTitle: (newTitle: string) => Promise<void>;
+  section: Section;
 }
 
 export function SectionEditor({
@@ -80,12 +80,14 @@ export function SectionEditor({
 
   const { novel, updateNovel, updating: updatingNovel } = useNovel(novelId);
 
-  const [localBody, setLocalBody] = useState('');
-  const [savedBody, setSavedBody] = useState('');
+  const [localBody, setLocalBody] = useState("");
+  const [savedBody, setSavedBody] = useState("");
   const [wordCount, setWordCount] = useState(0);
   const [targetWords, setTargetWords] = useState(() => {
-    const saved = localStorage.getItem(`novel-creator:target-words:${section.id}`);
-    return saved ? parseInt(saved, 10) : 2000;
+    const saved = localStorage.getItem(
+      `novel-creator:target-words:${section.id}`
+    );
+    return saved ? Number.parseInt(saved, 10) : 2000;
   });
 
   // モーダル用ステート
@@ -107,8 +109,8 @@ export function SectionEditor({
   };
 
   // インラインAI支援用ステート
-  const [selectedText, setSelectedText] = useState('');
-  const [inlineVariants, setInlineVariants] = useState<string[]>(['']);
+  const [selectedText, setSelectedText] = useState("");
+  const [inlineVariants, setInlineVariants] = useState<string[]>([""]);
   const [activeVariantIndex, setActiveVariantIndex] = useState(0);
   const [isInlineActive, setIsInlineActive] = useState(false);
 
@@ -129,12 +131,14 @@ export function SectionEditor({
   const isDirty = localBody !== savedBody;
 
   const handleSave = useCallback(async () => {
-    if (!isDirty && !saving) return;
+    if (!isDirty && !saving) {
+      return;
+    }
     try {
       await updateContent(localBody);
       setSavedBody(localBody);
       await onRefresh();
-      toast.success('本文を保存しました');
+      toast.success("本文を保存しました");
     } catch (e) {
       toast.error(toErrorMessage(e));
     }
@@ -143,31 +147,34 @@ export function SectionEditor({
   // Ctrl+S / Cmd+S ショートカットで保存
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
         e.preventDefault();
         void handleSave();
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleSave]);
 
   const handleTargetWordsChange = (val: number) => {
-    const clamped = Math.max(100, Math.min(50000, isNaN(val) ? 2000 : val));
+    const clamped = Math.max(100, Math.min(50_000, isNaN(val) ? 2000 : val));
     setTargetWords(clamped);
-    localStorage.setItem(`novel-creator:target-words:${section.id}`, String(clamped));
+    localStorage.setItem(
+      `novel-creator:target-words:${section.id}`,
+      String(clamped)
+    );
   };
 
-  const [selectedModelConfigId, setSelectedModelConfigId] = useState<string | null>(() => {
-    return localStorage.getItem('novel-creator:editor-model') || null;
-  });
+  const [selectedModelConfigId, setSelectedModelConfigId] = useState<
+    string | null
+  >(() => localStorage.getItem("novel-creator:editor-model") || null);
 
   const handleModelChange = (id: string | null) => {
     setSelectedModelConfigId(id);
     if (id) {
-      localStorage.setItem('novel-creator:editor-model', id);
+      localStorage.setItem("novel-creator:editor-model", id);
     } else {
-      localStorage.removeItem('novel-creator:editor-model');
+      localStorage.removeItem("novel-creator:editor-model");
     }
   };
 
@@ -180,14 +187,16 @@ export function SectionEditor({
         accumulated += chunk;
         setLocalBody(accumulated);
       },
-      selectedModelConfigId,
+      selectedModelConfigId
     );
     await updateContent(accumulated);
     setSavedBody(accumulated);
   }
 
   async function handleExtract() {
-    if (!localBody.trim()) return;
+    if (!localBody.trim()) {
+      return;
+    }
     const result = await extract(section.id);
     extractResultModal.setResult(result);
     extractResultModal.open();
@@ -198,7 +207,7 @@ export function SectionEditor({
   // 校正モーダル
   const handleOpenProofread = async () => {
     if (!localBody.trim()) {
-      toast.error('校正する本文がありません');
+      toast.error("校正する本文がありません");
       return;
     }
     proofreadModal.open();
@@ -210,11 +219,11 @@ export function SectionEditor({
         section.id,
         localBody,
         selectedModelConfigId,
-        controller.signal,
+        controller.signal
       );
       proofreadModal.setResult(res);
     } catch (e) {
-      if ((e as Error)?.name === 'AbortError' || controller.signal.aborted) {
+      if ((e as Error)?.name === "AbortError" || controller.signal.aborted) {
         return;
       }
       toast.error(toErrorMessage(e));
@@ -237,7 +246,7 @@ export function SectionEditor({
   // 口調チェッカーモーダル
   const handleOpenVoiceChecker = async () => {
     if (!localBody.trim()) {
-      toast.error('チェックする本文がありません');
+      toast.error("チェックする本文がありません");
       return;
     }
     voiceCheckerModal.open();
@@ -252,7 +261,9 @@ export function SectionEditor({
       voiceCheckerModal.setResult(res);
       voiceHistory.bumpHistoryKey();
     } catch (e) {
-      if ((e as Error)?.name === 'AbortError') return;
+      if ((e as Error)?.name === "AbortError") {
+        return;
+      }
       voiceCheckerModal.setError(toErrorMessage(e));
     }
   };
@@ -260,7 +271,7 @@ export function SectionEditor({
   // 模擬読者レビューモーダル
   const handleOpenPersonaReview = async () => {
     if (!localBody.trim()) {
-      toast.error('レビュー対象の本文がありません');
+      toast.error("レビュー対象の本文がありません");
       return;
     }
     personaReviewModal.open();
@@ -276,20 +287,26 @@ export function SectionEditor({
       personaReviewModal.setResult(res);
       personaHistory.bumpHistoryKey();
     } catch (e) {
-      if ((e as Error)?.name === 'AbortError') return;
+      if ((e as Error)?.name === "AbortError") {
+        return;
+      }
       personaReviewModal.setError(toErrorMessage(e));
     }
   };
 
   // 履歴から結果を読み込む
   const handleSelectVoiceHistory = (entry: AnalysisHistoryEntry) => {
-    if (entry.analysisType !== 'check-voice') return;
+    if (entry.analysisType !== "check-voice") {
+      return;
+    }
     voiceCheckerModal.setResult(entry.result as CharacterVoiceCheckResult);
     voiceCheckerModal.setError(null);
     voiceHistory.showHistory(entry.createdAt);
   };
   const handleSelectPersonaHistory = (entry: AnalysisHistoryEntry) => {
-    if (entry.analysisType !== 'persona-review') return;
+    if (entry.analysisType !== "persona-review") {
+      return;
+    }
     personaReviewModal.setResult(entry.result as MultiPersonaReviewResult);
     personaReviewModal.setError(null);
     personaHistory.showHistory(entry.createdAt);
@@ -302,20 +319,20 @@ export function SectionEditor({
     (useSelected = false) => {
       if (useSelected && selectedText.trim()) {
         openChat(novelId, {
-          entityType: 'selection',
-          title: `第${section.order}節「${section.title || '（無題）'}」（選択テキスト）`,
+          entityType: "selection",
+          title: `第${section.order}節「${section.title || "（無題）"}」（選択テキスト）`,
           selectedText: selectedText.trim(),
         });
         return;
       }
 
       openChat(novelId, {
-        entityType: 'section',
-        title: `第${section.order}節「${section.title || '（無題）'}」`,
-        summary: localBody.slice(0, 800) + (localBody.length > 800 ? '…' : ''),
+        entityType: "section",
+        title: `第${section.order}節「${section.title || "（無題）"}」`,
+        summary: localBody.slice(0, 800) + (localBody.length > 800 ? "…" : ""),
       });
     },
-    [localBody, novelId, openChat, section.order, section.title, selectedText],
+    [localBody, novelId, openChat, section.order, section.title, selectedText]
   );
 
   // 選択テキスト変更
@@ -331,11 +348,13 @@ export function SectionEditor({
     action: InlineAssistAction,
     customInstruction?: string,
     customPromptId?: string | null,
-    variantCount: number = 1,
+    variantCount: number = 1
   ) => {
-    if (!selectedText) return;
+    if (!selectedText) {
+      return;
+    }
     const count = Math.max(1, Math.min(3, variantCount));
-    const initialVariants = Array.from({ length: count }, () => '');
+    const initialVariants = Array.from({ length: count }, () => "");
     setInlineVariants(initialVariants);
     setActiveVariantIndex(0);
     const accVariants = [...initialVariants];
@@ -353,12 +372,14 @@ export function SectionEditor({
         },
         (chunk, variantIndex) => {
           const idx =
-            typeof variantIndex === 'number' && variantIndex >= 0 && variantIndex < count
+            typeof variantIndex === "number" &&
+            variantIndex >= 0 &&
+            variantIndex < count
               ? variantIndex
               : 0;
-          accVariants[idx] = (accVariants[idx] || '') + chunk;
+          accVariants[idx] = (accVariants[idx] || "") + chunk;
           setInlineVariants([...accVariants]);
-        },
+        }
       );
     } catch (e) {
       toast.error(toErrorMessage(e));
@@ -367,29 +388,37 @@ export function SectionEditor({
 
   // インラインAI置換
   const handleApplyInlineReplace = (generated: string) => {
-    if (!selectedText || !generated) return;
+    if (!selectedText || !generated) {
+      return;
+    }
     const newBody = localBody.replace(selectedText, generated);
     setLocalBody(newBody);
     setIsInlineActive(false);
-    setSelectedText('');
-    setInlineVariants(['']);
+    setSelectedText("");
+    setInlineVariants([""]);
     setActiveVariantIndex(0);
-    toast.success('選択範囲を書き換えました');
+    toast.success("選択範囲を書き換えました");
   };
 
   // インラインAI挿入
   const handleApplyInlineInsertAfter = (generated: string) => {
-    if (!selectedText || !generated) return;
+    if (!selectedText || !generated) {
+      return;
+    }
     const idx = localBody.indexOf(selectedText);
     if (idx !== -1) {
       const insertPos = idx + selectedText.length;
-      const newBody = localBody.slice(0, insertPos) + '\n' + generated + localBody.slice(insertPos);
+      const newBody =
+        localBody.slice(0, insertPos) +
+        "\n" +
+        generated +
+        localBody.slice(insertPos);
       setLocalBody(newBody);
       setIsInlineActive(false);
-      setSelectedText('');
-      setInlineVariants(['']);
+      setSelectedText("");
+      setInlineVariants([""]);
       setActiveVariantIndex(0);
-      toast.success('直後にテキストを挿入しました');
+      toast.success("直後にテキストを挿入しました");
     }
   };
 
@@ -398,17 +427,20 @@ export function SectionEditor({
     if (localBody.includes(orig)) {
       const updated = localBody.replace(orig, sugg);
       setLocalBody(updated);
-      toast.success('セリフを修正しました');
+      toast.success("セリフを修正しました");
     } else {
-      toast.error('本文中に該当箇所が見つかりませんでした');
+      toast.error("本文中に該当箇所が見つかりませんでした");
     }
   };
 
   // 進捗率
-  const progressPercent = Math.min(100, Math.round((wordCount / targetWords) * 100));
+  const progressPercent = Math.min(
+    100,
+    Math.round((wordCount / targetWords) * 100)
+  );
 
   return (
-    <div className="flex h-full w-full flex-col min-h-0 overflow-hidden">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
       <EditorToolbar
         section={section}
         onUpdateTitle={onUpdateTitle}
@@ -438,17 +470,17 @@ export function SectionEditor({
       />
 
       {/* 目標達成度プログレスバー */}
-      <div className="h-1 w-full bg-border shrink-0">
+      <div className="h-1 w-full shrink-0 bg-border">
         <div
           className={`h-full transition-all duration-300 ${
-            progressPercent >= 100 ? 'bg-emerald-500' : 'bg-primary'
+            progressPercent >= 100 ? "bg-emerald-500" : "bg-primary"
           }`}
           style={{ width: `${progressPercent}%` }}
         />
       </div>
 
       {extracting && (
-        <div className="px-4 py-2 border-b border-border bg-surface shrink-0">
+        <div className="shrink-0 border-border border-b bg-surface px-4 py-2">
           <AIProgressIndicator
             variant="inline"
             stage="AIが本文から設定・時系列を自動抽出中..."
@@ -459,11 +491,11 @@ export function SectionEditor({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-hidden relative flex flex-col">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
         {loading ? (
           <Loading message="本文を読み込み中..." />
         ) : (
-          <div className="flex-1 min-h-0 overflow-hidden relative">
+          <div className="relative min-h-0 flex-1 overflow-hidden">
             <MonacoEditor
               value={localBody}
               onChange={setLocalBody}
@@ -472,18 +504,18 @@ export function SectionEditor({
 
             {/* 選択テキストがある場合のインラインAI・チャット相談トリガーバー */}
             {selectedText && !isInlineActive && (
-              <div className="absolute top-4 right-8 z-30 flex items-center gap-2 animate-in fade-in slide-in-from-top-1 duration-150">
+              <div className="fade-in slide-in-from-top-1 absolute top-4 right-8 z-30 flex animate-in items-center gap-2 duration-150">
                 <button
                   type="button"
                   onClick={() => setIsInlineActive(true)}
-                  className="flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-bold text-primary-foreground shadow-lg hover:brightness-110 transition cursor-pointer border border-primary/20"
+                  className="flex cursor-pointer items-center gap-1.5 rounded-full border border-primary/20 bg-primary px-3.5 py-1.5 font-bold text-primary-foreground text-xs shadow-lg transition hover:brightness-110"
                 >
                   <span>✨ 選択範囲をAI推敲 ({selectedText.length}文字)</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => handleOpenChat(true)}
-                  className="flex items-center gap-1.5 rounded-full bg-surface-raised border border-border px-3.5 py-1.5 text-xs font-bold text-foreground shadow-lg hover:bg-surface-hover hover:border-primary/50 transition cursor-pointer"
+                  className="flex cursor-pointer items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3.5 py-1.5 font-bold text-foreground text-xs shadow-lg transition hover:border-primary/50 hover:bg-surface-hover"
                 >
                   <span>💬 チャットで相談</span>
                 </button>
@@ -503,7 +535,7 @@ export function SectionEditor({
                       cancelGeneration();
                     }
                     setIsInlineActive(false);
-                    setInlineVariants(['']);
+                    setInlineVariants([""]);
                     setActiveVariantIndex(0);
                   }}
                   onExecuteAssist={handleExecuteInlineAssist}
@@ -544,7 +576,7 @@ export function SectionEditor({
         onRestoreSuccess={(restored) => {
           setLocalBody(restored);
           setSavedBody(restored);
-          toast.success('過去のバージョンから本文を復元しました');
+          toast.success("過去のバージョンから本文を復元しました");
           void onRefresh();
         }}
       />
@@ -562,7 +594,7 @@ export function SectionEditor({
         onCancel={handleCancelProofread}
         onApplyPolishedBody={(polished) => {
           setLocalBody(polished);
-          toast.success('推敲後の文章を本文に反映しました');
+          toast.success("推敲後の文章を本文に反映しました");
         }}
       />
       <CharacterVoiceCheckerModal
@@ -570,7 +602,7 @@ export function SectionEditor({
         onClose={voiceCheckerModal.close}
         result={voiceCheckerModal.result}
         progress={progress}
-        running={running === 'check-voice'}
+        running={running === "check-voice"}
         error={voiceCheckerModal.error}
         isHistoryView={voiceHistory.isHistoryView}
         viewedAt={voiceHistory.viewedAt}
@@ -586,7 +618,7 @@ export function SectionEditor({
         onClose={personaReviewModal.close}
         result={personaReviewModal.result}
         progress={progress}
-        running={running === 'persona-review'}
+        running={running === "persona-review"}
         error={personaReviewModal.error}
         isHistoryView={personaHistory.isHistoryView}
         viewedAt={personaHistory.viewedAt}

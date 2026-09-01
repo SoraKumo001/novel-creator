@@ -1,25 +1,29 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toErrorMessage } from '@/lib/errors.js';
-import { novelKeys } from '@/lib/queryKeys.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toErrorMessage } from "@/lib/errors.js";
+import { novelKeys } from "@/lib/queryKeys.js";
 import {
   createTimeline,
   deleteTimeline,
   fetchTimelines,
   updateTimeline,
-} from '@/lib/services/index.js';
-import type { CreateTimelineInput, Timeline, UpdateTimelineInput } from '@/lib/types.js';
+} from "@/lib/services/index.js";
+import type {
+  CreateTimelineInput,
+  Timeline,
+  UpdateTimelineInput,
+} from "@/lib/types.js";
 
 interface UseTimelinesReturn {
-  timelines: Timeline[];
-  loading: boolean;
-  error: string | null;
-  refetch: () => Promise<void>;
   createTimeline: (input: CreateTimelineInput) => Promise<Timeline>;
-  updateTimeline: (id: string, input: UpdateTimelineInput) => Promise<Timeline>;
-  deleteTimeline: (id: string) => Promise<void>;
   creating: boolean;
-  updating: boolean;
+  deleteTimeline: (id: string) => Promise<void>;
   deleting: boolean;
+  error: string | null;
+  loading: boolean;
+  refetch: () => Promise<void>;
+  timelines: Timeline[];
+  updateTimeline: (id: string, input: UpdateTimelineInput) => Promise<Timeline>;
+  updating: boolean;
 }
 
 export function useTimelines(novelId: string): UseTimelinesReturn {
@@ -38,18 +42,21 @@ export function useTimelines(novelId: string): UseTimelinesReturn {
 
   const createMutation = useMutation({
     mutationFn: (input: CreateTimelineInput) => createTimeline(novelId, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.timelines(novelId) }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: novelKeys.timelines(novelId) }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateTimelineInput }) =>
       updateTimeline(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.timelines(novelId) }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: novelKeys.timelines(novelId) }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteTimeline(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.timelines(novelId) }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: novelKeys.timelines(novelId) }),
   });
 
   return {

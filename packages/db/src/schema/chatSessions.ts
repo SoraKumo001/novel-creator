@@ -1,5 +1,5 @@
-import { pgTable, text, timestamp, uuid, jsonb } from 'drizzle-orm/pg-core';
-import { novels } from './novels.js';
+import { jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { novels } from "./novels.js";
 
 /**
  * 相談セッションの権限モード。
@@ -7,31 +7,33 @@ import { novels } from './novels.js';
  * - suggest: 編集提案（適用にはユーザー承認が必須）
  * - edit: 自動適用（本文・削除は常に承認必須）
  */
-export const CHAT_PERMISSION_MODES = ['consult', 'suggest', 'edit'] as const;
+export const CHAT_PERMISSION_MODES = ["consult", "suggest", "edit"] as const;
 export type ChatPermissionMode = (typeof CHAT_PERMISSION_MODES)[number];
 
-export const chatSessions = pgTable('chat_sessions', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  novelId: uuid('novel_id').references(() => novels.id, { onDelete: 'cascade' }),
-  title: text('title').notNull().default('新しい相談'),
-  permissionMode: text('permission_mode').notNull().default('consult'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+export const chatSessions = pgTable("chat_sessions", {
+  createdAt: timestamp("created_at").defaultNow(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  novelId: uuid("novel_id").references(() => novels.id, {
+    onDelete: "cascade",
+  }),
+  permissionMode: text("permission_mode").notNull().default("consult"),
+  title: text("title").notNull().default("新しい相談"),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-export const chatMessages = pgTable('chat_messages', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  sessionId: uuid('session_id')
-    .notNull()
-    .references(() => chatSessions.id, { onDelete: 'cascade' }),
-  role: text('role').notNull(), // 'user' | 'assistant' | 'tool'
-  content: text('content').notNull(),
+export const chatMessages = pgTable("chat_messages", {
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  id: uuid("id").primaryKey().defaultRandom(),
   /**
    * AI SDK UIMessage の parts 配列（テキスト・ツール呼び出し・承認要求などを含む）。
    * Phase 0 では null 許容（従来メッセージはテキストのみ）。
    */
-  parts: jsonb('parts'),
-  createdAt: timestamp('created_at').defaultNow(),
+  parts: jsonb("parts"),
+  role: text("role").notNull(), // 'user' | 'assistant' | 'tool'
+  sessionId: uuid("session_id")
+    .notNull()
+    .references(() => chatSessions.id, { onDelete: "cascade" }),
 });
 
 export type ChatSession = typeof chatSessions.$inferSelect;

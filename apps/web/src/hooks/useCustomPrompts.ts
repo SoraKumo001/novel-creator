@@ -1,22 +1,22 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from "react";
+import { toErrorMessage } from "@/lib/errors.js";
 import {
   createCustomPrompt,
   deleteCustomPrompt,
   fetchCustomPrompts,
   seedDefaultCustomPrompts,
   updateCustomPrompt,
-} from '@/lib/services/customPrompts.js';
+} from "@/lib/services/customPrompts.js";
 import type {
   CreateCustomPromptInput,
   CustomPrompt,
   UpdateCustomPromptInput,
-} from '@/lib/types.js';
-import { toErrorMessage } from '@/lib/errors.js';
+} from "@/lib/types.js";
 
 interface UseCustomPromptsOptions {
-  novelId?: string | null;
-  category?: 'inline' | 'generation' | 'chat' | 'general';
   autoFetch?: boolean;
+  category?: "inline" | "generation" | "chat" | "general";
+  novelId?: string | null;
 }
 
 export function useCustomPrompts(options: UseCustomPromptsOptions = {}) {
@@ -56,17 +56,20 @@ export function useCustomPrompts(options: UseCustomPromptsOptions = {}) {
     }
   }, []);
 
-  const handleUpdate = useCallback(async (id: string, input: UpdateCustomPromptInput) => {
-    setError(null);
-    try {
-      const updated = await updateCustomPrompt(id, input);
-      setPrompts((prev) => prev.map((p) => (p.id === id ? updated : p)));
-      return updated;
-    } catch (err) {
-      setError(toErrorMessage(err));
-      throw err;
-    }
-  }, []);
+  const handleUpdate = useCallback(
+    async (id: string, input: UpdateCustomPromptInput) => {
+      setError(null);
+      try {
+        const updated = await updateCustomPrompt(id, input);
+        setPrompts((prev) => prev.map((p) => (p.id === id ? updated : p)));
+        return updated;
+      } catch (err) {
+        setError(toErrorMessage(err));
+        throw err;
+      }
+    },
+    []
+  );
 
   const handleDelete = useCallback(async (id: string) => {
     setError(null);

@@ -1,16 +1,16 @@
-import { desc, eq } from 'drizzle-orm';
-import { chapters, characters, novels, settings } from '@novel-creator/db';
+import { chapters, characters, novels, settings } from "@novel-creator/db";
 import {
   editStoryOutlineDocument,
   editStoryOutlineSection,
   generateJSON,
   generatePlotFromStoryOutline,
   generateText,
-} from '@novel-creator/llm';
-import { searchContext } from '../rag.js';
-import { insertEditHistory } from './history.service.js';
-import { resolveLLMModel } from './model-resolver.js';
-import { assertFound, ValidationError, type ServiceContext } from './types.js';
+} from "@novel-creator/llm";
+import { desc, eq } from "drizzle-orm";
+import { searchContext } from "../rag.js";
+import { insertEditHistory } from "./history.service.js";
+import { resolveLLMModel } from "./model-resolver.js";
+import { assertFound, type ServiceContext, ValidationError } from "./types.js";
 
 export class NovelDomainService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -20,19 +20,26 @@ export class NovelDomainService {
   }
 
   async getNovelDetail(id: string) {
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, id));
-    assertFound(novel, 'Novel not found');
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, id));
+    assertFound(novel, "Novel not found");
 
     const [chapterRows, characterRows, settingRows] = await Promise.all([
-      this.ctx.db.select().from(chapters).where(eq(chapters.novelId, id)).orderBy(chapters.order),
+      this.ctx.db
+        .select()
+        .from(chapters)
+        .where(eq(chapters.novelId, id))
+        .orderBy(chapters.order),
       this.ctx.db.select().from(characters).where(eq(characters.novelId, id)),
       this.ctx.db.select().from(settings).where(eq(settings.novelId, id)),
     ]);
 
     return {
-      novel,
       chapters: chapterRows,
       characters: characterRows,
+      novel,
       settings: settingRows,
     };
   }
@@ -44,15 +51,15 @@ export class NovelDomainService {
     storyOutline?: string | null;
   }) {
     if (!data.title?.trim()) {
-      throw new ValidationError('Title is required');
+      throw new ValidationError("Title is required");
     }
     const [row] = await this.ctx.db
       .insert(novels)
       .values({
-        title: data.title,
         description: data.description ?? null,
-        styleGuide: data.styleGuide ?? null,
         storyOutline: data.storyOutline ?? null,
+        styleGuide: data.styleGuide ?? null,
+        title: data.title,
       })
       .returning();
     return row;
@@ -65,20 +72,26 @@ export class NovelDomainService {
       description?: string | null;
       styleGuide?: string | null;
       storyOutline?: string | null;
-    },
+    }
   ) {
     const [row] = await this.ctx.db
       .update(novels)
       .set({
-        ...(data.title !== undefined ? { title: data.title } : {}),
-        ...(data.description !== undefined ? { description: data.description } : {}),
-        ...(data.styleGuide !== undefined ? { styleGuide: data.styleGuide } : {}),
-        ...(data.storyOutline !== undefined ? { storyOutline: data.storyOutline } : {}),
+        ...(data.title === undefined ? {} : { title: data.title }),
+        ...(data.description === undefined
+          ? {}
+          : { description: data.description }),
+        ...(data.styleGuide === undefined
+          ? {}
+          : { styleGuide: data.styleGuide }),
+        ...(data.storyOutline === undefined
+          ? {}
+          : { storyOutline: data.storyOutline }),
         updatedAt: new Date(),
       })
       .where(eq(novels.id, id))
       .returning();
-    assertFound(row, 'Novel not found');
+    assertFound(row, "Novel not found");
     return row;
   }
 
@@ -87,15 +100,18 @@ export class NovelDomainService {
       .select({ storyOutline: novels.storyOutline })
       .from(novels)
       .where(eq(novels.id, id));
-    assertFound(novel, 'Novel not found');
-    return novel.storyOutline ?? '';
+    assertFound(novel, "Novel not found");
+    return novel.storyOutline ?? "";
   }
 
   async saveStoryOutline(id: string, markdown: string) {
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, id));
-    assertFound(novel, 'Novel not found');
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, id));
+    assertFound(novel, "Novel not found");
 
-    const previousMarkdown = novel.storyOutline ?? '';
+    const previousMarkdown = novel.storyOutline ?? "";
     const [updated] = await this.ctx.db
       .update(novels)
       .set({
@@ -107,12 +123,12 @@ export class NovelDomainService {
 
     if (previousMarkdown.trim() !== markdown.trim()) {
       await insertEditHistory(this.ctx.db, {
-        novelId: id,
-        entityType: 'story_outline_markdown',
-        entityId: id,
-        title: `${novel.title} - ストーリー構想`,
         content: markdown,
-        description: 'ストーリー構想マークダウンを更新',
+        description: "ストーリー構想マークダウンを更新",
+        entityId: id,
+        entityType: "story_outline_markdown",
+        novelId: id,
+        title: `${novel.title} - ストーリー構想`,
         wordCount: markdown.length,
       });
     }
@@ -127,10 +143,13 @@ export class NovelDomainService {
       instruction: string;
       markdown: string;
       modelConfigId?: string | null;
-    },
+    }
   ): Promise<string> {
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, id));
-    assertFound(novel, 'Novel not found');
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, id));
+    assertFound(novel, "Novel not found");
 
     let contextSettings: string[] = [];
     let contextCharacters: string[] = [];
@@ -140,7 +159,7 @@ export class NovelDomainService {
         this.ctx.embedding,
         id,
         { query: `${params.activeSection.name} ${params.instruction}` },
-        this.ctx.env,
+        this.ctx.env
       );
       contextSettings = context.settings;
       contextCharacters = context.characters;
@@ -148,14 +167,22 @@ export class NovelDomainService {
       // ベクトル検索失敗時は空コンテキストで継続
     }
 
-    const prompt = editStoryOutlineSection(params.activeSection, params.instruction, {
-      novelTitle: novel.title,
-      characters: contextCharacters,
-      settings: contextSettings,
-      entireOutlinePreview: params.markdown.slice(0, 3000),
-    });
+    const prompt = editStoryOutlineSection(
+      params.activeSection,
+      params.instruction,
+      {
+        characters: contextCharacters,
+        entireOutlinePreview: params.markdown.slice(0, 3000),
+        novelTitle: novel.title,
+        settings: contextSettings,
+      }
+    );
 
-    const llm = await resolveLLMModel(this.ctx, params.modelConfigId, 'useDefault');
+    const llm = await resolveLLMModel(
+      this.ctx,
+      params.modelConfigId,
+      "useDefault"
+    );
     return generateText(llm, prompt);
   }
 
@@ -165,10 +192,13 @@ export class NovelDomainService {
       instruction: string;
       markdown: string;
       modelConfigId?: string | null;
-    },
+    }
   ): Promise<string> {
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, id));
-    assertFound(novel, 'Novel not found');
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, id));
+    assertFound(novel, "Novel not found");
 
     let contextSettings: string[] = [];
     let contextCharacters: string[] = [];
@@ -178,7 +208,7 @@ export class NovelDomainService {
         this.ctx.embedding,
         id,
         { query: `${novel.title} ${params.instruction}` },
-        this.ctx.env,
+        this.ctx.env
       );
       contextSettings = context.settings;
       contextCharacters = context.characters;
@@ -186,13 +216,21 @@ export class NovelDomainService {
       // ベクトル検索失敗時は空コンテキストで継続
     }
 
-    const prompt = editStoryOutlineDocument(params.markdown, params.instruction, {
-      novelTitle: novel.title,
-      characters: contextCharacters,
-      settings: contextSettings,
-    });
+    const prompt = editStoryOutlineDocument(
+      params.markdown,
+      params.instruction,
+      {
+        characters: contextCharacters,
+        novelTitle: novel.title,
+        settings: contextSettings,
+      }
+    );
 
-    const llm = await resolveLLMModel(this.ctx, params.modelConfigId, 'useDefault');
+    const llm = await resolveLLMModel(
+      this.ctx,
+      params.modelConfigId,
+      "useDefault"
+    );
     return generateText(llm, prompt);
   }
 
@@ -201,10 +239,13 @@ export class NovelDomainService {
     params: {
       storyOutline: string;
       modelConfigId?: string | null;
-    },
+    }
   ) {
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, id));
-    assertFound(novel, 'Novel not found');
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, id));
+    assertFound(novel, "Novel not found");
 
     let contextSettings: string[] = [];
     let contextCharacters: string[] = [];
@@ -214,7 +255,7 @@ export class NovelDomainService {
         this.ctx.embedding,
         id,
         { query: `${novel.title} ${params.storyOutline.slice(0, 500)}` },
-        this.ctx.env,
+        this.ctx.env
       );
       contextSettings = context.settings;
       contextCharacters = context.characters;
@@ -223,13 +264,17 @@ export class NovelDomainService {
     }
 
     const prompt = generatePlotFromStoryOutline({
-      novelTitle: novel.title,
-      storyOutline: params.storyOutline,
       characters: contextCharacters,
+      novelTitle: novel.title,
       settings: contextSettings,
+      storyOutline: params.storyOutline,
     });
 
-    const llm = await resolveLLMModel(this.ctx, params.modelConfigId, 'useDefault');
+    const llm = await resolveLLMModel(
+      this.ctx,
+      params.modelConfigId,
+      "useDefault"
+    );
     return generateJSON<{
       title: string;
       description: string;
@@ -238,8 +283,11 @@ export class NovelDomainService {
   }
 
   async deleteNovel(id: string) {
-    const [row] = await this.ctx.db.delete(novels).where(eq(novels.id, id)).returning();
-    assertFound(row, 'Novel not found');
+    const [row] = await this.ctx.db
+      .delete(novels)
+      .where(eq(novels.id, id))
+      .returning();
+    assertFound(row, "Novel not found");
     return row;
   }
 }

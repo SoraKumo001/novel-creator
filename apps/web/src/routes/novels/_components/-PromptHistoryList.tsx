@@ -1,4 +1,4 @@
-import type { LlmInstruction } from '@/lib/types.js';
+import type { LlmInstruction } from "@/lib/types.js";
 
 interface PromptHistoryListProps {
   instructions: LlmInstruction[];
@@ -11,14 +11,16 @@ export function PromptHistoryList({
   onApply,
   onRequestDelete,
 }: PromptHistoryListProps) {
-  if (instructions.length === 0) return null;
+  if (instructions.length === 0) {
+    return null;
+  }
 
   return (
-    <div className="pt-2 border-t border-border">
-      <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+    <div className="border-border border-t pt-2">
+      <h4 className="mb-2 font-bold text-muted-foreground text-xs uppercase tracking-wider">
         過去のプロンプト履歴
       </h4>
-      <ul className="space-y-2 max-h-60 overflow-y-auto pr-1">
+      <ul className="max-h-60 space-y-2 overflow-y-auto pr-1">
         {instructions.map((item) => (
           <li
             key={item.id}
@@ -27,7 +29,7 @@ export function PromptHistoryList({
             <button
               type="button"
               onClick={() => onApply(item.instruction)}
-              className="flex-1 text-left text-xs text-foreground transition group-hover:text-primary leading-relaxed"
+              className="flex-1 text-left text-foreground text-xs leading-relaxed transition group-hover:text-primary"
               title="この指示を入力欄に適用"
             >
               {item.instruction}
@@ -36,7 +38,7 @@ export function PromptHistoryList({
               type="button"
               onClick={() => onRequestDelete(item.id)}
               title="履歴から削除"
-              className="rounded p-1 text-muted-foreground opacity-60 hover:opacity-100 hover:text-destructive hover:bg-destructive/10 transition shrink-0"
+              className="shrink-0 rounded p-1 text-muted-foreground opacity-60 transition hover:bg-destructive/10 hover:text-destructive hover:opacity-100"
             >
               <TrashIcon />
             </button>

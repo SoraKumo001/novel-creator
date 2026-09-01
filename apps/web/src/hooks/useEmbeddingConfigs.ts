@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toErrorMessage } from '@/lib/errors.js';
-import { embeddingConfigKeys } from '@/lib/queryKeys.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toErrorMessage } from "@/lib/errors.js";
+import { embeddingConfigKeys } from "@/lib/queryKeys.js";
 import {
   createEmbeddingConfig,
   deleteEmbeddingConfig,
@@ -8,31 +8,36 @@ import {
   setDefaultEmbeddingConfig,
   testEmbeddingConfig,
   updateEmbeddingConfig,
-} from '@/lib/services/index.js';
+} from "@/lib/services/index.js";
 import type {
   CreateEmbeddingConfigInput,
   EmbeddingConfig,
   TestConnectionResult,
   TestEmbeddingConnectionInput,
   UpdateEmbeddingConfigInput,
-} from '@/lib/types.js';
+} from "@/lib/types.js";
 
 interface UseEmbeddingConfigsReturn {
   configs: EmbeddingConfig[];
-  defaultConfig: EmbeddingConfig | undefined;
-  loading: boolean;
-  error: string | null;
-  refetch: () => Promise<void>;
   createConfig: (input: CreateEmbeddingConfigInput) => Promise<EmbeddingConfig>;
-  updateConfig: (id: string, input: UpdateEmbeddingConfigInput) => Promise<EmbeddingConfig>;
-  deleteConfig: (id: string) => Promise<void>;
-  setDefaultConfig: (id: string) => Promise<EmbeddingConfig>;
-  testConnection: (input: TestEmbeddingConnectionInput) => Promise<TestConnectionResult>;
   creating: boolean;
-  updating: boolean;
+  defaultConfig: EmbeddingConfig | undefined;
+  deleteConfig: (id: string) => Promise<void>;
   deleting: boolean;
+  error: string | null;
+  loading: boolean;
+  refetch: () => Promise<void>;
+  setDefaultConfig: (id: string) => Promise<EmbeddingConfig>;
   settingDefault: boolean;
+  testConnection: (
+    input: TestEmbeddingConnectionInput
+  ) => Promise<TestConnectionResult>;
   testing: boolean;
+  updateConfig: (
+    id: string,
+    input: UpdateEmbeddingConfigInput
+  ) => Promise<EmbeddingConfig>;
+  updating: boolean;
 }
 
 export function useEmbeddingConfigs(): UseEmbeddingConfigsReturn {
@@ -49,28 +54,39 @@ export function useEmbeddingConfigs(): UseEmbeddingConfigsReturn {
   });
 
   const createMutation = useMutation({
-    mutationFn: (input: CreateEmbeddingConfigInput) => createEmbeddingConfig(input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: embeddingConfigKeys.all }),
+    mutationFn: (input: CreateEmbeddingConfigInput) =>
+      createEmbeddingConfig(input),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: embeddingConfigKeys.all }),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdateEmbeddingConfigInput }) =>
-      updateEmbeddingConfig(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: embeddingConfigKeys.all }),
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: UpdateEmbeddingConfigInput;
+    }) => updateEmbeddingConfig(id, input),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: embeddingConfigKeys.all }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteEmbeddingConfig(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: embeddingConfigKeys.all }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: embeddingConfigKeys.all }),
   });
 
   const setDefaultMutation = useMutation({
     mutationFn: (id: string) => setDefaultEmbeddingConfig(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: embeddingConfigKeys.all }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: embeddingConfigKeys.all }),
   });
 
   const testMutation = useMutation({
-    mutationFn: (input: TestEmbeddingConnectionInput) => testEmbeddingConfig(input),
+    mutationFn: (input: TestEmbeddingConnectionInput) =>
+      testEmbeddingConfig(input),
   });
 
   const defaultConfig = configs.find((c) => c.isDefault);

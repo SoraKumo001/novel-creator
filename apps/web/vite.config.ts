@@ -1,15 +1,15 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import { TanStackRouterVite } from '@tanstack/router-plugin/vite';
-import path from 'node:path';
+import path from "node:path";
+import { TanStackRouterVite } from "@tanstack/router-plugin/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
 
 const proxy = {
-  '/api': {
-    target: 'http://localhost:3000',
+  "/api": {
+    target: "http://localhost:3000",
     changeOrigin: true,
   },
-  '/novelcreator.v1.': {
-    target: 'http://localhost:3000',
+  "/novelcreator.v1.": {
+    target: "http://localhost:3000",
     changeOrigin: true,
   },
 };
@@ -18,7 +18,7 @@ export default defineConfig({
   plugins: [TanStackRouterVite(), react()],
   resolve: {
     alias: {
-      '@': path.resolve(import.meta.dirname, './src'),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
   server: {

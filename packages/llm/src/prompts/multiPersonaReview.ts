@@ -1,30 +1,40 @@
 export type ReaderPersonaType =
-  | 'editor' // 商業文芸・ラノベ編集者（構成・引き・商業性重視）
-  | 'casual' // 一般エンタメ読者（面白さ・感情移入・爽快感重視）
-  | 'lore' // 世界観・考察派読者（設定の緻密さ・伏線重視）
-  | 'critic'; // 辛口文学評論家（文体・テーマ性・心理描写重視）
+  | "editor" // 商業文芸・ラノベ編集者（構成・引き・商業性重視）
+  | "casual" // 一般エンタメ読者（面白さ・感情移入・爽快感重視）
+  | "lore" // 世界観・考察派読者（設定の緻密さ・伏線重視）
+  | "critic"; // 辛口文学評論家（文体・テーマ性・心理描写重視）
 
 export interface MultiPersonaReviewContext {
-  novelTitle?: string;
-  genre?: string;
-  targetAudience?: string;
   chapterTitle?: string;
+  genre?: string;
+  novelTitle?: string;
   sectionTitle?: string;
+  targetAudience?: string;
   text: string;
 }
 
-export function multiPersonaReviewPrompt(context: MultiPersonaReviewContext): string {
+export function multiPersonaReviewPrompt(
+  context: MultiPersonaReviewContext
+): string {
   let prompt = `あなたは多様な視点を持つ小説の査読チーム（編集者、ライト読者、設定考察派ファン、辛口文芸評論家）です。
 以下の小説テキストを精読し、4つの異なるペルソナになりきって独自の視点から感想・評価・改善点をフィードバックしてください。
 
 ■ 作品情報:
-- タイトル: ${context.novelTitle ?? '未設定'}
+- タイトル: ${context.novelTitle ?? "未設定"}
 `;
 
-  if (context.genre) prompt += `- ジャンル: ${context.genre}\n`;
-  if (context.targetAudience) prompt += `- ターゲット層: ${context.targetAudience}\n`;
-  if (context.chapterTitle) prompt += `- 対象章: ${context.chapterTitle}\n`;
-  if (context.sectionTitle) prompt += `- 対象節: ${context.sectionTitle}\n`;
+  if (context.genre) {
+    prompt += `- ジャンル: ${context.genre}\n`;
+  }
+  if (context.targetAudience) {
+    prompt += `- ターゲット層: ${context.targetAudience}\n`;
+  }
+  if (context.chapterTitle) {
+    prompt += `- 対象章: ${context.chapterTitle}\n`;
+  }
+  if (context.sectionTitle) {
+    prompt += `- 対象節: ${context.sectionTitle}\n`;
+  }
 
   prompt += `\n■ 対象本文:\n\`\`\`\n${context.text}\n\`\`\`\n\n`;
 

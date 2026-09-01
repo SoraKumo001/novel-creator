@@ -1,6 +1,6 @@
-import { eq } from 'drizzle-orm';
-import { timelines } from '@novel-creator/db';
-import { assertFound, ValidationError, type ServiceContext } from './types.js';
+import { timelines } from "@novel-creator/db";
+import { eq } from "drizzle-orm";
+import { assertFound, type ServiceContext, ValidationError } from "./types.js";
 
 export class TimelineDomainService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -19,7 +19,7 @@ export class TimelineDomainService {
       .from(timelines)
       .where(eq(timelines.novelId, novelId))
       .orderBy(timelines.order);
-    return rows.length > 0 ? (rows[rows.length - 1].order ?? 0) + 1 : 1;
+    return rows.length > 0 ? (rows.at(-1)?.order ?? 0) + 1 : 1;
   }
 
   async createTimeline(data: {
@@ -30,7 +30,7 @@ export class TimelineDomainService {
     sectionId?: string | null;
   }) {
     if (!data.event?.trim()) {
-      throw new ValidationError('Event is required');
+      throw new ValidationError("Event is required");
     }
     const order =
       data.order !== undefined && data.order > 0
@@ -40,10 +40,10 @@ export class TimelineDomainService {
     const [row] = await this.ctx.db
       .insert(timelines)
       .values({
-        novelId: data.novelId,
-        sectionId: data.sectionId || null,
         event: data.event,
+        novelId: data.novelId,
         order,
+        sectionId: data.sectionId || null,
         timestamp: data.timestamp || null,
       })
       .returning();
@@ -57,31 +57,40 @@ export class TimelineDomainService {
       order?: number;
       timestamp?: string | null;
       sectionId?: string | null;
-    },
+    }
   ) {
     const patch: Record<string, unknown> = {};
     if (data.event !== undefined) {
       if (!data.event.trim()) {
-        throw new ValidationError('Event cannot be empty');
+        throw new ValidationError("Event cannot be empty");
       }
       patch.event = data.event;
     }
-    if (data.order !== undefined) patch.order = data.order;
-    if (data.timestamp !== undefined) patch.timestamp = data.timestamp;
-    if (data.sectionId !== undefined) patch.sectionId = data.sectionId;
+    if (data.order !== undefined) {
+      patch.order = data.order;
+    }
+    if (data.timestamp !== undefined) {
+      patch.timestamp = data.timestamp;
+    }
+    if (data.sectionId !== undefined) {
+      patch.sectionId = data.sectionId;
+    }
 
     const [row] = await this.ctx.db
       .update(timelines)
       .set(patch)
       .where(eq(timelines.id, id))
       .returning();
-    assertFound(row, 'Timeline not found');
+    assertFound(row, "Timeline not found");
     return row;
   }
 
   async deleteTimeline(id: string) {
-    const [row] = await this.ctx.db.delete(timelines).where(eq(timelines.id, id)).returning();
-    assertFound(row, 'Timeline not found');
+    const [row] = await this.ctx.db
+      .delete(timelines)
+      .where(eq(timelines.id, id))
+      .returning();
+    assertFound(row, "Timeline not found");
     return row;
   }
 }

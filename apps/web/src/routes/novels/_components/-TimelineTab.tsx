@@ -1,22 +1,22 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Button } from '@/components/Button.js';
-import { ConfirmDialog } from '@/components/ConfirmDialog.js';
-import { EmptyState } from '@/components/EmptyState.js';
-import { Input } from '@/components/Input.js';
-import { Loading } from '@/components/Loading.js';
-import { Modal } from '@/components/Modal.js';
-import { Select } from '@/components/Select.js';
-import { Textarea } from '@/components/Textarea.js';
-import { useNovel } from '@/hooks/useNovel.js';
-import { useTimelines } from '@/hooks/useTimelines.js';
-import type { Chapter, Section, Timeline } from '@/lib/types.js';
-import { IconButton, PencilIcon, PlusIcon, TrashIcon } from './-Icons.js';
+import { useEffect, useMemo, useState } from "react";
+import { Button } from "@/components/Button.js";
+import { ConfirmDialog } from "@/components/ConfirmDialog.js";
+import { EmptyState } from "@/components/EmptyState.js";
+import { Input } from "@/components/Input.js";
+import { Loading } from "@/components/Loading.js";
+import { Modal } from "@/components/Modal.js";
+import { Select } from "@/components/Select.js";
+import { Textarea } from "@/components/Textarea.js";
+import { useNovel } from "@/hooks/useNovel.js";
+import { useTimelines } from "@/hooks/useTimelines.js";
+import type { Chapter, Section, Timeline } from "@/lib/types.js";
+import { IconButton, PencilIcon, PlusIcon, TrashIcon } from "./-Icons.js";
 
 export function TimelineTab({
   novel,
   onRefresh,
 }: {
-  novel: NonNullable<ReturnType<typeof useNovel>['novel']>;
+  novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;
   onRefresh: () => Promise<void>;
 }) {
   const {
@@ -36,12 +36,12 @@ export function TimelineTab({
 
   const chaptersWithSections = useMemo(
     () => (novel.chapters as Array<Chapter & { sections?: Section[] }>) ?? [],
-    [novel],
+    [novel]
   );
 
   const allSections = useMemo(
     () => chaptersWithSections.flatMap((c) => c.sections ?? []),
-    [chaptersWithSections],
+    [chaptersWithSections]
   );
 
   // 節IDから表示用テキスト（章タイトル > 節タイトル）を取得するマップ
@@ -49,7 +49,10 @@ export function TimelineTab({
     const map = new Map<string, string>();
     for (const chapter of chaptersWithSections) {
       for (const section of chapter.sections ?? []) {
-        map.set(section.id, `${chapter.title} > ${section.title || `節 ${section.order}`}`);
+        map.set(
+          section.id,
+          `${chapter.title} > ${section.title || `節 ${section.order}`}`
+        );
       }
     }
     return map;
@@ -87,7 +90,9 @@ export function TimelineTab({
   }
 
   async function handleDelete() {
-    if (!deletingId) return;
+    if (!deletingId) {
+      return;
+    }
     await deleteTimeline(deletingId);
     setDeletingId(null);
     await onRefresh();
@@ -96,7 +101,7 @@ export function TimelineTab({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-foreground">タイムライン</h2>
+        <h2 className="font-bold text-foreground text-xl">タイムライン</h2>
         <Button onClick={handleOpenCreate} leftIcon={<PlusIcon />}>
           イベント追加
         </Button>
@@ -113,23 +118,26 @@ export function TimelineTab({
 
       {!loading && timelines.length > 0 && (
         <div className="relative space-y-0 pl-4">
-          <div className="absolute bottom-0 left-7 top-0 w-px bg-border" />
+          <div className="absolute top-0 bottom-0 left-7 w-px bg-border" />
           {timelines.map((timeline) => {
             const sectionLabel = timeline.sectionId
               ? sectionTitleMap.get(timeline.sectionId)
               : null;
             return (
-              <div key={timeline.id} className="relative flex items-start gap-4 py-3">
+              <div
+                key={timeline.id}
+                className="relative flex items-start gap-4 py-3"
+              >
                 <div className="z-10 mt-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-surface" />
                 <div className="flex-1 rounded-xl border border-border bg-surface p-4 shadow-sm transition hover:border-border-hover">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-semibold text-primary">
+                        <span className="font-semibold text-primary text-xs">
                           {timeline.timestamp || `順序 ${timeline.order}`}
                         </span>
                         {sectionLabel && (
-                          <span className="inline-flex items-center rounded-md bg-surface-raised px-2 py-0.5 text-xs text-muted-foreground border border-border">
+                          <span className="inline-flex items-center rounded-md border border-border bg-surface-raised px-2 py-0.5 text-muted-foreground text-xs">
                             📖 {sectionLabel}
                           </span>
                         )}
@@ -138,7 +146,7 @@ export function TimelineTab({
                         {timeline.event}
                       </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex shrink-0 items-center gap-1">
                       <IconButton
                         label="編集"
                         onClick={() => handleOpenEdit(timeline)}
@@ -207,10 +215,10 @@ function TimelineFormModal({
   novelSections: Section[];
 }) {
   const isEdit = !!defaultValues;
-  const [event, setEvent] = useState('');
+  const [event, setEvent] = useState("");
   const [order, setOrder] = useState(1);
-  const [timestamp, setTimestamp] = useState('');
-  const [sectionId, setSectionId] = useState('');
+  const [timestamp, setTimestamp] = useState("");
+  const [sectionId, setSectionId] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -218,13 +226,13 @@ function TimelineFormModal({
       if (defaultValues) {
         setEvent(defaultValues.event);
         setOrder(defaultValues.order);
-        setTimestamp(defaultValues.timestamp ?? '');
-        setSectionId(defaultValues.sectionId ?? '');
+        setTimestamp(defaultValues.timestamp ?? "");
+        setSectionId(defaultValues.sectionId ?? "");
       } else {
-        setEvent('');
+        setEvent("");
         setOrder(1);
-        setTimestamp('');
-        setSectionId('');
+        setTimestamp("");
+        setSectionId("");
       }
       setError(null);
     }
@@ -234,7 +242,7 @@ function TimelineFormModal({
     e.preventDefault();
     setError(null);
     if (!event.trim()) {
-      setError('イベント内容を入力してください');
+      setError("イベント内容を入力してください");
       return;
     }
     await onSubmit({
@@ -249,7 +257,7 @@ function TimelineFormModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={isEdit ? 'イベントを編集' : 'イベントを追加'}
+      title={isEdit ? "イベントを編集" : "イベントを追加"}
       size="md"
       footer={
         <>
@@ -257,7 +265,7 @@ function TimelineFormModal({
             キャンセル
           </Button>
           <Button onClick={handleSubmit} isLoading={isLoading}>
-            {isEdit ? '更新' : '追加'}
+            {isEdit ? "更新" : "追加"}
           </Button>
         </>
       }
@@ -286,7 +294,7 @@ function TimelineFormModal({
         </div>
         {novelSections.length > 0 && (
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
+            <label className="mb-1.5 block font-medium text-foreground-secondary text-sm">
               紐づける節 (任意)
             </label>
             <Select
@@ -313,7 +321,7 @@ function TimelineFormModal({
             </Select>
           </div>
         )}
-        {error && <p className="text-sm text-rose-500">{error}</p>}
+        {error && <p className="text-rose-500 text-sm">{error}</p>}
       </form>
     </Modal>
   );

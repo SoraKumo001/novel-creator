@@ -5,18 +5,19 @@
 export function editCharacterDocument(
   document: string,
   instruction: string,
-  context?: { settings: string[]; characters: string[] },
+  context?: { settings: string[]; characters: string[] }
 ): string {
   const contextLines: string[] = [];
   if (context?.settings && context.settings.length > 0) {
-    contextLines.push('## 関連する設定');
+    contextLines.push("## 関連する設定");
     contextLines.push(...context.settings.map((s) => `- ${s}`));
   }
   if (context?.characters && context.characters.length > 0) {
-    contextLines.push('## 関連する人物');
+    contextLines.push("## 関連する人物");
     contextLines.push(...context.characters.map((c) => `- ${c}`));
   }
-  const contextBlock = contextLines.length > 0 ? contextLines.join('\n') : '（なし）';
+  const contextBlock =
+    contextLines.length > 0 ? contextLines.join("\n") : "（なし）";
 
   return `あなたは小説の登場人物を管理する編集者です。以下の人物マークダウン文書全体を、指示に従って編集してください。
 

@@ -1,12 +1,12 @@
 export interface ProofreadContext {
-  novelTitle?: string;
+  body: string;
   chapterTitle?: string;
-  sectionTitle?: string;
-  sectionSummary?: string;
   characters?: string;
+  novelTitle?: string;
+  sectionSummary?: string;
+  sectionTitle?: string;
   settings?: string;
   styleGuide?: string;
-  body: string;
 }
 
 export function proofreadPrompt(context: ProofreadContext): string {

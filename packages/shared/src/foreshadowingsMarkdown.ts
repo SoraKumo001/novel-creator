@@ -12,38 +12,38 @@ import {
   buildMarkdownCategoryTree,
   calculateEntityDiff,
   findSectionByLine,
+  type MarkdownCategoryNode,
   scanMarkdownSections,
   writeMarkdownEntitySections,
-  type MarkdownCategoryNode,
-} from './markdownCore.js';
-import type { ForeshadowingStatus } from './schemas/entities.js';
+} from "./markdownCore.js";
+import type { ForeshadowingStatus } from "./schemas/entities.js";
 
 /** マークダウン解析後の伏線セクション。 */
 export interface ParsedForeshadowingSection {
   category: string;
-  title: string;
   description: string;
-  status: ForeshadowingStatus;
   placedSectionId?: string | null;
   resolvedSectionId?: string | null;
+  status: ForeshadowingStatus;
+  title: string;
 }
 
 /** フォーカストラッキング用のセクション情報（行範囲付き）。 */
 export interface ForeshadowingSectionRange {
   category: string;
-  title: string;
-  name: string;
-  /** `##` 見出し行の 0 始まり行番号。 */
-  headingLine: number;
-  /** 本文開始行（見出しの次行）の 0 始まり行番号。 */
-  startLine: number;
-  /** 本文終端行（次の見出しの前行、または文書末尾）の 0 始まり行番号（含む）。 */
-  endLine: number;
   /** セクション本文。 */
   description: string;
-  status: ForeshadowingStatus;
+  /** 本文終端行（次の見出しの前行、または文書末尾）の 0 始まり行番号（含む）。 */
+  endLine: number;
+  /** `##` 見出し行の 0 始まり行番号。 */
+  headingLine: number;
+  name: string;
   placedSectionId?: string | null;
   resolvedSectionId?: string | null;
+  /** 本文開始行（見出しの次行）の 0 始まり行番号。 */
+  startLine: number;
+  status: ForeshadowingStatus;
+  title: string;
 }
 
 /** カテゴリごとのツリーノード。 */
@@ -60,22 +60,24 @@ export function serializeForeshadowingsToMarkdown(
     status?: ForeshadowingStatus | null;
     placedSectionId?: string | null;
     resolvedSectionId?: string | null;
-  }[],
+  }[]
 ): string {
-  if (items.length === 0) return '';
+  if (items.length === 0) {
+    return "";
+  }
 
   const normalized = items.map((f) => ({
-    category: (f.category ?? '').trim() || '未分類',
-    title: f.title.trim(),
-    description: (f.description ?? '').trim(),
-    status: f.status ?? 'unresolved',
+    category: (f.category ?? "").trim() || "未分類",
+    description: (f.description ?? "").trim(),
     placedSectionId: f.placedSectionId ?? null,
     resolvedSectionId: f.resolvedSectionId ?? null,
+    status: f.status ?? "unresolved",
+    title: f.title.trim(),
   }));
 
   const sorted = [...normalized].sort((a, b) => {
-    const c = a.category.localeCompare(b.category, 'ja');
-    return c !== 0 ? c : a.title.localeCompare(b.title, 'ja');
+    const c = a.category.localeCompare(b.category, "ja");
+    return c === 0 ? a.title.localeCompare(b.title, "ja") : c;
   });
 
   return writeMarkdownEntitySections(sorted, {
@@ -84,15 +86,19 @@ export function serializeForeshadowingsToMarkdown(
     writeBody: (item, lines) => {
       // ステータス等のメタ情報を HTML コメントとして付与
       const metaParts: string[] = [`status: ${item.status}`];
-      if (item.placedSectionId) metaParts.push(`placed: ${item.placedSectionId}`);
-      if (item.resolvedSectionId) metaParts.push(`resolved: ${item.resolvedSectionId}`);
-      lines.push(`<!-- ${metaParts.join(', ')} -->`);
-      lines.push('');
+      if (item.placedSectionId) {
+        metaParts.push(`placed: ${item.placedSectionId}`);
+      }
+      if (item.resolvedSectionId) {
+        metaParts.push(`resolved: ${item.resolvedSectionId}`);
+      }
+      lines.push(`<!-- ${metaParts.join(", ")} -->`);
+      lines.push("");
 
       if (item.description) {
         lines.push(item.description);
       }
-      lines.push('');
+      lines.push("");
     },
   });
 }
@@ -106,10 +112,12 @@ function parseMetaComment(line: string): {
   resolvedSectionId?: string;
 } {
   const match = /<!--\s*(.*?)\s*-->/.exec(line);
-  if (!match) return {};
+  if (!match) {
+    return {};
+  }
 
   const content = match[1];
-  const parts = content.split(',').map((p) => p.trim());
+  const parts = content.split(",").map((p) => p.trim());
   const result: {
     status?: ForeshadowingStatus;
     placedSectionId?: string;
@@ -117,14 +125,14 @@ function parseMetaComment(line: string): {
   } = {};
 
   for (const part of parts) {
-    const [key, val] = part.split(':').map((s) => s.trim());
-    if (key === 'status') {
-      if (val === 'resolved' || val === 'abandoned' || val === 'unresolved') {
+    const [key, val] = part.split(":").map((s) => s.trim());
+    if (key === "status") {
+      if (val === "resolved" || val === "abandoned" || val === "unresolved") {
         result.status = val;
       }
-    } else if (key === 'placed' && val) {
+    } else if (key === "placed" && val) {
       result.placedSectionId = val;
-    } else if (key === 'resolved' && val) {
+    } else if (key === "resolved" && val) {
       result.resolvedSectionId = val;
     }
   }
@@ -135,7 +143,9 @@ function parseMetaComment(line: string): {
 /**
  * マークダウン文書を解析して伏線セクション配列を返す。
  */
-export function parseForeshadowingsMarkdown(markdown: string): ParsedForeshadowingSection[] {
+export function parseForeshadowingsMarkdown(
+  markdown: string
+): ParsedForeshadowingSection[] {
   const rawSections = scanMarkdownSections(markdown);
   const sections: ParsedForeshadowingSection[] = [];
   const seen = new Set<string>();
@@ -145,7 +155,7 @@ export function parseForeshadowingsMarkdown(markdown: string): ParsedForeshadowi
     if (!seen.has(key)) {
       seen.add(key);
 
-      let status: ForeshadowingStatus = 'unresolved';
+      let status: ForeshadowingStatus = "unresolved";
       let placedSectionId: string | null = null;
       let resolvedSectionId: string | null = null;
       const cleanBodyLines: string[] = [];
@@ -153,25 +163,37 @@ export function parseForeshadowingsMarkdown(markdown: string): ParsedForeshadowi
       for (const line of raw.bodyLines) {
         if (/^\s*<!--.*?-->\s*$/.test(line)) {
           const meta = parseMetaComment(line);
-          if (meta.status) status = meta.status;
-          if (meta.placedSectionId !== undefined) placedSectionId = meta.placedSectionId;
-          if (meta.resolvedSectionId !== undefined) resolvedSectionId = meta.resolvedSectionId;
+          if (meta.status) {
+            status = meta.status;
+          }
+          if (meta.placedSectionId !== undefined) {
+            placedSectionId = meta.placedSectionId;
+          }
+          if (meta.resolvedSectionId !== undefined) {
+            resolvedSectionId = meta.resolvedSectionId;
+          }
         } else {
           cleanBodyLines.push(line);
         }
       }
 
-      while (cleanBodyLines.length > 0 && cleanBodyLines[0].trim() === '') cleanBodyLines.shift();
-      while (cleanBodyLines.length > 0 && cleanBodyLines[cleanBodyLines.length - 1].trim() === '')
+      while (cleanBodyLines.length > 0 && cleanBodyLines[0].trim() === "") {
+        cleanBodyLines.shift();
+      }
+      while (
+        cleanBodyLines.length > 0 &&
+        cleanBodyLines.at(-1)?.trim() === ""
+      ) {
         cleanBodyLines.pop();
+      }
 
       sections.push({
         category: raw.category,
-        title: raw.name,
-        description: cleanBodyLines.join('\n'),
-        status,
+        description: cleanBodyLines.join("\n"),
         placedSectionId,
         resolvedSectionId,
+        status,
+        title: raw.name,
       });
     }
   }
@@ -182,10 +204,12 @@ export function parseForeshadowingsMarkdown(markdown: string): ParsedForeshadowi
 /**
  * マークダウン文書を走査し、行範囲情報を含むセクション配列を返す。
  */
-export function scanForeshadowingSectionRanges(markdown: string): ForeshadowingSectionRange[] {
+export function scanForeshadowingSectionRanges(
+  markdown: string
+): ForeshadowingSectionRange[] {
   const rawSections = scanMarkdownSections(markdown);
   return rawSections.map((raw) => {
-    let status: ForeshadowingStatus = 'unresolved';
+    let status: ForeshadowingStatus = "unresolved";
     let placedSectionId: string | null = null;
     let resolvedSectionId: string | null = null;
     const cleanBodyLines: string[] = [];
@@ -193,29 +217,38 @@ export function scanForeshadowingSectionRanges(markdown: string): ForeshadowingS
     for (const line of raw.bodyLines) {
       if (/^\s*<!--.*?-->\s*$/.test(line)) {
         const meta = parseMetaComment(line);
-        if (meta.status) status = meta.status;
-        if (meta.placedSectionId !== undefined) placedSectionId = meta.placedSectionId;
-        if (meta.resolvedSectionId !== undefined) resolvedSectionId = meta.resolvedSectionId;
+        if (meta.status) {
+          status = meta.status;
+        }
+        if (meta.placedSectionId !== undefined) {
+          placedSectionId = meta.placedSectionId;
+        }
+        if (meta.resolvedSectionId !== undefined) {
+          resolvedSectionId = meta.resolvedSectionId;
+        }
       } else {
         cleanBodyLines.push(line);
       }
     }
 
-    while (cleanBodyLines.length > 0 && cleanBodyLines[0].trim() === '') cleanBodyLines.shift();
-    while (cleanBodyLines.length > 0 && cleanBodyLines[cleanBodyLines.length - 1].trim() === '')
+    while (cleanBodyLines.length > 0 && cleanBodyLines[0].trim() === "") {
+      cleanBodyLines.shift();
+    }
+    while (cleanBodyLines.length > 0 && cleanBodyLines.at(-1)?.trim() === "") {
       cleanBodyLines.pop();
+    }
 
     return {
       category: raw.category,
-      title: raw.name,
-      name: raw.name,
-      headingLine: raw.headingLine,
-      startLine: raw.startLine,
+      description: cleanBodyLines.join("\n"),
       endLine: raw.endLine,
-      description: cleanBodyLines.join('\n'),
-      status,
+      headingLine: raw.headingLine,
+      name: raw.name,
       placedSectionId,
       resolvedSectionId,
+      startLine: raw.startLine,
+      status,
+      title: raw.name,
     };
   });
 }
@@ -225,7 +258,7 @@ export function scanForeshadowingSectionRanges(markdown: string): ForeshadowingS
  */
 export function findForeshadowingSectionByLine(
   markdown: string,
-  lineNumber: number,
+  lineNumber: number
 ): ForeshadowingSectionRange | null {
   const ranges = scanForeshadowingSectionRanges(markdown);
   return findSectionByLine(ranges, lineNumber);
@@ -234,7 +267,9 @@ export function findForeshadowingSectionByLine(
 /**
  * マークダウンからカテゴリ構造ツリーを構築する。
  */
-export function buildForeshadowingCategoryTree(markdown: string): ForeshadowingCategoryNode[] {
+export function buildForeshadowingCategoryTree(
+  markdown: string
+): ForeshadowingCategoryNode[] {
   return buildMarkdownCategoryTree(markdown);
 }
 
@@ -243,8 +278,12 @@ export function buildForeshadowingCategoryTree(markdown: string): ForeshadowingC
  * 作成・更新・削除の差分を算出する。
  */
 export interface ForeshadowingsDiff {
+  /** 同一 (category, title) で重複出現した件数。 */
+  duplicateCount: number;
   /** 新規作成すべき伏線。 */
   toCreate: ParsedForeshadowingSection[];
+  /** 削除すべき伏線の id。 */
+  toDelete: string[];
   /** 更新すべき伏線。 */
   toUpdate: {
     id: string;
@@ -255,10 +294,6 @@ export interface ForeshadowingsDiff {
     placedSectionId: string | null;
     resolvedSectionId: string | null;
   }[];
-  /** 削除すべき伏線の id。 */
-  toDelete: string[];
-  /** 同一 (category, title) で重複出現した件数。 */
-  duplicateCount: number;
 }
 
 export function diffForeshadowings(
@@ -271,25 +306,25 @@ export function diffForeshadowings(
     placedSectionId?: string | null;
     resolvedSectionId?: string | null;
   }[],
-  parsedSections: ParsedForeshadowingSection[],
+  parsedSections: ParsedForeshadowingSection[]
 ): ForeshadowingsDiff {
   const normalizedExisting = existingItems.map((f) => ({
+    category: (f.category ?? "").trim() || "未分類",
+    description: f.description ?? "",
     id: f.id,
     name: f.title,
-    category: (f.category ?? '').trim() || '未分類',
-    description: f.description ?? '',
-    status: f.status ?? 'unresolved',
     placedSectionId: f.placedSectionId ?? null,
     resolvedSectionId: f.resolvedSectionId ?? null,
+    status: f.status ?? "unresolved",
   }));
 
   const normalizedParsed = parsedSections.map((s) => ({
-    name: s.title,
-    category: s.category.trim() || '未分類',
+    category: s.category.trim() || "未分類",
     description: s.description,
-    status: s.status,
+    name: s.title,
     placedSectionId: s.placedSectionId ?? null,
     resolvedSectionId: s.resolvedSectionId ?? null,
+    status: s.status,
   }));
 
   const diffResult = calculateEntityDiff(
@@ -301,27 +336,27 @@ export function diffForeshadowings(
       a.placedSectionId !== b.placedSectionId ||
       a.resolvedSectionId !== b.resolvedSectionId,
     (ex, p) => ({
-      id: ex.id,
       category: p.category,
-      title: p.name,
       description: p.description,
-      status: p.status,
+      id: ex.id,
       placedSectionId: p.placedSectionId,
       resolvedSectionId: p.resolvedSectionId,
-    }),
+      status: p.status,
+      title: p.name,
+    })
   );
 
   return {
+    duplicateCount: diffResult.duplicateCount,
     toCreate: diffResult.toCreate.map((c) => ({
       category: c.category,
-      title: c.name,
       description: c.description,
-      status: c.status,
       placedSectionId: c.placedSectionId,
       resolvedSectionId: c.resolvedSectionId,
+      status: c.status,
+      title: c.name,
     })),
-    toUpdate: diffResult.toUpdate,
     toDelete: diffResult.toDelete,
-    duplicateCount: diffResult.duplicateCount,
+    toUpdate: diffResult.toUpdate,
   };
 }

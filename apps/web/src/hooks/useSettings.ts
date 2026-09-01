@@ -1,7 +1,7 @@
-import { useCallback } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toErrorMessage } from '@/lib/errors.js';
-import { novelKeys } from '@/lib/queryKeys.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
+import { toErrorMessage } from "@/lib/errors.js";
+import { novelKeys } from "@/lib/queryKeys.js";
 import {
   createSetting,
   deleteSetting,
@@ -13,45 +13,50 @@ import {
   generateSettingDraft,
   saveSettingsMarkdown,
   updateSetting,
-} from '@/lib/services/index.js';
+} from "@/lib/services/index.js";
 import type {
   CreateSettingInput,
   SaveSettingsMarkdownResult,
   Setting,
   SettingDraft,
   UpdateSettingInput,
-} from '@/lib/types.js';
+} from "@/lib/types.js";
 
 interface UseSettingsReturn {
-  settings: Setting[];
-  loading: boolean;
-  error: string | null;
-  refetch: () => Promise<void>;
   createSetting: (input: CreateSettingInput) => Promise<Setting>;
-  updateSetting: (id: string, input: UpdateSettingInput) => Promise<Setting>;
+  creating: boolean;
   deleteSetting: (id: string) => Promise<void>;
-  llmEditSetting: (id: string, instruction: string) => Promise<Setting>;
-  generateDraft: (
-    instruction: string,
-    currentDraft?: { category: string; name: string; description?: string },
-  ) => Promise<SettingDraft>;
-  fetchSettingsMarkdown: () => Promise<string>;
-  saveSettingsMarkdown: (markdown: string) => Promise<SaveSettingsMarkdownResult>;
+  deleting: boolean;
+  editingDocument: boolean;
+  editingSection: boolean;
+  editSettingDocument: (input: {
+    markdown: string;
+    instruction: string;
+  }) => Promise<string>;
   editSettingSection: (input: {
     category: string;
     name: string;
     description: string;
     instruction: string;
   }) => Promise<string>;
-  editSettingDocument: (input: { markdown: string; instruction: string }) => Promise<string>;
-  creating: boolean;
-  updating: boolean;
-  deleting: boolean;
-  llmEditing: boolean;
+  error: string | null;
+  fetchSettingsMarkdown: () => Promise<string>;
+  generateDraft: (
+    instruction: string,
+    currentDraft?: { category: string; name: string; description?: string }
+  ) => Promise<SettingDraft>;
   generatingDraft: boolean;
+  llmEditing: boolean;
+  llmEditSetting: (id: string, instruction: string) => Promise<Setting>;
+  loading: boolean;
+  refetch: () => Promise<void>;
+  saveSettingsMarkdown: (
+    markdown: string
+  ) => Promise<SaveSettingsMarkdownResult>;
   savingMarkdown: boolean;
-  editingSection: boolean;
-  editingDocument: boolean;
+  settings: Setting[];
+  updateSetting: (id: string, input: UpdateSettingInput) => Promise<Setting>;
+  updating: boolean;
 }
 
 export function useSettings(novelId: string): UseSettingsReturn {
@@ -70,24 +75,28 @@ export function useSettings(novelId: string): UseSettingsReturn {
 
   const createMutation = useMutation({
     mutationFn: (input: CreateSettingInput) => createSetting(novelId, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: UpdateSettingInput }) =>
       updateSetting(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteSetting(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
   });
 
   const llmEditMutation = useMutation({
     mutationFn: ({ id, instruction }: { id: string; instruction: string }) =>
       editSetting(id, { instruction }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) }),
   });
 
   const draftMutation = useMutation({
@@ -103,8 +112,12 @@ export function useSettings(novelId: string): UseSettingsReturn {
   const saveMarkdownMutation = useMutation({
     mutationFn: (markdown: string) => saveSettingsMarkdown(novelId, markdown),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: novelKeys.settings(novelId) });
-      void queryClient.invalidateQueries({ queryKey: novelKeys.settingsMarkdown(novelId) });
+      void queryClient.invalidateQueries({
+        queryKey: novelKeys.settings(novelId),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: novelKeys.settingsMarkdown(novelId),
+      });
     },
   });
 
@@ -119,15 +132,19 @@ export function useSettings(novelId: string): UseSettingsReturn {
 
   const editDocumentMutation = useMutation({
     mutationFn: (input: { markdown: string; instruction: string }) =>
-      editSettingDocument(novelId, input.markdown, input.instruction).then((res) => res.markdown),
+      editSettingDocument(novelId, input.markdown, input.instruction).then(
+        (res) => res.markdown
+      ),
   });
 
-  const fetchMarkdown = useCallback(async (): Promise<string> => {
-    return queryClient.ensureQueryData({
-      queryKey: novelKeys.settingsMarkdown(novelId),
-      queryFn: async () => (await fetchSettingsMarkdown(novelId)).markdown,
-    });
-  }, [queryClient, novelId]);
+  const fetchMarkdown = useCallback(
+    async (): Promise<string> =>
+      queryClient.ensureQueryData({
+        queryKey: novelKeys.settingsMarkdown(novelId),
+        queryFn: async () => (await fetchSettingsMarkdown(novelId)).markdown,
+      }),
+    [queryClient, novelId]
+  );
 
   return {
     settings,
@@ -139,7 +156,8 @@ export function useSettings(novelId: string): UseSettingsReturn {
     createSetting: createMutation.mutateAsync,
     updateSetting: (id, input) => updateMutation.mutateAsync({ id, input }),
     deleteSetting: (id: string) => deleteMutation.mutateAsync(id),
-    llmEditSetting: (id, instruction) => llmEditMutation.mutateAsync({ id, instruction }),
+    llmEditSetting: (id, instruction) =>
+      llmEditMutation.mutateAsync({ id, instruction }),
     generateDraft: (instruction, currentDraft) =>
       draftMutation.mutateAsync({ instruction, currentDraft }),
     fetchSettingsMarkdown: fetchMarkdown,

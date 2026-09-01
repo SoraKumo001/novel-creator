@@ -1,19 +1,18 @@
-import { useCallback } from 'react';
 import {
   buildForeshadowingCategoryTree,
+  type ForeshadowingSectionRange,
   findForeshadowingSectionByLine,
   scanForeshadowingSectionRanges,
-  type ForeshadowingSectionRange,
-} from '@novel-creator/shared';
-import type { ForeshadowingStatus } from '@/lib/types.js';
-import { EntityMarkdownEditor } from './-EntityMarkdownEditor.js';
+} from "@novel-creator/shared";
+import { useCallback } from "react";
+import type { ForeshadowingStatus } from "@/lib/types.js";
+import { EntityMarkdownEditor } from "./-EntityMarkdownEditor.js";
 
 interface ForeshadowingsMarkdownEditorProps {
-  novelId: string;
-  fetchForeshadowingsMarkdown: () => Promise<string>;
-  saveForeshadowingsMarkdown: (
-    markdown: string,
-  ) => Promise<{ created: number; updated: number; deleted: number }>;
+  editForeshadowingDocument: (input: {
+    markdown: string;
+    instruction: string;
+  }) => Promise<string>;
   editForeshadowingSection: (input: {
     category: string;
     title: string;
@@ -21,10 +20,14 @@ interface ForeshadowingsMarkdownEditorProps {
     status?: ForeshadowingStatus;
     instruction: string;
   }) => Promise<string>;
-  editForeshadowingDocument: (input: { markdown: string; instruction: string }) => Promise<string>;
-  savingMarkdown: boolean;
-  editingSection: boolean;
   editingDocument: boolean;
+  editingSection: boolean;
+  fetchForeshadowingsMarkdown: () => Promise<string>;
+  novelId: string;
+  saveForeshadowingsMarkdown: (
+    markdown: string
+  ) => Promise<{ created: number; updated: number; deleted: number }>;
+  savingMarkdown: boolean;
 }
 
 export function ForeshadowingsMarkdownEditor({
@@ -49,11 +52,15 @@ export function ForeshadowingsMarkdownEditor({
     }) => {
       const sections = scanForeshadowingSectionRanges(markdown);
       const target = sections.find(
-        (s) => s.category === activeSection.category && s.title === activeSection.title,
+        (s) =>
+          s.category === activeSection.category &&
+          s.title === activeSection.title
       );
 
       if (!target) {
-        throw new Error(`伏線「${activeSection.title}」のセクションが見つかりません`);
+        throw new Error(
+          `伏線「${activeSection.title}」のセクションが見つかりません`
+        );
       }
 
       const nextSummary = await editForeshadowingSection({
@@ -64,19 +71,23 @@ export function ForeshadowingsMarkdownEditor({
         instruction,
       });
 
-      const lines = markdown.split('\n');
+      const lines = markdown.split("\n");
       const before = lines.slice(0, target.startLine);
       const after = lines.slice(target.endLine + 1);
-      return [...before, nextSummary.trim(), ...after].join('\n');
+      return [...before, nextSummary.trim(), ...after].join("\n");
     },
-    [editForeshadowingSection],
+    [editForeshadowingSection]
   );
 
   const handleEditDocument = useCallback(
-    async ({ markdown, instruction }: { markdown: string; instruction: string }) => {
-      return editForeshadowingDocument({ markdown, instruction });
-    },
-    [editForeshadowingDocument],
+    async ({
+      markdown,
+      instruction,
+    }: {
+      markdown: string;
+      instruction: string;
+    }) => editForeshadowingDocument({ markdown, instruction }),
+    [editForeshadowingDocument]
   );
 
   return (
@@ -105,7 +116,7 @@ export function ForeshadowingsMarkdownEditor({
       sectionPlaceholder={(active: ForeshadowingSectionRange | null) =>
         active
           ? `「${active.title}」への指示（例: 回収時の展開アイデアを追加して）`
-          : 'カーソルを伏線セクション内に置いてください'
+          : "カーソルを伏線セクション内に置いてください"
       }
       documentPlaceholder="全体への指示（例: 終盤に向けた主要伏線のカテゴリを整理して）"
     />

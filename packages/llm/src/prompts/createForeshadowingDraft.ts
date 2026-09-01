@@ -3,7 +3,12 @@
  */
 export function createForeshadowingDraft(
   instruction: string,
-  currentDraft?: { category?: string; title: string; description?: string; status?: string },
+  currentDraft?: {
+    category?: string;
+    title: string;
+    description?: string;
+    status?: string;
+  }
 ): string {
   if (!currentDraft) {
     return `あなたは小説の構成・伏線を管理する編集者です。以下の指示に従って、新しい伏線・フラグのドラフトを生成してください。
@@ -27,9 +32,9 @@ ${instruction}
 }`;
   }
 
-  const category = currentDraft.category ?? '未分類';
-  const description = currentDraft.description ?? '（未設定）';
-  const status = currentDraft.status ?? 'unresolved';
+  const category = currentDraft.category ?? "未分類";
+  const description = currentDraft.description ?? "（未設定）";
+  const status = currentDraft.status ?? "unresolved";
 
   return `あなたは小説の構成・伏線を管理する編集者です。以下の伏線のドラフトを、指示に従って修正してください。
 

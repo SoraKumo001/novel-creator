@@ -13,39 +13,39 @@ import {
   buildMarkdownCategoryTree,
   calculateEntityDiff,
   findSectionByLine,
+  type MarkdownCategoryNode,
   scanMarkdownSections,
   trimAndJoinLines,
   writeMarkdownEntitySections,
-  type MarkdownCategoryNode,
-} from './markdownCore.js';
+} from "./markdownCore.js";
 
 /** マークダウン解析後の人物セクション。 */
 export interface ParsedCharacterSection {
   category: string;
-  name: string;
   description: string;
-  traits: string[];
+  name: string;
   relationships: string;
+  traits: string[];
 }
 
 /** フォーカストラッキング用のセクション情報（行範囲付き）。 */
 export interface CharacterSectionRange {
   category: string;
-  name: string;
-  /** `##` 見出し行の 0 始まり行番号。 */
-  headingLine: number;
-  /** 本文開始行（見出しの次行）の 0 始まり行番号。 */
-  startLine: number;
+  /** description 部分。 */
+  description: string;
   /** 本文終端行（次の見出しの前行、または文書末尾）の 0 始まり行番号（含む）。 */
   endLine: number;
   /** セクション全文（見出し含む）。LLM編集時に送信するテキスト。 */
   fullText: string;
-  /** description 部分。 */
-  description: string;
-  /** traits 配列。 */
-  traits: string[];
+  /** `##` 見出し行の 0 始まり行番号。 */
+  headingLine: number;
+  name: string;
   /** relationships テキスト。 */
   relationships: string;
+  /** 本文開始行（見出しの次行）の 0 始まり行番号。 */
+  startLine: number;
+  /** traits 配列。 */
+  traits: string[];
 }
 
 /** カテゴリごとのツリーノード。 */
@@ -64,45 +64,47 @@ export function serializeCharactersToMarkdown(
     description?: string | null;
     traits?: string[] | null;
     relationships?: unknown;
-  }[],
+  }[]
 ): string {
-  if (characters.length === 0) return '';
+  if (characters.length === 0) {
+    return "";
+  }
 
   const sorted = [...characters].sort((a, b) => {
-    const ca = (a.category ?? '未分類').trim() || '未分類';
-    const cb = (b.category ?? '未分類').trim() || '未分類';
-    const c = ca.localeCompare(cb, 'ja');
-    return c !== 0 ? c : a.name.localeCompare(b.name, 'ja');
+    const ca = (a.category ?? "未分類").trim() || "未分類";
+    const cb = (b.category ?? "未分類").trim() || "未分類";
+    const c = ca.localeCompare(cb, "ja");
+    return c === 0 ? a.name.localeCompare(b.name, "ja") : c;
   });
 
   return writeMarkdownEntitySections(sorted, {
-    categoryOf: (c) => (c.category ?? '未分類').trim() || '未分類',
+    categoryOf: (c) => (c.category ?? "未分類").trim() || "未分類",
     nameOf: (c) => c.name,
     writeBody: (c, lines) => {
-      lines.push('');
+      lines.push("");
 
-      const desc = (c.description ?? '').trim();
+      const desc = (c.description ?? "").trim();
       if (desc) {
         lines.push(desc);
-        lines.push('');
+        lines.push("");
       }
 
       const traits = c.traits?.filter((t) => t.trim()) ?? [];
       if (traits.length > 0) {
-        lines.push('### 特徴');
-        lines.push('');
+        lines.push("### 特徴");
+        lines.push("");
         for (const t of traits) {
           lines.push(`- ${t}`);
         }
-        lines.push('');
+        lines.push("");
       }
 
       const rel = relationshipsToText(c.relationships);
       if (rel) {
-        lines.push('### 関係性');
-        lines.push('');
+        lines.push("### 関係性");
+        lines.push("");
         lines.push(rel);
-        lines.push('');
+        lines.push("");
       }
     },
   });
@@ -113,17 +115,21 @@ export function serializeCharactersToMarkdown(
  * 文字列ならそのまま、オブジェクト/配列なら JSON 文字列化、未定義なら空。
  */
 function relationshipsToText(relationships: unknown): string {
-  if (relationships == null) return '';
-  if (typeof relationships === 'string') return relationships.trim();
-  if (typeof relationships === 'object') {
+  if (relationships == null) {
+    return "";
+  }
+  if (typeof relationships === "string") {
+    return relationships.trim();
+  }
+  if (typeof relationships === "object") {
     try {
       const text = JSON.stringify(relationships, null, 2);
-      return text === '{}' ? '' : text;
+      return text === "{}" ? "" : text;
     } catch {
-      return '';
+      return "";
     }
   }
-  return '';
+  return "";
 }
 
 /**
@@ -133,9 +139,9 @@ function relationshipsToText(relationships: unknown): string {
 function parseCharacterBody(
   category: string,
   name: string,
-  bodyLines: string[],
+  bodyLines: string[]
 ): ParsedCharacterSection {
-  let currentSub: 'description' | 'traits' | 'relationships' = 'description';
+  let currentSub: "description" | "traits" | "relationships" = "description";
   const descLines: string[] = [];
   const traitLines: string[] = [];
   const relLines: string[] = [];
@@ -145,37 +151,47 @@ function parseCharacterBody(
   for (const line of bodyLines) {
     if (/^\s*```/.test(line)) {
       inFence = !inFence;
-      if (currentSub === 'description') descLines.push(line);
-      else if (currentSub === 'traits') traitLines.push(line);
-      else relLines.push(line);
+      if (currentSub === "description") {
+        descLines.push(line);
+      } else if (currentSub === "traits") {
+        traitLines.push(line);
+      } else {
+        relLines.push(line);
+      }
       continue;
     }
     if (inFence) {
-      if (currentSub === 'description') descLines.push(line);
-      else if (currentSub === 'traits') traitLines.push(line);
-      else relLines.push(line);
+      if (currentSub === "description") {
+        descLines.push(line);
+      } else if (currentSub === "traits") {
+        traitLines.push(line);
+      } else {
+        relLines.push(line);
+      }
       continue;
     }
 
     // `### 特徴` サブ見出し
     if (/^###\s+特徴\s*$/.test(line)) {
-      currentSub = 'traits';
+      currentSub = "traits";
       continue;
     }
     // `### 関係性` サブ見出し
     if (/^###\s+関係性\s*$/.test(line)) {
-      currentSub = 'relationships';
+      currentSub = "relationships";
       continue;
     }
     // その他の `###` は description 扱い（安全側に倒す）
     if (/^###\s+/.test(line)) {
-      if (currentSub === 'description') descLines.push(line);
+      if (currentSub === "description") {
+        descLines.push(line);
+      }
       continue;
     }
 
-    if (currentSub === 'description') {
+    if (currentSub === "description") {
       descLines.push(line);
-    } else if (currentSub === 'traits') {
+    } else if (currentSub === "traits") {
       traitLines.push(line);
     } else {
       relLines.push(line);
@@ -184,22 +200,24 @@ function parseCharacterBody(
 
   // traits: リスト項目（`- ` または `* ` で始まる行）を抽出
   const traits = traitLines
-    .map((l) => l.replace(/^\s*[-*]\s+/, '').trim())
+    .map((l) => l.replace(/^\s*[-*]\s+/, "").trim())
     .filter((t) => t.length > 0);
 
   return {
     category,
-    name,
     description: trimAndJoinLines(descLines),
-    traits,
+    name,
     relationships: trimAndJoinLines(relLines),
+    traits,
   };
 }
 
 /**
  * マークダウン文書を解析して人物セクション配列を返す。
  */
-export function parseCharactersMarkdown(markdown: string): ParsedCharacterSection[] {
+export function parseCharactersMarkdown(
+  markdown: string
+): ParsedCharacterSection[] {
   const rawSections = scanMarkdownSections(markdown);
   const sections: ParsedCharacterSection[] = [];
   const seen = new Set<string>();
@@ -220,20 +238,22 @@ export function parseCharactersMarkdown(markdown: string): ParsedCharacterSectio
  *
  * フォーカストラッキング用: カーソル行を含むセクションを特定するために使う。
  */
-export function getCharacterSections(markdown: string): CharacterSectionRange[] {
+export function getCharacterSections(
+  markdown: string
+): CharacterSectionRange[] {
   const rawSections = scanMarkdownSections(markdown);
   return rawSections.map((raw) => {
     const parsed = parseCharacterBody(raw.category, raw.name, raw.bodyLines);
     return {
       category: raw.category,
-      name: raw.name,
-      headingLine: raw.headingLine,
-      startLine: raw.startLine,
-      endLine: raw.endLine,
-      fullText: raw.bodyLines.join('\n'),
       description: parsed.description,
-      traits: parsed.traits,
+      endLine: raw.endLine,
+      fullText: raw.bodyLines.join("\n"),
+      headingLine: raw.headingLine,
+      name: raw.name,
       relationships: parsed.relationships,
+      startLine: raw.startLine,
+      traits: parsed.traits,
     };
   });
 }
@@ -250,7 +270,7 @@ export function buildCharacterTree(markdown: string): CharacterCategoryNode[] {
  */
 export function findCharacterAtLine(
   markdown: string,
-  lineNumber: number,
+  lineNumber: number
 ): CharacterSectionRange | null {
   const sections = getCharacterSections(markdown);
   return findSectionByLine(sections, lineNumber);
@@ -260,8 +280,12 @@ export function findCharacterAtLine(
  * 保存時の差分を計算する。
  */
 export interface CharactersDiff {
+  /** 同一 (category, name) で重複出現した件数。 */
+  duplicateCount: number;
   /** 新規作成すべき人物。 */
   toCreate: ParsedCharacterSection[];
+  /** 削除すべき人物の id。 */
+  toDelete: string[];
   /** 更新すべき人物（description/traits/relationships のいずれかが変化したもの）。 */
   toUpdate: {
     id: string;
@@ -271,10 +295,6 @@ export interface CharactersDiff {
     traits: string[];
     relationships: string;
   }[];
-  /** 削除すべき人物の id。 */
-  toDelete: string[];
-  /** 同一 (category, name) で重複出現した件数。 */
-  duplicateCount: number;
 }
 
 export function diffCharacters(
@@ -286,27 +306,27 @@ export function diffCharacters(
     traits?: string[] | null;
     relationships?: unknown;
   }[],
-  parsed: ParsedCharacterSection[],
+  parsed: ParsedCharacterSection[]
 ): CharactersDiff {
   return calculateEntityDiff(
     existing,
     parsed,
     (ex, p) => {
-      const exDesc = (ex.description ?? '').trim();
+      const exDesc = (ex.description ?? "").trim();
       const newDesc = p.description.trim();
-      const exTraits = (ex.traits ?? []).join(',');
-      const newTraits = p.traits.join(',');
+      const exTraits = (ex.traits ?? []).join(",");
+      const newTraits = p.traits.join(",");
       const exRel = relationshipsToText(ex.relationships);
       const newRel = p.relationships.trim();
       return exDesc !== newDesc || exTraits !== newTraits || exRel !== newRel;
     },
     (ex, p) => ({
-      id: ex.id,
       category: p.category,
-      name: p.name,
       description: p.description,
-      traits: p.traits,
+      id: ex.id,
+      name: p.name,
       relationships: p.relationships,
-    }),
+      traits: p.traits,
+    })
   );
 }

@@ -1,51 +1,36 @@
-import { useCallback } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toErrorMessage } from '@/lib/errors.js';
-import { novelKeys } from '@/lib/queryKeys.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
+import { toErrorMessage } from "@/lib/errors.js";
+import { novelKeys } from "@/lib/queryKeys.js";
 import {
   createForeshadowing,
   deleteForeshadowing,
   editForeshadowingDocument,
   editForeshadowingSection,
   fetchForeshadowings,
-  getForeshadowingsMarkdown,
   generateForeshadowingDraft,
+  getForeshadowingsMarkdown,
   saveForeshadowingsMarkdown,
   updateForeshadowing,
-} from '@/lib/services/index.js';
+} from "@/lib/services/index.js";
 import type {
   CreateForeshadowingInput,
   Foreshadowing,
   ForeshadowingStatus,
   UpdateForeshadowingInput,
-} from '@/lib/types.js';
+} from "@/lib/types.js";
 
 interface UseForeshadowingsReturn {
-  foreshadowings: Foreshadowing[];
-  loading: boolean;
-  error: string | null;
-  refetch: () => Promise<void>;
-  createForeshadowing: (input: CreateForeshadowingInput) => Promise<Foreshadowing>;
-  updateForeshadowing: (id: string, input: UpdateForeshadowingInput) => Promise<Foreshadowing>;
+  createForeshadowing: (
+    input: CreateForeshadowingInput
+  ) => Promise<Foreshadowing>;
+  creating: boolean;
   deleteForeshadowing: (id: string) => Promise<void>;
-  generateDraft: (
-    instruction: string,
-    currentDraft?: {
-      category?: string;
-      title: string;
-      description?: string;
-      status?: ForeshadowingStatus;
-    },
-  ) => Promise<{
-    category: string;
-    title: string;
-    description: string;
-    status: ForeshadowingStatus;
-  }>;
-  fetchForeshadowingsMarkdown: () => Promise<string>;
-  saveForeshadowingsMarkdown: (
-    markdown: string,
-  ) => Promise<{ created: number; updated: number; deleted: number }>;
+  deleting: boolean;
+  editForeshadowingDocument: (input: {
+    markdown: string;
+    instruction: string;
+  }) => Promise<string>;
   editForeshadowingSection: (input: {
     category: string;
     title: string;
@@ -53,14 +38,37 @@ interface UseForeshadowingsReturn {
     status?: ForeshadowingStatus;
     instruction: string;
   }) => Promise<string>;
-  editForeshadowingDocument: (input: { markdown: string; instruction: string }) => Promise<string>;
-  creating: boolean;
-  updating: boolean;
-  deleting: boolean;
-  generatingDraft: boolean;
-  savingMarkdown: boolean;
-  editingSection: boolean;
   editingDocument: boolean;
+  editingSection: boolean;
+  error: string | null;
+  fetchForeshadowingsMarkdown: () => Promise<string>;
+  foreshadowings: Foreshadowing[];
+  generateDraft: (
+    instruction: string,
+    currentDraft?: {
+      category?: string;
+      title: string;
+      description?: string;
+      status?: ForeshadowingStatus;
+    }
+  ) => Promise<{
+    category: string;
+    title: string;
+    description: string;
+    status: ForeshadowingStatus;
+  }>;
+  generatingDraft: boolean;
+  loading: boolean;
+  refetch: () => Promise<void>;
+  saveForeshadowingsMarkdown: (
+    markdown: string
+  ) => Promise<{ created: number; updated: number; deleted: number }>;
+  savingMarkdown: boolean;
+  updateForeshadowing: (
+    id: string,
+    input: UpdateForeshadowingInput
+  ) => Promise<Foreshadowing>;
+  updating: boolean;
 }
 
 export function useForeshadowings(novelId: string): UseForeshadowingsReturn {
@@ -78,19 +86,34 @@ export function useForeshadowings(novelId: string): UseForeshadowingsReturn {
   });
 
   const createMutation = useMutation({
-    mutationFn: (input: CreateForeshadowingInput) => createForeshadowing(novelId, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.foreshadowings(novelId) }),
+    mutationFn: (input: CreateForeshadowingInput) =>
+      createForeshadowing(novelId, input),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: novelKeys.foreshadowings(novelId),
+      }),
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdateForeshadowingInput }) =>
-      updateForeshadowing(id, input),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.foreshadowings(novelId) }),
+    mutationFn: ({
+      id,
+      input,
+    }: {
+      id: string;
+      input: UpdateForeshadowingInput;
+    }) => updateForeshadowing(id, input),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: novelKeys.foreshadowings(novelId),
+      }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteForeshadowing(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.foreshadowings(novelId) }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: novelKeys.foreshadowings(novelId),
+      }),
   });
 
   const draftMutation = useMutation({
@@ -109,10 +132,15 @@ export function useForeshadowings(novelId: string): UseForeshadowingsReturn {
   });
 
   const saveMarkdownMutation = useMutation({
-    mutationFn: (markdown: string) => saveForeshadowingsMarkdown(novelId, markdown),
+    mutationFn: (markdown: string) =>
+      saveForeshadowingsMarkdown(novelId, markdown),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: novelKeys.foreshadowings(novelId) });
-      queryClient.invalidateQueries({ queryKey: novelKeys.foreshadowingsMarkdown(novelId) });
+      queryClient.invalidateQueries({
+        queryKey: novelKeys.foreshadowings(novelId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: novelKeys.foreshadowingsMarkdown(novelId),
+      });
     },
   });
 
@@ -127,13 +155,19 @@ export function useForeshadowings(novelId: string): UseForeshadowingsReturn {
   });
 
   const editDocumentMutation = useMutation({
-    mutationFn: ({ markdown, instruction }: { markdown: string; instruction: string }) =>
-      editForeshadowingDocument(novelId, instruction, markdown),
+    mutationFn: ({
+      markdown,
+      instruction,
+    }: {
+      markdown: string;
+      instruction: string;
+    }) => editForeshadowingDocument(novelId, instruction, markdown),
   });
 
-  const fetchForeshadowingsMarkdown = useCallback(async () => {
-    return getForeshadowingsMarkdown(novelId);
-  }, [novelId]);
+  const fetchForeshadowingsMarkdown = useCallback(
+    async () => getForeshadowingsMarkdown(novelId),
+    [novelId]
+  );
 
   return {
     foreshadowings,
@@ -143,7 +177,8 @@ export function useForeshadowings(novelId: string): UseForeshadowingsReturn {
       await refetch();
     },
     createForeshadowing: createMutation.mutateAsync,
-    updateForeshadowing: (id, input) => updateMutation.mutateAsync({ id, input }),
+    updateForeshadowing: (id, input) =>
+      updateMutation.mutateAsync({ id, input }),
     deleteForeshadowing: async (id) => {
       await deleteMutation.mutateAsync(id);
     },

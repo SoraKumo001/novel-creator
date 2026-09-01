@@ -2,60 +2,56 @@
   "name": "novel-creator",
   "version": "0.0.0",
   "private": true,
+  "repository": "https://github.com/SoraKumo001/novel-creator",
+  "license": "MIT",
+  "author": "SoraKumo <info@croud.jp>",
   "type": "module",
+  "main": "index.js",
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
-    "lint": "eslint --fix --cache .",
-    "format": "prettier --write .",
-    "typecheck": "pnpm -r typecheck",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
-    "setup:db": "docker compose up -d && pnpm --filter @novel-creator/db db:push",
-    "db:up": "docker compose up -d",
+    "build-storybook": "pnpm --filter @novel-creator/web build-storybook",
+    "check": "ultracite check",
     "db:down": "docker compose down",
-    "db:push": "pnpm --filter @novel-creator/db db:push",
     "db:generate": "pnpm --filter @novel-creator/db db:generate",
     "db:migrate": "pnpm --filter @novel-creator/db db:migrate",
+    "db:push": "pnpm --filter @novel-creator/db db:push",
     "db:studio": "pnpm --filter @novel-creator/db db:studio",
+    "db:up": "docker compose up -d",
+    "deploy:api": "pnpm --filter @novel-creator/api deploy",
+    "deploy:web": "pnpm --filter @novel-creator/web deploy",
+    "dev": "pnpm -r --parallel dev",
     "dev:api": "pnpm --filter @novel-creator/api dev",
     "dev:web": "pnpm --filter @novel-creator/web dev",
     "dev:worker": "pnpm --filter @novel-creator/api dev:worker",
-    "start": "pnpm --filter @novel-creator/api start",
-    "start:api": "pnpm --filter @novel-creator/api start",
+    "fix": "ultracite fix",
+    "format": "ultracite fix",
+    "lint": "ultracite check",
     "preview": "pnpm --filter @novel-creator/web preview",
     "preview:web": "pnpm --filter @novel-creator/web preview",
+    "setup:db": "docker compose up -d && pnpm --filter @novel-creator/db db:push",
+    "start": "pnpm --filter @novel-creator/api start",
+    "start:api": "pnpm --filter @novel-creator/api start",
     "storybook": "pnpm --filter @novel-creator/web storybook",
-    "build-storybook": "pnpm --filter @novel-creator/web build-storybook",
-    "deploy:api": "pnpm --filter @novel-creator/api deploy",
-    "deploy:web": "pnpm --filter @novel-creator/web deploy"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,jsonc,css,md,yaml,yml,html}": [
+      "ultracite fix"
+    ]
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
+    "@biomejs/biome": "2.5.9",
     "@vitest/coverage-v8": "^4.1.11",
-    "eslint": "^10.9.1",
     "husky": "^9.0.0",
     "lint-staged": "^17.4.1",
-    "prettier": "^3.0.0",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
-    "typescript-eslint": "^8.68.0",
     "typescript7": "npm:typescript@^7.0.2",
+    "ultracite": "7.10.7",
     "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=22.22.2"
-  },
-  "lint-staged": {
-    "*.{ts,tsx,js,jsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "*.{json,md,yaml,yml,css,html}": [
-      "prettier --write"
-    ]
-  },
-  "main": "index.js",
-  "repository": "https://github.com/SoraKumo001/novel-creator",
-  "author": "SoraKumo <info@croud.jp>",
-  "license": "MIT"
+  }
 }

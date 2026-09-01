@@ -3,16 +3,16 @@
  */
 
 export interface CategoryTreeNode<T> {
-  /** 現在の階層名（例: "採取メンバー"） */
-  name: string;
-  /** ルートからのフルパス（スラッシュ区切り。例: "採取ギルド / 採取メンバー"） */
-  fullPath: string;
-  /** 階層の深さ (0: トップレベル) */
-  level: number;
-  /** このカテゴリ階層に直接属するアイテム */
-  items: T[];
   /** 子カテゴリノード */
   children: CategoryTreeNode<T>[];
+  /** ルートからのフルパス（スラッシュ区切り。例: "採取ギルド / 採取メンバー"） */
+  fullPath: string;
+  /** このカテゴリ階層に直接属するアイテム */
+  items: T[];
+  /** 階層の深さ (0: トップレベル) */
+  level: number;
+  /** 現在の階層名（例: "採取メンバー"） */
+  name: string;
   /** 直下および子孫カテゴリの全アイテム合計件数 */
   totalCount: number;
 }
@@ -24,12 +24,14 @@ export interface CategoryTreeNode<T> {
  * 例: "" または null -> ["未分類"]
  */
 export function parseCategoryPath(category?: string | null): string[] {
-  if (!category) return ['未分類'];
+  if (!category) {
+    return ["未分類"];
+  }
   const segments = category
     .split(/[/／]/)
     .map((s) => s.trim())
     .filter(Boolean);
-  return segments.length > 0 ? segments : ['未分類'];
+  return segments.length > 0 ? segments : ["未分類"];
 }
 
 /**
@@ -37,17 +39,19 @@ export function parseCategoryPath(category?: string | null): string[] {
  * 例: ["採取ギルド", "採取メンバー"] -> "採取ギルド / 採取メンバー"
  */
 export function formatCategoryPath(segments: readonly string[]): string {
-  if (segments.length === 0) return '未分類';
-  return segments.join(' / ');
+  if (segments.length === 0) {
+    return "未分類";
+  }
+  return segments.join(" / ");
 }
 
 export type CategorySortOption =
-  | 'category-asc-name-asc'
-  | 'category-asc-name-desc'
-  | 'category-desc-name-asc'
-  | 'category-desc-name-desc'
-  | 'name-asc'
-  | 'name-desc';
+  | "category-asc-name-asc"
+  | "category-asc-name-desc"
+  | "category-desc-name-asc"
+  | "category-desc-name-desc"
+  | "name-asc"
+  | "name-desc";
 
 /**
  * エンティティ配列から複数階層のカテゴリツリーを構築する。
@@ -55,7 +59,7 @@ export type CategorySortOption =
 export function buildCategoryTree<T extends { name: string }>(
   items: readonly T[],
   categoryOf: (item: T) => string | null | undefined,
-  sortOption: CategorySortOption = 'category-asc-name-asc',
+  sortOption: CategorySortOption = "category-asc-name-asc"
 ): CategoryTreeNode<T>[] {
   const rootNodes: CategoryTreeNode<T>[] = [];
 
@@ -75,11 +79,11 @@ export function buildCategoryTree<T extends { name: string }>(
       let targetNode = currentLevelNodes.find((n) => n.name === segmentName);
       if (!targetNode) {
         targetNode = {
-          name: segmentName,
-          fullPath,
-          level: depth,
-          items: [],
           children: [],
+          fullPath,
+          items: [],
+          level: depth,
+          name: segmentName,
           totalCount: 0,
         };
         currentLevelNodes.push(targetNode);
@@ -97,10 +101,10 @@ export function buildCategoryTree<T extends { name: string }>(
   function processNode(node: CategoryTreeNode<T>): void {
     // アイテムのソート
     node.items.sort((a, b) => {
-      if (sortOption.endsWith('desc')) {
-        return b.name.localeCompare(a.name, 'ja');
+      if (sortOption.endsWith("desc")) {
+        return b.name.localeCompare(a.name, "ja");
       }
-      return a.name.localeCompare(b.name, 'ja');
+      return a.name.localeCompare(b.name, "ja");
     });
 
     // 子ノードの再帰処理
@@ -110,14 +114,16 @@ export function buildCategoryTree<T extends { name: string }>(
 
     // 子ノード自体のソート
     node.children.sort((a, b) => {
-      if (sortOption.startsWith('category-desc')) {
-        return b.name.localeCompare(a.name, 'ja');
+      if (sortOption.startsWith("category-desc")) {
+        return b.name.localeCompare(a.name, "ja");
       }
-      return a.name.localeCompare(b.name, 'ja');
+      return a.name.localeCompare(b.name, "ja");
     });
 
     // 合計件数
-    node.totalCount = node.items.length + node.children.reduce((sum, c) => sum + c.totalCount, 0);
+    node.totalCount =
+      node.items.length +
+      node.children.reduce((sum, c) => sum + c.totalCount, 0);
   }
 
   for (const root of rootNodes) {
@@ -127,12 +133,16 @@ export function buildCategoryTree<T extends { name: string }>(
   // ルートノードのソート
   rootNodes.sort((a, b) => {
     // 「未分類」は常に最後に配置
-    if (a.name === '未分類') return 1;
-    if (b.name === '未分類') return -1;
-    if (sortOption.startsWith('category-desc')) {
-      return b.name.localeCompare(a.name, 'ja');
+    if (a.name === "未分類") {
+      return 1;
     }
-    return a.name.localeCompare(b.name, 'ja');
+    if (b.name === "未分類") {
+      return -1;
+    }
+    if (sortOption.startsWith("category-desc")) {
+      return b.name.localeCompare(a.name, "ja");
+    }
+    return a.name.localeCompare(b.name, "ja");
   });
 
   return rootNodes;
@@ -142,7 +152,7 @@ export function buildCategoryTree<T extends { name: string }>(
  * カテゴリツリーを深さ優先で平坦化（フラットなリスト）にし、カード表示用のセクション配列等に変換する。
  */
 export function flattenCategoryTree<T>(
-  nodes: readonly CategoryTreeNode<T>[],
+  nodes: readonly CategoryTreeNode<T>[]
 ): CategoryTreeNode<T>[] {
   const result: CategoryTreeNode<T>[] = [];
 

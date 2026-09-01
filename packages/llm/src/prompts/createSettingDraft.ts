@@ -3,7 +3,7 @@
  */
 export function createSettingDraft(
   instruction: string,
-  currentDraft?: { category: string; name: string; description?: string },
+  currentDraft?: { category: string; name: string; description?: string }
 ): string {
   if (!currentDraft) {
     return `あなたは小説の設定を管理する編集者です。以下の指示に従って、新しい設定のドラフトを生成してください。
@@ -26,7 +26,7 @@ ${instruction}
 }`;
   }
 
-  const description = currentDraft.description ?? '（未設定）';
+  const description = currentDraft.description ?? "（未設定）";
 
   return `あなたは小説の設定を管理する編集者です。以下の設定のドラフトを、指示に従って修正してください。
 

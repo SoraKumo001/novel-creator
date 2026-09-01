@@ -1,14 +1,19 @@
-import Editor, { type OnMount } from '@monaco-editor/react';
-import { useTheme } from '@/hooks/useTheme.js';
+import Editor, { type OnMount } from "@monaco-editor/react";
+import { useTheme } from "@/hooks/useTheme.js";
 
 interface MonacoEditorProps {
-  value: string;
   onChange: (value: string) => void;
   onMount?: OnMount;
   onSelectionChange?: (selectedText: string) => void;
+  value: string;
 }
 
-export function MonacoEditor({ value, onChange, onMount, onSelectionChange }: MonacoEditorProps) {
+export function MonacoEditor({
+  value,
+  onChange,
+  onMount,
+  onSelectionChange,
+}: MonacoEditorProps) {
   const { resolvedTheme } = useTheme();
 
   const handleMount: OnMount = (editor, monaco) => {
@@ -19,7 +24,7 @@ export function MonacoEditor({ value, onChange, onMount, onSelectionChange }: Mo
           const selected = model.getValueInRange(e.selection);
           onSelectionChange(selected);
         } else if (e.selection.isEmpty()) {
-          onSelectionChange('');
+          onSelectionChange("");
         }
       });
     }
@@ -34,18 +39,19 @@ export function MonacoEditor({ value, onChange, onMount, onSelectionChange }: Mo
       height="100%"
       defaultLanguage="markdown"
       value={value}
-      onChange={(v) => onChange(v ?? '')}
+      onChange={(v) => onChange(v ?? "")}
       onMount={handleMount}
       options={{
-        wordWrap: 'on',
+        wordWrap: "on",
         minimap: { enabled: false },
-        lineNumbers: 'on',
+        lineNumbers: "on",
         fontSize: 15,
-        fontFamily: '"Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif',
+        fontFamily:
+          '"Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif',
         padding: { top: 16, bottom: 240 },
         smoothScrolling: true,
       }}
-      theme={resolvedTheme === 'dark' ? 'vs-dark' : 'light'}
+      theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
     />
   );
 }

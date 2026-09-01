@@ -1,7 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { ForeshadowingEditor } from '../../_components/-ForeshadowingEditor.js';
+import { createFileRoute } from "@tanstack/react-router";
+import { ForeshadowingEditor } from "../../_components/-ForeshadowingEditor.js";
 
-export const Route = createFileRoute('/novels/$novelId/foreshadowings/new')({
+export const Route = createFileRoute("/novels/$novelId/foreshadowings/new")({
   component: NewForeshadowingPage,
 });
 

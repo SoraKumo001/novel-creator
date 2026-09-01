@@ -1,9 +1,9 @@
-import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
+import { zValidator } from "@hono/zod-validator";
+import { Hono } from "hono";
 
-import type { AppContext } from '../context.js';
+import type { AppContext } from "../context.js";
 
-import { getServices } from '../core/services.js';
+import { getServices } from "../core/services.js";
 import {
   generateContentBodySchema,
   idParamSchema,
@@ -11,13 +11,13 @@ import {
   proofreadBodySchema,
   updateContentSchema,
   updateSectionSchema,
-} from '../schemas/index.js';
-import { sseStream } from '../sse.js';
+} from "../schemas/index.js";
+import { sseStream } from "../sse.js";
 
 const sectionsRouter = new Hono<AppContext>()
   // GET /api/sections/:id - 節個別取得（本文含む）
-  .get('/:id', zValidator('param', idParamSchema), async (c) => {
-    const { id } = c.req.valid('param');
+  .get("/:id", zValidator("param", idParamSchema), async (c) => {
+    const { id } = c.req.valid("param");
     const result = await getServices(c).section.getSectionWithContent(id);
     return c.json({
       ...result.section,
@@ -26,103 +26,114 @@ const sectionsRouter = new Hono<AppContext>()
   })
   // PUT /api/sections/:id - 節更新
   .put(
-    '/:id',
-    zValidator('param', idParamSchema),
-    zValidator('json', updateSectionSchema),
+    "/:id",
+    zValidator("param", idParamSchema),
+    zValidator("json", updateSectionSchema),
     async (c) => {
-      const { id } = c.req.valid('param');
-      const body = c.req.valid('json');
+      const { id } = c.req.valid("param");
+      const body = c.req.valid("json");
       const row = await getServices(c).section.updateSection(id, body);
       return c.json(row);
-    },
+    }
   )
   // DELETE /api/sections/:id - 節削除
-  .delete('/:id', zValidator('param', idParamSchema), async (c) => {
-    const { id } = c.req.valid('param');
+  .delete("/:id", zValidator("param", idParamSchema), async (c) => {
+    const { id } = c.req.valid("param");
     await getServices(c).section.deleteSection(id);
     return c.json({ success: true });
   })
   // GET /api/sections/:id/content - 本文取得
-  .get('/:id/content', zValidator('param', idParamSchema), async (c) => {
-    const { id } = c.req.valid('param');
+  .get("/:id/content", zValidator("param", idParamSchema), async (c) => {
+    const { id } = c.req.valid("param");
     const row = await getServices(c).content.getContent(id);
     return c.json(row);
   })
   // PUT /api/sections/:id/content - 本文更新
   .put(
-    '/:id/content',
-    zValidator('param', idParamSchema),
-    zValidator('json', updateContentSchema),
+    "/:id/content",
+    zValidator("param", idParamSchema),
+    zValidator("json", updateContentSchema),
     async (c) => {
-      const { id } = c.req.valid('param');
-      const body = c.req.valid('json');
+      const { id } = c.req.valid("param");
+      const body = c.req.valid("json");
       const row = await getServices(c).content.updateContent(id, body.body);
       return c.json(row);
-    },
+    }
   )
   // POST /api/sections/:id/generate/summary - 節概要生成
-  .post('/:id/generate/summary', zValidator('param', idParamSchema), async (c) => {
-    const { id } = c.req.valid('param');
-    const result = await getServices(c).generate.generateSectionSummary(id);
-    return c.json(result);
-  })
+  .post(
+    "/:id/generate/summary",
+    zValidator("param", idParamSchema),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const result = await getServices(c).generate.generateSectionSummary(id);
+      return c.json(result);
+    }
+  )
   // POST /api/sections/:id/generate/content - 本文ストリーミング生成
   .post(
-    '/:id/generate/content',
-    zValidator('param', idParamSchema),
-    zValidator('json', generateContentBodySchema.optional()),
+    "/:id/generate/content",
+    zValidator("param", idParamSchema),
+    zValidator("json", generateContentBodySchema.optional()),
     async (c) => {
-      const { id } = c.req.valid('param');
-      const jsonBody = c.req.valid('json');
+      const { id } = c.req.valid("param");
+      const jsonBody = c.req.valid("json");
       return sseStream(
         c,
-        getServices(c).generate.generateSectionContent(id, jsonBody?.modelConfigId),
+        getServices(c).generate.generateSectionContent(
+          id,
+          jsonBody?.modelConfigId
+        )
       );
-    },
+    }
   )
   // POST /api/sections/:id/generate/extract - 本文から設定・時系列を抽出
-  .post('/:id/generate/extract', zValidator('param', idParamSchema), async (c) => {
-    const { id } = c.req.valid('param');
-    const result = await getServices(c).generate.extractEntities(id);
-    return c.json(result);
-  })
+  .post(
+    "/:id/generate/extract",
+    zValidator("param", idParamSchema),
+    async (c) => {
+      const { id } = c.req.valid("param");
+      const result = await getServices(c).generate.extractEntities(id);
+      return c.json(result);
+    }
+  )
   // POST /api/sections/:id/generate/proofread - 本文校正・推敲・レビュー
   .post(
-    '/:id/generate/proofread',
-    zValidator('param', idParamSchema),
-    zValidator('json', proofreadBodySchema.optional()),
+    "/:id/generate/proofread",
+    zValidator("param", idParamSchema),
+    zValidator("json", proofreadBodySchema.optional()),
     async (c) => {
-      const { id } = c.req.valid('param');
-      const jsonBody = c.req.valid('json');
+      const { id } = c.req.valid("param");
+      const jsonBody = c.req.valid("json");
       const result = await getServices(c).generate.proofreadContent(
         id,
         jsonBody?.body,
-        jsonBody?.modelConfigId,
+        jsonBody?.modelConfigId
       );
       return c.json(result);
-    },
+    }
   )
   // POST /api/sections/:id/generate/inline-assist - 選択範囲のインラインAI支援（ストリーミング）
   .post(
-    '/:id/generate/inline-assist',
-    zValidator('param', idParamSchema),
-    zValidator('json', inlineAssistBodySchema),
+    "/:id/generate/inline-assist",
+    zValidator("param", idParamSchema),
+    zValidator("json", inlineAssistBodySchema),
     async (c) => {
-      const { id } = c.req.valid('param');
-      const body = c.req.valid('json');
+      const { id } = c.req.valid("param");
+      const body = c.req.valid("json");
       return sseStream(
         c,
         getServices(c).generate.inlineAssist(id, {
-          selectedText: body.selectedText,
           action: body.action,
           customInstruction: body.customInstruction,
           customPromptId: body.customPromptId,
-          surroundingText: body.surroundingText,
           modelConfigId: body.modelConfigId,
+          selectedText: body.selectedText,
+          surroundingText: body.surroundingText,
           variantCount: body.variantCount,
-        }),
+        })
       );
-    },
+    }
   );
 
 export default sectionsRouter;

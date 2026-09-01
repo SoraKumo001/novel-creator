@@ -1,6 +1,6 @@
-import { z } from 'zod';
-import type { ServiceContext } from '../types.js';
-import { scopedTool } from './scopedTool.js';
+import { z } from "zod";
+import type { ServiceContext } from "../types.js";
+import { scopedTool } from "./scopedTool.js";
 
 /**
  * 創作相談チャット用の小説設定提案ツール群（Propose Tools）。
@@ -10,181 +10,215 @@ import { scopedTool } from './scopedTool.js';
  */
 export function createProposeTools(
   _ctx: ServiceContext,
-  defaultNovelId?: string | null,
+  defaultNovelId?: string | null
 ): Record<string, unknown> {
-  const resolveNovelId = (providedId?: string | null): string | null => {
-    return providedId || defaultNovelId || null;
-  };
+  const resolveNovelId = (providedId?: string | null): string | null =>
+    providedId || defaultNovelId || null;
 
   return {
+    proposeAddForeshadowing: scopedTool({
+      description:
+        "新しい伏線の登録をユーザーに提案します。作中に散りばめる謎や回収計画が考案された場合に使用してください。",
+      errorMessage: "伏線登録提案の生成に失敗しました。",
+      parameters: z.object({
+        description: z.string().describe("伏線の詳細、真相、回収アイデア"),
+        novelId: z
+          .string()
+          .optional()
+          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
+        status: z
+          .enum(["unresolved", "resolved", "abandoned"])
+          .optional()
+          .default("unresolved")
+          .describe("ステータス（通常は unresolved）"),
+        title: z.string().describe("伏線のタイトル・概要"),
+      }),
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      run: (targetId, { title, description, status = "unresolved" }) => ({
+        data: {
+          description,
+          status,
+          title,
+        },
+        novelId: targetId,
+        proposalType: "foreshadowing",
+        summary: `伏線「${title}」の登録提案`,
+        type: "proposal",
+      }),
+    }),
+
+    proposeAddTimelineEvent: scopedTool({
+      description:
+        "作中の時系列・年表への新しい出来事（イベント）の追加をユーザーに提案します。",
+      errorMessage: "年表イベント追加提案の生成に失敗しました。",
+      parameters: z.object({
+        event: z.string().describe("出来事・イベントの内容"),
+        novelId: z
+          .string()
+          .optional()
+          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
+        timestamp: z
+          .string()
+          .optional()
+          .describe(
+            "作中時期や日時・順序を表す文字列（例: 帝都暦742年、物語開始直前など）"
+          ),
+      }),
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      run: (targetId, { event, timestamp }) => ({
+        data: {
+          event,
+          timestamp: timestamp || null,
+        },
+        novelId: targetId,
+        proposalType: "timeline",
+        summary: `年表イベント「${event}」の追加提案`,
+        type: "proposal",
+      }),
+    }),
     proposeCreateCharacter: scopedTool({
       description:
-        '新しい登場人物（キャラクター）の登録をユーザーに提案します。会話の中で新しい人物が考案されたり固まった場合に使用してください。',
+        "新しい登場人物（キャラクター）の登録をユーザーに提案します。会話の中で新しい人物が考案されたり固まった場合に使用してください。",
+      errorMessage: "キャラクター登録提案の生成に失敗しました。",
       parameters: z.object({
-        novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
-        name: z.string().describe('キャラクター名'),
         category: z
           .string()
           .optional()
-          .default('未分類')
-          .describe('役割・身分（例: 主人公, ヒロイン, 敵役, 師匠, 騎士団長 など）'),
-        description: z.string().describe('外見、性格、背景、能力、動機などの詳細説明'),
+          .default("未分類")
+          .describe(
+            "役割・身分（例: 主人公, ヒロイン, 敵役, 師匠, 騎士団長 など）"
+          ),
+        description: z
+          .string()
+          .describe("外見、性格、背景、能力、動機などの詳細説明"),
+        name: z.string().describe("キャラクター名"),
+        novelId: z
+          .string()
+          .optional()
+          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
         traits: z
           .array(z.string())
           .optional()
           .default([])
-          .describe('特徴・キーワードの配列（例: ["銀髪", "冷静沈着", "炎魔法"]）'),
+          .describe(
+            '特徴・キーワードの配列（例: ["銀髪", "冷静沈着", "炎魔法"]）'
+          ),
       }),
       resolve: ({ novelId }) => resolveNovelId(novelId),
-      errorMessage: 'キャラクター登録提案の生成に失敗しました。',
-      run: (targetId, { name, category = '未分類', description, traits = [] }) => ({
-        type: 'proposal',
-        proposalType: 'character',
-        novelId: targetId,
+      run: (
+        targetId,
+        { name, category = "未分類", description, traits = [] }
+      ) => ({
         data: {
-          name,
           category,
           description,
+          name,
           traits,
         },
+        novelId: targetId,
+        proposalType: "character",
         summary: `登場人物「${name}」の設定登録提案`,
+        type: "proposal",
       }),
     }),
 
     proposeCreateSetting: scopedTool({
       description:
-        '新しい世界観・設定（用語、地理、魔法体系、組織、アイテムなど）の登録をユーザーに提案します。会話の中で新しい設定が考案された場合に使用してください。',
+        "新しい世界観・設定（用語、地理、魔法体系、組織、アイテムなど）の登録をユーザーに提案します。会話の中で新しい設定が考案された場合に使用してください。",
+      errorMessage: "設定登録提案の生成に失敗しました。",
       parameters: z.object({
-        novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
-        name: z.string().describe('設定の名称'),
         category: z
           .string()
           .describe(
-            'カテゴリ（例: 世界観, 魔法・技術, 地理・場所, 組織・国家, 歴史・事件, アイテム）',
+            "カテゴリ（例: 世界観, 魔法・技術, 地理・場所, 組織・国家, 歴史・事件, アイテム）"
           ),
-        description: z.string().describe('設定の詳細説明や作中ルール'),
-      }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      errorMessage: '設定登録提案の生成に失敗しました。',
-      run: (targetId, { name, category, description }) => ({
-        type: 'proposal',
-        proposalType: 'setting',
-        novelId: targetId,
-        data: {
-          name,
-          category,
-          description,
-        },
-        summary: `世界観設定「${name}」(${category})の登録提案`,
-      }),
-    }),
-
-    proposeAddForeshadowing: scopedTool({
-      description:
-        '新しい伏線の登録をユーザーに提案します。作中に散りばめる謎や回収計画が考案された場合に使用してください。',
-      parameters: z.object({
-        novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
-        title: z.string().describe('伏線のタイトル・概要'),
-        description: z.string().describe('伏線の詳細、真相、回収アイデア'),
-        status: z
-          .enum(['unresolved', 'resolved', 'abandoned'])
-          .optional()
-          .default('unresolved')
-          .describe('ステータス（通常は unresolved）'),
-      }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      errorMessage: '伏線登録提案の生成に失敗しました。',
-      run: (targetId, { title, description, status = 'unresolved' }) => ({
-        type: 'proposal',
-        proposalType: 'foreshadowing',
-        novelId: targetId,
-        data: {
-          title,
-          description,
-          status,
-        },
-        summary: `伏線「${title}」の登録提案`,
-      }),
-    }),
-
-    proposeAddTimelineEvent: scopedTool({
-      description: '作中の時系列・年表への新しい出来事（イベント）の追加をユーザーに提案します。',
-      parameters: z.object({
-        novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
-        event: z.string().describe('出来事・イベントの内容'),
-        timestamp: z
+        description: z.string().describe("設定の詳細説明や作中ルール"),
+        name: z.string().describe("設定の名称"),
+        novelId: z
           .string()
           .optional()
-          .describe('作中時期や日時・順序を表す文字列（例: 帝都暦742年、物語開始直前など）'),
+          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
       }),
       resolve: ({ novelId }) => resolveNovelId(novelId),
-      errorMessage: '年表イベント追加提案の生成に失敗しました。',
-      run: (targetId, { event, timestamp }) => ({
-        type: 'proposal',
-        proposalType: 'timeline',
-        novelId: targetId,
+      run: (targetId, { name, category, description }) => ({
         data: {
-          event,
-          timestamp: timestamp || null,
+          category,
+          description,
+          name,
         },
-        summary: `年表イベント「${event}」の追加提案`,
+        novelId: targetId,
+        proposalType: "setting",
+        summary: `世界観設定「${name}」(${category})の登録提案`,
+        type: "proposal",
       }),
     }),
 
     proposeUpdatePlot: scopedTool({
-      description: '章のプロット・あらすじの作成または更新をユーザーに提案します。',
+      description:
+        "章のプロット・あらすじの作成または更新をユーザーに提案します。",
+      errorMessage: "プロット反映提案の生成に失敗しました。",
       parameters: z.object({
-        novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
-        chapterTitle: z.string().describe('章のタイトル（例: 第1章 旅立ち）'),
-        summary: z.string().describe('提案する章のあらすじ・プロット内容'),
+        chapterTitle: z.string().describe("章のタイトル（例: 第1章 旅立ち）"),
+        novelId: z
+          .string()
+          .optional()
+          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
+        summary: z.string().describe("提案する章のあらすじ・プロット内容"),
       }),
       resolve: ({ novelId }) => resolveNovelId(novelId),
-      errorMessage: 'プロット反映提案の生成に失敗しました。',
       run: (targetId, { chapterTitle, summary }) => ({
-        type: 'proposal',
-        proposalType: 'plot',
-        novelId: targetId,
         data: {
           chapterTitle,
           summary,
         },
+        novelId: targetId,
+        proposalType: "plot",
         summary: `章「${chapterTitle}」のプロット反映提案`,
+        type: "proposal",
       }),
     }),
 
     proposeUpdateStoryOutline: scopedTool({
       description:
-        'ストーリー構想（全体のあらすじ、起承転結、序盤・中盤・結末、今後の展開候補、構想メモなど）のマークダウンの追加・更新・ブラッシュアップをユーザーに提案します。あらすじの整理や展開・結末のアイデアが固まった際に積極的に使用してください。',
+        "ストーリー構想（全体のあらすじ、起承転結、序盤・中盤・結末、今後の展開候補、構想メモなど）のマークダウンの追加・更新・ブラッシュアップをユーザーに提案します。あらすじの整理や展開・結末のアイデアが固まった際に積極的に使用してください。",
+      errorMessage: "ストーリー構想更新提案の生成に失敗しました。",
       parameters: z.object({
-        novelId: z.string().optional().describe('対象の小説ID（省略時は現在の相談対象小説）'),
+        content: z
+          .string()
+          .describe("反映するマークダウン形式の本文（箇条書きや文章）"),
+        mode: z
+          .enum(["replace", "append", "prepend", "full_document"])
+          .optional()
+          .default("replace")
+          .describe(
+            "反映モード（replace: セクション全体を置換, append: 末尾に追記, prepend: 先頭に挿入, full_document: マークダウン全体を置換）"
+          ),
+        novelId: z
+          .string()
+          .optional()
+          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
+        reason: z
+          .string()
+          .optional()
+          .describe("この更新を提案する理由・変更ポイントの要約"),
         sectionName: z
           .string()
           .describe(
-            '反映先セクション名または見出し名（例: "全体あらすじ", "結（結末・エンディング）", "起（序盤・導入）", "承（中盤・展開）", "転（転換点・クライマックス）", "今後の展開候補 & 分岐アイデア", "作品コンセプト & ログライン", "ドキュメント全体" など）',
+            '反映先セクション名または見出し名（例: "全体あらすじ", "結（結末・エンディング）", "起（序盤・導入）", "承（中盤・展開）", "転（転換点・クライマックス）", "今後の展開候補 & 分岐アイデア", "作品コンセプト & ログライン", "ドキュメント全体" など）'
           ),
-        content: z.string().describe('反映するマークダウン形式の本文（箇条書きや文章）'),
-        mode: z
-          .enum(['replace', 'append', 'prepend', 'full_document'])
-          .optional()
-          .default('replace')
-          .describe(
-            '反映モード（replace: セクション全体を置換, append: 末尾に追記, prepend: 先頭に挿入, full_document: マークダウン全体を置換）',
-          ),
-        reason: z.string().optional().describe('この更新を提案する理由・変更ポイントの要約'),
       }),
       resolve: ({ novelId }) => resolveNovelId(novelId),
-      errorMessage: 'ストーリー構想更新提案の生成に失敗しました。',
-      run: (targetId, { sectionName, content, mode = 'replace', reason }) => ({
-        type: 'proposal',
-        proposalType: 'story_outline',
-        novelId: targetId,
+      run: (targetId, { sectionName, content, mode = "replace", reason }) => ({
         data: {
-          sectionName,
           content,
           mode,
           reason: reason || null,
+          sectionName,
         },
-        summary: `ストーリー構想「${sectionName}」の更新提案${reason ? `（${reason}）` : ''}`,
+        novelId: targetId,
+        proposalType: "story_outline",
+        summary: `ストーリー構想「${sectionName}」の更新提案${reason ? `（${reason}）` : ""}`,
+        type: "proposal",
       }),
     }),
   };

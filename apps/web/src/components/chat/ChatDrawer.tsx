@@ -1,23 +1,23 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
-import { Button } from '@/components/Button.js';
-import { LLMModelSelector } from '@/components/LLMModelSelector.js';
-import { MarkdownText } from '@/components/MarkdownText.js';
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import { Button } from "@/components/Button.js";
+import { LLMModelSelector } from "@/components/LLMModelSelector.js";
+import { MarkdownText } from "@/components/MarkdownText.js";
 import {
+  type ChatFocusContext,
   QUICK_PROMPTS,
+  type QuickPrompt,
   useChatStreamingState,
   useChatUI,
-  type ChatFocusContext,
-  type QuickPrompt,
-} from '@/context/ChatContext.js';
-import { useNovels } from '@/hooks/useNovels.js';
-import { usePinnedSessions } from '@/hooks/usePinnedSessions.js';
-import { useToast } from '@/hooks/useToast.js';
-import { ChatInsertEntityModal } from './ChatInsertEntityModal.js';
-import { ChatSessionList } from './ChatSessionList.js';
-import { ToolActivity } from './ToolActivity.js';
+} from "@/context/ChatContext.js";
+import { useNovels } from "@/hooks/useNovels.js";
+import { usePinnedSessions } from "@/hooks/usePinnedSessions.js";
+import { useToast } from "@/hooks/useToast.js";
+import { ChatInsertEntityModal } from "./ChatInsertEntityModal.js";
+import { ChatSessionList } from "./ChatSessionList.js";
+import { ToolActivity } from "./ToolActivity.js";
 
-type DrawerWidth = 'normal' | 'wide' | 'full';
-type ChatLayoutMode = 'overlay' | 'docked';
+type DrawerWidth = "normal" | "wide" | "full";
+type ChatLayoutMode = "overlay" | "docked";
 
 /** focus 情報から相談フォーカス用のプリフィルテキストを生成する（純関数・テスト可能） */
 export function buildChatPrefill(focus: ChatFocusContext): string {
@@ -72,35 +72,42 @@ export function ChatDrawer() {
   const { novels } = useNovels();
   const toast = useToast();
 
-  const [drawerWidth, setDrawerWidth] = useState<DrawerWidth>(() => {
-    return (localStorage.getItem('novel-creator:chat-width') as DrawerWidth) || 'normal';
-  });
-  const [layoutMode, setLayoutMode] = useState<ChatLayoutMode>(() => {
-    return (localStorage.getItem('novel-creator:chat-layout-mode') as ChatLayoutMode) || 'docked';
-  });
+  const [drawerWidth, setDrawerWidth] = useState<DrawerWidth>(
+    () =>
+      (localStorage.getItem("novel-creator:chat-width") as DrawerWidth) ||
+      "normal"
+  );
+  const [layoutMode, setLayoutMode] = useState<ChatLayoutMode>(
+    () =>
+      (localStorage.getItem(
+        "novel-creator:chat-layout-mode"
+      ) as ChatLayoutMode) || "docked"
+  );
   const { pinnedIds, togglePin } = usePinnedSessions();
 
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showHistoryView, setShowHistoryView] = useState(false);
-  const [insertModalSource, setInsertModalSource] = useState<string | null>(null);
+  const [insertModalSource, setInsertModalSource] = useState<string | null>(
+    null
+  );
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const handleWidthChange = (width: DrawerWidth) => {
     setDrawerWidth(width);
-    localStorage.setItem('novel-creator:chat-width', width);
+    localStorage.setItem("novel-creator:chat-width", width);
   };
 
   const handleLayoutModeChange = (mode: ChatLayoutMode) => {
     setLayoutMode(mode);
-    localStorage.setItem('novel-creator:chat-layout-mode', mode);
+    localStorage.setItem("novel-creator:chat-layout-mode", mode);
   };
 
   // メッセージやストリーミング更新時に最下部にスクロール
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -113,14 +120,16 @@ export function ChatDrawer() {
   // エディタからの「AIと相談」フォーカスが未消費なら入力欄にプリフィルする。
   // 既存入力は上書きせず末尾へ追記し、消費後はクリアして二重プリフィルを防ぐ。
   useEffect(() => {
-    if (!isOpen || !chatFocus) return;
+    if (!isOpen || !chatFocus) {
+      return;
+    }
     const prefill = buildChatPrefill(chatFocus);
     setInput((prev) => (prev ? `${prev}\n\n${prefill}` : prefill));
     consumeFocus();
     requestAnimationFrame(() => {
       const el = textareaRef.current;
       if (el) {
-        el.style.height = 'auto';
+        el.style.height = "auto";
         el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
         el.focus();
         el.setSelectionRange(el.value.length, el.value.length);
@@ -130,17 +139,19 @@ export function ChatDrawer() {
 
   // 送信ハンドラ
   const handleSend = async () => {
-    if (!input.trim() || isStreaming) return;
+    if (!input.trim() || isStreaming) {
+      return;
+    }
     const text = input;
-    setInput('');
+    setInput("");
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = "auto";
     }
     await sendMessage(text);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
       void handleSend();
     }
@@ -154,25 +165,25 @@ export function ChatDrawer() {
     try {
       await navigator.clipboard.writeText(content);
       setCopiedId(id);
-      toast.success('クリップボードにコピーしました');
+      toast.success("クリップボードにコピーしました");
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
-      toast.error('コピーに失敗しました');
+      toast.error("コピーに失敗しました");
     }
   };
 
   const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     const target = e.target;
-    target.style.height = 'auto';
+    target.style.height = "auto";
     target.style.height = `${Math.min(target.scrollHeight, 180)}px`;
   };
 
   const handleStartNewChat = () => {
     setShowHistoryView(false);
-    setInput('');
+    setInput("");
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = "auto";
     }
     startNewChat();
   };
@@ -185,9 +196,9 @@ export function ChatDrawer() {
   const handleSaveTitle = async (id: string, newTitle: string) => {
     const ok = await updateSessionTitle(id, newTitle);
     if (ok) {
-      toast.success('タイトルを変更しました');
+      toast.success("タイトルを変更しました");
     } else {
-      toast.error('タイトルの変更に失敗しました');
+      toast.error("タイトルの変更に失敗しました");
     }
     return ok;
   };
@@ -195,33 +206,37 @@ export function ChatDrawer() {
   const handleDeleteSession = async (id: string) => {
     try {
       await deleteSession(id);
-      toast.success('相談履歴を削除しました');
+      toast.success("相談履歴を削除しました");
     } catch {
-      toast.error('削除に失敗しました');
+      toast.error("削除に失敗しました");
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   const currentNovel = novels.find((n) => n.id === selectedNovelId);
 
-  const isFull = drawerWidth === 'full';
+  const isFull = drawerWidth === "full";
 
   // 幅クラス（標準 / ワイド）
   const widthClasses =
-    drawerWidth === 'wide' ? 'sm:w-[680px] md:w-[760px]' : 'sm:w-[480px] md:w-[520px]';
+    drawerWidth === "wide"
+      ? "sm:w-[680px] md:w-[760px]"
+      : "sm:w-[480px] md:w-[520px]";
 
   const containerClasses = isFull
-    ? 'fixed inset-0 z-50 flex flex-col bg-surface shadow-2xl transition-all duration-200 w-screen h-screen'
-    : layoutMode === 'docked'
+    ? "fixed inset-0 z-50 flex flex-col bg-surface shadow-2xl transition-all duration-200 w-screen h-screen"
+    : layoutMode === "docked"
       ? `relative z-20 flex flex-col h-full shrink-0 border-l border-border bg-surface shadow-md transition-all duration-200 max-md:fixed max-md:inset-y-0 max-md:right-0 max-md:z-50 w-full ${widthClasses}`
       : `fixed inset-y-0 right-0 z-50 flex flex-col border-l border-border bg-surface shadow-2xl transition-all duration-200 w-full ${widthClasses}`;
 
   return (
     <aside aria-label="創作相談チャット" className={containerClasses}>
       {/* ヘッダー */}
-      <header className="flex shrink-0 items-center justify-between border-b border-border bg-surface-raised/90 px-4 py-3 backdrop-blur">
-        <div className="flex min-w-0 flex-1 items-center gap-2 mr-3">
+      <header className="flex shrink-0 items-center justify-between border-border border-b bg-surface-raised/90 px-4 py-3 backdrop-blur">
+        <div className="mr-3 flex min-w-0 flex-1 items-center gap-2">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -240,10 +255,10 @@ export function ChatDrawer() {
           </div>
           <div className="min-w-0 flex-1">
             <h2
-              className="truncate text-sm font-bold text-foreground"
-              title={currentSession ? currentSession.title : 'AI創作相談'}
+              className="truncate font-bold text-foreground text-sm"
+              title={currentSession ? currentSession.title : "AI創作相談"}
             >
-              {currentSession ? currentSession.title : 'AI創作相談'}
+              {currentSession ? currentSession.title : "AI創作相談"}
             </h2>
             <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
@@ -256,20 +271,24 @@ export function ChatDrawer() {
           {/* 配置モード切り替え（重ねる ⇔ 占有） */}
           <button
             type="button"
-            onClick={() => handleLayoutModeChange(layoutMode === 'docked' ? 'overlay' : 'docked')}
-            className={`rounded-lg border p-1.5 text-xs transition cursor-pointer ${
-              layoutMode === 'docked'
-                ? 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/20'
-                : 'border-border bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground'
+            onClick={() =>
+              handleLayoutModeChange(
+                layoutMode === "docked" ? "overlay" : "docked"
+              )
+            }
+            className={`cursor-pointer rounded-lg border p-1.5 text-xs transition ${
+              layoutMode === "docked"
+                ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
+                : "border-border bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground"
             }`}
             title={
-              layoutMode === 'docked'
-                ? '右側エリアを占有中（クリックで重ねて表示に変更）'
-                : '重ねて表示中（クリックで右側エリアを占有して画面分割）'
+              layoutMode === "docked"
+                ? "右側エリアを占有中（クリックで重ねて表示に変更）"
+                : "重ねて表示中（クリックで右側エリアを占有して画面分割）"
             }
             aria-label="配置モード切り替え"
           >
-            {layoutMode === 'docked' ? (
+            {layoutMode === "docked" ? (
               /* ドッキング中アイコン（右分割パネル） */
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -301,16 +320,20 @@ export function ChatDrawer() {
             type="button"
             onClick={() => {
               const nextWidth: DrawerWidth =
-                drawerWidth === 'normal' ? 'wide' : drawerWidth === 'wide' ? 'full' : 'normal';
+                drawerWidth === "normal"
+                  ? "wide"
+                  : drawerWidth === "wide"
+                    ? "full"
+                    : "normal";
               handleWidthChange(nextWidth);
             }}
-            className="rounded-lg border border-border bg-surface p-1.5 text-xs text-muted-foreground transition hover:bg-surface-hover hover:text-foreground cursor-pointer flex items-center gap-1"
+            className="flex cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface p-1.5 text-muted-foreground text-xs transition hover:bg-surface-hover hover:text-foreground"
             title={`チャット幅: ${
-              drawerWidth === 'normal'
-                ? '標準 (クリックでワイド幅へ)'
-                : drawerWidth === 'wide'
-                  ? 'ワイド (クリックで全画面へ)'
-                  : '全画面 (クリックで標準幅へ)'
+              drawerWidth === "normal"
+                ? "標準 (クリックでワイド幅へ)"
+                : drawerWidth === "wide"
+                  ? "ワイド (クリックで全画面へ)"
+                  : "全画面 (クリックで標準幅へ)"
             }`}
             aria-label="チャット幅切り替え"
           >
@@ -326,8 +349,12 @@ export function ChatDrawer() {
                 clipRule="evenodd"
               />
             </svg>
-            <span className="text-[10px] font-medium uppercase text-muted-foreground">
-              {drawerWidth === 'normal' ? '標準' : drawerWidth === 'wide' ? 'ワイド' : '全画面'}
+            <span className="font-medium text-[10px] text-muted-foreground uppercase">
+              {drawerWidth === "normal"
+                ? "標準"
+                : drawerWidth === "wide"
+                  ? "ワイド"
+                  : "全画面"}
             </span>
           </button>
 
@@ -335,7 +362,7 @@ export function ChatDrawer() {
           <button
             type="button"
             onClick={handleStartNewChat}
-            className="inline-flex items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-xs font-medium text-primary shadow-xs transition hover:bg-primary/10 cursor-pointer"
+            className="inline-flex cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface px-2 py-1.5 font-medium text-primary text-xs shadow-xs transition hover:bg-primary/10"
             title="新しい相談を始める"
           >
             <svg
@@ -353,10 +380,10 @@ export function ChatDrawer() {
           <button
             type="button"
             onClick={() => setShowHistoryView((prev) => !prev)}
-            className={`inline-flex items-center gap-1 rounded-lg border px-2 py-1.5 text-xs font-medium shadow-xs transition cursor-pointer ${
+            className={`inline-flex cursor-pointer items-center gap-1 rounded-lg border px-2 py-1.5 font-medium text-xs shadow-xs transition ${
               showHistoryView
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border bg-surface text-foreground hover:bg-surface-hover'
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-surface text-foreground hover:bg-surface-hover"
             }`}
             title="相談履歴一覧"
           >
@@ -379,7 +406,7 @@ export function ChatDrawer() {
           <button
             type="button"
             onClick={closeChat}
-            className="rounded-lg p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground cursor-pointer"
+            className="cursor-pointer rounded-lg p-1.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
             title="閉じる"
           >
             <svg
@@ -390,15 +417,19 @@ export function ChatDrawer() {
               stroke="currentColor"
               className="h-5 w-5"
             >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
       </header>
 
       {/* 小説コンテキスト & LLMモデル選択バー */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface-raised/50 px-4 py-2 text-xs">
-        <div className="flex items-center gap-1.5 min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-border border-b bg-surface-raised/50 px-4 py-2 text-xs">
+        <div className="flex min-w-0 items-center gap-1.5">
           <label
             htmlFor="chat-novel-select"
             className="flex shrink-0 items-center gap-1 font-medium text-muted-foreground"
@@ -407,9 +438,11 @@ export function ChatDrawer() {
           </label>
           <select
             id="chat-novel-select"
-            value={selectedNovelId ?? ''}
-            onChange={(e) => setSelectedNovelId(e.target.value ? e.target.value : null)}
-            className="max-w-45 truncate rounded border border-border bg-surface px-2 py-1 text-xs text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            value={selectedNovelId ?? ""}
+            onChange={(e) =>
+              setSelectedNovelId(e.target.value ? e.target.value : null)
+            }
+            className="max-w-45 truncate rounded border border-border bg-surface px-2 py-1 text-foreground text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="">（全般相談）</option>
             {novels.map((n) => (
@@ -445,7 +478,7 @@ export function ChatDrawer() {
       ) : (
         /* メッセージチャットビュー */
         <>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          <div className="flex-1 space-y-4 overflow-y-auto p-4">
             {messages.length === 0 && !streamingContent && (
               <div className="space-y-4 py-6">
                 <div className="text-center">
@@ -453,13 +486,13 @@ export function ChatDrawer() {
                   <h3 className="mt-2 font-bold text-foreground text-sm">
                     AI創作パートナーへようこそ
                   </h3>
-                  <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                  <p className="mx-auto mt-1 max-w-xs text-muted-foreground text-xs">
                     設定、登場人物、プロット、シーン展開の相談など、創作に関するアイデア出しをサポートします。
                   </p>
                 </div>
 
                 <div className="space-y-2 pt-2">
-                  <div className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1">
+                  <div className="px-1 font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
                     クイック相談テンプレート
                   </div>
                   <div className="grid gap-2 sm:grid-cols-2">
@@ -469,13 +502,13 @@ export function ChatDrawer() {
                         type="button"
                         onClick={() => handleQuickPrompt(qp)}
                         disabled={isStreaming}
-                        className="flex flex-col text-left p-2.5 rounded-xl border border-border bg-surface hover:border-primary/50 hover:bg-surface-hover transition text-xs group"
+                        className="group flex flex-col rounded-xl border border-border bg-surface p-2.5 text-left text-xs transition hover:border-primary/50 hover:bg-surface-hover"
                       >
                         <div className="flex items-center gap-1.5 font-semibold text-foreground group-hover:text-primary">
                           <span>{qp.icon}</span>
                           <span>{qp.title}</span>
                         </div>
-                        <span className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
+                        <span className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
                           {qp.description}
                         </span>
                       </button>
@@ -486,17 +519,20 @@ export function ChatDrawer() {
             )}
 
             {messages.map((m) => {
-              const isUser = m.role === 'user';
+              const isUser = m.role === "user";
               return (
-                <div key={m.id} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
-                  <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-muted-foreground">
-                    <span>{isUser ? 'あなた' : 'AIパートナー'}</span>
+                <div
+                  key={m.id}
+                  className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
+                >
+                  <div className="mb-1 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
+                    <span>{isUser ? "あなた" : "AIパートナー"}</span>
                   </div>
                   <div
-                    className={`rounded-2xl px-4 py-2.5 max-w-[88%] text-sm shadow-xs ${
+                    className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm shadow-xs ${
                       isUser
-                        ? 'bg-primary text-primary-foreground rounded-br-xs'
-                        : 'bg-surface-raised border border-border text-foreground rounded-bl-xs'
+                        ? "rounded-br-xs bg-primary text-primary-foreground"
+                        : "rounded-bl-xs border border-border bg-surface-raised text-foreground"
                     }`}
                   >
                     {isUser ? (
@@ -512,19 +548,19 @@ export function ChatDrawer() {
 
                   {/* アシスタントメッセージのアクションバー */}
                   {!isUser && (
-                    <div className="flex items-center gap-2 mt-1 px-1 text-[11px] text-muted-foreground">
+                    <div className="mt-1 flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
                       <button
                         type="button"
                         onClick={() => handleCopy(m.content, m.id)}
                         className="hover:text-foreground"
                       >
-                        {copiedId === m.id ? '✓ コピー完了' : '📋 コピー'}
+                        {copiedId === m.id ? "✓ コピー完了" : "📋 コピー"}
                       </button>
                       <span>•</span>
                       <button
                         type="button"
                         onClick={() => setInsertModalSource(m.content)}
-                        className="hover:text-primary font-medium"
+                        className="font-medium hover:text-primary"
                       >
                         📥 設定・人物へ取り込む
                       </button>
@@ -537,29 +573,34 @@ export function ChatDrawer() {
             {/* ストリーミング中のリアルタイム表示 */}
             {isStreaming && (
               <div className="flex flex-col items-start space-y-1">
-                {streamingContent || (streamingParts && streamingParts.length > 0) ? (
+                {streamingContent ||
+                (streamingParts && streamingParts.length > 0) ? (
                   <>
-                    <div className="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-primary font-medium">
-                      <span className="h-1.5 w-1.5 rounded-full bg-primary animate-ping" />
+                    <div className="mb-1 flex items-center gap-1.5 px-1 font-medium text-[11px] text-primary">
+                      <span className="h-1.5 w-1.5 animate-ping rounded-full bg-primary" />
                       <span>AIパートナーが入力中...</span>
                     </div>
-                    <div className="rounded-2xl rounded-bl-xs bg-surface-raised border border-primary/30 px-4 py-2.5 max-w-[88%] text-sm text-foreground shadow-xs">
+                    <div className="max-w-[88%] rounded-2xl rounded-bl-xs border border-primary/30 bg-surface-raised px-4 py-2.5 text-foreground text-sm shadow-xs">
                       {/* 思考プロセス & ツール呼び出しはテキスト生成前でもリアルタイムに表示 */}
                       <ToolActivity parts={streamingParts} isStreaming={true} />
-                      {streamingContent && <MarkdownText content={streamingContent} />}
+                      {streamingContent && (
+                        <MarkdownText content={streamingContent} />
+                      )}
                     </div>
                   </>
                 ) : (
-                  <div className="flex items-center gap-2 rounded-2xl rounded-bl-xs bg-surface-raised border border-border px-4 py-3 text-xs text-muted-foreground shadow-xs animate-pulse">
-                    <span className="h-2 w-2 rounded-full bg-primary animate-ping" />
-                    <span>AIパートナーが思考中...（小説データと文脈を参照しています）</span>
+                  <div className="flex animate-pulse items-center gap-2 rounded-2xl rounded-bl-xs border border-border bg-surface-raised px-4 py-3 text-muted-foreground text-xs shadow-xs">
+                    <span className="h-2 w-2 animate-ping rounded-full bg-primary" />
+                    <span>
+                      AIパートナーが思考中...（小説データと文脈を参照しています）
+                    </span>
                   </div>
                 )}
               </div>
             )}
 
             {loadingMessages && (
-              <div className="py-8 text-center text-xs text-muted-foreground">
+              <div className="py-8 text-center text-muted-foreground text-xs">
                 メッセージを読み込み中...
               </div>
             )}
@@ -567,7 +608,7 @@ export function ChatDrawer() {
             {error && (
               <div
                 role="alert"
-                className="rounded-xl border border-destructive/40 bg-destructive/10 p-3.5 text-xs text-destructive space-y-2 shadow-xs"
+                className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3.5 text-destructive text-xs shadow-xs"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-1.5 font-semibold">
@@ -588,13 +629,13 @@ export function ChatDrawer() {
                   <button
                     type="button"
                     onClick={clearError}
-                    className="text-destructive/70 hover:text-destructive text-xs cursor-pointer p-0.5"
+                    className="cursor-pointer p-0.5 text-destructive/70 text-xs hover:text-destructive"
                     title="閉じる"
                   >
                     ✕
                   </button>
                 </div>
-                <div className="whitespace-pre-wrap break-words text-foreground/90 font-mono text-[11px] bg-background/60 p-2 rounded border border-destructive/20 max-h-36 overflow-y-auto">
+                <div className="max-h-36 overflow-y-auto whitespace-pre-wrap break-words rounded border border-destructive/20 bg-background/60 p-2 font-mono text-[11px] text-foreground/90">
                   {error}
                 </div>
                 {lastPrompt && (
@@ -621,7 +662,7 @@ export function ChatDrawer() {
           </div>
 
           {/* 入力フォーム */}
-          <div className="border-t border-border bg-surface p-3 shrink-0">
+          <div className="shrink-0 border-border border-t bg-surface p-3">
             <div className="relative flex flex-col gap-2">
               <textarea
                 ref={textareaRef}
@@ -631,13 +672,20 @@ export function ChatDrawer() {
                 placeholder="創作の相談を入力... (Ctrl + Enter で送信)"
                 rows={1}
                 disabled={isStreaming}
-                className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary max-h-45"
+                className="max-h-45 w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-foreground text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-muted-foreground">Ctrl + Enter で送信</span>
+                <span className="text-[11px] text-muted-foreground">
+                  Ctrl + Enter で送信
+                </span>
                 <div className="flex items-center gap-2">
                   {isStreaming ? (
-                    <Button type="button" size="sm" variant="danger" onClick={abortStream}>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="danger"
+                      onClick={abortStream}
+                    >
                       ■ 停止
                     </Button>
                   ) : (

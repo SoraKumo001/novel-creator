@@ -1,24 +1,22 @@
-import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useGenerate } from '../src/hooks/useGenerate.js';
-import * as services from '../src/lib/services/index.js';
-import * as sse from '../src/lib/sse.js';
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useGenerate } from "../src/hooks/useGenerate.js";
+import * as services from "../src/lib/services/index.js";
+import * as sse from "../src/lib/sse.js";
 
-describe('useGenerate', () => {
+describe("useGenerate", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
 
-  it('generatePlot 実行時に activeGeneration と startedAt が設定され、完了後にリセットされること', async () => {
+  it("generatePlot 実行時に activeGeneration と startedAt が設定され、完了後にリセットされること", async () => {
     const mockPlot = {
-      title: 'テスト作品',
-      description: 'あらすじ',
-      chapters: [{ title: '第1章', order: 1, summary: '概要' }],
+      title: "テスト作品",
+      description: "あらすじ",
+      chapters: [{ title: "第1章", order: 1, summary: "概要" }],
     };
 
-    vi.spyOn(services, 'generatePlot').mockImplementation(async () => {
-      return mockPlot;
-    });
+    vi.spyOn(services, "generatePlot").mockImplementation(async () => mockPlot);
 
     const { result } = renderHook(() => useGenerate());
 
@@ -28,11 +26,11 @@ describe('useGenerate', () => {
 
     let promise: Promise<unknown>;
     act(() => {
-      promise = result.current.generatePlot('novel-1');
+      promise = result.current.generatePlot("novel-1");
     });
 
     expect(result.current.generatingPlot).toBe(true);
-    expect(result.current.activeGeneration).toBe('plot');
+    expect(result.current.activeGeneration).toBe("plot");
     expect(result.current.startedAt).not.toBeNull();
 
     await act(async () => {
@@ -45,45 +43,47 @@ describe('useGenerate', () => {
     expect(result.current.generatedPlot).toEqual(mockPlot);
   });
 
-  it('generateContent 実行時に生成文字数がカウントされること', async () => {
-    vi.spyOn(sse, 'streamGenerateContent').mockImplementation(async (_sectionId, onChunk) => {
-      onChunk('吾輩は');
-      onChunk('猫である。');
-    });
+  it("generateContent 実行時に生成文字数がカウントされること", async () => {
+    vi.spyOn(sse, "streamGenerateContent").mockImplementation(
+      async (_sectionId, onChunk) => {
+        onChunk("吾輩は");
+        onChunk("猫である。");
+      }
+    );
 
     const { result } = renderHook(() => useGenerate());
     const onChunk = vi.fn();
 
     await act(async () => {
-      await result.current.generateContent('section-1', onChunk);
+      await result.current.generateContent("section-1", onChunk);
     });
 
-    expect(onChunk).toHaveBeenCalledWith('吾輩は');
-    expect(onChunk).toHaveBeenCalledWith('猫である。');
+    expect(onChunk).toHaveBeenCalledWith("吾輩は");
+    expect(onChunk).toHaveBeenCalledWith("猫である。");
     expect(result.current.generatingContent).toBe(false);
   });
 
-  it('cancelGeneration でアクティブな処理が中断されること', async () => {
+  it("cancelGeneration でアクティブな処理が中断されること", async () => {
     let capturedSignal: AbortSignal | undefined;
-    vi.spyOn(services, 'generatePlot').mockImplementation(
+    vi.spyOn(services, "generatePlot").mockImplementation(
       async (_novelId, _modelConfigId, signal) => {
         capturedSignal = signal;
         return new Promise((resolve, reject) => {
-          signal?.addEventListener('abort', () => {
-            reject(new DOMException('Aborted', 'AbortError'));
+          signal?.addEventListener("abort", () => {
+            reject(new DOMException("Aborted", "AbortError"));
           });
         });
-      },
+      }
     );
 
     const { result } = renderHook(() => useGenerate());
 
     let plotPromise: Promise<unknown>;
     act(() => {
-      plotPromise = result.current.generatePlot('novel-1');
+      plotPromise = result.current.generatePlot("novel-1");
     });
 
-    expect(result.current.activeGeneration).toBe('plot');
+    expect(result.current.activeGeneration).toBe("plot");
 
     await act(async () => {
       result.current.cancelGeneration();

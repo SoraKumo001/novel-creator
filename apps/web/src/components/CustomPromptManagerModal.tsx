@@ -1,19 +1,19 @@
-import { useState } from 'react';
-import { Button } from './Button.js';
-import { Modal } from './Modal.js';
-import { CustomPromptModal } from './CustomPromptModal.js';
-import { useCustomPrompts } from '@/hooks/useCustomPrompts.js';
-import { useToast } from '@/hooks/useToast.js';
+import { useState } from "react";
+import { useCustomPrompts } from "@/hooks/useCustomPrompts.js";
+import { useToast } from "@/hooks/useToast.js";
 import type {
   CreateCustomPromptInput,
   CustomPrompt,
   UpdateCustomPromptInput,
-} from '@/lib/types.js';
+} from "@/lib/types.js";
+import { Button } from "./Button.js";
+import { CustomPromptModal } from "./CustomPromptModal.js";
+import { Modal } from "./Modal.js";
 
 interface CustomPromptManagerModalProps {
-  open: boolean;
-  onClose: () => void;
   novelId?: string | null;
+  onClose: () => void;
+  open: boolean;
 }
 
 export function CustomPromptManagerModal({
@@ -21,16 +21,25 @@ export function CustomPromptManagerModal({
   onClose,
   novelId,
 }: CustomPromptManagerModalProps) {
-  const { prompts, loading, error, createPrompt, updatePrompt, deletePrompt, seedPresets } =
-    useCustomPrompts({ novelId, autoFetch: open });
+  const {
+    prompts,
+    loading,
+    error,
+    createPrompt,
+    updatePrompt,
+    deletePrompt,
+    seedPresets,
+  } = useCustomPrompts({ novelId, autoFetch: open });
 
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [editingPrompt, setEditingPrompt] = useState<CustomPrompt | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const toast = useToast();
 
   const filteredPrompts = prompts.filter((p) => {
-    if (selectedCategory === 'all') return true;
+    if (selectedCategory === "all") {
+      return true;
+    }
     return p.category === selectedCategory;
   });
 
@@ -45,57 +54,70 @@ export function CustomPromptManagerModal({
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`カスタムプロンプト「${name}」を削除してもよろしいですか？`)) return;
+    if (
+      !window.confirm(
+        `カスタムプロンプト「${name}」を削除してもよろしいですか？`
+      )
+    ) {
+      return;
+    }
     try {
       await deletePrompt(id);
-      toast.success('プロンプトを削除しました');
+      toast.success("プロンプトを削除しました");
     } catch {
-      toast.error('削除に失敗しました');
+      toast.error("削除に失敗しました");
     }
   };
 
   const handleSeed = async () => {
     try {
       await seedPresets();
-      toast.success('標準プリセットプロンプトを復元しました');
+      toast.success("標準プリセットプロンプトを復元しました");
     } catch {
-      toast.error('プリセットの復元に失敗しました');
+      toast.error("プリセットの復元に失敗しました");
     }
   };
 
-  const handleModalSubmit = async (data: CreateCustomPromptInput | UpdateCustomPromptInput) => {
+  const handleModalSubmit = async (
+    data: CreateCustomPromptInput | UpdateCustomPromptInput
+  ) => {
     if (editingPrompt) {
       await updatePrompt(editingPrompt.id, data as UpdateCustomPromptInput);
-      toast.success('プロンプトを更新しました');
+      toast.success("プロンプトを更新しました");
     } else {
       await createPrompt(data as CreateCustomPromptInput);
-      toast.success('新しいプロンプトを登録しました');
+      toast.success("新しいプロンプトを登録しました");
     }
   };
 
   return (
     <>
-      <Modal isOpen={open} onClose={onClose} title="🪄 カスタムプロンプト管理" size="lg">
+      <Modal
+        isOpen={open}
+        onClose={onClose}
+        title="🪄 カスタムプロンプト管理"
+        size="lg"
+      >
         <div className="space-y-4">
           {/* ヘッダー操作バー */}
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-border border-b pb-3">
             {/* カテゴリフィルタ */}
             <div className="flex items-center gap-1.5 overflow-x-auto">
               {[
-                { id: 'all', label: 'すべて' },
-                { id: 'inline', label: 'インライン推敲' },
-                { id: 'generation', label: '本文・プロット' },
-                { id: 'chat', label: '創作相談' },
-                { id: 'general', label: '汎用' },
+                { id: "all", label: "すべて" },
+                { id: "inline", label: "インライン推敲" },
+                { id: "generation", label: "本文・プロット" },
+                { id: "chat", label: "創作相談" },
+                { id: "general", label: "汎用" },
               ].map((tab) => (
                 <button
                   key={tab.id}
                   type="button"
                   onClick={() => setSelectedCategory(tab.id)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium cursor-pointer transition ${
+                  className={`cursor-pointer rounded-md px-2.5 py-1 font-medium text-xs transition ${
                     selectedCategory === tab.id
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   {tab.label}
@@ -120,52 +142,60 @@ export function CustomPromptManagerModal({
 
           {/* プロンプト一覧 */}
           {loading ? (
-            <div className="py-12 text-center text-xs text-muted-foreground">読み込み中...</div>
+            <div className="py-12 text-center text-muted-foreground text-xs">
+              読み込み中...
+            </div>
           ) : error ? (
-            <div className="p-4 rounded-lg bg-danger/10 border border-danger/30 text-xs text-danger">
+            <div className="rounded-lg border border-danger/30 bg-danger/10 p-4 text-danger text-xs">
               {error}
             </div>
           ) : filteredPrompts.length === 0 ? (
-            <div className="py-12 text-center space-y-2">
+            <div className="space-y-2 py-12 text-center">
               <span className="text-3xl">🪄</span>
-              <p className="text-xs text-muted-foreground">登録されているプロンプトがありません</p>
+              <p className="text-muted-foreground text-xs">
+                登録されているプロンプトがありません
+              </p>
               <Button size="sm" variant="secondary" onClick={handleOpenNew}>
                 最初のプロンプトを登録する
               </Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+            <div className="grid max-h-[60vh] grid-cols-1 gap-3 overflow-y-auto pr-1 md:grid-cols-2">
               {filteredPrompts.map((p) => (
                 <div
                   key={p.id}
-                  className="rounded-xl border border-border bg-surface p-3.5 space-y-2.5 hover:border-primary/50 transition shadow-sm flex flex-col justify-between"
+                  className="flex flex-col justify-between space-y-2.5 rounded-xl border border-border bg-surface p-3.5 shadow-sm transition hover:border-primary/50"
                 >
                   <div className="space-y-1.5">
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-xl shrink-0">{p.icon || '🪄'}</span>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="shrink-0 text-xl">
+                          {p.icon || "🪄"}
+                        </span>
                         <div className="min-w-0">
-                          <h4 className="text-xs font-bold text-foreground truncate">{p.name}</h4>
+                          <h4 className="truncate font-bold text-foreground text-xs">
+                            {p.name}
+                          </h4>
                           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                            <span className="bg-muted px-1.5 py-0.2 rounded border border-border/60">
-                              {p.category === 'inline'
-                                ? 'インライン推敲'
-                                : p.category === 'generation'
-                                  ? '生成'
-                                  : p.category === 'chat'
-                                    ? '相談'
-                                    : '汎用'}
+                            <span className="rounded border border-border/60 bg-muted px-1.5 py-0.2">
+                              {p.category === "inline"
+                                ? "インライン推敲"
+                                : p.category === "generation"
+                                  ? "生成"
+                                  : p.category === "chat"
+                                    ? "相談"
+                                    : "汎用"}
                             </span>
-                            <span>{p.novelId ? '作品専用' : '全作品共通'}</span>
+                            <span>{p.novelId ? "作品専用" : "全作品共通"}</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-1 shrink-0">
+                      <div className="flex shrink-0 items-center gap-1">
                         <button
                           type="button"
                           onClick={() => handleOpenEdit(p)}
-                          className="text-xs text-muted-foreground hover:text-primary p-1 rounded hover:bg-muted cursor-pointer"
+                          className="cursor-pointer rounded p-1 text-muted-foreground text-xs hover:bg-muted hover:text-primary"
                           title="編集"
                         >
                           ✏️
@@ -173,7 +203,7 @@ export function CustomPromptManagerModal({
                         <button
                           type="button"
                           onClick={() => handleDelete(p.id, p.name)}
-                          className="text-xs text-muted-foreground hover:text-danger p-1 rounded hover:bg-muted cursor-pointer"
+                          className="cursor-pointer rounded p-1 text-muted-foreground text-xs hover:bg-muted hover:text-danger"
                           title="削除"
                         >
                           🗑️
@@ -182,13 +212,13 @@ export function CustomPromptManagerModal({
                     </div>
 
                     {p.description && (
-                      <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">
+                      <p className="line-clamp-2 text-[11px] text-muted-foreground leading-relaxed">
                         {p.description}
                       </p>
                     )}
 
                     {/* テンプレートプレビュー */}
-                    <div className="rounded bg-surface-raised border border-border/70 p-2 text-[10px] font-mono text-muted-foreground max-h-20 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                    <div className="max-h-20 overflow-y-auto whitespace-pre-wrap rounded border border-border/70 bg-surface-raised p-2 font-mono text-[10px] text-muted-foreground leading-relaxed">
                       {p.userPrompt}
                     </div>
                   </div>
@@ -197,7 +227,7 @@ export function CustomPromptManagerModal({
             </div>
           )}
 
-          <div className="flex justify-end pt-2 border-t border-border">
+          <div className="flex justify-end border-border border-t pt-2">
             <Button size="sm" variant="secondary" onClick={onClose}>
               閉じる
             </Button>

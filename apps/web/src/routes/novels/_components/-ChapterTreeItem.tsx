@@ -1,4 +1,4 @@
-import type { Chapter, Section } from '@/lib/types.js';
+import type { Chapter, Section } from "@/lib/types.js";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -9,7 +9,7 @@ import {
   PlusIcon,
   SparklesIcon,
   TrashIcon,
-} from './-Icons.js';
+} from "./-Icons.js";
 
 export function ChapterTreeItem({
   chapter,
@@ -51,24 +51,29 @@ export function ChapterTreeItem({
   const isGeneratingChapter = generatingSummaryId === chapter.id;
 
   return (
-    <div className="rounded-xl border border-border bg-surface shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 bg-surface hover:bg-surface-hover/50 transition">
+    <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+      <div className="flex items-center justify-between bg-surface px-4 py-3 transition hover:bg-surface-hover/50">
         <div
-          className="flex items-center gap-3 cursor-pointer select-none flex-1 min-w-0"
+          className="flex min-w-0 flex-1 cursor-pointer select-none items-center gap-3"
           onClick={onToggle}
         >
-          <button type="button" className="text-muted-foreground hover:text-foreground">
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground"
+          >
             {isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
           </button>
           <div className="truncate">
-            <span className="font-semibold text-foreground mr-2">
+            <span className="mr-2 font-semibold text-foreground">
               第 {chapter.order} 章: {chapter.title}
             </span>
-            <span className="text-xs text-muted-foreground">({chapter.sections.length} 節)</span>
+            <span className="text-muted-foreground text-xs">
+              ({chapter.sections.length} 節)
+            </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex shrink-0 items-center gap-1">
           <IconButton
             label="章を上に移動"
             icon={<ArrowUpIcon />}
@@ -82,10 +87,12 @@ export function ChapterTreeItem({
             disabled={!canMoveDown}
           />
           <IconButton
-            label={isGeneratingChapter ? '概要を生成中...' : 'AIで章の概要を生成'}
+            label={
+              isGeneratingChapter ? "概要を生成中..." : "AIで章の概要を生成"
+            }
             icon={
               isGeneratingChapter ? (
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent inline-block" />
+                <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
               ) : (
                 <SparklesIcon />
               )
@@ -93,22 +100,36 @@ export function ChapterTreeItem({
             onClick={() => void onGenerateChapterSummary()}
             disabled={!!generatingSummaryId}
           />
-          <IconButton label="節を追加" icon={<PlusIcon />} onClick={onAddSection} />
-          <IconButton label="章を編集" icon={<PencilIcon />} onClick={onEditChapter} />
-          <IconButton label="章を削除" icon={<TrashIcon />} onClick={onDeleteChapter} />
+          <IconButton
+            label="節を追加"
+            icon={<PlusIcon />}
+            onClick={onAddSection}
+          />
+          <IconButton
+            label="章を編集"
+            icon={<PencilIcon />}
+            onClick={onEditChapter}
+          />
+          <IconButton
+            label="章を削除"
+            icon={<TrashIcon />}
+            onClick={onDeleteChapter}
+          />
         </div>
       </div>
 
       {chapter.summary && (
-        <div className="px-5 py-2.5 text-xs text-muted-foreground border-t border-border bg-surface-raised/40 leading-relaxed">
+        <div className="border-border border-t bg-surface-raised/40 px-5 py-2.5 text-muted-foreground text-xs leading-relaxed">
           {chapter.summary}
         </div>
       )}
 
       {isExpanded && (
-        <div className="border-t border-border bg-surface-raised/20 p-3 space-y-2">
+        <div className="space-y-2 border-border border-t bg-surface-raised/20 p-3">
           {chapter.sections.length === 0 ? (
-            <p className="p-2 text-xs text-muted-foreground italic">節がまだありません。</p>
+            <p className="p-2 text-muted-foreground text-xs italic">
+              節がまだありません。
+            </p>
           ) : (
             chapter.sections.map((section, secIdx) => {
               const isGeneratingSec = generatingSummaryId === section.id;
@@ -119,19 +140,20 @@ export function ChapterTreeItem({
                 >
                   <div className="min-w-0 flex-1">
                     <div className="font-medium text-foreground text-sm">
-                      節 {section.order}: {section.title || '（無題）'}
+                      節 {section.order}: {section.title || "（無題）"}
                     </div>
                     {section.summary ? (
-                      <div className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                      <div className="mt-0.5 text-muted-foreground text-xs leading-relaxed">
                         {section.summary}
                       </div>
                     ) : (
-                      <div className="text-xs text-muted-foreground/60 mt-0.5 italic">
-                        概要なし（✨ 概要生成ボタンでAIにあらすじを考えてもらえます）
+                      <div className="mt-0.5 text-muted-foreground/60 text-xs italic">
+                        概要なし（✨
+                        概要生成ボタンでAIにあらすじを考えてもらえます）
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                  <div className="ml-2 flex shrink-0 items-center gap-1">
                     <IconButton
                       label="節を上に移動"
                       icon={<ArrowUpIcon />}
@@ -145,10 +167,14 @@ export function ChapterTreeItem({
                       disabled={secIdx === chapter.sections.length - 1}
                     />
                     <IconButton
-                      label={isGeneratingSec ? '概要を生成中...' : 'AIで節の概要を生成'}
+                      label={
+                        isGeneratingSec
+                          ? "概要を生成中..."
+                          : "AIで節の概要を生成"
+                      }
                       icon={
                         isGeneratingSec ? (
-                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent inline-block" />
+                          <span className="inline-block h-3.5 w-3.5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                         ) : (
                           <SparklesIcon />
                         )

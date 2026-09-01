@@ -1,17 +1,17 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from "react";
+import type { AnalysisRunOptions } from "@/lib/services/analysis.js";
 import {
   runPersonaReviewAnalysis,
   runStoryArcAnalysis,
   runVoiceCheckAnalysis,
-} from '@/lib/services/analysis.js';
-import type { AnalysisRunOptions } from '@/lib/services/analysis.js';
+} from "@/lib/services/analysis.js";
 import type {
   AnalysisProgress,
   AnalysisType,
   CharacterVoiceCheckResult,
   MultiPersonaReviewResult,
   StoryArcResult,
-} from '@/lib/types.js';
+} from "@/lib/types.js";
 
 export type { AnalysisProgress };
 
@@ -28,13 +28,19 @@ export function useAnalysis(): {
   /** 現在の進捗（実行していない場合は null）。stage はそのまま表示してよい日本語ラベル */
   progress: AnalysisProgress | null;
   /** ストーリーアーク分析を実行し、結果を返す */
-  runStoryArc: (novelId: string, modelConfigId?: string | null) => Promise<StoryArcResult>;
+  runStoryArc: (
+    novelId: string,
+    modelConfigId?: string | null
+  ) => Promise<StoryArcResult>;
   /** キャラクター口調チェックを実行し、結果を返す */
-  runVoiceCheck: (novelId: string, opts?: AnalysisRunOptions) => Promise<CharacterVoiceCheckResult>;
+  runVoiceCheck: (
+    novelId: string,
+    opts?: AnalysisRunOptions
+  ) => Promise<CharacterVoiceCheckResult>;
   /** ペルソナレビューを実行し、結果を返す */
   runPersonaReview: (
     novelId: string,
-    opts?: AnalysisRunOptions,
+    opts?: AnalysisRunOptions
   ) => Promise<MultiPersonaReviewResult>;
   /** 実行中の分析をキャンセルする。対応する Promise は name==='AbortError' の Error で reject される */
   cancel: () => void;
@@ -46,18 +52,23 @@ export function useAnalysis(): {
   // Map は挿入順を保持するため、最後のエントリが「最後に開始した実行」。
   const activeRef = useRef<Map<AbortController, AnalysisType>>(new Map());
   // 実行ごとの最終進捗（フォールバック時に復元するため）
-  const lastProgressRef = useRef<Map<AbortController, AnalysisProgress>>(new Map());
+  const lastProgressRef = useRef<Map<AbortController, AnalysisProgress>>(
+    new Map()
+  );
   const lastControllerRef = useRef<AbortController | null>(null);
 
   /** abort 由来のエラーかどうか（fetch の DOMException とラップ済み Error の両方を吸収）。 */
   function isAbortError(e: unknown): boolean {
-    return e instanceof Error && e.name === 'AbortError';
+    return e instanceof Error && e.name === "AbortError";
   }
 
   const run = useCallback(
     async <T>(
       type: AnalysisType,
-      invoke: (onProgress: (p: AnalysisProgress) => void, signal: AbortSignal) => Promise<T>,
+      invoke: (
+        onProgress: (p: AnalysisProgress) => void,
+        signal: AbortSignal
+      ) => Promise<T>
     ): Promise<T> => {
       const controller = new AbortController();
       activeRef.current.set(controller, type);
@@ -81,11 +92,11 @@ export function useAnalysis(): {
           // キャンセルは UI 上のエラーにしない（呼び出し側で無視される前提）。
           // name だけは 'AbortError' に正規化して再スローする。
           if (e instanceof Error) {
-            e.name = 'AbortError';
+            e.name = "AbortError";
             throw e;
           }
-          const wrapped = new Error('分析がキャンセルされました');
-          wrapped.name = 'AbortError';
+          const wrapped = new Error("分析がキャンセルされました");
+          wrapped.name = "AbortError";
           throw wrapped;
         }
         throw e;
@@ -108,31 +119,31 @@ export function useAnalysis(): {
         }
       }
     },
-    [],
+    []
   );
 
   const runStoryArc = useCallback(
     (novelId: string, modelConfigId?: string | null) =>
-      run('story-arc', (onProgress, signal) =>
-        runStoryArcAnalysis(novelId, modelConfigId, onProgress, signal),
+      run("story-arc", (onProgress, signal) =>
+        runStoryArcAnalysis(novelId, modelConfigId, onProgress, signal)
       ),
-    [run],
+    [run]
   );
 
   const runVoiceCheck = useCallback(
     (novelId: string, opts?: AnalysisRunOptions) =>
-      run('check-voice', (onProgress, signal) =>
-        runVoiceCheckAnalysis(novelId, opts, onProgress, signal),
+      run("check-voice", (onProgress, signal) =>
+        runVoiceCheckAnalysis(novelId, opts, onProgress, signal)
       ),
-    [run],
+    [run]
   );
 
   const runPersonaReview = useCallback(
     (novelId: string, opts?: AnalysisRunOptions) =>
-      run('persona-review', (onProgress, signal) =>
-        runPersonaReviewAnalysis(novelId, opts, onProgress, signal),
+      run("persona-review", (onProgress, signal) =>
+        runPersonaReviewAnalysis(novelId, opts, onProgress, signal)
       ),
-    [run],
+    [run]
   );
 
   const cancel = useCallback(() => {
@@ -142,5 +153,12 @@ export function useAnalysis(): {
     }
   }, []);
 
-  return { running, progress, runStoryArc, runVoiceCheck, runPersonaReview, cancel };
+  return {
+    running,
+    progress,
+    runStoryArc,
+    runVoiceCheck,
+    runPersonaReview,
+    cancel,
+  };
 }

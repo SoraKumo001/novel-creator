@@ -1,18 +1,22 @@
-import { parseResponseError } from '../errors.js';
-import { apiClient } from '../api-client.js';
+import { apiClient } from "../api-client.js";
+import { parseResponseError } from "../errors.js";
 import type {
   ChatSession,
   ChatSessionDetail,
   CreateChatSessionInput,
   ExtractedChatEntities,
   UpdateChatSessionInput,
-} from '../types.js';
+} from "../types.js";
 
-export async function fetchChatSessions(novelId?: string): Promise<ChatSession[]> {
+export async function fetchChatSessions(
+  novelId?: string
+): Promise<ChatSession[]> {
   const res = await apiClient.chat.sessions.$get({
     query: { novelId: novelId || undefined },
   });
-  if (!res.ok) throw await parseResponseError(res, 'チャットセッション一覧の取得');
+  if (!res.ok) {
+    throw await parseResponseError(res, "チャットセッション一覧の取得");
+  }
   const rows = await res.json();
   return rows.map((s) => ({
     id: s.id,
@@ -24,8 +28,10 @@ export async function fetchChatSessions(novelId?: string): Promise<ChatSession[]
 }
 
 export async function fetchChatSession(id: string): Promise<ChatSessionDetail> {
-  const res = await apiClient.chat.sessions[':id'].$get({ param: { id } });
-  if (!res.ok) throw await parseResponseError(res, 'チャットセッション詳細の取得');
+  const res = await apiClient.chat.sessions[":id"].$get({ param: { id } });
+  if (!res.ok) {
+    throw await parseResponseError(res, "チャットセッション詳細の取得");
+  }
   const s = await res.json();
   return {
     id: s.id,
@@ -36,7 +42,7 @@ export async function fetchChatSession(id: string): Promise<ChatSessionDetail> {
     messages: s.messages.map((m) => ({
       id: m.id,
       sessionId: m.sessionId,
-      role: m.role as 'user' | 'assistant',
+      role: m.role as "user" | "assistant",
       content: m.content,
       createdAt: m.createdAt ? new Date(m.createdAt).toISOString() : null,
       // parts は並行レーン実装の DB jsonb 列。型クライアントが未反映でも許容する
@@ -45,14 +51,18 @@ export async function fetchChatSession(id: string): Promise<ChatSessionDetail> {
   };
 }
 
-export async function createChatSession(input: CreateChatSessionInput): Promise<ChatSession> {
+export async function createChatSession(
+  input: CreateChatSessionInput
+): Promise<ChatSession> {
   const res = await apiClient.chat.sessions.$post({
     json: {
       novelId: input.novelId,
       title: input.title,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, 'チャットセッションの作成');
+  if (!res.ok) {
+    throw await parseResponseError(res, "チャットセッションの作成");
+  }
   const s = await res.json();
   return {
     id: s.id,
@@ -65,15 +75,17 @@ export async function createChatSession(input: CreateChatSessionInput): Promise<
 
 export async function updateChatSession(
   id: string,
-  input: UpdateChatSessionInput,
+  input: UpdateChatSessionInput
 ): Promise<ChatSession> {
-  const res = await apiClient.chat.sessions[':id'].$put({
+  const res = await apiClient.chat.sessions[":id"].$put({
     param: { id },
     json: {
       title: input.title,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, 'チャットセッションの更新');
+  if (!res.ok) {
+    throw await parseResponseError(res, "チャットセッションの更新");
+  }
   const s = await res.json();
   return {
     id: s.id,
@@ -85,22 +97,33 @@ export async function updateChatSession(
 }
 
 export async function deleteChatSession(id: string): Promise<void> {
-  const res = await apiClient.chat.sessions[':id'].$delete({ param: { id } });
-  if (!res.ok) throw await parseResponseError(res, 'チャットセッションの削除');
+  const res = await apiClient.chat.sessions[":id"].$delete({ param: { id } });
+  if (!res.ok) {
+    throw await parseResponseError(res, "チャットセッションの削除");
+  }
 }
 
-export async function extractChatEntities(text: string): Promise<ExtractedChatEntities> {
-  const res = await apiClient.chat['extract-entities'].$post({
+export async function extractChatEntities(
+  text: string
+): Promise<ExtractedChatEntities> {
+  const res = await apiClient.chat["extract-entities"].$post({
     json: { text },
   });
-  if (!res.ok) throw await parseResponseError(res, '設定・人物の抽出');
+  if (!res.ok) {
+    throw await parseResponseError(res, "設定・人物の抽出");
+  }
   const data = (await res.json()) as {
-    characters?: { name: string; category: string; description: string; traits: string[] }[];
+    characters?: {
+      name: string;
+      category: string;
+      description: string;
+      traits: string[];
+    }[];
     settings?: { name: string; category: string; description: string }[];
     foreshadowings?: {
       title: string;
       description: string;
-      status: 'unresolved' | 'resolved' | 'abandoned';
+      status: "unresolved" | "resolved" | "abandoned";
     }[];
     timelines?: { event: string; timestamp: string }[];
     plots?: { title: string; summary: string }[];

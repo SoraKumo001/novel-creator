@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState } from "react";
 
 /**
  * モーダルの開閉状態のみを管理するフック。
@@ -10,10 +10,10 @@ import { useCallback, useState } from 'react';
  * イベントオブジェクトが payload として渡ることを型で防ぐ。
  */
 interface ModalStateControls<TPayload> {
-  isOpen: boolean;
-  payload: TPayload | null;
-  open: TPayload extends void ? () => void : (payload: TPayload) => void;
   close: () => void;
+  isOpen: boolean;
+  open: TPayload extends void ? () => void : (payload: TPayload) => void;
+  payload: TPayload | null;
 }
 
 export function useModalState<TPayload = void>(): ModalStateControls<TPayload> {
@@ -27,7 +27,7 @@ export function useModalState<TPayload = void>(): ModalStateControls<TPayload> {
     setIsOpen(true);
   }, []);
 
-  const open = openInternal as ModalStateControls<TPayload>['open'];
+  const open = openInternal as ModalStateControls<TPayload>["open"];
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -81,5 +81,12 @@ export function useHistoryViewState() {
   /** 新規実行の完了後に履歴一覧を再取得させるためのキーを進める */
   const bumpHistoryKey = useCallback(() => setHistoryKey((k) => k + 1), []);
 
-  return { isHistoryView, viewedAt, historyKey, showHistory, resetHistoryView, bumpHistoryKey };
+  return {
+    isHistoryView,
+    viewedAt,
+    historyKey,
+    showHistory,
+    resetHistoryView,
+    bumpHistoryKey,
+  };
 }

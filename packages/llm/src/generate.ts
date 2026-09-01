@@ -1,9 +1,3 @@
-import {
-  APICallError,
-  embed,
-  generateText as aiGenerateText,
-  streamText as aiStreamText,
-} from 'ai';
 import type {
   EmbeddingModel,
   LanguageModel,
@@ -11,7 +5,13 @@ import type {
   StopCondition,
   StreamTextResult,
   ToolSet,
-} from 'ai';
+} from "ai";
+import {
+  APICallError,
+  generateText as aiGenerateText,
+  streamText as aiStreamText,
+  embed,
+} from "ai";
 
 /**
  * リトライ設定。
@@ -39,12 +39,18 @@ const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
 function isRetryableError(error: unknown): boolean {
   if (APICallError.isInstance(error)) {
     const status = error.statusCode;
-    if (status === 429) return true;
-    if (status !== undefined && status >= 500 && status < 600) return true;
+    if (status === 429) {
+      return true;
+    }
+    if (status !== undefined && status >= 500 && status < 600) {
+      return true;
+    }
     return error.isRetryable === true;
   }
   // fetch のネットワークエラーは TypeError として投げられる。
-  if (error instanceof TypeError) return true;
+  if (error instanceof TypeError) {
+    return true;
+  }
   return false;
 }
 
@@ -55,7 +61,10 @@ function sleep(ms: number): Promise<void> {
 /**
  * リトライ付きで関数を実行する。指数バックオフで待機する。
  */
-async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: RetryOptions = {}
+): Promise<T> {
   const { maxRetries, retryDelay } = { ...DEFAULT_RETRY_OPTIONS, ...options };
   let attempt = 0;
   for (;;) {
@@ -79,7 +88,7 @@ async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): P
 export async function generateText(
   model: LanguageModel,
   prompt: string,
-  options: RetryOptions = {},
+  options: RetryOptions = {}
 ): Promise<string> {
   return withRetry(async () => {
     const result = await aiGenerateText({ model, prompt });
@@ -94,9 +103,12 @@ export async function generateText(
 export async function* streamText(
   model: LanguageModel,
   prompt: string,
-  options: RetryOptions = {},
+  options: RetryOptions = {}
 ): AsyncGenerator<string> {
-  const result = await withRetry(async () => aiStreamText({ model, prompt }), options);
+  const result = await withRetry(
+    async () => aiStreamText({ model, prompt }),
+    options
+  );
   for await (const chunk of result.textStream) {
     yield chunk;
   }
@@ -116,16 +128,18 @@ export async function* streamText(
 type Arrayable<T> = T | T[] | undefined;
 
 export interface StreamTextOptions extends RetryOptions {
-  /** LLM に渡すツール群（AI SDK の tool() 形式） */
-  tools?: ToolSet;
   /** ツールループの停止条件。未指定時は AI SDK デフォルト（isStepCount(1)） */
   stopWhen?: Arrayable<StopCondition<ToolSet, Record<string, unknown>>>;
+  /** LLM に渡すツール群（AI SDK の tool() 形式） */
+  tools?: ToolSet;
 }
 
-export async function streamTextResult<TOOLS extends ToolSet = Record<string, never>>(
+export async function streamTextResult<
+  TOOLS extends ToolSet = Record<string, never>,
+>(
   model: LanguageModel,
   prompt: string,
-  options: StreamTextOptions = {} as StreamTextOptions,
+  options: StreamTextOptions = {} as StreamTextOptions
 ): Promise<StreamTextResult<TOOLS, Record<string, unknown>, OutputInterface>> {
   return withRetry(
     async () =>
@@ -135,11 +149,13 @@ export async function streamTextResult<TOOLS extends ToolSet = Record<string, ne
         ...(options.tools ? { tools: options.tools as TOOLS } : {}),
         ...(options.stopWhen
           ? {
-              stopWhen: options.stopWhen as NonNullable<StreamTextOptions['stopWhen']>,
+              stopWhen: options.stopWhen as NonNullable<
+                StreamTextOptions["stopWhen"]
+              >,
             }
           : {}),
       }),
-    options,
+    options
   );
 }
 
@@ -160,11 +176,15 @@ function extractJSON(text: string): string {
 
   // 先頭の { や [ から末尾の } や ] までを抽出
   const startIdx = cleaned.search(/[{[]/);
-  if (startIdx === -1) return cleaned;
+  if (startIdx === -1) {
+    return cleaned;
+  }
   const startChar = cleaned[startIdx];
-  const endChar = startChar === '{' ? '}' : ']';
+  const endChar = startChar === "{" ? "}" : "]";
   const endIdx = cleaned.lastIndexOf(endChar);
-  if (endIdx === -1 || endIdx < startIdx) return cleaned;
+  if (endIdx === -1 || endIdx < startIdx) {
+    return cleaned;
+  }
 
   return cleaned.slice(startIdx, endIdx + 1);
 }
@@ -177,7 +197,7 @@ function extractJSON(text: string): string {
 export async function generateJSON<T>(
   model: LanguageModel,
   prompt: string,
-  options: RetryOptions = {},
+  options: RetryOptions = {}
 ): Promise<T> {
   const text = await generateText(model, prompt, options);
   const jsonStr = extractJSON(text);
@@ -198,7 +218,7 @@ export async function generateEmbedding(
   options: RetryOptions & {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     providerOptions?: Record<string, any>;
-  } = {},
+  } = {}
 ): Promise<number[]> {
   const { providerOptions, ...retryOptions } = options;
   return withRetry(async () => {

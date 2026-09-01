@@ -1,10 +1,13 @@
-import type { EmbeddingModel, LanguageModel } from 'ai';
-import type { Env as HonoEnv } from 'hono';
-
-import { createDb, createDbForHyperdrive, type Database } from '@novel-creator/db';
-import { createEmbeddingProvider, createLLMProvider } from '@novel-creator/llm';
-import type { Env } from '@novel-creator/shared';
-import { createVectorStore, type VectorStore } from '@novel-creator/vector';
+import {
+  createDb,
+  createDbForHyperdrive,
+  type Database,
+} from "@novel-creator/db";
+import { createEmbeddingProvider, createLLMProvider } from "@novel-creator/llm";
+import type { Env } from "@novel-creator/shared";
+import { createVectorStore, type VectorStore } from "@novel-creator/vector";
+import type { EmbeddingModel, LanguageModel } from "ai";
+import type { Env as HonoEnv } from "hono";
 
 /**
  * Hono の Context 変数として注入される DI コンテキスト。
@@ -22,12 +25,12 @@ export interface AppContext extends HonoEnv {
 /**
  * 環境変数から全依存関係を初期化して DI コンテキストを構築する。
  */
-export function createContext(env: Env): AppContext['Variables'] {
+export function createContext(env: Env): AppContext["Variables"] {
   const db = createDb(env.DATABASE_URL);
   const llm = createLLMProvider(env);
   const embedding = createEmbeddingProvider(env);
   const vectorStore = createVectorStore(env);
-  return { env, db, llm, embedding, vectorStore };
+  return { db, embedding, env, llm, vectorStore };
 }
 
 /**
@@ -36,13 +39,15 @@ export function createContext(env: Env): AppContext['Variables'] {
  */
 export function createContextForWorkers(
   env: Env,
-  bindings: { hyperdrive: Hyperdrive; vectorize: unknown },
-): AppContext['Variables'] {
+  bindings: { hyperdrive: Hyperdrive; vectorize: unknown }
+): AppContext["Variables"] {
   const db = createDbForHyperdrive(bindings.hyperdrive);
   const llm = createLLMProvider(env);
   const embedding = createEmbeddingProvider(env);
-  const vectorStore = createVectorStore(env, { vectorizeBinding: bindings.vectorize });
-  return { env, db, llm, embedding, vectorStore };
+  const vectorStore = createVectorStore(env, {
+    vectorizeBinding: bindings.vectorize,
+  });
+  return { db, embedding, env, llm, vectorStore };
 }
 
 /**

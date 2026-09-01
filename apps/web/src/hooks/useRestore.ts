@@ -1,13 +1,13 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { toErrorMessage } from '@/lib/errors.js';
-import { novelKeys } from '@/lib/queryKeys.js';
-import { importNovelBackup } from '@/lib/services/index.js';
-import type { ImportResult } from '@/lib/types.js';
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toErrorMessage } from "@/lib/errors.js";
+import { novelKeys } from "@/lib/queryKeys.js";
+import { importNovelBackup } from "@/lib/services/index.js";
+import type { ImportResult } from "@/lib/types.js";
 
 interface UseRestoreNovelReturn {
+  error: string | null;
   restoreNovel: (data: unknown) => Promise<ImportResult>;
   restoring: boolean;
-  error: string | null;
 }
 
 export function useRestoreNovel(): UseRestoreNovelReturn {

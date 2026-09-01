@@ -1,33 +1,36 @@
-import { useState } from 'react';
-import { Link, createFileRoute } from '@tanstack/react-router';
-import { Button } from '@/components/Button.js';
-import { Card, CardHeader } from '@/components/Card.js';
-import { EmptyState } from '@/components/EmptyState.js';
-import { Input } from '@/components/Input.js';
-import { Loading } from '@/components/Loading.js';
-import { MarkdownText } from '@/components/MarkdownText.js';
-import { Modal } from '@/components/Modal.js';
-import { Textarea } from '@/components/Textarea.js';
-import { useNovels } from '@/hooks/useNovels.js';
-import { toErrorMessage } from '@/lib/errors.js';
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useState } from "react";
+import { Button } from "@/components/Button.js";
+import { Card, CardHeader } from "@/components/Card.js";
+import { EmptyState } from "@/components/EmptyState.js";
+import { Input } from "@/components/Input.js";
+import { Loading } from "@/components/Loading.js";
+import { MarkdownText } from "@/components/MarkdownText.js";
+import { Modal } from "@/components/Modal.js";
+import { Textarea } from "@/components/Textarea.js";
+import { useNovels } from "@/hooks/useNovels.js";
+import { toErrorMessage } from "@/lib/errors.js";
 
-export const Route = createFileRoute('/novels/')({
+export const Route = createFileRoute("/novels/")({
   component: NovelsIndexPage,
 });
 
 function NovelsIndexPage() {
-  const { novels, loading, error, createNovel, creating, refetch } = useNovels();
+  const { novels, loading, error, createNovel, creating, refetch } =
+    useNovels();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
 
   function formatDate(value: string | null): string {
-    if (!value) return '未設定';
-    return new Date(value).toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+    if (!value) {
+      return "未設定";
+    }
+    return new Date(value).toLocaleDateString("ja-JP", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   }
 
@@ -35,14 +38,17 @@ function NovelsIndexPage() {
     e.preventDefault();
     setFormError(null);
     if (!title.trim()) {
-      setFormError('タイトルを入力してください');
+      setFormError("タイトルを入力してください");
       return;
     }
     try {
-      await createNovel({ title: title.trim(), description: description.trim() });
+      await createNovel({
+        title: title.trim(),
+        description: description.trim(),
+      });
       setIsModalOpen(false);
-      setTitle('');
-      setDescription('');
+      setTitle("");
+      setDescription("");
       void refetch();
     } catch (e) {
       setFormError(toErrorMessage(e));
@@ -53,8 +59,12 @@ function NovelsIndexPage() {
     <div className="max-w-6xl">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">小説一覧</h1>
-          <p className="mt-1 text-muted">あなたの物語をここから始めましょう。</p>
+          <h1 className="font-bold text-3xl text-foreground tracking-tight">
+            小説一覧
+          </h1>
+          <p className="mt-1 text-muted">
+            あなたの物語をここから始めましょう。
+          </p>
         </div>
         <Button onClick={() => setIsModalOpen(true)} leftIcon={<PlusIcon />}>
           新規作成
@@ -64,7 +74,7 @@ function NovelsIndexPage() {
       {loading && <Loading message="読み込み中..." />}
 
       {!loading && error && (
-        <div className="rounded-lg border border-danger-border bg-danger-subtle p-4 text-sm text-danger-subtle-fg">
+        <div className="rounded-lg border border-danger-border bg-danger-subtle p-4 text-danger-subtle-fg text-sm">
           {error}
         </div>
       )}
@@ -81,16 +91,25 @@ function NovelsIndexPage() {
       {!loading && !error && novels.length > 0 && (
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {novels.map((novel) => (
-            <Link key={novel.id} to="/novels/$novelId" params={{ novelId: novel.id }}>
+            <Link
+              key={novel.id}
+              to="/novels/$novelId"
+              params={{ novelId: novel.id }}
+            >
               <Card className="h-full">
-                <CardHeader title={novel.title} subtitle={formatDate(novel.updatedAt)} />
+                <CardHeader
+                  title={novel.title}
+                  subtitle={formatDate(novel.updatedAt)}
+                />
                 {novel.description ? (
                   <MarkdownText
                     content={novel.description}
-                    className="line-clamp-3 text-sm leading-relaxed text-foreground-secondary [&_p]:my-0 [&_p]:leading-relaxed"
+                    className="line-clamp-3 text-foreground-secondary text-sm leading-relaxed [&_p]:my-0 [&_p]:leading-relaxed"
                   />
                 ) : (
-                  <p className="text-sm italic text-muted">説明がありません。</p>
+                  <p className="text-muted text-sm italic">
+                    説明がありません。
+                  </p>
                 )}
               </Card>
             </Link>
@@ -101,7 +120,9 @@ function NovelsIndexPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={() => {
-          if (creating) return;
+          if (creating) {
+            return;
+          }
           setIsModalOpen(false);
           setFormError(null);
         }}
@@ -109,7 +130,11 @@ function NovelsIndexPage() {
         size="md"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setIsModalOpen(false)} disabled={creating}>
+            <Button
+              variant="secondary"
+              onClick={() => setIsModalOpen(false)}
+              disabled={creating}
+            >
               キャンセル
             </Button>
             <Button onClick={handleSubmit} isLoading={creating}>
@@ -133,7 +158,7 @@ function NovelsIndexPage() {
             placeholder="物語のあらすじやテーマを簡潔に"
             rows={4}
           />
-          {formError && <p className="text-sm text-rose-500">{formError}</p>}
+          {formError && <p className="text-rose-500 text-sm">{formError}</p>}
         </form>
       </Modal>
     </div>
@@ -150,7 +175,11 @@ function PlusIcon() {
       stroke="currentColor"
       className="h-4 w-4"
     >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 4.5v15m7.5-7.5h-15"
+      />
     </svg>
   );
 }

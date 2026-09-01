@@ -1,16 +1,16 @@
-import { pgTable, uuid, text, integer, timestamp } from 'drizzle-orm/pg-core';
-import { chapters } from './chapters.js';
+import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { chapters } from "./chapters.js";
 
-export const sections = pgTable('sections', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  chapterId: uuid('chapter_id')
+export const sections = pgTable("sections", {
+  chapterId: uuid("chapter_id")
     .notNull()
-    .references(() => chapters.id, { onDelete: 'cascade' }),
-  title: text('title'),
-  order: integer('order').notNull(),
-  summary: text('summary'),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+    .references(() => chapters.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  order: integer("order").notNull(),
+  summary: text("summary"),
+  title: text("title"),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export type Section = typeof sections.$inferSelect;

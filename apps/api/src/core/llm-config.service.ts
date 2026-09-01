@@ -1,22 +1,29 @@
-import { eq, desc } from 'drizzle-orm';
-import type { LanguageModel } from 'ai';
-import { llmConfigs, type LLMConfig, type NewLLMConfig } from '@novel-creator/db';
-import { testLLMConnection, type LLMConfigInput } from '@novel-creator/llm';
-import { resolveLLMModel as resolveLLMModelShared } from './model-resolver.js';
-import { assertFound, ValidationError, type ServiceContext } from './types.js';
+import {
+  type LLMConfig,
+  llmConfigs,
+  type NewLLMConfig,
+} from "@novel-creator/db";
+import { type LLMConfigInput, testLLMConnection } from "@novel-creator/llm";
+import type { LanguageModel } from "ai";
+import { desc, eq } from "drizzle-orm";
+import { resolveLLMModel as resolveLLMModelShared } from "./model-resolver.js";
+import { assertFound, type ServiceContext, ValidationError } from "./types.js";
 
-export interface MaskedLLMConfig extends Omit<LLMConfig, 'apiKey'> {
+export interface MaskedLLMConfig extends Omit<LLMConfig, "apiKey"> {
   apiKeyMasked: string | null;
   hasApiKey: boolean;
 }
 
-function maskApiKey(key?: string | null): { apiKeyMasked: string | null; hasApiKey: boolean } {
-  if (!key || !key.trim()) {
+function maskApiKey(key?: string | null): {
+  apiKeyMasked: string | null;
+  hasApiKey: boolean;
+} {
+  if (!key?.trim()) {
     return { apiKeyMasked: null, hasApiKey: false };
   }
   const trimmed = key.trim();
   if (trimmed.length <= 8) {
-    return { apiKeyMasked: '********', hasApiKey: true };
+    return { apiKeyMasked: "********", hasApiKey: true };
   }
   const prefix = trimmed.slice(0, 4);
   const suffix = trimmed.slice(-4);
@@ -45,19 +52,22 @@ export class LlmConfigDomainService {
   }
 
   async getConfig(id: string): Promise<LLMConfig> {
-    const [row] = await this.ctx.db.select().from(llmConfigs).where(eq(llmConfigs.id, id));
-    assertFound(row, 'LLM Config not found');
+    const [row] = await this.ctx.db
+      .select()
+      .from(llmConfigs)
+      .where(eq(llmConfigs.id, id));
+    assertFound(row, "LLM Config not found");
     return row;
   }
 
   async createConfig(
-    data: Omit<NewLLMConfig, 'id' | 'createdAt' | 'updatedAt'>,
+    data: Omit<NewLLMConfig, "id" | "createdAt" | "updatedAt">
   ): Promise<MaskedLLMConfig> {
     if (!data.name?.trim()) {
-      throw new ValidationError('Name is required');
+      throw new ValidationError("Name is required");
     }
     if (!data.modelId?.trim()) {
-      throw new ValidationError('Model ID is required');
+      throw new ValidationError("Model ID is required");
     }
 
     // 初めてのモデル設定なら自動的に isDefault を true にする
@@ -84,7 +94,7 @@ export class LlmConfigDomainService {
 
   async updateConfig(
     id: string,
-    data: Partial<Omit<NewLLMConfig, 'id' | 'createdAt' | 'updatedAt'>>,
+    data: Partial<Omit<NewLLMConfig, "id" | "createdAt" | "updatedAt">>
   ): Promise<MaskedLLMConfig> {
     const current = await this.getConfig(id);
 
@@ -93,7 +103,7 @@ export class LlmConfigDomainService {
     }
 
     // apiKey が空文字列ではなく undefined で渡された場合（変更なし）は既存のキーを維持
-    const apiKey = data.apiKey !== undefined ? data.apiKey : current.apiKey;
+    const apiKey = data.apiKey === undefined ? current.apiKey : data.apiKey;
 
     const [row] = await this.ctx.db
       .update(llmConfigs)
@@ -105,7 +115,7 @@ export class LlmConfigDomainService {
       .where(eq(llmConfigs.id, id))
       .returning();
 
-    assertFound(row, 'LLM Config not found');
+    assertFound(row, "LLM Config not found");
     const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
 
     const { apiKey: _, ...rest } = row;
@@ -114,8 +124,11 @@ export class LlmConfigDomainService {
 
   async deleteConfig(id: string): Promise<void> {
     const current = await this.getConfig(id);
-    const [deleted] = await this.ctx.db.delete(llmConfigs).where(eq(llmConfigs.id, id)).returning();
-    assertFound(deleted, 'LLM Config not found');
+    const [deleted] = await this.ctx.db
+      .delete(llmConfigs)
+      .where(eq(llmConfigs.id, id))
+      .returning();
+    assertFound(deleted, "LLM Config not found");
 
     // 削除されたものがデフォルトだった場合、残りの最新レコードをデフォルトにする
     if (current.isDefault) {
@@ -140,7 +153,7 @@ export class LlmConfigDomainService {
       .set({ isDefault: true, updatedAt: new Date() })
       .where(eq(llmConfigs.id, id))
       .returning();
-    assertFound(row, 'LLM Config not found');
+    assertFound(row, "LLM Config not found");
 
     const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
 
@@ -156,7 +169,9 @@ export class LlmConfigDomainService {
    * 指定された設定（未指定・不明時はデフォルト設定、それも無ければ環境変数の LLM）から
    * LanguageModel を解決する。共通リゾルバへの委譲（従来の id→miss→default 挙動を維持）。
    */
-  async resolveLanguageModel(modelConfigId?: string | null): Promise<LanguageModel> {
-    return resolveLLMModelShared(this.ctx, modelConfigId, 'useDefault');
+  async resolveLanguageModel(
+    modelConfigId?: string | null
+  ): Promise<LanguageModel> {
+    return resolveLLMModelShared(this.ctx, modelConfigId, "useDefault");
   }
 }

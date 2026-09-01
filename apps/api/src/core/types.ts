@@ -1,27 +1,27 @@
-import type { EmbeddingModel, LanguageModel } from 'ai';
-import type { Database } from '@novel-creator/db';
-import type { Env } from '@novel-creator/shared';
-import type { VectorStore } from '@novel-creator/vector';
+import type { Database } from "@novel-creator/db";
+import type { Env } from "@novel-creator/shared";
+import type { VectorStore } from "@novel-creator/vector";
+import type { EmbeddingModel, LanguageModel } from "ai";
 
 export interface ServiceContext {
   db: Database;
-  llm: LanguageModel;
   embedding: EmbeddingModel;
-  vectorStore: VectorStore;
   env: Env;
+  llm: LanguageModel;
+  vectorStore: VectorStore;
 }
 
 export class NotFoundError extends Error {
-  constructor(entityOrMessage: string = 'Resource not found', id?: string) {
+  constructor(entityOrMessage = "Resource not found", id?: string) {
     super(id ? `${entityOrMessage} ${id} not found` : entityOrMessage);
-    this.name = 'NotFoundError';
+    this.name = "NotFoundError";
   }
 }
 
 export class ValidationError extends Error {
-  constructor(message: string = 'Validation error') {
+  constructor(message = "Validation error") {
     super(message);
-    this.name = 'ValidationError';
+    this.name = "ValidationError";
   }
 }
 
@@ -32,7 +32,7 @@ export class ValidationError extends Error {
 export function assertFound<T>(
   row: T | undefined,
   entityOrMessage: string,
-  id?: string,
+  id?: string
 ): asserts row is T {
   if (!row) {
     throw new NotFoundError(entityOrMessage, id);

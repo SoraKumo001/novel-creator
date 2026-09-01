@@ -1,27 +1,29 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toErrorMessage } from '@/lib/errors.js';
-import { novelKeys } from '@/lib/queryKeys.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toErrorMessage } from "@/lib/errors.js";
+import { novelKeys } from "@/lib/queryKeys.js";
 import {
   createLlmInstruction,
   deleteLlmInstruction,
   fetchLlmInstructions,
-} from '@/lib/services/index.js';
-import type { CreateLlmInstructionInput, LlmInstruction } from '@/lib/types.js';
+} from "@/lib/services/index.js";
+import type { CreateLlmInstructionInput, LlmInstruction } from "@/lib/types.js";
 
 interface UseLlmInstructionsReturn {
+  deleteInstruction: (id: string) => Promise<void>;
+  deleting: boolean;
+  error: string | null;
   instructions: LlmInstruction[];
   loading: boolean;
-  error: string | null;
   refetch: () => Promise<void>;
-  saveInstruction: (input: CreateLlmInstructionInput) => Promise<LlmInstruction>;
-  deleteInstruction: (id: string) => Promise<void>;
+  saveInstruction: (
+    input: CreateLlmInstructionInput
+  ) => Promise<LlmInstruction>;
   saving: boolean;
-  deleting: boolean;
 }
 
 export function useLlmInstructions(
   novelId: string,
-  entityType: string = 'setting',
+  entityType: string = "setting"
 ): UseLlmInstructionsReturn {
   const queryClient = useQueryClient();
 
@@ -37,7 +39,8 @@ export function useLlmInstructions(
   });
 
   const saveMutation = useMutation({
-    mutationFn: (input: CreateLlmInstructionInput) => createLlmInstruction(novelId, input),
+    mutationFn: (input: CreateLlmInstructionInput) =>
+      createLlmInstruction(novelId, input),
     onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: novelKeys.llmInstructions(novelId, entityType),

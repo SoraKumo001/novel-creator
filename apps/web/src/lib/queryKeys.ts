@@ -4,31 +4,34 @@
  * invalidQueries をプレフィックス一致で一括無効化できるようにする。
  */
 export const novelKeys = {
-  all: ['novels'] as const,
-  detail: (novelId: string) => ['novels', novelId] as const,
-  chapters: (novelId: string) => ['novels', novelId, 'chapters'] as const,
-  characters: (novelId: string) => ['novels', novelId, 'characters'] as const,
-  charactersMarkdown: (novelId: string) => ['novels', novelId, 'characters', 'markdown'] as const,
-  settings: (novelId: string) => ['novels', novelId, 'settings'] as const,
-  settingsMarkdown: (novelId: string) => ['novels', novelId, 'settings', 'markdown'] as const,
-  timelines: (novelId: string) => ['novels', novelId, 'timelines'] as const,
-  foreshadowings: (novelId: string) => ['novels', novelId, 'foreshadowings'] as const,
+  all: ["novels"] as const,
+  detail: (novelId: string) => ["novels", novelId] as const,
+  chapters: (novelId: string) => ["novels", novelId, "chapters"] as const,
+  characters: (novelId: string) => ["novels", novelId, "characters"] as const,
+  charactersMarkdown: (novelId: string) =>
+    ["novels", novelId, "characters", "markdown"] as const,
+  settings: (novelId: string) => ["novels", novelId, "settings"] as const,
+  settingsMarkdown: (novelId: string) =>
+    ["novels", novelId, "settings", "markdown"] as const,
+  timelines: (novelId: string) => ["novels", novelId, "timelines"] as const,
+  foreshadowings: (novelId: string) =>
+    ["novels", novelId, "foreshadowings"] as const,
   foreshadowingsMarkdown: (novelId: string) =>
-    ['novels', novelId, 'foreshadowings', 'markdown'] as const,
+    ["novels", novelId, "foreshadowings", "markdown"] as const,
   llmInstructions: (novelId: string, entityType: string) =>
-    ['novels', novelId, 'llmInstructions', entityType] as const,
+    ["novels", novelId, "llmInstructions", entityType] as const,
 };
 
 export const sectionKeys = {
-  all: ['sections'] as const,
-  detail: (sectionId: string) => ['sections', sectionId] as const,
-  content: (sectionId: string) => ['sections', sectionId, 'content'] as const,
+  all: ["sections"] as const,
+  detail: (sectionId: string) => ["sections", sectionId] as const,
+  content: (sectionId: string) => ["sections", sectionId, "content"] as const,
 };
 
 export const historyKeys = {
-  all: ['histories'] as const,
+  all: ["histories"] as const,
   list: (novelId: string, entityType?: string, entityId?: string) =>
-    ['histories', novelId, entityType, entityId] as const,
+    ["histories", novelId, entityType, entityId] as const,
 };
 
 /**
@@ -37,16 +40,17 @@ export const historyKeys = {
  * invalidateQueries はプレフィックス ['chat'] で一括無効化できる。
  */
 export const chatKeys = {
-  all: ['chat'] as const,
-  sessions: (novelId?: string) => ['chat', 'sessions', novelId ?? 'all'] as const,
+  all: ["chat"] as const,
+  sessions: (novelId?: string) =>
+    ["chat", "sessions", novelId ?? "all"] as const,
 };
 
 export const llmConfigKeys = {
-  all: ['llmConfigs'] as const,
-  detail: (id: string) => ['llmConfigs', id] as const,
+  all: ["llmConfigs"] as const,
+  detail: (id: string) => ["llmConfigs", id] as const,
 };
 
 export const embeddingConfigKeys = {
-  all: ['embeddingConfigs'] as const,
-  detail: (id: string) => ['embeddingConfigs', id] as const,
+  all: ["embeddingConfigs"] as const,
+  detail: (id: string) => ["embeddingConfigs", id] as const,
 };

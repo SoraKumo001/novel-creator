@@ -1,19 +1,22 @@
-import { eq } from 'drizzle-orm';
-import { contents, sections } from '@novel-creator/db';
-import { assertFound, type ServiceContext } from './types.js';
+import { contents, sections } from "@novel-creator/db";
+import { eq } from "drizzle-orm";
+import { assertFound, type ServiceContext } from "./types.js";
 
 /**
  * 指定章内の次の節 order 番号を算出する。
  */
-async function getNextSectionOrder(ctx: ServiceContext, chapterId: string): Promise<number> {
+async function getNextSectionOrder(
+  ctx: ServiceContext,
+  chapterId: string
+): Promise<number> {
   const rows = await ctx.db
     .select({ order: sections.order })
     .from(sections)
     .where(eq(sections.chapterId, chapterId))
     .orderBy(sections.order);
 
-  const last = rows[rows.length - 1];
-  return last && typeof last.order === 'number' ? last.order + 1 : 1;
+  const last = rows.at(-1);
+  return last && typeof last.order === "number" ? last.order + 1 : 1;
 }
 
 export class SectionDomainService {
@@ -28,13 +31,19 @@ export class SectionDomainService {
   }
 
   async getSectionWithContent(id: string) {
-    const [section] = await this.ctx.db.select().from(sections).where(eq(sections.id, id));
-    assertFound(section, 'Section not found');
-    const [content] = await this.ctx.db.select().from(contents).where(eq(contents.sectionId, id));
+    const [section] = await this.ctx.db
+      .select()
+      .from(sections)
+      .where(eq(sections.id, id));
+    assertFound(section, "Section not found");
+    const [content] = await this.ctx.db
+      .select()
+      .from(contents)
+      .where(eq(contents.sectionId, id));
 
     return {
-      section,
       content: content ?? null,
+      section,
     };
   }
 
@@ -53,9 +62,9 @@ export class SectionDomainService {
       .insert(sections)
       .values({
         chapterId: data.chapterId,
-        title: data.title || null,
         order,
         summary: data.summary ?? null,
+        title: data.title || null,
       })
       .returning();
     return row;
@@ -63,25 +72,28 @@ export class SectionDomainService {
 
   async updateSection(
     id: string,
-    data: { title?: string | null; order?: number; summary?: string | null },
+    data: { title?: string | null; order?: number; summary?: string | null }
   ) {
     const [row] = await this.ctx.db
       .update(sections)
       .set({
-        ...(data.title !== undefined ? { title: data.title || null } : {}),
-        ...(data.order !== undefined ? { order: data.order } : {}),
-        ...(data.summary !== undefined ? { summary: data.summary } : {}),
+        ...(data.title === undefined ? {} : { title: data.title || null }),
+        ...(data.order === undefined ? {} : { order: data.order }),
+        ...(data.summary === undefined ? {} : { summary: data.summary }),
         updatedAt: new Date(),
       })
       .where(eq(sections.id, id))
       .returning();
-    assertFound(row, 'Section not found');
+    assertFound(row, "Section not found");
     return row;
   }
 
   async deleteSection(id: string) {
-    const [row] = await this.ctx.db.delete(sections).where(eq(sections.id, id)).returning();
-    assertFound(row, 'Section not found');
+    const [row] = await this.ctx.db
+      .delete(sections)
+      .where(eq(sections.id, id))
+      .returning();
+    assertFound(row, "Section not found");
     return row;
   }
 }

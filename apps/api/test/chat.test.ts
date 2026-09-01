@@ -1,31 +1,36 @@
-import { Hono } from 'hono';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { chatMessages, chatSessions, novels } from "@novel-creator/db";
+import { streamTextResult } from "@novel-creator/llm";
+import { Hono } from "hono";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { chatMessages, chatSessions, novels } from '@novel-creator/db';
-import { streamTextResult } from '@novel-creator/llm';
-
-import type { AppContext } from '../src/context.js';
-import { errorHandler } from '../src/middleware/error-handler.js';
-import chatRouter from '../src/routes/chat.js';
+import type { AppContext } from "../src/context.js";
+import { errorHandler } from "../src/middleware/error-handler.js";
+import chatRouter from "../src/routes/chat.js";
 
 // @novel-creator/llm の streamTextResult と generateText をモック
-vi.mock('@novel-creator/llm', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@novel-creator/llm')>();
+vi.mock("@novel-creator/llm", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@novel-creator/llm")>();
   return {
     ...actual,
-    creativeChatSystemPrompt: vi.fn().mockReturnValue('mock prompt'),
+    creativeChatSystemPrompt: vi.fn().mockReturnValue("mock prompt"),
     generateText: vi.fn().mockResolvedValue(
       JSON.stringify({
         characters: [
           {
-            name: 'アリス',
-            category: '主人公',
-            description: '勇敢な少女',
-            traits: ['金髪', '剣術'],
+            category: "主人公",
+            description: "勇敢な少女",
+            name: "アリス",
+            traits: ["金髪", "剣術"],
           },
         ],
-        settings: [{ name: '魔法王国', category: '世界観', description: '魔法が発達した国' }],
-      }),
+        settings: [
+          {
+            category: "世界観",
+            description: "魔法が発達した国",
+            name: "魔法王国",
+          },
+        ],
+      })
     ),
     streamTextResult: vi.fn(),
   };
@@ -33,29 +38,31 @@ vi.mock('@novel-creator/llm', async (importOriginal) => {
 
 const mockStreamTextResult = vi.mocked(streamTextResult);
 
-const SESSION_ID = '11111111-1111-4111-8111-111111111111';
+const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 
 /**
  * テキストを stream する偽の StreamTextResult を構築する。
  * toUIMessageStream が消費できる TextStreamPart の ReadableStream を返す。
  */
 function createFakeStreamResult(text: string) {
-  const id = 'text-1';
+  const id = "text-1";
   const parts = [
-    { type: 'start' },
-    { type: 'text-start', id },
-    { type: 'text-delta', id, text },
-    { type: 'text-end', id },
+    { type: "start" },
+    { id, type: "text-start" },
+    { id, text, type: "text-delta" },
+    { id, type: "text-end" },
     {
-      type: 'finish',
-      finishReason: 'stop',
-      rawFinishReason: 'stop',
-      totalUsage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+      finishReason: "stop",
+      rawFinishReason: "stop",
+      totalUsage: { completionTokens: 0, promptTokens: 0, totalTokens: 0 },
+      type: "finish",
     },
   ];
   const stream = new ReadableStream({
     start(controller) {
-      for (const p of parts) controller.enqueue(p);
+      for (const p of parts) {
+        controller.enqueue(p);
+      }
       controller.close();
     },
   });
@@ -81,17 +88,13 @@ function createMockDb(options: {
         return { returning: vi.fn().mockResolvedValue([]) };
       }),
     })),
-    update: vi.fn().mockImplementation((table: unknown) => ({
-      set: vi.fn().mockImplementation((values: unknown) => {
-        updateCalls.push({ table, values });
-        return { where: vi.fn().mockResolvedValue([]) };
-      }),
-    })),
     select: vi.fn().mockImplementation(() => ({
       from: vi.fn().mockImplementation((table: unknown) => {
         if (table === chatSessions) {
           return {
-            where: vi.fn().mockResolvedValue(options.session ? [options.session] : []),
+            where: vi
+              .fn()
+              .mockResolvedValue(options.session ? [options.session] : []),
           };
         }
         if (table === chatMessages) {
@@ -103,9 +106,17 @@ function createMockDb(options: {
         }
         if (table === novels) {
           return {
-            where: vi.fn().mockResolvedValue(options.novel ? [options.novel] : []),
+            where: vi
+              .fn()
+              .mockResolvedValue(options.novel ? [options.novel] : []),
           };
         }
+        return { where: vi.fn().mockResolvedValue([]) };
+      }),
+    })),
+    update: vi.fn().mockImplementation((table: unknown) => ({
+      set: vi.fn().mockImplementation((values: unknown) => {
+        updateCalls.push({ table, values });
         return { where: vi.fn().mockResolvedValue([]) };
       }),
     })),
@@ -116,84 +127,92 @@ function createMockDb(options: {
 
 function createTestChatApp(mockDb: unknown) {
   const app = new Hono<AppContext>();
-  app.use('*', async (c, next) => {
-    c.set('env', {} as never);
-    c.set('db', mockDb as never);
-    c.set('llm', {} as never);
-    c.set('embedding', {} as never);
-    c.set('vectorStore', {} as never);
+  app.use("*", async (c, next) => {
+    c.set("env", {} as never);
+    c.set("db", mockDb as never);
+    c.set("llm", {} as never);
+    c.set("embedding", {} as never);
+    c.set("vectorStore", {} as never);
     await next();
   });
   app.onError(errorHandler);
-  app.route('/api/chat', chatRouter);
+  app.route("/api/chat", chatRouter);
   return app;
 }
 
 function userMessage(text: string) {
   return {
-    id: 'user-1',
-    role: 'user',
-    parts: [{ type: 'text', text }],
+    id: "user-1",
+    parts: [{ text, type: "text" }],
+    role: "user",
   };
 }
 
-describe('Chat API', () => {
+describe("Chat API", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('POST /api/chat - ユーザーメッセージがストリーム前に保存され、完了後に assistant が保存されること', async () => {
+  it("POST /api/chat - ユーザーメッセージがストリーム前に保存され、完了後に assistant が保存されること", async () => {
     const { db, insertCalls, updateCalls } = createMockDb({
-      session: { id: SESSION_ID, novelId: null, title: '相談' },
       history: [],
+      session: { id: SESSION_ID, novelId: null, title: "相談" },
     });
-    mockStreamTextResult.mockResolvedValue(createFakeStreamResult('こんにちは！') as never);
+    mockStreamTextResult.mockResolvedValue(
+      createFakeStreamResult("こんにちは！") as never
+    );
 
     const app = createTestChatApp(db);
 
-    const res = await app.request('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await app.request("/api/chat", {
       body: JSON.stringify({
+        messages: [userMessage("世界観のアイデアをください")],
         sessionId: SESSION_ID,
-        messages: [userMessage('世界観のアイデアをください')],
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
 
     expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toContain('text/event-stream');
-    expect(res.headers.get('x-vercel-ai-ui-message-stream')).toBe('v1');
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+    expect(res.headers.get("x-vercel-ai-ui-message-stream")).toBe("v1");
 
     // ストリームを最後まで消費して onEnd（assistant 保存）を完了させる
     const text = await res.text();
     expect(text).toContain('"type":"text-delta"');
-    expect(text).toContain('こんにちは！');
+    expect(text).toContain("こんにちは！");
 
     // ユーザーメッセージが先に保存される
     const userInsert = insertCalls.find((c) => c.table === chatMessages);
     expect(userInsert).toBeDefined();
-    const userValues = userInsert!.values as {
+    const userValues = userInsert?.values as {
       sessionId: string;
       role: string;
       content: string;
       parts: unknown;
     };
     expect(userValues.sessionId).toBe(SESSION_ID);
-    expect(userValues.role).toBe('user');
-    expect(userValues.content).toBe('世界観のアイデアをください');
-    expect(userValues.parts).toEqual([{ type: 'text', text: '世界観のアイデアをください' }]);
+    expect(userValues.role).toBe("user");
+    expect(userValues.content).toBe("世界観のアイデアをください");
+    expect(userValues.parts).toEqual([
+      { text: "世界観のアイデアをください", type: "text" },
+    ]);
 
     // assistant メッセージが完了後に保存される
-    const assistantInsert = insertCalls.filter((c) => c.table === chatMessages)[1];
+    const assistantInsert = insertCalls.filter(
+      (c) => c.table === chatMessages
+    )[1];
     expect(assistantInsert).toBeDefined();
-    const assistantValues = assistantInsert!.values as {
+    const assistantValues = assistantInsert?.values as {
       role: string;
       content: string;
       parts: unknown;
     };
-    expect(assistantValues.role).toBe('assistant');
-    expect(assistantValues.content).toBe('こんにちは！');
-    expect(assistantValues.parts).toEqual([{ type: 'text', text: 'こんにちは！', state: 'done' }]);
+    expect(assistantValues.role).toBe("assistant");
+    expect(assistantValues.content).toBe("こんにちは！");
+    expect(assistantValues.parts).toEqual([
+      { state: "done", text: "こんにちは！", type: "text" },
+    ]);
 
     // updatedAt が更新される
     expect(updateCalls.length).toBeGreaterThan(0);
@@ -201,27 +220,47 @@ describe('Chat API', () => {
     expect(sessionUpdate).toBeDefined();
   });
 
-  it('POST /api/chat - プロンプトが DB 履歴から構築されること', async () => {
+  it("POST /api/chat - プロンプトが DB 履歴から構築されること", async () => {
     const { db } = createMockDb({
-      session: { id: SESSION_ID, novelId: null, title: '相談' },
       history: [
-        { id: 'm1', sessionId: SESSION_ID, role: 'user', content: '前回の質問', parts: null },
-        { id: 'm2', sessionId: SESSION_ID, role: 'assistant', content: '前回の回答', parts: null },
+        {
+          content: "前回の質問",
+          id: "m1",
+          parts: null,
+          role: "user",
+          sessionId: SESSION_ID,
+        },
+        {
+          content: "前回の回答",
+          id: "m2",
+          parts: null,
+          role: "assistant",
+          sessionId: SESSION_ID,
+        },
         // 今回挿入されたユーザーメッセージ（DB 正史の履歴再取得に含まれる）
-        { id: 'm3', sessionId: SESSION_ID, role: 'user', content: '今回の質問', parts: null },
+        {
+          content: "今回の質問",
+          id: "m3",
+          parts: null,
+          role: "user",
+          sessionId: SESSION_ID,
+        },
       ],
+      session: { id: SESSION_ID, novelId: null, title: "相談" },
     });
-    mockStreamTextResult.mockResolvedValue(createFakeStreamResult('回答') as never);
+    mockStreamTextResult.mockResolvedValue(
+      createFakeStreamResult("回答") as never
+    );
 
     const app = createTestChatApp(db);
 
-    const res = await app.request('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await app.request("/api/chat", {
       body: JSON.stringify({
+        messages: [userMessage("今回の質問")],
         sessionId: SESSION_ID,
-        messages: [userMessage('今回の質問')],
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
 
     expect(res.status).toBe(200);
@@ -229,95 +268,100 @@ describe('Chat API', () => {
 
     // streamTextResult に渡されたプロンプトが DB 履歴 + 今回のユーザーメッセージから構築される
     const prompt = mockStreamTextResult.mock.calls[0][1];
-    expect(prompt).toContain('mock prompt');
-    expect(prompt).toContain('ユーザー: 前回の質問');
-    expect(prompt).toContain('アシスタント: 前回の回答');
-    expect(prompt).toContain('ユーザー: 今回の質問');
+    expect(prompt).toContain("mock prompt");
+    expect(prompt).toContain("ユーザー: 前回の質問");
+    expect(prompt).toContain("アシスタント: 前回の回答");
+    expect(prompt).toContain("ユーザー: 今回の質問");
   });
 
-  it('system prompt - creativeChatSystemPrompt に提案フォーマットの指針が含まれること', async () => {
+  it("system prompt - creativeChatSystemPrompt に提案フォーマットの指針が含まれること", async () => {
     // 実システムプロンプト自体を検証する。vi.mock により静的 import も 'mock prompt' に
     // 置き換わるため、vi.importActual で実物のモジュールを取得して呼び出す。
-    const actual = await vi.importActual<typeof import('@novel-creator/llm')>('@novel-creator/llm');
+    const actual =
+      await vi.importActual<typeof import("@novel-creator/llm")>(
+        "@novel-creator/llm"
+      );
     const systemPrompt = actual.creativeChatSystemPrompt({
-      novel: { title: 'テスト小説' },
+      novel: { title: "テスト小説" },
     });
 
     // extract-entities / 📥 設定・人物へ取り込む フローに備えた提案フォーマットの指針が含まれること
-    expect(systemPrompt).toContain('提案のフォーマット');
-    expect(systemPrompt).toContain('【名前】');
-    expect(systemPrompt).toContain('【役割/身分】');
-    expect(systemPrompt).toContain('【分類】');
-    expect(systemPrompt).toContain('【名称】');
-    expect(systemPrompt).toContain('【概要】');
+    expect(systemPrompt).toContain("提案のフォーマット");
+    expect(systemPrompt).toContain("【名前】");
+    expect(systemPrompt).toContain("【役割/身分】");
+    expect(systemPrompt).toContain("【分類】");
+    expect(systemPrompt).toContain("【名称】");
+    expect(systemPrompt).toContain("【概要】");
   });
 
-  it('POST /api/chat - 未知の sessionId で 404 になること', async () => {
-    const { db } = createMockDb({ session: null, history: [] });
+  it("POST /api/chat - 未知の sessionId で 404 になること", async () => {
+    const { db } = createMockDb({ history: [], session: null });
 
     const app = createTestChatApp(db);
 
-    const res = await app.request('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await app.request("/api/chat", {
       body: JSON.stringify({
+        messages: [userMessage("質問")],
         sessionId: SESSION_ID,
-        messages: [userMessage('質問')],
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
 
     expect(res.status).toBe(404);
     expect(mockStreamTextResult).not.toHaveBeenCalled();
   });
 
-  it('POST /api/chat - 不正なリクエストボディで 400 エラーになること', async () => {
+  it("POST /api/chat - 不正なリクエストボディで 400 エラーになること", async () => {
     const app = createTestChatApp({});
 
-    const res = await app.request('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await app.request("/api/chat", {
       body: JSON.stringify({
         messages: [],
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
 
     expect(res.status).toBe(400);
   });
 
-  it('POST /api/chat - sessionId が uuid でない場合 400 エラーになること', async () => {
+  it("POST /api/chat - sessionId が uuid でない場合 400 エラーになること", async () => {
     const app = createTestChatApp({});
 
-    const res = await app.request('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await app.request("/api/chat", {
       body: JSON.stringify({
-        sessionId: 'not-a-uuid',
-        messages: [userMessage('質問')],
+        messages: [userMessage("質問")],
+        sessionId: "not-a-uuid",
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
 
     expect(res.status).toBe(400);
   });
 
-  it('POST /api/chat - novelId がある場合に読み取りツール群が streamTextResult に渡されること', async () => {
-    const novelId = '22222222-2222-4222-8222-222222222222';
+  it("POST /api/chat - novelId がある場合に読み取りツール群が streamTextResult に渡されること", async () => {
+    const novelId = "22222222-2222-4222-8222-222222222222";
     const { db } = createMockDb({
-      session: { id: SESSION_ID, novelId, title: '相談' },
-      novel: { id: novelId, title: 'テスト小説', description: null },
       history: [],
+      novel: { description: null, id: novelId, title: "テスト小説" },
+      session: { id: SESSION_ID, novelId, title: "相談" },
     });
-    mockStreamTextResult.mockResolvedValue(createFakeStreamResult('回答') as never);
+    mockStreamTextResult.mockResolvedValue(
+      createFakeStreamResult("回答") as never
+    );
 
     const app = createTestChatApp(db);
 
-    const res = await app.request('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await app.request("/api/chat", {
       body: JSON.stringify({
-        sessionId: SESSION_ID,
+        messages: [userMessage("主人公について教えて")],
         novelId,
-        messages: [userMessage('主人公について教えて')],
+        sessionId: SESSION_ID,
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
 
     expect(res.status).toBe(200);
@@ -328,9 +372,9 @@ describe('Chat API', () => {
       expect.anything(),
       expect.any(String),
       expect.objectContaining({
-        tools: expect.anything(),
         stopWhen: expect.anything(),
-      }),
+        tools: expect.anything(),
+      })
     );
 
     const options = mockStreamTextResult.mock.calls[0][2] as {
@@ -339,40 +383,42 @@ describe('Chat API', () => {
     };
     // 読み取りツールおよび設定提案ツールが登録されていること
     expect(Object.keys(options.tools).sort()).toEqual([
-      'getCharacters',
-      'getForeshadowings',
-      'getNovelInfo',
-      'getPlotAndChapters',
-      'getSectionContent',
-      'getSettings',
-      'getStoryOutline',
-      'getTimelines',
-      'proposeAddForeshadowing',
-      'proposeAddTimelineEvent',
-      'proposeCreateCharacter',
-      'proposeCreateSetting',
-      'proposeUpdatePlot',
-      'proposeUpdateStoryOutline',
-      'searchNovelKnowledge',
+      "getCharacters",
+      "getForeshadowings",
+      "getNovelInfo",
+      "getPlotAndChapters",
+      "getSectionContent",
+      "getSettings",
+      "getStoryOutline",
+      "getTimelines",
+      "proposeAddForeshadowing",
+      "proposeAddTimelineEvent",
+      "proposeCreateCharacter",
+      "proposeCreateSetting",
+      "proposeUpdatePlot",
+      "proposeUpdateStoryOutline",
+      "searchNovelKnowledge",
     ]);
   });
 
-  it('POST /api/chat - novelId がない場合に tools が渡されないこと', async () => {
+  it("POST /api/chat - novelId がない場合に tools が渡されないこと", async () => {
     const { db } = createMockDb({
-      session: { id: SESSION_ID, novelId: null, title: '相談' },
       history: [],
+      session: { id: SESSION_ID, novelId: null, title: "相談" },
     });
-    mockStreamTextResult.mockResolvedValue(createFakeStreamResult('回答') as never);
+    mockStreamTextResult.mockResolvedValue(
+      createFakeStreamResult("回答") as never
+    );
 
     const app = createTestChatApp(db);
 
-    const res = await app.request('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await app.request("/api/chat", {
       body: JSON.stringify({
+        messages: [userMessage("世界観のアイデアをください")],
         sessionId: SESSION_ID,
-        messages: [userMessage('世界観のアイデアをください')],
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
 
     expect(res.status).toBe(200);
@@ -386,12 +432,12 @@ describe('Chat API', () => {
     expect(options.stopWhen).toBeDefined();
   });
 
-  it('POST /api/chat/sessions - 新規セッションが作成できること', async () => {
+  it("POST /api/chat/sessions - 新規セッションが作成できること", async () => {
     const sampleSession = {
+      createdAt: new Date(),
       id: SESSION_ID,
       novelId: null,
-      title: '世界観の相談',
-      createdAt: new Date(),
+      title: "世界観の相談",
       updatedAt: new Date(),
     };
 
@@ -405,26 +451,26 @@ describe('Chat API', () => {
 
     const app = createTestChatApp(mockDb);
 
-    const res = await app.request('/api/chat/sessions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await app.request("/api/chat/sessions", {
       body: JSON.stringify({
-        title: '世界観の相談',
+        title: "世界観の相談",
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
 
     expect(res.status).toBe(201);
     const data = (await res.json()) as typeof sampleSession;
-    expect(data.title).toBe('世界観の相談');
+    expect(data.title).toBe("世界観の相談");
   });
 
-  it('GET /api/chat/sessions - セッション一覧が取得できること', async () => {
+  it("GET /api/chat/sessions - セッション一覧が取得できること", async () => {
     const sampleSessions = [
       {
+        createdAt: new Date(),
         id: SESSION_ID,
         novelId: null,
-        title: '相談1',
-        createdAt: new Date(),
+        title: "相談1",
         updatedAt: new Date(),
       },
     ];
@@ -441,80 +487,89 @@ describe('Chat API', () => {
 
     const app = createTestChatApp(mockDb);
 
-    const res = await app.request('/api/chat/sessions');
+    const res = await app.request("/api/chat/sessions");
     expect(res.status).toBe(200);
     const data = (await res.json()) as typeof sampleSessions;
     expect(data).toHaveLength(1);
   });
 
-  it('POST /api/chat/extract-entities - テキストから人物・設定が抽出されること', async () => {
+  it("POST /api/chat/extract-entities - テキストから人物・設定が抽出されること", async () => {
     const app = createTestChatApp({});
 
-    const res = await app.request('/api/chat/extract-entities', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await app.request("/api/chat/extract-entities", {
       body: JSON.stringify({
-        text: '主人公アリスと魔法王国の提案',
+        text: "主人公アリスと魔法王国の提案",
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
 
     expect(res.status).toBe(200);
     const data = (await res.json()) as {
-      characters: { name: string; category: string; description: string; traits: string[] }[];
+      characters: {
+        name: string;
+        category: string;
+        description: string;
+        traits: string[];
+      }[];
       settings: { name: string; category: string; description: string }[];
     };
     expect(data.characters).toHaveLength(1);
-    expect(data.characters[0].name).toBe('アリス');
+    expect(data.characters[0].name).toBe("アリス");
     expect(data.settings).toHaveLength(1);
-    expect(data.settings[0].name).toBe('魔法王国');
+    expect(data.settings[0].name).toBe("魔法王国");
   });
 
-  describe('formatErrorMessage & classifyError', () => {
-    it('APICallError 429 の場合にレート制限メッセージと詳細を返すこと', async () => {
-      const { APICallError } = await import('ai');
-      const { formatErrorMessage, classifyError } =
-        await import('../src/middleware/error-handler.js');
+  describe("formatErrorMessage & classifyError", () => {
+    it("APICallError 429 の場合にレート制限メッセージと詳細を返すこと", async () => {
+      const { APICallError } = await import("ai");
+      const { formatErrorMessage, classifyError } = await import(
+        "../src/middleware/error-handler.js"
+      );
       const apiErr = new APICallError({
-        message: 'Rate limit exceeded: 15 requests per minute',
-        statusCode: 429,
-        url: 'https://api.example.com',
+        message: "Rate limit exceeded: 15 requests per minute",
         requestBodyValues: {},
+        statusCode: 429,
+        url: "https://api.example.com",
       });
 
       const classified = classifyError(apiErr);
-      expect(classified.code).toBe('RATE_LIMITED');
+      expect(classified.code).toBe("RATE_LIMITED");
       expect(classified.status).toBe(429);
 
       const formatted = formatErrorMessage(apiErr);
-      expect(formatted).toContain('レート制限');
-      expect(formatted).toContain('Rate limit exceeded');
+      expect(formatted).toContain("レート制限");
+      expect(formatted).toContain("Rate limit exceeded");
     });
 
-    it('APICallError 401 の場合に認証エラーメッセージと詳細を返すこと', async () => {
-      const { APICallError } = await import('ai');
-      const { formatErrorMessage, classifyError } =
-        await import('../src/middleware/error-handler.js');
+    it("APICallError 401 の場合に認証エラーメッセージと詳細を返すこと", async () => {
+      const { APICallError } = await import("ai");
+      const { formatErrorMessage, classifyError } = await import(
+        "../src/middleware/error-handler.js"
+      );
       const apiErr = new APICallError({
-        message: 'Invalid API key provided',
-        statusCode: 401,
-        url: 'https://api.example.com',
+        message: "Invalid API key provided",
         requestBodyValues: {},
+        statusCode: 401,
+        url: "https://api.example.com",
       });
 
       const classified = classifyError(apiErr);
-      expect(classified.code).toBe('LLM_AUTH_ERROR');
+      expect(classified.code).toBe("LLM_AUTH_ERROR");
       expect(classified.status).toBe(502);
 
       const formatted = formatErrorMessage(apiErr);
-      expect(formatted).toContain('認証に失敗しました');
-      expect(formatted).toContain('Invalid API key');
+      expect(formatted).toContain("認証に失敗しました");
+      expect(formatted).toContain("Invalid API key");
     });
 
-    it('一般の Error の場合にエラーメッセージを返すこと', async () => {
-      const { formatErrorMessage } = await import('../src/middleware/error-handler.js');
-      const err = new Error('Database connection timed out');
+    it("一般の Error の場合にエラーメッセージを返すこと", async () => {
+      const { formatErrorMessage } = await import(
+        "../src/middleware/error-handler.js"
+      );
+      const err = new Error("Database connection timed out");
       const formatted = formatErrorMessage(err);
-      expect(formatted).toBe('Database connection timed out');
+      expect(formatted).toBe("Database connection timed out");
     });
   });
 });

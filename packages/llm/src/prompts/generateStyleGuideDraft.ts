@@ -4,19 +4,21 @@
  */
 
 export interface GenerateStyleGuideDraftContext {
-  novelTitle: string;
-  description?: string | null;
   characters?: string[];
+  description?: string | null;
+  novelTitle: string;
   settings?: string[];
 }
 
-export function generateStyleGuideDraftPrompt(context: GenerateStyleGuideDraftContext): string {
+export function generateStyleGuideDraftPrompt(
+  context: GenerateStyleGuideDraftContext
+): string {
   const characters = context.characters?.length
-    ? context.characters.map((c) => `- ${c}`).join('\n')
-    : '（登録なし）';
+    ? context.characters.map((c) => `- ${c}`).join("\n")
+    : "（登録なし）";
   const settings = context.settings?.length
-    ? context.settings.map((s) => `- ${s}`).join('\n')
-    : '（登録なし）';
+    ? context.settings.map((s) => `- ${s}`).join("\n")
+    : "（登録なし）";
 
   return `あなたはプロの文芸編集者・小説作法ディレクターです。
 以下の小説の基本情報、あらすじ、登場人物、世界観設定を分析し、
@@ -24,7 +26,7 @@ export function generateStyleGuideDraftPrompt(context: GenerateStyleGuideDraftCo
 
 # 小説情報
 - 作品タイトル: ${context.novelTitle}
-- あらすじ・概要: ${context.description || '（未設定）'}
+- あらすじ・概要: ${context.description || "（未設定）"}
 
 # 登場人物
 ${characters}

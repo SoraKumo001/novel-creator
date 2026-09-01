@@ -1,13 +1,13 @@
-import { useMemo, useState } from 'react';
-import { Button } from './Button.js';
-import { Modal } from './Modal.js';
-import type { ChapterWithSections, Character } from '@/lib/types.js';
+import { useMemo, useState } from "react";
+import type { ChapterWithSections, Character } from "@/lib/types.js";
+import { Button } from "./Button.js";
+import { Modal } from "./Modal.js";
 
 interface CharacterHeatmapModalProps {
+  chapters: ChapterWithSections[];
+  characters: Character[];
   isOpen: boolean;
   onClose: () => void;
-  characters: Character[];
-  chapters: ChapterWithSections[];
   onSelectSection?: (sectionId: string) => void;
 }
 
@@ -18,33 +18,39 @@ export function CharacterHeatmapModal({
   chapters,
   onSelectSection,
 }: CharacterHeatmapModalProps) {
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
   // 全節のフラットリスト
-  const allSections = useMemo(() => {
-    return chapters.flatMap((c) =>
-      c.sections.map((s) => ({
-        chapterId: c.id,
-        chapterTitle: c.title,
-        sectionId: s.id,
-        sectionTitle: s.title || `節 ${s.order}`,
-        summary: s.summary || '',
-      })),
-    );
-  }, [chapters]);
+  const allSections = useMemo(
+    () =>
+      chapters.flatMap((c) =>
+        c.sections.map((s) => ({
+          chapterId: c.id,
+          chapterTitle: c.title,
+          sectionId: s.id,
+          sectionTitle: s.title || `節 ${s.order}`,
+          summary: s.summary || "",
+        }))
+      ),
+    [chapters]
+  );
 
   // カテゴリ一覧
   const categories = useMemo(() => {
     const set = new Set<string>();
     for (const c of characters) {
-      if (c.category) set.add(c.category);
+      if (c.category) {
+        set.add(c.category);
+      }
     }
     return Array.from(set);
   }, [characters]);
 
   // フィルタ済みキャラクター
   const filteredCharacters = useMemo(() => {
-    if (selectedCategory === 'all') return characters;
+    if (selectedCategory === "all") {
+      return characters;
+    }
     return characters.filter((c) => c.category === selectedCategory);
   }, [characters, selectedCategory]);
 
@@ -54,8 +60,12 @@ export function CharacterHeatmapModal({
       const charName = char.name;
       const sectionScores = allSections.map((sec) => {
         // 概要やタイトルに含まれる回数
-        const countInSummary = (sec.summary.match(new RegExp(charName, 'g')) || []).length;
-        const countInTitle = (sec.sectionTitle.match(new RegExp(charName, 'g')) || []).length;
+        const countInSummary = (
+          sec.summary.match(new RegExp(charName, "g")) || []
+        ).length;
+        const countInTitle = (
+          sec.sectionTitle.match(new RegExp(charName, "g")) || []
+        ).length;
         const total = countInSummary * 2 + countInTitle * 3;
         return total;
       });
@@ -88,11 +98,11 @@ export function CharacterHeatmapModal({
             <span className="text-muted-foreground">所属・勢力:</span>
             <button
               type="button"
-              onClick={() => setSelectedCategory('all')}
-              className={`rounded px-2.5 py-1 transition cursor-pointer ${
-                selectedCategory === 'all'
-                  ? 'bg-primary text-primary-foreground font-semibold'
-                  : 'bg-surface-raised hover:bg-border text-foreground'
+              onClick={() => setSelectedCategory("all")}
+              className={`cursor-pointer rounded px-2.5 py-1 transition ${
+                selectedCategory === "all"
+                  ? "bg-primary font-semibold text-primary-foreground"
+                  : "bg-surface-raised text-foreground hover:bg-border"
               }`}
             >
               すべて ({characters.length})
@@ -102,10 +112,10 @@ export function CharacterHeatmapModal({
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`rounded px-2.5 py-1 transition cursor-pointer ${
+                className={`cursor-pointer rounded px-2.5 py-1 transition ${
                   selectedCategory === cat
-                    ? 'bg-primary text-primary-foreground font-semibold'
-                    : 'bg-surface-raised hover:bg-border text-foreground'
+                    ? "bg-primary font-semibold text-primary-foreground"
+                    : "bg-surface-raised text-foreground hover:bg-border"
                 }`}
               >
                 {cat}
@@ -113,26 +123,26 @@ export function CharacterHeatmapModal({
             ))}
           </div>
 
-          <div className="text-xs text-muted-foreground">
+          <div className="text-muted-foreground text-xs">
             全 {allSections.length} 節 / {characters.length} 人
           </div>
         </div>
 
         {/* ヒートマップテーブル */}
-        <div className="rounded-xl border border-border bg-surface overflow-x-auto max-h-[60vh]">
+        <div className="max-h-[60vh] overflow-x-auto rounded-xl border border-border bg-surface">
           {filteredCharacters.length === 0 ? (
-            <div className="p-8 text-center text-xs text-muted-foreground">
+            <div className="p-8 text-center text-muted-foreground text-xs">
               キャラクターが登録されていません
             </div>
           ) : allSections.length === 0 ? (
-            <div className="p-8 text-center text-xs text-muted-foreground">
+            <div className="p-8 text-center text-muted-foreground text-xs">
               章や節がまだ作成されていません
             </div>
           ) : (
-            <table className="w-full text-xs text-left border-collapse">
+            <table className="w-full border-collapse text-left text-xs">
               <thead>
-                <tr className="border-b border-border bg-surface-raised sticky top-0 z-10">
-                  <th className="p-3 font-semibold text-foreground min-w-36 sticky left-0 bg-surface-raised z-20 border-r border-border">
+                <tr className="sticky top-0 z-10 border-border border-b bg-surface-raised">
+                  <th className="sticky left-0 z-20 min-w-36 border-border border-r bg-surface-raised p-3 font-semibold text-foreground">
                     登場人物
                   </th>
                   {allSections.map((sec, idx) => (
@@ -144,18 +154,22 @@ export function CharacterHeatmapModal({
                           onSelectSection(sec.sectionId);
                         }
                       }}
-                      className={`p-2 font-medium text-center min-w-16 border-r border-border/50 truncate max-w-24 ${
-                        onSelectSection ? 'cursor-pointer hover:bg-primary/20 transition' : ''
+                      className={`min-w-16 max-w-24 truncate border-border/50 border-r p-2 text-center font-medium ${
+                        onSelectSection
+                          ? "cursor-pointer transition hover:bg-primary/20"
+                          : ""
                       }`}
                       title={`${sec.chapterTitle} - ${sec.sectionTitle} (クリックで執筆画面へ移動)`}
                     >
-                      <div className="text-[10px] text-muted-foreground truncate">S{idx + 1}</div>
-                      <div className="text-[11px] truncate font-normal text-foreground">
+                      <div className="truncate text-[10px] text-muted-foreground">
+                        S{idx + 1}
+                      </div>
+                      <div className="truncate font-normal text-[11px] text-foreground">
                         {sec.sectionTitle}
                       </div>
                     </th>
                   ))}
-                  <th className="p-3 font-semibold text-foreground text-center min-w-20">
+                  <th className="min-w-20 p-3 text-center font-semibold text-foreground">
                     出番合計
                   </th>
                 </tr>
@@ -164,19 +178,19 @@ export function CharacterHeatmapModal({
                 {matrixData.map((row) => (
                   <tr
                     key={row.character.id}
-                    className="border-b border-border/50 hover:bg-surface-raised/50 transition"
+                    className="border-border/50 border-b transition hover:bg-surface-raised/50"
                   >
-                    <td className="p-3 sticky left-0 bg-surface z-10 border-r border-border font-medium text-foreground">
+                    <td className="sticky left-0 z-10 border-border border-r bg-surface p-3 font-medium text-foreground">
                       <div className="flex items-center gap-1.5">
                         <span>{row.character.name}</span>
                         {row.character.category && (
-                          <span className="text-[10px] text-muted-foreground bg-surface-raised px-1.5 py-0.5 rounded border border-border">
+                          <span className="rounded border border-border bg-surface-raised px-1.5 py-0.5 text-[10px] text-muted-foreground">
                             {row.character.category}
                           </span>
                         )}
                       </div>
                       {row.totalAppearances === 0 && (
-                        <span className="text-[10px] text-rose-500 font-semibold block mt-0.5">
+                        <span className="mt-0.5 block font-semibold text-[10px] text-rose-500">
                           ⚠️ 出番なし
                         </span>
                       )}
@@ -194,20 +208,20 @@ export function CharacterHeatmapModal({
                               onSelectSection(sec.sectionId);
                             }
                           }}
-                          className={`p-2 text-center border-r border-border/50 transition ${
+                          className={`border-border/50 border-r p-2 text-center transition ${
                             onSelectSection
-                              ? 'cursor-pointer hover:ring-2 hover:ring-primary hover:z-20'
-                              : ''
+                              ? "cursor-pointer hover:z-20 hover:ring-2 hover:ring-primary"
+                              : ""
                           } ${
                             hasAppearance
                               ? score >= 4
-                                ? 'bg-primary/40 font-bold text-primary-foreground'
-                                : 'bg-primary/15 font-semibold text-primary'
-                              : 'text-muted-foreground/30'
+                                ? "bg-primary/40 font-bold text-primary-foreground"
+                                : "bg-primary/15 font-semibold text-primary"
+                              : "text-muted-foreground/30"
                           }`}
                           title={`${row.character.name} in ${sec.sectionTitle} (スコア: ${score} - クリックで本文へジャンプ)`}
                         >
-                          {hasAppearance ? (score >= 4 ? '🔥' : '●') : '-'}
+                          {hasAppearance ? (score >= 4 ? "🔥" : "●") : "-"}
                         </td>
                       );
                     })}
@@ -216,10 +230,10 @@ export function CharacterHeatmapModal({
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs ${
                           row.totalAppearances >= 3
-                            ? 'bg-emerald-500/10 text-emerald-600'
+                            ? "bg-emerald-500/10 text-emerald-600"
                             : row.totalAppearances > 0
-                              ? 'bg-amber-500/10 text-amber-600'
-                              : 'bg-rose-500/10 text-rose-600'
+                              ? "bg-amber-500/10 text-amber-600"
+                              : "bg-rose-500/10 text-rose-600"
                         }`}
                       >
                         {row.totalAppearances} 節

@@ -1,12 +1,12 @@
-import { AIProgressIndicator } from './AIProgressIndicator.js';
-import type { AnalysisProgress } from '@/hooks/useAnalysis.js';
+import type { AnalysisProgress } from "@/hooks/useAnalysis.js";
+import { AIProgressIndicator } from "./AIProgressIndicator.js";
 
 interface AnalysisProgressPanelProps {
+  /** キャンセルボタン押下時のコールバック (useAnalysis.cancel を呼ぶ想定)。 */
+  onCancel: () => void;
   progress: AnalysisProgress | null;
   /** 解析開始時刻 (ms epoch)。経過時間の表示に利用する。 */
   startedAt: number;
-  /** キャンセルボタン押下時のコールバック (useAnalysis.cancel を呼ぶ想定)。 */
-  onCancel: () => void;
 }
 
 /**
@@ -21,7 +21,7 @@ export function AnalysisProgressPanel({
 }: AnalysisProgressPanelProps) {
   return (
     <AIProgressIndicator
-      stage={progress?.stage || '解析を実行しています…'}
+      stage={progress?.stage || "解析を実行しています…"}
       startedAt={startedAt}
       current={progress?.current}
       total={progress?.total}

@@ -1,27 +1,32 @@
-import { useCallback } from 'react';
 import {
   buildSettingTree,
   findSectionAtLine,
   getMarkdownSections,
   type SettingSectionRange,
-} from '@novel-creator/shared';
-import type { SaveSettingsMarkdownResult } from '@/lib/types.js';
-import { EntityMarkdownEditor } from './-EntityMarkdownEditor.js';
+} from "@novel-creator/shared";
+import { useCallback } from "react";
+import type { SaveSettingsMarkdownResult } from "@/lib/types.js";
+import { EntityMarkdownEditor } from "./-EntityMarkdownEditor.js";
 
 interface SettingsMarkdownEditorProps {
-  novelId: string;
-  fetchSettingsMarkdown: () => Promise<string>;
-  saveSettingsMarkdown: (markdown: string) => Promise<SaveSettingsMarkdownResult>;
+  editingDocument: boolean;
+  editingSection: boolean;
+  editSettingDocument: (input: {
+    markdown: string;
+    instruction: string;
+  }) => Promise<string>;
   editSettingSection: (input: {
     category: string;
     name: string;
     description: string;
     instruction: string;
   }) => Promise<string>;
-  editSettingDocument: (input: { markdown: string; instruction: string }) => Promise<string>;
+  fetchSettingsMarkdown: () => Promise<string>;
+  novelId: string;
+  saveSettingsMarkdown: (
+    markdown: string
+  ) => Promise<SaveSettingsMarkdownResult>;
   savingMarkdown: boolean;
-  editingSection: boolean;
-  editingDocument: boolean;
 }
 
 export function SettingsMarkdownEditor({
@@ -46,11 +51,14 @@ export function SettingsMarkdownEditor({
     }) => {
       const sections = getMarkdownSections(markdown);
       const target = sections.find(
-        (s) => s.category === activeSection.category && s.name === activeSection.name,
+        (s) =>
+          s.category === activeSection.category && s.name === activeSection.name
       );
 
       if (!target) {
-        throw new Error(`設定「${activeSection.name}」のセクションが見つかりません`);
+        throw new Error(
+          `設定「${activeSection.name}」のセクションが見つかりません`
+        );
       }
 
       const nextSummary = await editSettingSection({
@@ -60,19 +68,23 @@ export function SettingsMarkdownEditor({
         instruction,
       });
 
-      const lines = markdown.split('\n');
+      const lines = markdown.split("\n");
       const before = lines.slice(0, target.startLine);
       const after = lines.slice(target.endLine + 1);
-      return [...before, nextSummary.trim(), ...after].join('\n');
+      return [...before, nextSummary.trim(), ...after].join("\n");
     },
-    [editSettingSection],
+    [editSettingSection]
   );
 
   const handleEditDocument = useCallback(
-    async ({ markdown, instruction }: { markdown: string; instruction: string }) => {
-      return editSettingDocument({ markdown, instruction });
-    },
-    [editSettingDocument],
+    async ({
+      markdown,
+      instruction,
+    }: {
+      markdown: string;
+      instruction: string;
+    }) => editSettingDocument({ markdown, instruction }),
+    [editSettingDocument]
   );
 
   return (
@@ -93,7 +105,7 @@ export function SettingsMarkdownEditor({
       sectionPlaceholder={(active: SettingSectionRange | null) =>
         active
           ? `「${active.name}」への指示（例: 魔法体系の制約を追加して）`
-          : 'カーソルを設定セクション内に置いてください'
+          : "カーソルを設定セクション内に置いてください"
       }
       documentPlaceholder="全体への指示（例: 宗教・信仰に関する大項目を追加して）"
     />

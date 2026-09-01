@@ -1,10 +1,13 @@
 /**
  * 本文から設定情報を抽出・更新するプロンプト。JSON 配列を返すよう指示する。
  */
-export function extractSettings(content: string, existingSettings?: string[]): string {
+export function extractSettings(
+  content: string,
+  existingSettings?: string[]
+): string {
   const existing = existingSettings?.length
-    ? existingSettings.map((s) => `- ${s}`).join('\n')
-    : '（既存の設定なし）';
+    ? existingSettings.map((s) => `- ${s}`).join("\n")
+    : "（既存の設定なし）";
 
   return `あなたは小説の設定管理の専門家です。以下の小説本文から、設定情報を抽出・更新してください。
 

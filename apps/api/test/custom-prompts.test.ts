@@ -1,38 +1,39 @@
-import { describe, expect, it } from 'vitest';
-import { createApp } from '../src/app.js';
-import { createContext } from '../src/context.js';
-import { parseEnv } from '@novel-creator/shared/env';
+import { parseEnv } from "@novel-creator/shared/env";
+import { describe, expect, it } from "vitest";
+import { createApp } from "../src/app.js";
+import { createContext } from "../src/context.js";
 
-describe('Custom Prompts API', () => {
+describe("Custom Prompts API", () => {
   const env = parseEnv();
   const context = createContext(env);
   const app = createApp(context);
 
-  it('GET /api/custom-prompts - 一覧を取得できること（プリセット自動生成含む）', async () => {
-    const res = await app.request('/api/custom-prompts');
+  it("GET /api/custom-prompts - 一覧を取得できること（プリセット自動生成含む）", async () => {
+    const res = await app.request("/api/custom-prompts");
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(Array.isArray(data)).toBe(true);
     expect(data.length).toBeGreaterThan(0);
   });
 
-  it('POST /api/custom-prompts - 新規プロンプトを作成、更新、削除できること', async () => {
+  it("POST /api/custom-prompts - 新規プロンプトを作成、更新、削除できること", async () => {
     // 1. 作成
-    const createRes = await app.request('/api/custom-prompts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const createRes = await app.request("/api/custom-prompts", {
       body: JSON.stringify({
-        name: 'テスト用緊迫感アップ',
-        description: 'テスト用の推敲プロンプト',
-        icon: '⚡',
-        category: 'inline',
-        userPrompt: '以下のテキストを緊迫感重視で書き換えてください: {selectedText}',
+        category: "inline",
+        description: "テスト用の推敲プロンプト",
+        icon: "⚡",
+        name: "テスト用緊迫感アップ",
+        userPrompt:
+          "以下のテキストを緊迫感重視で書き換えてください: {selectedText}",
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     });
     expect(createRes.status).toBe(201);
     const created = await createRes.json();
-    expect(created.name).toBe('テスト用緊迫感アップ');
-    expect(created.icon).toBe('⚡');
+    expect(created.name).toBe("テスト用緊迫感アップ");
+    expect(created.icon).toBe("⚡");
 
     // 2. 詳細取得
     const getRes = await app.request(`/api/custom-prompts/${created.id}`);
@@ -42,21 +43,21 @@ describe('Custom Prompts API', () => {
 
     // 3. 更新
     const updateRes = await app.request(`/api/custom-prompts/${created.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        name: 'テスト用緊迫感アップ（更新版）',
-        icon: '🔥',
+        icon: "🔥",
+        name: "テスト用緊迫感アップ（更新版）",
       }),
+      headers: { "Content-Type": "application/json" },
+      method: "PUT",
     });
     expect(updateRes.status).toBe(200);
     const updated = await updateRes.json();
-    expect(updated.name).toBe('テスト用緊迫感アップ（更新版）');
-    expect(updated.icon).toBe('🔥');
+    expect(updated.name).toBe("テスト用緊迫感アップ（更新版）");
+    expect(updated.icon).toBe("🔥");
 
     // 4. 削除
     const deleteRes = await app.request(`/api/custom-prompts/${created.id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     });
     expect(deleteRes.status).toBe(200);
 

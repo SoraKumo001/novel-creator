@@ -9,42 +9,42 @@ import type {
   Foreshadowing,
   Setting,
   Timeline,
-} from '@/lib/types.js';
+} from "@/lib/types.js";
 
-export type EntityAction = 'create' | 'overwrite' | 'merge';
+export type EntityAction = "create" | "overwrite" | "merge";
 
 export interface EditableCharacter extends ExtractedCharacterItem {
   _id: string;
   _selected: boolean;
-  traitsString: string;
-  matchedExisting?: Character;
   action: EntityAction;
+  matchedExisting?: Character;
+  traitsString: string;
 }
 
 export interface EditableSetting extends ExtractedSettingItem {
   _id: string;
   _selected: boolean;
-  matchedExisting?: Setting;
   action: EntityAction;
+  matchedExisting?: Setting;
 }
 
 export interface EditableForeshadowing extends ExtractedChatForeshadowingItem {
   _id: string;
   _selected: boolean;
-  matchedExisting?: Foreshadowing;
   action: EntityAction;
+  matchedExisting?: Foreshadowing;
 }
 
 export interface EditableTimeline extends ExtractedChatTimelineItem {
   _id: string;
   _selected: boolean;
-  matchedExisting?: Timeline;
   action: EntityAction;
+  matchedExisting?: Timeline;
 }
 
 export interface EditablePlot extends ExtractedChatPlotItem {
   _id: string;
   _selected: boolean;
-  matchedExisting?: Chapter;
   action: EntityAction;
+  matchedExisting?: Chapter;
 }

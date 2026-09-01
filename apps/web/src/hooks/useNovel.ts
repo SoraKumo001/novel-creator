@@ -1,18 +1,22 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toErrorMessage } from '@/lib/errors.js';
-import { novelKeys } from '@/lib/queryKeys.js';
-import { deleteNovel, fetchNovelDetail, updateNovel } from '@/lib/services/index.js';
-import type { Novel, NovelDetail, UpdateNovelInput } from '@/lib/types.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toErrorMessage } from "@/lib/errors.js";
+import { novelKeys } from "@/lib/queryKeys.js";
+import {
+  deleteNovel,
+  fetchNovelDetail,
+  updateNovel,
+} from "@/lib/services/index.js";
+import type { Novel, NovelDetail, UpdateNovelInput } from "@/lib/types.js";
 
 interface UseNovelReturn {
-  novel: NovelDetail | null;
-  loading: boolean;
+  deleteNovel: (id: string) => Promise<void>;
+  deleting: boolean;
   error: string | null;
+  loading: boolean;
+  novel: NovelDetail | null;
   refetch: () => Promise<void>;
   updateNovel: (id: string, input: UpdateNovelInput) => Promise<Novel>;
   updating: boolean;
-  deleteNovel: (id: string) => Promise<void>;
-  deleting: boolean;
 }
 
 export function useNovel(novelId: string): UseNovelReturn {
@@ -30,7 +34,8 @@ export function useNovel(novelId: string): UseNovelReturn {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdateNovelInput }) => updateNovel(id, input),
+    mutationFn: ({ id, input }: { id: string; input: UpdateNovelInput }) =>
+      updateNovel(id, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: novelKeys.all });
       queryClient.invalidateQueries({ queryKey: novelKeys.detail(novelId) });

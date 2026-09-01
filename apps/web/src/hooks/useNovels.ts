@@ -1,20 +1,25 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toErrorMessage } from '@/lib/errors.js';
-import { novelKeys } from '@/lib/queryKeys.js';
-import { createNovel, deleteNovel, fetchNovels, updateNovel } from '@/lib/services/index.js';
-import type { CreateNovelInput, Novel, UpdateNovelInput } from '@/lib/types.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toErrorMessage } from "@/lib/errors.js";
+import { novelKeys } from "@/lib/queryKeys.js";
+import {
+  createNovel,
+  deleteNovel,
+  fetchNovels,
+  updateNovel,
+} from "@/lib/services/index.js";
+import type { CreateNovelInput, Novel, UpdateNovelInput } from "@/lib/types.js";
 
 interface UseNovelsReturn {
-  novels: Novel[];
-  loading: boolean;
-  error: string | null;
-  refetch: () => Promise<void>;
   createNovel: (input: CreateNovelInput) => Promise<Novel>;
-  updateNovel: (id: string, input: UpdateNovelInput) => Promise<Novel>;
-  deleteNovel: (id: string) => Promise<void>;
   creating: boolean;
-  updating: boolean;
+  deleteNovel: (id: string) => Promise<void>;
   deleting: boolean;
+  error: string | null;
+  loading: boolean;
+  novels: Novel[];
+  refetch: () => Promise<void>;
+  updateNovel: (id: string, input: UpdateNovelInput) => Promise<Novel>;
+  updating: boolean;
 }
 
 export function useNovels(): UseNovelsReturn {
@@ -36,7 +41,8 @@ export function useNovels(): UseNovelsReturn {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: UpdateNovelInput }) => updateNovel(id, input),
+    mutationFn: ({ id, input }: { id: string; input: UpdateNovelInput }) =>
+      updateNovel(id, input),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: novelKeys.all }),
   });
 

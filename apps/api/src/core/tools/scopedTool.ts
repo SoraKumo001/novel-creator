@@ -1,10 +1,10 @@
-import { tool } from 'ai';
-import type { z } from 'zod';
+import { tool } from "ai";
+import type { z } from "zod";
 
 /**
  * 小説スコープが未解決のときに全ツール共通で返すエラーメッセージ。
  */
-export const NOVEL_NOT_SPECIFIED_ERROR = '対象の小説が指定されていません。';
+export const NOVEL_NOT_SPECIFIED_ERROR = "対象の小説が指定されていません。";
 
 /**
  * AI SDK v7 の Tool 型は inputSchema のみを定義しており、v4 互換の parameters プロパティは
@@ -18,14 +18,17 @@ const defineTool = tool as any;
 interface ScopedToolConfig<TSchema extends z.ZodType, TResult> {
   /** LLM に渡るツールの説明 */
   description: string;
+  /** run が例外を投げた場合に { error } として返すメッセージ */
+  errorMessage: string;
   /** LLM に渡るツールの入力スキーマ */
   parameters: TSchema;
   /** 実行対象の小説IDを解決する。null を返した場合は { error: NOVEL_NOT_SPECIFIED_ERROR } を返す */
   resolve: (params: z.input<TSchema>) => string | null;
-  /** run が例外を投げた場合に { error } として返すメッセージ */
-  errorMessage: string;
   /** ツール本体。解決済み小説IDとパラメータを受け取る */
-  run: (novelId: string, params: z.input<TSchema>) => TResult | Promise<TResult>;
+  run: (
+    novelId: string,
+    params: z.input<TSchema>
+  ) => TResult | Promise<TResult>;
 }
 
 /**
@@ -33,7 +36,7 @@ interface ScopedToolConfig<TSchema extends z.ZodType, TResult> {
  * description / parameters / execute の戻り値形状は手書き実装と完全に同一になる。
  */
 export function scopedTool<TSchema extends z.ZodType, TResult>(
-  config: ScopedToolConfig<TSchema, TResult>,
+  config: ScopedToolConfig<TSchema, TResult>
 ): {
   description: string;
   parameters: TSchema;
@@ -41,7 +44,6 @@ export function scopedTool<TSchema extends z.ZodType, TResult>(
 } {
   return defineTool({
     description: config.description,
-    parameters: config.parameters,
     execute: async (params: z.input<TSchema>) => {
       const novelId = config.resolve(params);
       if (!novelId) {
@@ -56,5 +58,6 @@ export function scopedTool<TSchema extends z.ZodType, TResult>(
         return { error: config.errorMessage };
       }
     },
+    parameters: config.parameters,
   });
 }

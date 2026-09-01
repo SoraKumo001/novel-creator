@@ -1,27 +1,27 @@
-import { randomUUID } from 'node:crypto';
-import { characters, novels, settings } from '@novel-creator/db';
-import { generateEmbedding } from '@novel-creator/llm';
-import { eq } from 'drizzle-orm';
-import type { VectorRecord } from '@novel-creator/vector';
-import { EmbeddingConfigDomainService } from './embedding-config.service.js';
-import { fetchNovelStructureWithContents } from './novel-structure.js';
-import type { ServiceContext } from './types.js';
+import { randomUUID } from "node:crypto";
+import { characters, novels, settings } from "@novel-creator/db";
+import { generateEmbedding } from "@novel-creator/llm";
+import type { VectorRecord } from "@novel-creator/vector";
+import { eq } from "drizzle-orm";
+import { EmbeddingConfigDomainService } from "./embedding-config.service.js";
+import { fetchNovelStructureWithContents } from "./novel-structure.js";
+import type { ServiceContext } from "./types.js";
 
 export interface ReindexProgressEvent {
   current: number;
-  total: number;
+  error?: string;
+  itemTitle?: string;
   percent: number;
   stage: string;
-  itemTitle?: string;
-  error?: string;
+  total: number;
 }
 
 export interface EntityToEmbed {
+  content: string;
+  entityId: string;
+  entityType: "character" | "setting" | "content";
   id: string;
   novelId: string;
-  entityType: 'character' | 'setting' | 'content';
-  entityId: string;
-  content: string;
   title: string;
 }
 
@@ -34,17 +34,19 @@ export class ReindexDomainService {
 
   async reindexAll(
     embeddingConfigId?: string | null,
-    onProgress?: (event: ReindexProgressEvent) => void,
+    onProgress?: (event: ReindexProgressEvent) => void
   ): Promise<{ totalIndexed: number; dimensions: number }> {
     // 1. 使用する埋め込みモデルと次元数を解決
     const { model, dimensions } =
-      await this.embeddingConfigService.resolveEmbeddingModel(embeddingConfigId);
+      await this.embeddingConfigService.resolveEmbeddingModel(
+        embeddingConfigId
+      );
 
     onProgress?.({
       current: 0,
-      total: 0,
       percent: 0,
       stage: `インデックススキーマを初期化中 (次元数: ${dimensions})...`,
+      total: 0,
     });
 
     // 2. ベクトルストアのスキーマを再作成（またはクリア）
@@ -60,7 +62,7 @@ export class ReindexDomainService {
     // 全小説対象でも chapters / sections / contents の 3 クエリで済む）
     const structureMap = await fetchNovelStructureWithContents(
       this.ctx.db,
-      allNovels.map((novel) => novel.id),
+      allNovels.map((novel) => novel.id)
     );
     const itemsToEmbed: EntityToEmbed[] = [];
 
@@ -73,42 +75,49 @@ export class ReindexDomainService {
       for (const char of chars) {
         const textParts = [
           `名前: ${char.name}`,
-          char.category ? `分類: ${char.category}` : '',
-          char.description ? `説明: ${char.description}` : '',
-          char.traits && char.traits.length > 0 ? `特徴: ${char.traits.join(', ')}` : '',
-          char.relationships ? `関係性: ${JSON.stringify(char.relationships)}` : '',
+          char.category ? `分類: ${char.category}` : "",
+          char.description ? `説明: ${char.description}` : "",
+          char.traits && char.traits.length > 0
+            ? `特徴: ${char.traits.join(", ")}`
+            : "",
+          char.relationships
+            ? `関係性: ${JSON.stringify(char.relationships)}`
+            : "",
         ]
           .filter(Boolean)
-          .join('\n');
+          .join("\n");
 
         itemsToEmbed.push({
+          content: textParts,
+          entityId: char.id,
+          entityType: "character",
           id: randomUUID(),
           novelId: novel.id,
-          entityType: 'character',
-          entityId: char.id,
-          content: textParts,
           title: `人物: ${char.name}`,
         });
       }
 
       // 世界観設定
-      const setts = await this.ctx.db.select().from(settings).where(eq(settings.novelId, novel.id));
+      const setts = await this.ctx.db
+        .select()
+        .from(settings)
+        .where(eq(settings.novelId, novel.id));
       for (const sett of setts) {
         const textParts = [
           `名前: ${sett.name}`,
-          sett.category ? `分類: ${sett.category}` : '',
-          sett.description ? `説明: ${sett.description}` : '',
-          sett.metadata ? `詳細: ${JSON.stringify(sett.metadata)}` : '',
+          sett.category ? `分類: ${sett.category}` : "",
+          sett.description ? `説明: ${sett.description}` : "",
+          sett.metadata ? `詳細: ${JSON.stringify(sett.metadata)}` : "",
         ]
           .filter(Boolean)
-          .join('\n');
+          .join("\n");
 
         itemsToEmbed.push({
+          content: textParts,
+          entityId: sett.id,
+          entityType: "setting",
           id: randomUUID(),
           novelId: novel.id,
-          entityType: 'setting',
-          entityId: sett.id,
-          content: textParts,
           title: `設定: ${sett.name}`,
         });
       }
@@ -116,13 +125,13 @@ export class ReindexDomainService {
       // 章および節の本文（章・節・本文は structureMap にバルク取得済み）
       for (const chapterNode of structureMap.get(novel.id) ?? []) {
         for (const { section: sect, body: cntBody } of chapterNode.sections) {
-          if (cntBody && cntBody.trim()) {
+          if (cntBody?.trim()) {
             itemsToEmbed.push({
+              content: cntBody.trim(),
+              entityId: sect.id,
+              entityType: "content",
               id: randomUUID(),
               novelId: novel.id,
-              entityType: 'content',
-              entityId: sect.id,
-              content: cntBody.trim(),
               title: `本文: ${sect.title || `第${sect.order}節`}`,
             });
           }
@@ -134,11 +143,11 @@ export class ReindexDomainService {
     if (total === 0) {
       onProgress?.({
         current: 0,
-        total: 0,
         percent: 100,
-        stage: '対象データがありませんでした',
+        stage: "対象データがありませんでした",
+        total: 0,
       });
-      return { totalIndexed: 0, dimensions };
+      return { dimensions, totalIndexed: 0 };
     }
 
     // 4. バッチサイズ（例: 10件ずつ）で Embedding 生成 & upsertBatch
@@ -154,17 +163,17 @@ export class ReindexDomainService {
           try {
             const vector = await generateEmbedding(model, item.content);
             vectorRecords.push({
-              id: item.id,
-              novelId: item.novelId,
-              entityType: item.entityType,
-              entityId: item.entityId,
               content: item.content,
               embedding: vector,
+              entityId: item.entityId,
+              entityType: item.entityType,
+              id: item.id,
+              novelId: item.novelId,
             });
           } catch (e) {
             console.error(`[reindex] Failed to embed ${item.title}:`, e);
           }
-        }),
+        })
       );
 
       if (vectorRecords.length > 0) {
@@ -176,20 +185,20 @@ export class ReindexDomainService {
 
       onProgress?.({
         current: completedCount,
-        total,
+        itemTitle: batch.at(-1)?.title,
         percent,
         stage: `データをベクトル化中... (${completedCount}/${total})`,
-        itemTitle: batch[batch.length - 1]?.title,
+        total,
       });
     }
 
     onProgress?.({
       current: total,
-      total,
       percent: 100,
       stage: `全 ${total} 件のインデックス再構築が完了しました`,
+      total,
     });
 
-    return { totalIndexed: total, dimensions };
+    return { dimensions, totalIndexed: total };
   }
 }

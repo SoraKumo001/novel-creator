@@ -1,22 +1,29 @@
-import type { z } from 'zod';
-import { desc, eq, isNull } from 'drizzle-orm';
-import { createUIMessageStreamResponse, isStepCount, toUIMessageStream } from 'ai';
-import type { LanguageModel, ToolSet } from 'ai';
-import { chatMessages, chatSessions, novels } from '@novel-creator/db';
+import { chatMessages, chatSessions, novels } from "@novel-creator/db";
 import {
   creativeChatSystemPrompt,
   extractChatEntities,
   generateText,
   streamTextResult,
-} from '@novel-creator/llm';
-
-import { searchContext } from '../rag.js';
-import { chatRequestSchema } from '../schemas/index.js';
-import { formatErrorMessage } from '../middleware/error-handler.js';
-import { resolveLLMModel } from './model-resolver.js';
-import { createReadTools } from './tools/readTools.js';
-import { createProposeTools } from './tools/proposeTools.js';
-import { NotFoundError, ValidationError, type ServiceContext } from './types.js';
+} from "@novel-creator/llm";
+import type { LanguageModel, ToolSet } from "ai";
+import {
+  createUIMessageStreamResponse,
+  isStepCount,
+  toUIMessageStream,
+} from "ai";
+import { desc, eq, isNull } from "drizzle-orm";
+import type { z } from "zod";
+import { formatErrorMessage } from "../middleware/error-handler.js";
+import { searchContext } from "../rag.js";
+import type { chatRequestSchema } from "../schemas/index.js";
+import { resolveLLMModel } from "./model-resolver.js";
+import { createProposeTools } from "./tools/proposeTools.js";
+import { createReadTools } from "./tools/readTools.js";
+import {
+  NotFoundError,
+  type ServiceContext,
+  ValidationError,
+} from "./types.js";
 
 export class ChatDomainService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -36,9 +43,12 @@ export class ChatDomainService {
   }
 
   async getChatSessionWithMessages(id: string) {
-    const [session] = await this.ctx.db.select().from(chatSessions).where(eq(chatSessions.id, id));
+    const [session] = await this.ctx.db
+      .select()
+      .from(chatSessions)
+      .where(eq(chatSessions.id, id));
     if (!session) {
-      throw new NotFoundError('Chat session not found');
+      throw new NotFoundError("Chat session not found");
     }
     const messages = await this.ctx.db
       .select()
@@ -47,31 +57,31 @@ export class ChatDomainService {
       .orderBy(chatMessages.createdAt);
 
     return {
-      session,
       messages,
+      session,
     };
   }
 
   async createChatSession(data: {
     novelId?: string | null;
     title?: string;
-    messages?: { role: 'user' | 'assistant'; content: string }[];
+    messages?: { role: "user" | "assistant"; content: string }[];
   }) {
     const [session] = await this.ctx.db
       .insert(chatSessions)
       .values({
         novelId: data.novelId || null,
-        title: data.title?.trim() || '新しい相談',
+        title: data.title?.trim() || "新しい相談",
       })
       .returning();
 
     if (data.messages && data.messages.length > 0) {
       await this.ctx.db.insert(chatMessages).values(
         data.messages.map((m) => ({
-          sessionId: session.id,
-          role: m.role,
           content: m.content,
-        })),
+          role: m.role,
+          sessionId: session.id,
+        }))
       );
     }
 
@@ -89,7 +99,7 @@ export class ChatDomainService {
       .returning();
 
     if (!updated) {
-      throw new NotFoundError('Chat session not found');
+      throw new NotFoundError("Chat session not found");
     }
 
     return updated;
@@ -101,7 +111,7 @@ export class ChatDomainService {
       .where(eq(chatSessions.id, id))
       .returning();
     if (!deleted) {
-      throw new NotFoundError('Chat session not found');
+      throw new NotFoundError("Chat session not found");
     }
     return deleted;
   }
@@ -111,68 +121,94 @@ export class ChatDomainService {
     const rawResult = await generateText(this.ctx.llm, prompt);
 
     let parsed: {
-      characters?: { name: string; category?: string; description?: string; traits?: string[] }[];
+      characters?: {
+        name: string;
+        category?: string;
+        description?: string;
+        traits?: string[];
+      }[];
       settings?: { name: string; category?: string; description?: string }[];
       foreshadowings?: {
         title: string;
         description?: string;
-        status?: 'unresolved' | 'resolved' | 'abandoned';
+        status?: "unresolved" | "resolved" | "abandoned";
       }[];
       timelines?: { event: string; timestamp?: string }[];
       plots?: { title: string; summary?: string }[];
-    } = { characters: [], settings: [], foreshadowings: [], timelines: [], plots: [] };
+    } = {
+      characters: [],
+      foreshadowings: [],
+      plots: [],
+      settings: [],
+      timelines: [],
+    };
 
     try {
       const jsonStr = rawResult
-        .replace(/^```(?:json)?\s*/i, '')
-        .replace(/\s*```$/i, '')
+        .replace(/^```(?:json)?\s*/i, "")
+        .replace(/\s*```$/i, "")
         .trim();
       const resultObj = JSON.parse(jsonStr);
-      if (resultObj && typeof resultObj === 'object') {
+      if (resultObj && typeof resultObj === "object") {
         parsed = {
-          characters: Array.isArray(resultObj.characters) ? resultObj.characters : [],
-          settings: Array.isArray(resultObj.settings) ? resultObj.settings : [],
-          foreshadowings: Array.isArray(resultObj.foreshadowings) ? resultObj.foreshadowings : [],
-          timelines: Array.isArray(resultObj.timelines) ? resultObj.timelines : [],
+          characters: Array.isArray(resultObj.characters)
+            ? resultObj.characters
+            : [],
+          foreshadowings: Array.isArray(resultObj.foreshadowings)
+            ? resultObj.foreshadowings
+            : [],
           plots: Array.isArray(resultObj.plots) ? resultObj.plots : [],
+          settings: Array.isArray(resultObj.settings) ? resultObj.settings : [],
+          timelines: Array.isArray(resultObj.timelines)
+            ? resultObj.timelines
+            : [],
         };
       }
     } catch {
-      parsed = { characters: [], settings: [], foreshadowings: [], timelines: [], plots: [] };
+      parsed = {
+        characters: [],
+        foreshadowings: [],
+        plots: [],
+        settings: [],
+        timelines: [],
+      };
     }
 
     const cleanLabel = (str?: string) =>
-      (str ?? '')
+      (str ?? "")
         .replace(
           /[（(【][\s\u3000]*(?:既存|新規|既存キャラ|新規キャラ|既存設定|新規設定|既存情報|新規案|既存人物|新規人物)[\s\u3000]*[）)】]/gi,
-          '',
+          ""
         )
         .trim();
 
     return {
       characters: (parsed.characters ?? []).map((c) => ({
-        name: cleanLabel(c.name),
         category: cleanLabel(c.category),
-        description: c.description ?? '',
+        description: c.description ?? "",
+        name: cleanLabel(c.name),
         traits: c.traits ?? [],
       })),
-      settings: (parsed.settings ?? []).map((s) => ({
-        name: cleanLabel(s.name),
-        category: cleanLabel(s.category),
-        description: s.description ?? '',
-      })),
       foreshadowings: (parsed.foreshadowings ?? []).map((f) => ({
+        description: f.description ?? "",
+        status:
+          f.status === "resolved" || f.status === "abandoned"
+            ? f.status
+            : "unresolved",
         title: cleanLabel(f.title),
-        description: f.description ?? '',
-        status: f.status === 'resolved' || f.status === 'abandoned' ? f.status : 'unresolved',
+      })),
+      plots: (parsed.plots ?? []).map((p) => ({
+        summary: p.summary ?? "",
+        title: cleanLabel(p.title),
+      })),
+      settings: (parsed.settings ?? []).map((s) => ({
+        category: cleanLabel(s.category),
+        description: s.description ?? "",
+        name: cleanLabel(s.name),
       })),
       timelines: (parsed.timelines ?? []).map((t) => ({
         event: cleanLabel(t.event),
-        timestamp: t.timestamp ?? '',
-      })),
-      plots: (parsed.plots ?? []).map((p) => ({
-        title: cleanLabel(p.title),
-        summary: p.summary ?? '',
+        timestamp: t.timestamp ?? "",
       })),
     };
   }
@@ -186,7 +222,7 @@ export class ChatDomainService {
   async streamCreativeChat(input: {
     sessionId: string;
     novelId?: string | null;
-    messages: z.infer<typeof chatRequestSchema>['messages'];
+    messages: z.infer<typeof chatRequestSchema>["messages"];
     modelConfigId?: string | null;
   }): Promise<Response> {
     const { sessionId, novelId, messages, modelConfigId } = input;
@@ -199,12 +235,16 @@ export class ChatDomainService {
 
     // 会話履歴（サーバー DB 正史）と RAG コンテキストからプロンプトを構築
     const effectiveNovelId = novelId ?? session.novelId;
-    const prompt = await this.buildChatContext(sessionId, effectiveNovelId, userText);
+    const prompt = await this.buildChatContext(
+      sessionId,
+      effectiveNovelId,
+      userText
+    );
 
     // 使用する LLM モデルを解決（modelConfigId 指定 or デフォルト設定 or 環境変数）。
     // ユーザー指定の modelConfigId が存在しない場合は黙って別モデルへ
     // フォールバックさせずエラーにする（'throw'）。
-    const llmModel = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
+    const llmModel = await resolveLLMModel(this.ctx, modelConfigId, "throw");
 
     // ツール群（読み取りツール ＋ 設定提案ツール）を構築する
     const tools = this.buildChatTools(effectiveNovelId);
@@ -222,7 +262,7 @@ export class ChatDomainService {
       .from(chatSessions)
       .where(eq(chatSessions.id, sessionId));
     if (!session) {
-      throw new NotFoundError('Chat session not found');
+      throw new NotFoundError("Chat session not found");
     }
     return session;
   }
@@ -234,22 +274,24 @@ export class ChatDomainService {
    */
   private async persistUserMessage(
     sessionId: string,
-    messages: z.infer<typeof chatRequestSchema>['messages'],
+    messages: z.infer<typeof chatRequestSchema>["messages"]
   ) {
-    const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user');
+    const lastUserMessage = [...messages]
+      .reverse()
+      .find((m) => m.role === "user");
     if (!lastUserMessage) {
-      throw new ValidationError('No user message provided');
+      throw new ValidationError("No user message provided");
     }
     const userText = lastUserMessage.parts
-      .filter((p) => p.type === 'text')
-      .map((p) => (p as { text?: string }).text ?? '')
-      .join('');
+      .filter((p) => p.type === "text")
+      .map((p) => (p as { text?: string }).text ?? "")
+      .join("");
 
     await this.ctx.db.insert(chatMessages).values({
-      sessionId,
-      role: 'user',
       content: userText,
       parts: lastUserMessage.parts,
+      role: "user",
+      sessionId,
     });
     await this.ctx.db
       .update(chatSessions)
@@ -267,7 +309,7 @@ export class ChatDomainService {
   private async buildChatContext(
     sessionId: string,
     effectiveNovelId: string | null | undefined,
-    userText: string,
+    userText: string
   ) {
     const history = await this.ctx.db
       .select()
@@ -279,23 +321,28 @@ export class ChatDomainService {
     let contextSettings: string[] = [];
     let contextCharacters: string[] = [];
     let novelInfo:
-      { title: string; description?: string | null; styleGuide?: string | null } | undefined;
+      | {
+          title: string;
+          description?: string | null;
+          styleGuide?: string | null;
+        }
+      | undefined;
 
     if (effectiveNovelId) {
       try {
         const [novel] = await this.ctx.db
           .select({
-            title: novels.title,
             description: novels.description,
             styleGuide: novels.styleGuide,
+            title: novels.title,
           })
           .from(novels)
           .where(eq(novels.id, effectiveNovelId));
         if (novel) {
           novelInfo = {
-            title: novel.title,
             description: novel.description,
             styleGuide: novel.styleGuide,
+            title: novel.title,
           };
         }
 
@@ -304,7 +351,7 @@ export class ChatDomainService {
           this.ctx.embedding,
           effectiveNovelId,
           { query: userText },
-          this.ctx.env,
+          this.ctx.env
         );
         contextSettings = ragContext.settings;
         contextCharacters = ragContext.characters;
@@ -314,24 +361,29 @@ export class ChatDomainService {
     }
 
     const systemPrompt = creativeChatSystemPrompt({
+      characters: contextCharacters,
       novel: novelInfo,
       settings: contextSettings,
-      characters: contextCharacters,
     });
 
     return [
       systemPrompt,
       ...history
-        .filter((m) => m.role === 'user' || m.role === 'assistant')
-        .map((m) => `${m.role === 'user' ? 'ユーザー' : 'アシスタント'}: ${m.content}`),
-    ].join('\n\n');
+        .filter((m) => m.role === "user" || m.role === "assistant")
+        .map(
+          (m) =>
+            `${m.role === "user" ? "ユーザー" : "アシスタント"}: ${m.content}`
+        ),
+    ].join("\n\n");
   }
 
   /**
    * ツール群（読み取りツール ＋ 設定提案ツール）を構築する（ツール対象は小説コンテキストがある場合のみ）。
    * 構築に失敗してもチャット自体は継続させる（RAG フォールバック方針に倣う）。
    */
-  private buildChatTools(effectiveNovelId: string | null | undefined): ToolSet | undefined {
+  private buildChatTools(
+    effectiveNovelId: string | null | undefined
+  ): ToolSet | undefined {
     if (!effectiveNovelId) {
       return undefined;
     }
@@ -354,40 +406,36 @@ export class ChatDomainService {
     sessionId: string,
     llmModel: LanguageModel,
     prompt: string,
-    tools: ToolSet | undefined,
+    tools: ToolSet | undefined
   ): Promise<Response> {
     const result = await streamTextResult(llmModel, prompt, {
-      tools,
       stopWhen: isStepCount(8),
+      tools,
     });
 
     let assistantSaved = false;
     const uiStream = toUIMessageStream({
-      stream: result.stream,
-      tools,
-      onError: (error) => {
-        console.error('[Chat Stream Error]', error);
-        return formatErrorMessage(error);
-      },
       onEnd: async ({ responseMessage }) => {
-        if (assistantSaved) return;
+        if (assistantSaved) {
+          return;
+        }
         assistantSaved = true;
         const fullText = responseMessage.parts
-          .filter((p) => p.type === 'text')
-          .map((p) => (p as { text?: string }).text ?? '')
-          .join('');
+          .filter((p) => p.type === "text")
+          .map((p) => (p as { text?: string }).text ?? "")
+          .join("");
         try {
           // 思考プロセス（reasoning）やツール呼び出しパーツ（tool-*）を含めた全 parts を保存
           const savedParts =
             responseMessage.parts && responseMessage.parts.length > 0
               ? JSON.parse(JSON.stringify(responseMessage.parts))
-              : [{ type: 'text', text: fullText }];
+              : [{ text: fullText, type: "text" }];
 
           await this.ctx.db.insert(chatMessages).values({
-            sessionId,
-            role: 'assistant',
             content: fullText,
             parts: savedParts,
+            role: "assistant",
+            sessionId,
           });
           await this.ctx.db
             .update(chatSessions)
@@ -397,6 +445,12 @@ export class ChatDomainService {
           // ベストエフォート保存: 永続化失敗はストリームを中断しない
         }
       },
+      onError: (error) => {
+        console.error("[Chat Stream Error]", error);
+        return formatErrorMessage(error);
+      },
+      stream: result.stream,
+      tools,
     });
 
     return createUIMessageStreamResponse({ stream: uiStream });

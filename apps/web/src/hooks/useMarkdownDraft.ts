@@ -1,23 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface UseMarkdownDraftOptions {
-  storageKey: string;
   debounceMs?: number;
+  storageKey: string;
 }
 
 interface UseMarkdownDraftReturn {
-  /** Whether a draft exists in localStorage that differs from the current content. */
-  hasDraft: boolean;
-  /** The draft content from localStorage (null if none). */
-  draftContent: string | null;
-  /** Save content to localStorage (debounced). */
-  saveDraft: (content: string) => void;
+  /** Check if there's a draft in localStorage. Call on mount. */
+  checkDraft: () => void;
   /** Clear the draft from localStorage AND reset state. */
   clearDraft: () => void;
   /** Dismiss the draft banner without removing from localStorage. */
   dismissDraft: () => void;
-  /** Check if there's a draft in localStorage. Call on mount. */
-  checkDraft: () => void;
+  /** The draft content from localStorage (null if none). */
+  draftContent: string | null;
+  /** Whether a draft exists in localStorage that differs from the current content. */
+  hasDraft: boolean;
+  /** Save content to localStorage (debounced). */
+  saveDraft: (content: string) => void;
 }
 
 export function useMarkdownDraft({
@@ -38,7 +38,9 @@ export function useMarkdownDraft({
 
   const saveDraft = useCallback(
     (content: string) => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
       timerRef.current = setTimeout(() => {
         try {
           localStorage.setItem(storageKey, content);
@@ -47,11 +49,13 @@ export function useMarkdownDraft({
         }
       }, debounceMs);
     },
-    [storageKey, debounceMs],
+    [storageKey, debounceMs]
   );
 
   const clearDraft = useCallback(() => {
-    if (timerRef.current) clearTimeout(timerRef.current);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
     try {
       localStorage.removeItem(storageKey);
     } catch {
@@ -64,11 +68,14 @@ export function useMarkdownDraft({
     setDraftContent(null);
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, []);
+  useEffect(
+    () => () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+    },
+    []
+  );
 
   return {
     hasDraft: draftContent !== null,

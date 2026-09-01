@@ -1,10 +1,17 @@
-import { parseResponseError } from '@/lib/errors.js';
-import { apiClient } from '../api-client.js';
-import type { CreateNovelInput, Novel, NovelDetail, UpdateNovelInput } from '../types.js';
+import { parseResponseError } from "@/lib/errors.js";
+import { apiClient } from "../api-client.js";
+import type {
+  CreateNovelInput,
+  Novel,
+  NovelDetail,
+  UpdateNovelInput,
+} from "../types.js";
 
 export async function fetchNovels(): Promise<Novel[]> {
   const res = await apiClient.novels.$get();
-  if (!res.ok) throw await parseResponseError(res, '小説一覧の取得');
+  if (!res.ok) {
+    throw await parseResponseError(res, "小説一覧の取得");
+  }
   const rows = await res.json();
   return rows.map((n) => ({
     id: n.id,
@@ -17,8 +24,10 @@ export async function fetchNovels(): Promise<Novel[]> {
 }
 
 export async function fetchNovelDetail(id: string): Promise<NovelDetail> {
-  const res = await apiClient.novels[':id'].$get({ param: { id } });
-  if (!res.ok) throw await parseResponseError(res, '小説詳細の取得');
+  const res = await apiClient.novels[":id"].$get({ param: { id } });
+  if (!res.ok) {
+    throw await parseResponseError(res, "小説詳細の取得");
+  }
   const n = await res.json();
   return {
     id: n.id,
@@ -68,7 +77,9 @@ export async function createNovel(input: CreateNovelInput): Promise<Novel> {
       styleGuide: input.styleGuide ?? undefined,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, '小説の作成');
+  if (!res.ok) {
+    throw await parseResponseError(res, "小説の作成");
+  }
   const row = await res.json();
   return {
     id: row.id,
@@ -80,8 +91,11 @@ export async function createNovel(input: CreateNovelInput): Promise<Novel> {
   };
 }
 
-export async function updateNovel(id: string, input: UpdateNovelInput): Promise<Novel> {
-  const res = await apiClient.novels[':id'].$put({
+export async function updateNovel(
+  id: string,
+  input: UpdateNovelInput
+): Promise<Novel> {
+  const res = await apiClient.novels[":id"].$put({
     param: { id },
     json: {
       title: input.title,
@@ -90,7 +104,9 @@ export async function updateNovel(id: string, input: UpdateNovelInput): Promise<
       storyOutline: input.storyOutline,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, '小説の更新');
+  if (!res.ok) {
+    throw await parseResponseError(res, "小説の更新");
+  }
   const row = await res.json();
   return {
     id: row.id,
@@ -104,20 +120,27 @@ export async function updateNovel(id: string, input: UpdateNovelInput): Promise<
 }
 
 export async function fetchStoryOutline(id: string): Promise<string> {
-  const res = await apiClient.novels[':id']['story-outline'].markdown.$get({
+  const res = await apiClient.novels[":id"]["story-outline"].markdown.$get({
     param: { id },
   });
-  if (!res.ok) throw await parseResponseError(res, 'ストーリー構想の取得');
+  if (!res.ok) {
+    throw await parseResponseError(res, "ストーリー構想の取得");
+  }
   const data = await res.json();
   return data.markdown;
 }
 
-export async function saveStoryOutline(id: string, markdown: string): Promise<Novel> {
-  const res = await apiClient.novels[':id']['story-outline'].markdown.$put({
+export async function saveStoryOutline(
+  id: string,
+  markdown: string
+): Promise<Novel> {
+  const res = await apiClient.novels[":id"]["story-outline"].markdown.$put({
     param: { id },
     json: { markdown },
   });
-  if (!res.ok) throw await parseResponseError(res, 'ストーリー構想の保存');
+  if (!res.ok) {
+    throw await parseResponseError(res, "ストーリー構想の保存");
+  }
   const data = await res.json();
   return {
     id: data.novel.id,
@@ -137,9 +160,11 @@ export async function editStoryOutlineSection(
     instruction: string;
     markdown: string;
     modelConfigId?: string | null;
-  },
+  }
 ): Promise<string> {
-  const res = await apiClient.novels[':id']['story-outline']['edit-section'].$post({
+  const res = await apiClient.novels[":id"]["story-outline"][
+    "edit-section"
+  ].$post({
     param: { id },
     json: {
       category: params.activeSection.category,
@@ -150,7 +175,9 @@ export async function editStoryOutlineSection(
       modelConfigId: params.modelConfigId ?? undefined,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, 'セクションのAI編集');
+  if (!res.ok) {
+    throw await parseResponseError(res, "セクションのAI編集");
+  }
   const data = await res.json();
   return data.content;
 }
@@ -161,9 +188,11 @@ export async function editStoryOutlineDocument(
     instruction: string;
     markdown: string;
     modelConfigId?: string | null;
-  },
+  }
 ): Promise<string> {
-  const res = await apiClient.novels[':id']['story-outline']['edit-document'].$post({
+  const res = await apiClient.novels[":id"]["story-outline"][
+    "edit-document"
+  ].$post({
     param: { id },
     json: {
       instruction: params.instruction,
@@ -171,7 +200,9 @@ export async function editStoryOutlineDocument(
       modelConfigId: params.modelConfigId ?? undefined,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, '全体のAI編集');
+  if (!res.ok) {
+    throw await parseResponseError(res, "全体のAI編集");
+  }
   const data = await res.json();
   return data.markdown;
 }
@@ -181,56 +212,68 @@ export async function generatePlotFromStoryOutline(
   params: {
     storyOutline: string;
     modelConfigId?: string | null;
-  },
+  }
 ): Promise<{
   title: string;
   description: string;
   chapters: { title: string; order: number; summary: string }[];
 }> {
-  const res = await apiClient.novels[':id']['story-outline']['generate-plot'].$post({
+  const res = await apiClient.novels[":id"]["story-outline"][
+    "generate-plot"
+  ].$post({
     param: { id },
     json: {
       storyOutline: params.storyOutline,
       modelConfigId: params.modelConfigId ?? undefined,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, '章立て（プロット）の自動設計');
+  if (!res.ok) {
+    throw await parseResponseError(res, "章立て（プロット）の自動設計");
+  }
   return res.json();
 }
 
 export async function generateStyleGuideDraft(
   novelId: string,
-  modelConfigId?: string | null,
+  modelConfigId?: string | null
 ): Promise<string> {
-  const res = await apiClient.novels[':id'].generate['style-guide'].$post({
+  const res = await apiClient.novels[":id"].generate["style-guide"].$post({
     param: { id: novelId },
     json: { modelConfigId: modelConfigId ?? null },
   });
-  if (!res.ok) throw await parseResponseError(res, '執筆スタイルのドラフト生成');
+  if (!res.ok) {
+    throw await parseResponseError(res, "執筆スタイルのドラフト生成");
+  }
   const data = await res.json();
   return data.draft;
 }
 
 export async function deleteNovel(id: string): Promise<void> {
-  const res = await apiClient.novels[':id'].$delete({ param: { id } });
-  if (!res.ok) throw await parseResponseError(res, '小説の削除');
+  const res = await apiClient.novels[":id"].$delete({ param: { id } });
+  if (!res.ok) {
+    throw await parseResponseError(res, "小説の削除");
+  }
 }
 
 export async function fetchNovelExportData(id: string) {
   const [novelRes, chaptersRes] = await Promise.all([
-    apiClient.novels[':id'].$get({ param: { id } }),
-    apiClient.novels[':id'].chapters.$get({ param: { id } }),
+    apiClient.novels[":id"].$get({ param: { id } }),
+    apiClient.novels[":id"].chapters.$get({ param: { id } }),
   ]);
 
-  if (!novelRes.ok) throw await parseResponseError(novelRes, '小説データの取得');
-  if (!chaptersRes.ok) throw await parseResponseError(chaptersRes, '章データの取得');
+  if (!novelRes.ok) {
+    throw await parseResponseError(novelRes, "小説データの取得");
+  }
+  if (!chaptersRes.ok) {
+    throw await parseResponseError(chaptersRes, "章データの取得");
+  }
 
   const novel = await novelRes.json();
   const rawChapters = await chaptersRes.json();
 
   const chaptersWithSections = await Promise.all(
     rawChapters.map(async (ch) => {
-      const chDetailRes = await apiClient.chapters[':id'].$get({
+      const chDetailRes = await apiClient.chapters[":id"].$get({
         param: { id: ch.id },
       });
       const chDetail = chDetailRes.ok ? await chDetailRes.json() : null;
@@ -238,7 +281,7 @@ export async function fetchNovelExportData(id: string) {
 
       const sectionsWithContent = await Promise.all(
         rawSections.map(async (sec) => {
-          const contentRes = await apiClient.contents[':id'].$get({
+          const contentRes = await apiClient.contents[":id"].$get({
             param: { id: sec.id },
           });
           const contentData = contentRes.ok ? await contentRes.json() : null;
@@ -247,7 +290,7 @@ export async function fetchNovelExportData(id: string) {
             order: sec.order,
             content: contentData?.body ?? null,
           };
-        }),
+        })
       );
 
       return {
@@ -255,7 +298,7 @@ export async function fetchNovelExportData(id: string) {
         order: ch.order,
         sections: sectionsWithContent,
       };
-    }),
+    })
   );
 
   return {

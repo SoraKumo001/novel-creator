@@ -17,27 +17,28 @@ export function editStoryOutlineSection(
     settings?: string[];
     characters?: string[];
     entireOutlinePreview?: string;
-  },
+  }
 ): string {
-  const content = section.content.trim() || '（未記入）';
+  const content = section.content.trim() || "（未記入）";
 
   const contextLines: string[] = [];
   if (context?.novelTitle) {
     contextLines.push(`- 作品タイトル: ${context.novelTitle}`);
   }
   if (context?.characters && context.characters.length > 0) {
-    contextLines.push('## 登場人物');
+    contextLines.push("## 登場人物");
     contextLines.push(...context.characters.map((c) => `- ${c}`));
   }
   if (context?.settings && context.settings.length > 0) {
-    contextLines.push('## 世界観・設定');
+    contextLines.push("## 世界観・設定");
     contextLines.push(...context.settings.map((s) => `- ${s}`));
   }
   if (context?.entireOutlinePreview) {
-    contextLines.push('## ストーリー構想全体（文脈参考）');
+    contextLines.push("## ストーリー構想全体（文脈参考）");
     contextLines.push(context.entireOutlinePreview);
   }
-  const contextBlock = contextLines.length > 0 ? contextLines.join('\n') : '（なし）';
+  const contextBlock =
+    contextLines.length > 0 ? contextLines.join("\n") : "（なし）";
 
   return `あなたはプロの小説ストーリーアーキテクト（構成作家・編集者）です。以下のストーリー構想の特定セクションを、作家の指示に従って推敲・展開・修正してください。
 
@@ -74,21 +75,22 @@ export function editStoryOutlineDocument(
     novelTitle?: string;
     settings?: string[];
     characters?: string[];
-  },
+  }
 ): string {
   const contextLines: string[] = [];
   if (context?.novelTitle) {
     contextLines.push(`- 作品タイトル: ${context.novelTitle}`);
   }
   if (context?.characters && context.characters.length > 0) {
-    contextLines.push('## 登場人物');
+    contextLines.push("## 登場人物");
     contextLines.push(...context.characters.map((c) => `- ${c}`));
   }
   if (context?.settings && context.settings.length > 0) {
-    contextLines.push('## 世界観・設定');
+    contextLines.push("## 世界観・設定");
     contextLines.push(...context.settings.map((s) => `- ${s}`));
   }
-  const contextBlock = contextLines.length > 0 ? contextLines.join('\n') : '（なし）';
+  const contextBlock =
+    contextLines.length > 0 ? contextLines.join("\n") : "（なし）";
 
   return `あなたはプロの小説ストーリーアーキテクトです。ストーリー構想全体のマークダウン文書を、指示に従って編集・ブラッシュアップしてください。
 
@@ -121,11 +123,11 @@ export function generatePlotFromStoryOutline(params: {
   characters?: string[];
 }): string {
   const settings = params.settings?.length
-    ? params.settings.map((s) => `- ${s}`).join('\n')
-    : '（指定なし）';
+    ? params.settings.map((s) => `- ${s}`).join("\n")
+    : "（指定なし）";
   const characters = params.characters?.length
-    ? params.characters.map((c) => `- ${c}`).join('\n')
-    : '（指定なし）';
+    ? params.characters.map((c) => `- ${c}`).join("\n")
+    : "（指定なし）";
 
   return `あなたはプロの構成作家です。以下のストーリー構想（あらすじ、各フェーズの展開、今後の展開候補、結末）を忠実に反映し、小説全体の章立てプロット（各章のタイトルと詳細な概要）を設計してください。
 

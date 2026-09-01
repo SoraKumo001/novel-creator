@@ -1,10 +1,16 @@
-import { drizzle as nodeDrizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { drizzle as neonDrizzle, type NeonDatabase } from 'drizzle-orm/neon-serverless';
-import { Pool } from 'pg';
+import {
+  type NeonDatabase,
+  drizzle as neonDrizzle,
+} from "drizzle-orm/neon-serverless";
+import {
+  type NodePgDatabase,
+  drizzle as nodeDrizzle,
+} from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 
-import * as schema from './schema/index.js';
+import * as schema from "./schema/index.js";
 
-export * from './schema/index.js';
+export * from "./schema/index.js";
 
 /**
  * Cloudflare Hyperdrive binding の最小型定義。
@@ -19,7 +25,9 @@ export interface Hyperdrive {
  * Node.js（node-postgres）と Cloudflare Workers（Neon serverless）の両方で
  * 使用できるように共用型として定義する。
  */
-export type Database = NodePgDatabase<typeof schema> | NeonDatabase<typeof schema>;
+export type Database =
+  | NodePgDatabase<typeof schema>
+  | NeonDatabase<typeof schema>;
 
 /**
  * Node.js 環境向けに PostgreSQL へ接続する。

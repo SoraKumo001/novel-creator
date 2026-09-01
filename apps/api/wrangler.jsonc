@@ -7,19 +7,19 @@
     {
       "binding": "HYPERDRIVE",
       "id": "hyperdrive-id",
-      "localConnectionString": "postgres://novel:novel@localhost:5433/novel",
-    },
+      "localConnectionString": "postgres://novel:novel@localhost:5433/novel"
+    }
   ],
   "vectorize": [
     {
       "binding": "VECTORIZE_INDEX",
-      "index_name": "novel-creator",
-    },
+      "index_name": "novel-creator"
+    }
   ],
   "vars": {
     "LLM_PROVIDER": "openai",
     "LLM_MODEL": "gpt-4o-mini",
     "EMBEDDING_MODEL": "text-embedding-3-small",
-    "VECTOR_STORE_PROVIDER": "vectorize",
-  },
+    "VECTOR_STORE_PROVIDER": "vectorize"
+  }
 }

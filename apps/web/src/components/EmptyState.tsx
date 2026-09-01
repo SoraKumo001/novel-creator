@@ -1,17 +1,23 @@
-import type { ReactNode } from 'react';
-import { Button } from './Button.js';
+import type { ReactNode } from "react";
+import { Button } from "./Button.js";
 
 interface EmptyStateProps {
-  title: string;
-  description?: string;
   actionLabel?: string;
-  onAction?: () => void;
+  description?: string;
   icon?: ReactNode;
+  onAction?: () => void;
+  title: string;
 }
 
-export function EmptyState({ title, description, actionLabel, onAction, icon }: EmptyStateProps) {
+export function EmptyState({
+  title,
+  description,
+  actionLabel,
+  onAction,
+  icon,
+}: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface-muted/50 py-12 text-center">
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-border border-dashed bg-surface-muted/50 py-12 text-center">
       {icon && <div className="mb-4 text-muted">{icon}</div>}
       {!icon && (
         <svg
@@ -29,8 +35,12 @@ export function EmptyState({ title, description, actionLabel, onAction, icon }: 
           />
         </svg>
       )}
-      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-      {description && <p className="mx-auto mt-2 max-w-sm text-sm text-muted">{description}</p>}
+      <h3 className="font-semibold text-foreground text-lg">{title}</h3>
+      {description && (
+        <p className="mx-auto mt-2 max-w-sm text-muted text-sm">
+          {description}
+        </p>
+      )}
       {actionLabel && onAction && (
         <Button className="mt-6" onClick={onAction}>
           {actionLabel}

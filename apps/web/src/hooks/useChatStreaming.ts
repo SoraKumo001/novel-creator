@@ -1,42 +1,55 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport, type UIMessage } from 'ai';
-import { createChatSession, deleteChatSession, updateChatSession } from '@/lib/services/index.js';
-import type { ChatSession } from '@/lib/types.js';
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport, type UIMessage } from "ai";
+import {
+  type RefObject,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  createChatSession,
+  deleteChatSession,
+  updateChatSession,
+} from "@/lib/services/index.js";
+import type { ChatSession } from "@/lib/types.js";
 
 export interface ChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
   content: string;
   createdAt: number;
+  id: string;
   /**
    * UI Message の生 parts（v7）。ツールパーツ（tool-<name>）表示などに使用。
    * text パーツの連結結果が content に入るが、ツールパーツは content には含まれない。
    */
-  parts: UIMessage['parts'];
+  parts: UIMessage["parts"];
+  role: "user" | "assistant";
 }
 
 /** チャットのストリーミング状態機械に必要なセッション層の入力 */
 export interface UseChatStreamingInput {
-  /** 選択中の小説ID（最新値を同期参照するための ref） */
-  selectedNovelIdRef: RefObject<string | null>;
   /** セッション一覧のリフレッシュ（クエリの invalidate をラップしたもの） */
   refreshSessions: () => Promise<void>;
+  /** 選択中の小説ID（最新値を同期参照するための ref） */
+  selectedNovelIdRef: RefObject<string | null>;
 }
 
 /** UI Message からテキストパーツのみを連結して取り出す */
 function textOf(message: UIMessage): string {
   return message.parts
-    .filter((p): p is Extract<typeof p, { type: 'text' }> => p.type === 'text')
+    .filter((p): p is Extract<typeof p, { type: "text" }> => p.type === "text")
     .map((p) => p.text)
-    .join('');
+    .join("");
 }
 
 /** ツールパーツ（tool-<name> / dynamic-tool）が含まれるか */
-function hasToolPart(parts: UIMessage['parts']): boolean {
+function hasToolPart(parts: UIMessage["parts"]): boolean {
   return parts.some((p) => {
     const t = (p as { type?: string }).type;
-    return typeof t === 'string' && (t.startsWith('tool-') || t === 'dynamic-tool');
+    return (
+      typeof t === "string" && (t.startsWith("tool-") || t === "dynamic-tool")
+    );
   });
 }
 
@@ -48,14 +61,14 @@ function hasToolPart(parts: UIMessage['parts']): boolean {
  */
 export function rowToUIMessage(row: {
   id: string;
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
   content: string;
   parts?: unknown[] | null;
 }): UIMessage {
-  const parts: UIMessage['parts'] =
+  const parts: UIMessage["parts"] =
     Array.isArray(row.parts) && row.parts.length > 0
-      ? (row.parts as UIMessage['parts'])
-      : [{ type: 'text', text: row.content, state: 'done' }];
+      ? (row.parts as UIMessage["parts"])
+      : [{ type: "text", text: row.content, state: "done" }];
   return {
     id: row.id,
     role: row.role,
@@ -66,7 +79,7 @@ export function rowToUIMessage(row: {
 /** 応答メッセージからタイトル案（〜30文字）を生成する */
 function extractTitle(message: UIMessage): string {
   const text = textOf(message).trim();
-  return text.replace(/\s+/g, ' ').slice(0, 30);
+  return text.replace(/\s+/g, " ").slice(0, 30);
 }
 
 /**
@@ -79,12 +92,17 @@ function extractTitle(message: UIMessage): string {
  * セッション一覧の取得自体は ChatContext 側の useQuery が行うため、
  * selectedNovelIdRef と refreshSessions を注入して連携する。
  */
-export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseChatStreamingInput) {
-  const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(null);
+export function useChatStreaming({
+  selectedNovelIdRef,
+  refreshSessions,
+}: UseChatStreamingInput) {
+  const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(
+    null
+  );
   const currentSessionIdRef = useRef<string | null>(currentSessionId);
-  const [selectedModelConfigId, setSelectedModelConfigId] = useState<string | null>(() => {
-    return localStorage.getItem('novel-creator:chat-model') || null;
-  });
+  const [selectedModelConfigId, setSelectedModelConfigId] = useState<
+    string | null
+  >(() => localStorage.getItem("novel-creator:chat-model") || null);
   const selectedModelConfigIdRef = useRef<string | null>(selectedModelConfigId);
   selectedModelConfigIdRef.current = selectedModelConfigId;
 
@@ -96,7 +114,9 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
 
   // selectedNovelId は外部（ChatContext）から ref で注入されるため、
   // 最新値を毎レンダーで live な ref にコピーして stale closure を避ける。
-  const selectedNovelIdLiveRef = useRef<string | null>(selectedNovelIdRef.current);
+  const selectedNovelIdLiveRef = useRef<string | null>(
+    selectedNovelIdRef.current
+  );
   selectedNovelIdLiveRef.current = selectedNovelIdRef.current;
 
   // 新規セッションの初回応答後にタイトルを応答から設定するためのフラグ
@@ -113,9 +133,9 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     setSelectedModelConfigId(id);
     selectedModelConfigIdRef.current = id;
     if (id) {
-      localStorage.setItem('novel-creator:chat-model', id);
+      localStorage.setItem("novel-creator:chat-model", id);
     } else {
-      localStorage.removeItem('novel-creator:chat-model');
+      localStorage.removeItem("novel-creator:chat-model");
     }
   }, []);
 
@@ -123,7 +143,7 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
-        api: '/api/chat',
+        api: "/api/chat",
         prepareSendMessagesRequest: ({ messages }) => ({
           body: {
             sessionId: sessionIdRef.current,
@@ -133,7 +153,7 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
           },
         }),
       }),
-    [],
+    []
   );
 
   const {
@@ -144,13 +164,17 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     status,
     error: chatError,
   } = useChat({
-    id: 'main-chat',
+    id: "main-chat",
     transport,
     onError: (err) => {
-      setError(err instanceof Error ? err.message : 'チャットエラーが発生しました');
+      setError(
+        err instanceof Error ? err.message : "チャットエラーが発生しました"
+      );
     },
     onFinish: ({ isAbort, isError, message }) => {
-      if (isAbort || isError) return;
+      if (isAbort || isError) {
+        return;
+      }
       // 新規セッションの初回応答完了後: 応答テキストからタイトル案を PUT + 一覧再取得
       if (
         autoCreatedSessionRef.current &&
@@ -159,7 +183,9 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
         autoCreatedSessionRef.current = null;
         const title = extractTitle(message);
         if (title && currentSessionIdRef.current) {
-          void updateChatSession(currentSessionIdRef.current, { title }).catch(() => {});
+          void updateChatSession(currentSessionIdRef.current, { title }).catch(
+            () => {}
+          );
         }
       }
       void refreshSessions();
@@ -174,7 +200,7 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
   }, [chatError]);
 
   // 公開 API 用の派生値
-  const isStreaming = status === 'submitted' || status === 'streaming';
+  const isStreaming = status === "submitted" || status === "streaming";
 
   // isStreaming を同期参照するための ref。
   // selectSession など UI 操作系のコールバックが依存に isStreaming を含めずに済み、
@@ -189,44 +215,60 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
       .filter((m) => {
         // ストリーミング中（state==='streaming' の text パーツを持つ）の
         // アシスタントメッセージは streamingContent で表示するため除外する
-        const hasStreamingText = m.parts.some((p) => p.type === 'text' && p.state === 'streaming');
+        const hasStreamingText = m.parts.some(
+          (p) => p.type === "text" && p.state === "streaming"
+        );
         return !hasStreamingText;
       })
       .map((m) => ({
         id: m.id,
-        role: (m.role === 'assistant' ? 'assistant' : 'user') as 'assistant' | 'user',
+        role: (m.role === "assistant" ? "assistant" : "user") as
+          | "assistant"
+          | "user",
         content: textOf(m),
         createdAt: Date.now(),
         parts: m.parts,
       }))
-      .filter((m) => m.content !== '' || hasToolPart(m.parts));
+      .filter((m) => m.content !== "" || hasToolPart(m.parts));
   }, [uiMessages]);
 
   // ストリーミング中のリアルタイム表示用テキスト
   const streamingContent = useMemo(() => {
-    if (!isStreaming) return '';
+    if (!isStreaming) {
+      return "";
+    }
     const last = uiMessages[uiMessages.length - 1];
-    if (!last || last.role !== 'assistant') return '';
+    if (!last || last.role !== "assistant") {
+      return "";
+    }
     return textOf(last);
   }, [uiMessages, isStreaming]);
 
   // ストリーミング中のアシスタントメッセージの生 parts。
   // ツール呼び出しパーツを送信完了前でも随時表示するために公開する。
-  const streamingParts = useMemo<UIMessage['parts'] | null>(() => {
-    if (!isStreaming) return null;
+  const streamingParts = useMemo<UIMessage["parts"] | null>(() => {
+    if (!isStreaming) {
+      return null;
+    }
     const last = uiMessages[uiMessages.length - 1];
-    if (!last || last.role !== 'assistant') return null;
+    if (!last || last.role !== "assistant") {
+      return null;
+    }
     return last.parts;
   }, [uiMessages, isStreaming]);
 
   // 新規セッション作成
   const createSession = useCallback(
-    async (novelId?: string | null, initialTitle?: string): Promise<ChatSession | null> => {
-      const targetNovelId = novelId !== undefined ? novelId : selectedNovelIdLiveRef.current;
+    async (
+      novelId?: string | null,
+      initialTitle?: string
+    ): Promise<ChatSession | null> => {
+      const targetNovelId =
+        novelId !== undefined ? novelId : selectedNovelIdLiveRef.current;
       try {
         const created = await createChatSession({
           novelId: targetNovelId || undefined,
-          title: initialTitle || '新しい相談',
+          title: initialTitle || "新しい相談",
         });
         setCurrentSessionId(created.id);
         setUiMessages([]);
@@ -235,12 +277,13 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
         await refreshSessions();
         return created;
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'セッションの作成に失敗しました';
+        const msg =
+          err instanceof Error ? err.message : "セッションの作成に失敗しました";
         setError(msg);
         return null;
       }
     },
-    [refreshSessions, setCurrentSessionId, setUiMessages],
+    [refreshSessions, setCurrentSessionId, setUiMessages]
   );
 
   // セッション削除
@@ -254,11 +297,12 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
           setUiMessages([]);
         }
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'セッションの削除に失敗しました';
+        const msg =
+          err instanceof Error ? err.message : "セッションの削除に失敗しました";
         setError(msg);
       }
     },
-    [refreshSessions, setCurrentSessionId, setUiMessages],
+    [refreshSessions, setCurrentSessionId, setUiMessages]
   );
 
   // ストリーミング中断（部分応答をメッセージとして確定する）
@@ -267,16 +311,24 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
     // 部分応答（streaming の text パーツ）を done に確定して画面に残す
     setUiMessages((prev) =>
       prev.map((m, idx) => {
-        if (idx !== prev.length - 1 || m.role !== 'assistant') return m;
-        const hasStreaming = m.parts.some((p) => p.type === 'text' && p.state === 'streaming');
-        if (!hasStreaming) return m;
+        if (idx !== prev.length - 1 || m.role !== "assistant") {
+          return m;
+        }
+        const hasStreaming = m.parts.some(
+          (p) => p.type === "text" && p.state === "streaming"
+        );
+        if (!hasStreaming) {
+          return m;
+        }
         return {
           ...m,
           parts: m.parts.map((p) =>
-            p.type === 'text' && p.state === 'streaming' ? { ...p, state: 'done' } : p,
+            p.type === "text" && p.state === "streaming"
+              ? { ...p, state: "done" }
+              : p
           ),
         };
-      }),
+      })
     );
   }, [setUiMessages, stop]);
 
@@ -307,7 +359,9 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
   const sendMessage = useCallback(
     async (content: string) => {
       const text = content.trim();
-      if (!text || isStreaming) return;
+      if (!text || isStreaming) {
+        return;
+      }
 
       lastPromptRef.current = text;
       setError(null);
@@ -316,9 +370,15 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
 
       // まだセッションがない場合は新規セッションを作成
       if (!activeSessionId) {
-        const titleProposal = text.slice(0, 30).trim().replace(/\n+/g, ' ') || '新しい相談';
-        const newSession = await createSession(selectedNovelIdLiveRef.current, titleProposal);
-        if (!newSession) return;
+        const titleProposal =
+          text.slice(0, 30).trim().replace(/\n+/g, " ") || "新しい相談";
+        const newSession = await createSession(
+          selectedNovelIdLiveRef.current,
+          titleProposal
+        );
+        if (!newSession) {
+          return;
+        }
         activeSessionId = newSession.id;
         autoCreatedSessionRef.current = activeSessionId;
       }
@@ -326,12 +386,14 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
       // AI SDK がユーザーメッセージを追加して送信する
       await chatSendMessage({ text });
     },
-    [createSession, chatSendMessage, isStreaming],
+    [createSession, chatSendMessage, isStreaming]
   );
 
   // 直前のメッセージを再試行する
   const retryLastMessage = useCallback(async () => {
-    if (!lastPromptRef.current || isStreaming) return;
+    if (!lastPromptRef.current || isStreaming) {
+      return;
+    }
     await sendMessage(lastPromptRef.current);
   }, [sendMessage, isStreaming]);
 
@@ -390,6 +452,6 @@ export function useChatStreaming({ selectedNovelIdRef, refreshSessions }: UseCha
       abortStream,
       abortStreamDiscard,
       clearMessages,
-    ],
+    ]
   );
 }

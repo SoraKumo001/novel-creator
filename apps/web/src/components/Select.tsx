@@ -1,4 +1,4 @@
-import { forwardRef, type SelectHTMLAttributes } from 'react';
+import { forwardRef, type SelectHTMLAttributes } from "react";
 
 type SelectProps = SelectHTMLAttributes<HTMLSelectElement>;
 
@@ -12,15 +12,13 @@ type SelectProps = SelectHTMLAttributes<HTMLSelectElement>;
  * 既存の生 <select> と完全に同じクラスセットを維持できる。
  */
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className = '', ...props }, ref) => {
-    return (
-      <select
-        ref={ref}
-        className={`rounded-lg border border-border bg-surface text-foreground ${className}`}
-        {...props}
-      />
-    );
-  },
+  ({ className = "", ...props }, ref) => (
+    <select
+      ref={ref}
+      className={`rounded-lg border border-border bg-surface text-foreground ${className}`}
+      {...props}
+    />
+  )
 );
 
-Select.displayName = 'Select';
+Select.displayName = "Select";

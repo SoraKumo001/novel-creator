@@ -1,64 +1,64 @@
-import type { ServiceContext } from './types.js';
-import { NovelDomainService } from './novel.service.js';
-import { ChapterDomainService } from './chapter.service.js';
-import { SectionDomainService } from './section.service.js';
-import { ContentDomainService } from './content.service.js';
-import { CharacterDomainService } from './character.service.js';
-import { SettingDomainService } from './setting.service.js';
-import { TimelineDomainService } from './timeline.service.js';
-import { LlmInstructionDomainService } from './llm-instruction.service.js';
-import { GenerateDomainService } from './generate.service.js';
-import { AnalysisDomainService } from './analysis.service.js';
-import { ChatDomainService } from './chat.service.js';
-import { BackupDomainService } from './backup.service.js';
-import { HistoryDomainService } from './history.service.js';
-import { ForeshadowingDomainService } from './foreshadowing.service.js';
-import { LlmConfigDomainService } from './llm-config.service.js';
-import { EmbeddingConfigDomainService } from './embedding-config.service.js';
-import { ReindexDomainService } from './reindex.service.js';
-import { CustomPromptDomainService } from './custom-prompt.service.js';
+import { AnalysisDomainService } from "./analysis.service.js";
+import { BackupDomainService } from "./backup.service.js";
+import { ChapterDomainService } from "./chapter.service.js";
+import { CharacterDomainService } from "./character.service.js";
+import { ChatDomainService } from "./chat.service.js";
+import { ContentDomainService } from "./content.service.js";
+import { CustomPromptDomainService } from "./custom-prompt.service.js";
+import { EmbeddingConfigDomainService } from "./embedding-config.service.js";
+import { ForeshadowingDomainService } from "./foreshadowing.service.js";
+import { GenerateDomainService } from "./generate.service.js";
+import { HistoryDomainService } from "./history.service.js";
+import { LlmConfigDomainService } from "./llm-config.service.js";
+import { LlmInstructionDomainService } from "./llm-instruction.service.js";
+import { NovelDomainService } from "./novel.service.js";
+import { ReindexDomainService } from "./reindex.service.js";
+import { SectionDomainService } from "./section.service.js";
+import { SettingDomainService } from "./setting.service.js";
+import { TimelineDomainService } from "./timeline.service.js";
+import type { ServiceContext } from "./types.js";
 
 export interface DomainServices {
-  novel: NovelDomainService;
-  chapter: ChapterDomainService;
-  section: SectionDomainService;
-  content: ContentDomainService;
-  character: CharacterDomainService;
-  setting: SettingDomainService;
-  timeline: TimelineDomainService;
-  foreshadowing: ForeshadowingDomainService;
-  llmInstruction: LlmInstructionDomainService;
-  generate: GenerateDomainService;
   analysis: AnalysisDomainService;
-  chat: ChatDomainService;
   backup: BackupDomainService;
+  chapter: ChapterDomainService;
+  character: CharacterDomainService;
+  chat: ChatDomainService;
+  content: ContentDomainService;
+  customPrompt: CustomPromptDomainService;
+  embeddingConfig: EmbeddingConfigDomainService;
+  foreshadowing: ForeshadowingDomainService;
+  generate: GenerateDomainService;
   history: HistoryDomainService;
   llmConfig: LlmConfigDomainService;
-  embeddingConfig: EmbeddingConfigDomainService;
+  llmInstruction: LlmInstructionDomainService;
+  novel: NovelDomainService;
   reindex: ReindexDomainService;
-  customPrompt: CustomPromptDomainService;
+  section: SectionDomainService;
+  setting: SettingDomainService;
+  timeline: TimelineDomainService;
 }
 
 export function createDomainServices(ctx: ServiceContext): DomainServices {
   return {
-    novel: new NovelDomainService(ctx),
-    chapter: new ChapterDomainService(ctx),
-    section: new SectionDomainService(ctx),
-    content: new ContentDomainService(ctx),
-    character: new CharacterDomainService(ctx),
-    setting: new SettingDomainService(ctx),
-    timeline: new TimelineDomainService(ctx),
-    foreshadowing: new ForeshadowingDomainService(ctx),
-    llmInstruction: new LlmInstructionDomainService(ctx),
-    generate: new GenerateDomainService(ctx),
     analysis: new AnalysisDomainService(ctx),
-    chat: new ChatDomainService(ctx),
     backup: new BackupDomainService(ctx),
+    chapter: new ChapterDomainService(ctx),
+    character: new CharacterDomainService(ctx),
+    chat: new ChatDomainService(ctx),
+    content: new ContentDomainService(ctx),
+    customPrompt: new CustomPromptDomainService(ctx),
+    embeddingConfig: new EmbeddingConfigDomainService(ctx),
+    foreshadowing: new ForeshadowingDomainService(ctx),
+    generate: new GenerateDomainService(ctx),
     history: new HistoryDomainService(ctx),
     llmConfig: new LlmConfigDomainService(ctx),
-    embeddingConfig: new EmbeddingConfigDomainService(ctx),
+    llmInstruction: new LlmInstructionDomainService(ctx),
+    novel: new NovelDomainService(ctx),
     reindex: new ReindexDomainService(ctx),
-    customPrompt: new CustomPromptDomainService(ctx),
+    section: new SectionDomainService(ctx),
+    setting: new SettingDomainService(ctx),
+    timeline: new TimelineDomainService(ctx),
   };
 }
 
@@ -74,9 +74,9 @@ export function getServices(c: {
   }
   return createDomainServices({
     db: c.var.db!,
-    llm: c.var.llm!,
     embedding: c.var.embedding!,
-    vectorStore: c.var.vectorStore!,
     env: c.var.env!,
+    llm: c.var.llm!,
+    vectorStore: c.var.vectorStore!,
   });
 }

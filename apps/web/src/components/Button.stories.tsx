@@ -1,9 +1,9 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Button } from './Button';
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { Button } from "./Button";
 
 const meta = {
   component: Button,
-  tags: ['autodocs'],
+  tags: ["autodocs"],
 } satisfies Meta<typeof Button>;
 
 export default meta;
@@ -11,63 +11,63 @@ type Story = StoryObj<typeof meta>;
 
 export const Primary: Story = {
   args: {
-    children: 'Primary Button',
-    variant: 'primary',
+    children: "Primary Button",
+    variant: "primary",
   },
 };
 
 export const Secondary: Story = {
   args: {
-    children: 'Secondary Button',
-    variant: 'secondary',
+    children: "Secondary Button",
+    variant: "secondary",
   },
 };
 
 export const Danger: Story = {
   args: {
-    children: 'Danger Button',
-    variant: 'danger',
+    children: "Danger Button",
+    variant: "danger",
   },
 };
 
 export const Ghost: Story = {
   args: {
-    children: 'Ghost Button',
-    variant: 'ghost',
+    children: "Ghost Button",
+    variant: "ghost",
   },
 };
 
 export const Disabled: Story = {
   args: {
-    children: 'Disabled Button',
+    children: "Disabled Button",
     disabled: true,
   },
 };
 
 export const Loading: Story = {
   args: {
-    children: 'Saving...',
+    children: "Saving...",
     isLoading: true,
   },
 };
 
 export const Small: Story = {
   args: {
-    children: 'Small',
-    size: 'sm',
+    children: "Small",
+    size: "sm",
   },
 };
 
 export const Large: Story = {
   args: {
-    children: 'Large',
-    size: 'lg',
+    children: "Large",
+    size: "lg",
   },
 };
 
 export const WithLeftIcon: Story = {
   args: {
-    children: '生成',
+    children: "生成",
     leftIcon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"

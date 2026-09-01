@@ -4,7 +4,9 @@
  */
 export function countWords(text: string): number {
   const trimmed = text.trim();
-  if (!trimmed) return 0;
+  if (!trimmed) {
+    return 0;
+  }
   const japanese = trimmed.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g);
   if (japanese && japanese.length > 0) {
     return japanese.length;

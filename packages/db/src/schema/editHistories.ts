@@ -1,18 +1,18 @@
-import { pgTable, uuid, text, integer, timestamp } from 'drizzle-orm/pg-core';
-import { novels } from './novels.js';
+import { integer, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { novels } from "./novels.js";
 
-export const editHistories = pgTable('edit_histories', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  novelId: uuid('novel_id')
+export const editHistories = pgTable("edit_histories", {
+  content: text("content").notNull(), // 本文、マークダウン、またはJSON文字列
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  description: text("description").notNull().default("手動保存"),
+  entityId: text("entity_id").notNull(), // sectionId, characterId, settingId, or novelId
+  entityType: text("entity_type").notNull(), // 'content' | 'character' | 'setting' | 'characters_markdown' | 'settings_markdown'
+  id: uuid("id").primaryKey().defaultRandom(),
+  novelId: uuid("novel_id")
     .notNull()
-    .references(() => novels.id, { onDelete: 'cascade' }),
-  entityType: text('entity_type').notNull(), // 'content' | 'character' | 'setting' | 'characters_markdown' | 'settings_markdown'
-  entityId: text('entity_id').notNull(), // sectionId, characterId, settingId, or novelId
-  title: text('title').notNull().default(''),
-  content: text('content').notNull(), // 本文、マークダウン、またはJSON文字列
-  description: text('description').notNull().default('手動保存'),
-  wordCount: integer('word_count'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
+    .references(() => novels.id, { onDelete: "cascade" }),
+  title: text("title").notNull().default(""),
+  wordCount: integer("word_count"),
 });
 
 export type EditHistory = typeof editHistories.$inferSelect;

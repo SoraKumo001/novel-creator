@@ -1,15 +1,15 @@
-import { Button } from './Button.js';
-import { Modal } from './Modal.js';
+import { Button } from "./Button.js";
+import { Modal } from "./Modal.js";
 
 interface ConfirmDialogProps {
+  cancelLabel?: string;
+  confirmLabel?: string;
+  isLoading?: boolean;
   isOpen: boolean;
+  message: string;
   onClose: () => void;
   onConfirm: () => void;
   title: string;
-  message: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  isLoading?: boolean;
 }
 
 export function ConfirmDialog({
@@ -18,8 +18,8 @@ export function ConfirmDialog({
   onConfirm,
   title,
   message,
-  confirmLabel = '削除',
-  cancelLabel = 'キャンセル',
+  confirmLabel = "削除",
+  cancelLabel = "キャンセル",
   isLoading = false,
 }: ConfirmDialogProps) {
   return (
@@ -39,7 +39,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p className="text-sm text-foreground-secondary">{message}</p>
+      <p className="text-foreground-secondary text-sm">{message}</p>
     </Modal>
   );
 }

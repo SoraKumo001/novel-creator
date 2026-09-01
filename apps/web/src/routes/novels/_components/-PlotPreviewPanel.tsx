@@ -1,5 +1,5 @@
-import { Button } from '@/components/Button.js';
-import type { GeneratedPlot } from '@/lib/types.js';
+import { Button } from "@/components/Button.js";
+import type { GeneratedPlot } from "@/lib/types.js";
 
 export function PlotPreviewPanel({
   plotPreview,
@@ -17,14 +17,17 @@ export function PlotPreviewPanel({
   onApply: () => void;
 }) {
   const allSelected =
-    selectedPlotIndices.size === plotPreview.chapters.length && plotPreview.chapters.length > 0;
+    selectedPlotIndices.size === plotPreview.chapters.length &&
+    plotPreview.chapters.length > 0;
 
   return (
-    <div className="rounded-xl border border-primary/40 bg-surface-raised p-5 shadow-sm space-y-4">
-      <div className="flex items-center justify-between border-b border-border pb-3">
+    <div className="space-y-4 rounded-xl border border-primary/40 bg-surface-raised p-5 shadow-sm">
+      <div className="flex items-center justify-between border-border border-b pb-3">
         <div>
-          <h3 className="font-bold text-foreground text-base">生成されたプロット案</h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
+          <h3 className="font-bold text-base text-foreground">
+            生成されたプロット案
+          </h3>
+          <p className="mt-0.5 text-muted-foreground text-xs">
             チェックを入れた章を一括で章立て一覧に反映します。
           </p>
         </div>
@@ -43,8 +46,8 @@ export function PlotPreviewPanel({
         </div>
       </div>
 
-      <div className="flex items-center justify-between text-xs px-1 text-muted-foreground">
-        <label className="flex items-center gap-2 cursor-pointer font-medium text-foreground">
+      <div className="flex items-center justify-between px-1 text-muted-foreground text-xs">
+        <label className="flex cursor-pointer items-center gap-2 font-medium text-foreground">
           <input
             type="checkbox"
             checked={allSelected}
@@ -62,10 +65,10 @@ export function PlotPreviewPanel({
           return (
             <label
               key={idx}
-              className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition ${
+              className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition ${
                 isChecked
-                  ? 'border-primary bg-primary/5 dark:bg-primary/10 shadow-xs'
-                  : 'border-border bg-surface hover:bg-surface-hover/50 opacity-70'
+                  ? "border-primary bg-primary/5 shadow-xs dark:bg-primary/10"
+                  : "border-border bg-surface opacity-70 hover:bg-surface-hover/50"
               }`}
             >
               <input
@@ -78,7 +81,9 @@ export function PlotPreviewPanel({
                 <span className="font-semibold text-foreground">
                   第 {ch.order} 章: {ch.title}
                 </span>
-                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{ch.summary}</p>
+                <p className="mt-0.5 text-muted-foreground text-xs leading-relaxed">
+                  {ch.summary}
+                </p>
               </div>
             </label>
           );

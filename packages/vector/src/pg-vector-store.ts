@@ -1,34 +1,48 @@
-import { and, cosineDistance, eq, sql } from 'drizzle-orm';
-import { index, jsonb, pgTable, text, timestamp, uuid, vector } from 'drizzle-orm/pg-core';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { Pool } from 'pg';
+import { and, cosineDistance, eq, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/node-postgres";
+import {
+  index,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+  vector,
+} from "drizzle-orm/pg-core";
+import { Pool } from "pg";
 
-import type { VectorRecord, VectorSearchResult, VectorStore } from './types.js';
+import type { VectorRecord, VectorSearchResult, VectorStore } from "./types.js";
 
 export const vectorEmbeddings = pgTable(
-  'vector_embeddings',
+  "vector_embeddings",
   {
-    id: uuid('id').primaryKey(),
-    novelId: uuid('novel_id').notNull(),
-    entityType: text('entity_type').notNull(),
-    entityId: uuid('entity_id').notNull(),
-    content: text('content').notNull(),
-    metadata: jsonb('metadata').$type<Record<string, unknown>>(),
-    embedding: vector('embedding', { dimensions: 3072 }).notNull(),
-    createdAt: timestamp('created_at').defaultNow(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+    embedding: vector("embedding", { dimensions: 3072 }).notNull(),
+    entityId: uuid("entity_id").notNull(),
+    entityType: text("entity_type").notNull(),
+    id: uuid("id").primaryKey(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    novelId: uuid("novel_id").notNull(),
   },
   (table) => [
-    index('vector_embeddings_novel_entity_idx').on(table.novelId, table.entityType),
-    index('vector_embeddings_embedding_idx')
-      .using('ivfflat', table.embedding.op('vector_cosine_ops'))
+    index("vector_embeddings_novel_entity_idx").on(
+      table.novelId,
+      table.entityType
+    ),
+    index("vector_embeddings_embedding_idx")
+      .using("ivfflat", table.embedding.op("vector_cosine_ops"))
       .with({ lists: 100 }),
-  ],
+  ]
 );
 
 export type VectorEmbedding = typeof vectorEmbeddings.$inferSelect;
 export type NewVectorEmbedding = typeof vectorEmbeddings.$inferInsert;
 
-export function createPgVectorStore(connectionString: string, dimensions = 1536): VectorStore {
+export function createPgVectorStore(
+  connectionString: string,
+  dimensions = 1536
+): VectorStore {
   const pool = new Pool({ connectionString });
   const db = drizzle(pool, { schema: { vectorEmbeddings } });
 
@@ -40,9 +54,11 @@ export function createPgVectorStore(connectionString: string, dimensions = 1536)
         // 不一致の場合は CREATE TABLE IF NOT EXISTS が何もせず、insert 時に初めて失敗するため、ここで早期に検出する。
         await validateExistingTableDimension();
         // ivfflat は2000次元まで、HNSW はそれ以上に対応
-        const indexType = dimensions > 2000 ? 'hnsw' : 'ivfflat';
+        const indexType = dimensions > 2000 ? "hnsw" : "ivfflat";
         const indexOptions =
-          indexType === 'hnsw' ? 'WITH (m = 16, ef_construction = 64)' : 'WITH (lists = 100)';
+          indexType === "hnsw"
+            ? "WITH (m = 16, ef_construction = 64)"
+            : "WITH (lists = 100)";
         await db.execute(
           sql.raw(`
           CREATE TABLE IF NOT EXISTS vector_embeddings (
@@ -59,7 +75,7 @@ export function createPgVectorStore(connectionString: string, dimensions = 1536)
             ON vector_embeddings (novel_id, entity_type);
           CREATE INDEX IF NOT EXISTS vector_embeddings_embedding_idx
             ON vector_embeddings USING ${indexType} (embedding vector_cosine_ops) ${indexOptions};
-        `),
+        `)
         );
       })();
     }
@@ -83,100 +99,30 @@ export function createPgVectorStore(connectionString: string, dimensions = 1536)
           AND a.attnum > 0
           AND NOT a.attisdropped
         LIMIT 1
-      `),
+      `)
     );
     const row = result.rows[0] as { dimensions?: unknown } | undefined;
-    if (!row || row.dimensions == null) return;
+    if (!row || row.dimensions == null) {
+      return;
+    }
 
     const existingDimensions = Number(row.dimensions);
     if (existingDimensions !== dimensions) {
       throw new Error(
         `vector_embeddings テーブルの embedding 列の次元（${existingDimensions}）が` +
           `要求された次元（${dimensions}）と一致しません。` +
-          '次元のソースは環境変数 EMBEDDING_DIMENSIONS のほか、DB の embedding 設定' +
-          '（embedding_configs テーブルの dimensions カラム）の場合もあります。' +
-          '環境変数または embedding 設定の dimensions を既存テーブルの次元に合わせるか、' +
-          'recreateSchema でテーブルを作り直してください。',
+          "次元のソースは環境変数 EMBEDDING_DIMENSIONS のほか、DB の embedding 設定" +
+          "（embedding_configs テーブルの dimensions カラム）の場合もあります。" +
+          "環境変数または embedding 設定の dimensions を既存テーブルの次元に合わせるか、" +
+          "recreateSchema でテーブルを作り直してください。"
       );
     }
   }
 
   return {
-    async upsert(record: VectorRecord): Promise<void> {
+    async clearAll(): Promise<void> {
       await ensureSchema();
-      await db
-        .insert(vectorEmbeddings)
-        .values(toRow(record))
-        .onConflictDoUpdate({
-          target: vectorEmbeddings.id,
-          set: {
-            novelId: record.novelId,
-            entityType: record.entityType,
-            entityId: record.entityId,
-            content: record.content,
-            metadata: record.metadata ?? null,
-            embedding: record.embedding,
-          },
-        });
-    },
-
-    async upsertBatch(records: VectorRecord[]): Promise<void> {
-      if (records.length === 0) return;
-      await ensureSchema();
-      await db.transaction(async (tx) => {
-        for (const record of records) {
-          await tx
-            .insert(vectorEmbeddings)
-            .values(toRow(record))
-            .onConflictDoUpdate({
-              target: vectorEmbeddings.id,
-              set: {
-                novelId: record.novelId,
-                entityType: record.entityType,
-                entityId: record.entityId,
-                content: record.content,
-                metadata: record.metadata ?? null,
-                embedding: record.embedding,
-              },
-            });
-        }
-      });
-    },
-
-    async search(
-      query: number[],
-      options: { novelId?: string; entityType?: string; topK?: number } = {},
-    ): Promise<VectorSearchResult[]> {
-      await ensureSchema();
-      const topK = options.topK ?? 10;
-      const conditions = [];
-      if (options.novelId) conditions.push(eq(vectorEmbeddings.novelId, options.novelId));
-      if (options.entityType) conditions.push(eq(vectorEmbeddings.entityType, options.entityType));
-
-      const where = conditions.length > 0 ? and(...conditions) : undefined;
-
-      const rows = await db
-        .select({
-          id: vectorEmbeddings.id,
-          content: vectorEmbeddings.content,
-          entityType: vectorEmbeddings.entityType,
-          entityId: vectorEmbeddings.entityId,
-          metadata: vectorEmbeddings.metadata,
-          distance: cosineDistance(vectorEmbeddings.embedding, query).as('distance'),
-        })
-        .from(vectorEmbeddings)
-        .where(where)
-        .orderBy((fields) => fields.distance)
-        .limit(topK);
-
-      return rows.map((row) => ({
-        id: row.id,
-        content: row.content,
-        entityType: row.entityType,
-        entityId: row.entityId,
-        metadata: row.metadata ?? undefined,
-        score: 1 - (row.distance as number),
-      }));
+      await db.delete(vectorEmbeddings);
     },
 
     async delete(id: string): Promise<void> {
@@ -189,24 +135,26 @@ export function createPgVectorStore(connectionString: string, dimensions = 1536)
       await db
         .delete(vectorEmbeddings)
         .where(
-          and(eq(vectorEmbeddings.entityType, entityType), eq(vectorEmbeddings.entityId, entityId)),
+          and(
+            eq(vectorEmbeddings.entityType, entityType),
+            eq(vectorEmbeddings.entityId, entityId)
+          )
         );
     },
 
     async deleteByNovel(novelId: string): Promise<void> {
       await ensureSchema();
-      await db.delete(vectorEmbeddings).where(eq(vectorEmbeddings.novelId, novelId));
-    },
-
-    async clearAll(): Promise<void> {
-      await ensureSchema();
-      await db.delete(vectorEmbeddings);
+      await db
+        .delete(vectorEmbeddings)
+        .where(eq(vectorEmbeddings.novelId, novelId));
     },
 
     async recreateSchema(newDimensions: number): Promise<void> {
-      const indexType = newDimensions > 2000 ? 'hnsw' : 'ivfflat';
+      const indexType = newDimensions > 2000 ? "hnsw" : "ivfflat";
       const indexOptions =
-        indexType === 'hnsw' ? 'WITH (m = 16, ef_construction = 64)' : 'WITH (lists = 100)';
+        indexType === "hnsw"
+          ? "WITH (m = 16, ef_construction = 64)"
+          : "WITH (lists = 100)";
       await db.execute(
         sql.raw(`
         DROP TABLE IF EXISTS vector_embeddings CASCADE;
@@ -224,21 +172,105 @@ export function createPgVectorStore(connectionString: string, dimensions = 1536)
           ON vector_embeddings (novel_id, entity_type);
         CREATE INDEX vector_embeddings_embedding_idx
           ON vector_embeddings USING ${indexType} (embedding vector_cosine_ops) ${indexOptions};
-      `),
+      `)
       );
       schemaReady = Promise.resolve();
+    },
+
+    async search(
+      query: number[],
+      options: { novelId?: string; entityType?: string; topK?: number } = {}
+    ): Promise<VectorSearchResult[]> {
+      await ensureSchema();
+      const topK = options.topK ?? 10;
+      const conditions = [];
+      if (options.novelId) {
+        conditions.push(eq(vectorEmbeddings.novelId, options.novelId));
+      }
+      if (options.entityType) {
+        conditions.push(eq(vectorEmbeddings.entityType, options.entityType));
+      }
+
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const rows = await db
+        .select({
+          content: vectorEmbeddings.content,
+          distance: cosineDistance(vectorEmbeddings.embedding, query).as(
+            "distance"
+          ),
+          entityId: vectorEmbeddings.entityId,
+          entityType: vectorEmbeddings.entityType,
+          id: vectorEmbeddings.id,
+          metadata: vectorEmbeddings.metadata,
+        })
+        .from(vectorEmbeddings)
+        .where(where)
+        .orderBy((fields) => fields.distance)
+        .limit(topK);
+
+      return rows.map((row) => ({
+        content: row.content,
+        entityId: row.entityId,
+        entityType: row.entityType,
+        id: row.id,
+        metadata: row.metadata ?? undefined,
+        score: 1 - (row.distance as number),
+      }));
+    },
+    async upsert(record: VectorRecord): Promise<void> {
+      await ensureSchema();
+      await db
+        .insert(vectorEmbeddings)
+        .values(toRow(record))
+        .onConflictDoUpdate({
+          set: {
+            content: record.content,
+            embedding: record.embedding,
+            entityId: record.entityId,
+            entityType: record.entityType,
+            metadata: record.metadata ?? null,
+            novelId: record.novelId,
+          },
+          target: vectorEmbeddings.id,
+        });
+    },
+
+    async upsertBatch(records: VectorRecord[]): Promise<void> {
+      if (records.length === 0) {
+        return;
+      }
+      await ensureSchema();
+      await db.transaction(async (tx) => {
+        for (const record of records) {
+          await tx
+            .insert(vectorEmbeddings)
+            .values(toRow(record))
+            .onConflictDoUpdate({
+              set: {
+                content: record.content,
+                embedding: record.embedding,
+                entityId: record.entityId,
+                entityType: record.entityType,
+                metadata: record.metadata ?? null,
+                novelId: record.novelId,
+              },
+              target: vectorEmbeddings.id,
+            });
+        }
+      });
     },
   };
 }
 
 function toRow(record: VectorRecord): NewVectorEmbedding {
   return {
-    id: record.id,
-    novelId: record.novelId,
-    entityType: record.entityType,
-    entityId: record.entityId,
     content: record.content,
-    metadata: record.metadata ?? null,
     embedding: record.embedding,
+    entityId: record.entityId,
+    entityType: record.entityType,
+    id: record.id,
+    metadata: record.metadata ?? null,
+    novelId: record.novelId,
   };
 }

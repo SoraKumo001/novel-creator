@@ -1,7 +1,7 @@
-import { parseEnvFromBindings } from '@novel-creator/shared/env';
+import { parseEnvFromBindings } from "@novel-creator/shared/env";
 
-import { createApp } from './app.js';
-import { createContextForWorkers } from './context.js';
+import { createApp } from "./app.js";
+import { createContextForWorkers } from "./context.js";
 
 /**
  * Cloudflare Workers 環境の bindings と環境変数。
@@ -25,7 +25,11 @@ export type WorkerEnv = {
 };
 
 export default {
-  async fetch(request: Request, env: WorkerEnv, ctx: ExecutionContext): Promise<Response> {
+  async fetch(
+    request: Request,
+    env: WorkerEnv,
+    ctx: ExecutionContext
+  ): Promise<Response> {
     const parsedEnv = parseEnvFromBindings(env);
 
     const context = createContextForWorkers(parsedEnv, {

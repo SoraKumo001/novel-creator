@@ -1,14 +1,14 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
-import type { ReactNode } from 'react';
-import { ToastProvider } from './Toast';
-import { useToast } from '@/hooks/useToast.js';
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { ReactNode } from "react";
+import { useToast } from "@/hooks/useToast.js";
+import { ToastProvider } from "./Toast";
 
 function ToastDemo({
   type,
   message,
   children,
 }: {
-  type: 'success' | 'error' | 'loading';
+  type: "success" | "error" | "loading";
   message: string;
   children?: ReactNode;
 }) {
@@ -17,7 +17,7 @@ function ToastDemo({
     <div className="flex h-64 items-center justify-center rounded-lg border border-border bg-surface-muted">
       <button
         onClick={() => toast[type](message)}
-        className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary-hover"
+        className="rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground text-sm hover:bg-primary-hover"
       >
         {children ?? `${type} トーストを表示`}
       </button>
@@ -27,7 +27,7 @@ function ToastDemo({
 
 const meta = {
   component: ToastProvider,
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   decorators: [
     (Story) => (
       <ToastProvider>

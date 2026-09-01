@@ -1,4 +1,3 @@
-import { eq, inArray } from 'drizzle-orm';
 import {
   chapters,
   characters,
@@ -6,10 +5,6 @@ import {
   chatSessions,
   contents,
   llmInstructions,
-  novels,
-  sections,
-  settings,
-  timelines,
   type NewChapter,
   type NewCharacter,
   type NewChatMessage,
@@ -20,8 +15,13 @@ import {
   type NewSection,
   type NewSetting,
   type NewTimeline,
-} from '@novel-creator/db';
-import { assertFound, ValidationError, type ServiceContext } from './types.js';
+  novels,
+  sections,
+  settings,
+  timelines,
+} from "@novel-creator/db";
+import { eq, inArray } from "drizzle-orm";
+import { assertFound, type ServiceContext, ValidationError } from "./types.js";
 
 export interface BackupBody {
   meta: {
@@ -48,8 +48,11 @@ export class BackupDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
   async exportNovel(novelId: string) {
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
-    assertFound(novel, 'Novel not found');
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, novelId));
+    assertFound(novel, "Novel not found");
 
     const chapterRows = await this.ctx.db
       .select()
@@ -58,20 +61,39 @@ export class BackupDomainService {
     const chapterIds = chapterRows.map((ch) => ch.id);
     const sectionRows =
       chapterIds.length > 0
-        ? await this.ctx.db.select().from(sections).where(inArray(sections.chapterId, chapterIds))
+        ? await this.ctx.db
+            .select()
+            .from(sections)
+            .where(inArray(sections.chapterId, chapterIds))
         : [];
     const sectionIds = sectionRows.map((s) => s.id);
     const contentRows =
       sectionIds.length > 0
-        ? await this.ctx.db.select().from(contents).where(inArray(contents.sectionId, sectionIds))
+        ? await this.ctx.db
+            .select()
+            .from(contents)
+            .where(inArray(contents.sectionId, sectionIds))
         : [];
 
-    const [characterRows, settingRows, timelineRows, llmInstructionRows] = await Promise.all([
-      this.ctx.db.select().from(characters).where(eq(characters.novelId, novelId)),
-      this.ctx.db.select().from(settings).where(eq(settings.novelId, novelId)),
-      this.ctx.db.select().from(timelines).where(eq(timelines.novelId, novelId)),
-      this.ctx.db.select().from(llmInstructions).where(eq(llmInstructions.novelId, novelId)),
-    ]);
+    const [characterRows, settingRows, timelineRows, llmInstructionRows] =
+      await Promise.all([
+        this.ctx.db
+          .select()
+          .from(characters)
+          .where(eq(characters.novelId, novelId)),
+        this.ctx.db
+          .select()
+          .from(settings)
+          .where(eq(settings.novelId, novelId)),
+        this.ctx.db
+          .select()
+          .from(timelines)
+          .where(eq(timelines.novelId, novelId)),
+        this.ctx.db
+          .select()
+          .from(llmInstructions)
+          .where(eq(llmInstructions.novelId, novelId)),
+      ]);
 
     const chatSessionRows = await this.ctx.db
       .select()
@@ -88,22 +110,22 @@ export class BackupDomainService {
 
     return {
       meta: {
-        version: 1,
         exportedAt: new Date().toISOString(),
         novelId: novel.id,
         novelTitle: novel.title,
+        version: 1,
       },
       rdb: {
-        novel,
         chapters: chapterRows,
-        sections: sectionRows,
-        contents: contentRows,
         characters: characterRows,
+        chatMessages: chatMessageRows,
+        chatSessions: chatSessionRows,
+        contents: contentRows,
+        llmInstructions: llmInstructionRows,
+        novel,
+        sections: sectionRows,
         settings: settingRows,
         timelines: timelineRows,
-        llmInstructions: llmInstructionRows,
-        chatSessions: chatSessionRows,
-        chatMessages: chatMessageRows,
       },
     };
   }
@@ -111,14 +133,14 @@ export class BackupDomainService {
   async importNovel(body: BackupBody) {
     if (
       !body ||
-      typeof body !== 'object' ||
+      typeof body !== "object" ||
       !body.meta ||
-      typeof body.meta.version !== 'number' ||
-      typeof body.meta.novelId !== 'string' ||
+      typeof body.meta.version !== "number" ||
+      typeof body.meta.novelId !== "string" ||
       !body.rdb ||
       !body.rdb.novel
     ) {
-      throw new ValidationError('Invalid backup structure');
+      throw new ValidationError("Invalid backup structure");
     }
 
     const novelId = body.meta.novelId;
@@ -159,7 +181,7 @@ export class BackupDomainService {
     try {
       await this.ctx.vectorStore.deleteByNovel(novelId);
     } catch (err) {
-      console.error('[backup] failed to clean up orphaned vectors', err);
+      console.error("[backup] failed to clean up orphaned vectors", err);
     }
 
     return {

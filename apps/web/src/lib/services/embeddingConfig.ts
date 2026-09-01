@@ -1,24 +1,26 @@
-import { parseResponseError } from '../errors.js';
-import { apiClient } from '../api-client.js';
+import { apiClient } from "../api-client.js";
+import { parseResponseError } from "../errors.js";
 import type {
   CreateEmbeddingConfigInput,
   EmbeddingConfig,
-  TestEmbeddingConnectionInput,
   TestConnectionResult,
+  TestEmbeddingConnectionInput,
   UpdateEmbeddingConfigInput,
-} from '../types.js';
+} from "../types.js";
 
 export async function fetchEmbeddingConfigs(): Promise<EmbeddingConfig[]> {
-  const res = await apiClient['embedding-configs'].$get();
-  if (!res.ok) throw await parseResponseError(res, '埋め込み設定一覧の取得');
+  const res = await apiClient["embedding-configs"].$get();
+  if (!res.ok) {
+    throw await parseResponseError(res, "埋め込み設定一覧の取得");
+  }
   const data = await res.json();
   return data;
 }
 
 export async function createEmbeddingConfig(
-  input: CreateEmbeddingConfigInput,
+  input: CreateEmbeddingConfigInput
 ): Promise<EmbeddingConfig> {
-  const res = await apiClient['embedding-configs'].$post({
+  const res = await apiClient["embedding-configs"].$post({
     json: {
       name: input.name,
       provider: input.provider,
@@ -30,44 +32,54 @@ export async function createEmbeddingConfig(
       description: input.description || null,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, '埋め込み設定の作成');
+  if (!res.ok) {
+    throw await parseResponseError(res, "埋め込み設定の作成");
+  }
   const data = await res.json();
   return data;
 }
 
 export async function updateEmbeddingConfig(
   id: string,
-  input: UpdateEmbeddingConfigInput,
+  input: UpdateEmbeddingConfigInput
 ): Promise<EmbeddingConfig> {
-  const res = await apiClient['embedding-configs'][':id'].$put({
+  const res = await apiClient["embedding-configs"][":id"].$put({
     param: { id },
     json: input,
   });
-  if (!res.ok) throw await parseResponseError(res, '埋め込み設定の更新');
+  if (!res.ok) {
+    throw await parseResponseError(res, "埋め込み設定の更新");
+  }
   const data = await res.json();
   return data;
 }
 
 export async function deleteEmbeddingConfig(id: string): Promise<void> {
-  const res = await apiClient['embedding-configs'][':id'].$delete({
+  const res = await apiClient["embedding-configs"][":id"].$delete({
     param: { id },
   });
-  if (!res.ok) throw await parseResponseError(res, '埋め込み設定の削除');
+  if (!res.ok) {
+    throw await parseResponseError(res, "埋め込み設定の削除");
+  }
 }
 
-export async function setDefaultEmbeddingConfig(id: string): Promise<EmbeddingConfig> {
-  const res = await apiClient['embedding-configs'][':id']['set-default'].$post({
+export async function setDefaultEmbeddingConfig(
+  id: string
+): Promise<EmbeddingConfig> {
+  const res = await apiClient["embedding-configs"][":id"]["set-default"].$post({
     param: { id },
   });
-  if (!res.ok) throw await parseResponseError(res, 'デフォルト埋め込み設定の変更');
+  if (!res.ok) {
+    throw await parseResponseError(res, "デフォルト埋め込み設定の変更");
+  }
   const data = await res.json();
   return data;
 }
 
 export async function testEmbeddingConfig(
-  input: TestEmbeddingConnectionInput,
+  input: TestEmbeddingConnectionInput
 ): Promise<TestConnectionResult> {
-  const res = await apiClient['embedding-configs'].test.$post({
+  const res = await apiClient["embedding-configs"].test.$post({
     json: {
       provider: input.provider,
       modelId: input.modelId,
@@ -76,7 +88,9 @@ export async function testEmbeddingConfig(
       apiKey: input.apiKey || null,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, '埋め込み接続テスト');
+  if (!res.ok) {
+    throw await parseResponseError(res, "埋め込み接続テスト");
+  }
   const data = await res.json();
   return data;
 }

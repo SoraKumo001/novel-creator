@@ -1,33 +1,37 @@
-import { describe, expect, it, vi } from 'vitest';
-import { HistoryDomainService, NotFoundError, type ServiceContext } from '../src/core/index.js';
+import { describe, expect, it, vi } from "vitest";
+import {
+  HistoryDomainService,
+  NotFoundError,
+  type ServiceContext,
+} from "../src/core/index.js";
 
 function createMockContext(mockDb: unknown): ServiceContext {
   return {
     db: mockDb as never,
-    llm: {} as never,
     embedding: {} as never,
-    vectorStore: {
-      deleteByNovel: vi.fn().mockResolvedValue(undefined),
-      deleteByEntity: vi.fn().mockResolvedValue(undefined),
-      upsert: vi.fn().mockResolvedValue(undefined),
-      search: vi.fn().mockResolvedValue([]),
-    } as never,
     env: {} as never,
+    llm: {} as never,
+    vectorStore: {
+      deleteByEntity: vi.fn().mockResolvedValue(undefined),
+      deleteByNovel: vi.fn().mockResolvedValue(undefined),
+      search: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn().mockResolvedValue(undefined),
+    } as never,
   };
 }
 
-describe('HistoryDomainService', () => {
-  it('recordHistory - 履歴を正常に記録できること', async () => {
+describe("HistoryDomainService", () => {
+  it("recordHistory - 履歴を正常に記録できること", async () => {
     const sampleHistory = {
-      id: 'h1',
-      novelId: 'n1',
-      entityType: 'content',
-      entityId: 'sec1',
-      title: '第1節',
-      content: '本文テスト',
-      description: '手動保存',
-      wordCount: 5,
+      content: "本文テスト",
       createdAt: new Date(),
+      description: "手動保存",
+      entityId: "sec1",
+      entityType: "content",
+      id: "h1",
+      novelId: "n1",
+      title: "第1節",
+      wordCount: 5,
     };
 
     const mockDb = {
@@ -40,19 +44,19 @@ describe('HistoryDomainService', () => {
 
     const service = new HistoryDomainService(createMockContext(mockDb));
     const res = await service.recordHistory({
-      novelId: 'n1',
-      entityType: 'content',
-      entityId: 'sec1',
-      title: '第1節',
-      content: '本文テスト',
-      description: '手動保存',
+      content: "本文テスト",
+      description: "手動保存",
+      entityId: "sec1",
+      entityType: "content",
+      novelId: "n1",
+      title: "第1節",
       wordCount: 5,
     });
 
     expect(res).toEqual(sampleHistory);
   });
 
-  it('getHistory - 存在しない場合に NotFoundError をスローすること', async () => {
+  it("getHistory - 存在しない場合に NotFoundError をスローすること", async () => {
     const mockDb = {
       select: vi.fn().mockReturnValue({
         from: vi.fn().mockReturnValue({
@@ -62,12 +66,20 @@ describe('HistoryDomainService', () => {
     };
 
     const service = new HistoryDomainService(createMockContext(mockDb));
-    await expect(service.getHistory('non-existent')).rejects.toThrow(NotFoundError);
+    await expect(service.getHistory("non-existent")).rejects.toThrow(
+      NotFoundError
+    );
   });
 
-  it('listHistories - 履歴一覧を取得できること', async () => {
+  it("listHistories - 履歴一覧を取得できること", async () => {
     const sampleHistories = [
-      { id: 'h1', novelId: 'n1', entityType: 'content', entityId: 'sec1', title: '第1節' },
+      {
+        entityId: "sec1",
+        entityType: "content",
+        id: "h1",
+        novelId: "n1",
+        title: "第1節",
+      },
     ];
 
     const mockDb = {
@@ -83,7 +95,10 @@ describe('HistoryDomainService', () => {
     };
 
     const service = new HistoryDomainService(createMockContext(mockDb));
-    const res = await service.listHistories('n1', { entityType: 'content', entityId: 'sec1' });
+    const res = await service.listHistories("n1", {
+      entityId: "sec1",
+      entityType: "content",
+    });
     expect(res).toEqual(sampleHistories);
   });
 });

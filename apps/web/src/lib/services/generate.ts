@@ -1,21 +1,27 @@
-import { parseResponseError } from '../errors.js';
-import { apiClient } from '../api-client.js';
-import type { ExtractResult, GeneratedPlot, GeneratedSummary } from '../types.js';
+import { apiClient } from "../api-client.js";
+import { parseResponseError } from "../errors.js";
+import type {
+  ExtractResult,
+  GeneratedPlot,
+  GeneratedSummary,
+} from "../types.js";
 
 export async function generatePlot(
   novelId: string,
   modelConfigId?: string | null,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<GeneratedPlot> {
-  const res = await apiClient.novels[':id'].generate.plot.$post(
+  const res = await apiClient.novels[":id"].generate.plot.$post(
     {
       param: { id: novelId },
       json: { modelConfigId: modelConfigId || null },
     },
-    { init: { signal } },
+    { init: { signal } }
   );
 
-  if (!res.ok) throw await parseResponseError(res, 'プロット生成');
+  if (!res.ok) {
+    throw await parseResponseError(res, "プロット生成");
+  }
   const data = await res.json();
   return {
     title: data.title,
@@ -30,15 +36,17 @@ export async function generatePlot(
 
 export async function generateChapterSummary(
   chapterId: string,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<GeneratedSummary> {
-  const res = await apiClient.chapters[':id'].generate.summary.$post(
+  const res = await apiClient.chapters[":id"].generate.summary.$post(
     {
       param: { id: chapterId },
     },
-    { init: { signal } },
+    { init: { signal } }
   );
-  if (!res.ok) throw await parseResponseError(res, '章のあらすじ生成');
+  if (!res.ok) {
+    throw await parseResponseError(res, "章のあらすじ生成");
+  }
   const data = await res.json();
   return {
     title: data.title,
@@ -49,15 +57,17 @@ export async function generateChapterSummary(
 
 export async function generateSectionSummary(
   sectionId: string,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<GeneratedSummary> {
-  const res = await apiClient.sections[':id'].generate.summary.$post(
+  const res = await apiClient.sections[":id"].generate.summary.$post(
     {
       param: { id: sectionId },
     },
-    { init: { signal } },
+    { init: { signal } }
   );
-  if (!res.ok) throw await parseResponseError(res, '節のあらすじ生成');
+  if (!res.ok) {
+    throw await parseResponseError(res, "節のあらすじ生成");
+  }
   const data = await res.json();
   return {
     title: data.title,
@@ -69,42 +79,50 @@ export async function generateSectionSummary(
 export async function* generateSectionContent(
   sectionId: string,
   modelConfigId?: string | null,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): AsyncIterable<string> {
-  const res = await apiClient.sections[':id'].generate.content.$post(
+  const res = await apiClient.sections[":id"].generate.content.$post(
     {
       param: { id: sectionId },
       json: { modelConfigId: modelConfigId || null },
     },
-    { init: { signal } },
+    { init: { signal } }
   );
   if (!res.ok) {
-    throw await parseResponseError(res, '本文生成');
+    throw await parseResponseError(res, "本文生成");
   }
   if (!res.body) {
-    throw new Error('レスポンスボディが空です');
+    throw new Error("レスポンスボディが空です");
   }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = '';
+  let buffer = "";
 
   try {
     while (true) {
-      if (signal?.aborted) break;
+      if (signal?.aborted) {
+        break;
+      }
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        break;
+      }
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n\n');
-      buffer = lines.pop() ?? '';
+      const lines = buffer.split("\n\n");
+      buffer = lines.pop() ?? "";
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (trimmed.startsWith('data: ')) {
+        if (trimmed.startsWith("data: ")) {
           try {
             const data = JSON.parse(trimmed.slice(6));
-            if (data.done) return;
-            if (data.text) yield data.text;
+            if (data.done) {
+              return;
+            }
+            if (data.text) {
+              yield data.text;
+            }
           } catch {
             // ignore JSON parse error
           }
@@ -120,30 +138,34 @@ export async function proofreadSectionContent(
   sectionId: string,
   customBody?: string,
   modelConfigId?: string | null,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ) {
-  const res = await apiClient.sections[':id'].generate.proofread.$post(
+  const res = await apiClient.sections[":id"].generate.proofread.$post(
     {
       param: { id: sectionId },
       json: { body: customBody, modelConfigId: modelConfigId || null },
     },
-    { init: { signal } },
+    { init: { signal } }
   );
-  if (!res.ok) throw await parseResponseError(res, '校正・推敲');
+  if (!res.ok) {
+    throw await parseResponseError(res, "校正・推敲");
+  }
   return res.json();
 }
 
 export async function extractEntities(
   sectionId: string,
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): Promise<ExtractResult> {
-  const res = await apiClient.sections[':id'].generate.extract.$post(
+  const res = await apiClient.sections[":id"].generate.extract.$post(
     {
       param: { id: sectionId },
     },
-    { init: { signal } },
+    { init: { signal } }
   );
-  if (!res.ok) throw await parseResponseError(res, '人物・設定の抽出');
+  if (!res.ok) {
+    throw await parseResponseError(res, "人物・設定の抽出");
+  }
   const data = await res.json();
   return {
     timelines: data.timelines.map((t) => ({
@@ -168,16 +190,23 @@ export async function* inlineAssistSectionContent(
   sectionId: string,
   input: {
     selectedText: string;
-    action: 'expand' | 'shorten' | 'emotional' | 'dialogue' | 'paraphrase' | 'custom' | 'template';
+    action:
+      | "expand"
+      | "shorten"
+      | "emotional"
+      | "dialogue"
+      | "paraphrase"
+      | "custom"
+      | "template";
     customInstruction?: string;
     customPromptId?: string | null;
     surroundingText?: string;
     modelConfigId?: string | null;
     variantCount?: number;
   },
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ): AsyncIterable<InlineAssistChunk> {
-  const res = await apiClient.sections[':id'].generate['inline-assist'].$post(
+  const res = await apiClient.sections[":id"].generate["inline-assist"].$post(
     {
       param: { id: sectionId },
       json: {
@@ -190,35 +219,41 @@ export async function* inlineAssistSectionContent(
         variantCount: input.variantCount ?? 1,
       },
     },
-    { init: { signal } },
+    { init: { signal } }
   );
 
   if (!res.ok) {
-    throw await parseResponseError(res, 'AIアシスト生成');
+    throw await parseResponseError(res, "AIアシスト生成");
   }
   if (!res.body) {
-    throw new Error('レスポンスボディが空です');
+    throw new Error("レスポンスボディが空です");
   }
 
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
-  let buffer = '';
+  let buffer = "";
 
   try {
     while (true) {
-      if (signal?.aborted) break;
+      if (signal?.aborted) {
+        break;
+      }
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        break;
+      }
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n\n');
-      buffer = lines.pop() ?? '';
+      const lines = buffer.split("\n\n");
+      buffer = lines.pop() ?? "";
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (trimmed.startsWith('data: ')) {
+        if (trimmed.startsWith("data: ")) {
           try {
             const data = JSON.parse(trimmed.slice(6));
-            if (data.done) return;
+            if (data.done) {
+              return;
+            }
             if (data.text) {
               yield { text: data.text, variant: data.variant ?? 0 };
             }
@@ -236,15 +271,15 @@ export async function* inlineAssistSectionContent(
 export async function analyzeSettingImpact(
   novelId: string,
   input: {
-    changeTarget: 'character' | 'setting';
+    changeTarget: "character" | "setting";
     targetName: string;
     beforeValue: string;
     afterValue: string;
     modelConfigId?: string | null;
   },
-  signal?: AbortSignal,
+  signal?: AbortSignal
 ) {
-  const res = await apiClient.novels[':id'].generate.impact.$post(
+  const res = await apiClient.novels[":id"].generate.impact.$post(
     {
       param: { id: novelId },
       json: {
@@ -255,8 +290,10 @@ export async function analyzeSettingImpact(
         modelConfigId: input.modelConfigId || null,
       },
     },
-    { init: { signal } },
+    { init: { signal } }
   );
-  if (!res.ok) throw await parseResponseError(res, '影響分析');
+  if (!res.ok) {
+    throw await parseResponseError(res, "影響分析");
+  }
   return res.json();
 }

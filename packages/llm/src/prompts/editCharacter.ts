@@ -2,14 +2,19 @@
  * 人物情報を LLM で編集するプロンプト。
  */
 export function editCharacter(
-  character: { category?: string; name: string; description?: string; traits?: string[] },
-  instruction: string,
+  character: {
+    category?: string;
+    name: string;
+    description?: string;
+    traits?: string[];
+  },
+  instruction: string
 ): string {
-  const category = character.category ?? '未分類';
-  const description = character.description ?? '（未設定）';
+  const category = character.category ?? "未分類";
+  const description = character.description ?? "（未設定）";
   const traits = character.traits?.length
-    ? character.traits.map((t) => `- ${t}`).join('\n')
-    : '（未設定）';
+    ? character.traits.map((t) => `- ${t}`).join("\n")
+    : "（未設定）";
 
   return `あなたは小説の登場人物を管理する編集者です。以下の人物情報を、指示に従って編集してください。
 

@@ -1,55 +1,66 @@
-import { Hono } from 'hono';
-import { zValidator } from '@hono/zod-validator';
+import { zValidator } from "@hono/zod-validator";
+import { Hono } from "hono";
 
-import type { AppContext } from '../context.js';
-import { getServices } from '../core/services.js';
+import type { AppContext } from "../context.js";
+import { getServices } from "../core/services.js";
 import {
   createForeshadowingSchema,
   idParamSchema,
   novelIdParamSchema,
   updateForeshadowingSchema,
-} from '../schemas/index.js';
+} from "../schemas/index.js";
 
 const foreshadowingsRouter = new Hono<AppContext>()
   // GET /api/foreshadowings/novel/:novelId - 小説の伏線一覧取得
-  .get('/novel/:novelId', zValidator('param', novelIdParamSchema), async (c) => {
-    const { novelId } = c.req.valid('param');
-    const items = await getServices(c).foreshadowing.getForeshadowingsByNovel(novelId);
-    return c.json(items);
-  })
+  .get(
+    "/novel/:novelId",
+    zValidator("param", novelIdParamSchema),
+    async (c) => {
+      const { novelId } = c.req.valid("param");
+      const items =
+        await getServices(c).foreshadowing.getForeshadowingsByNovel(novelId);
+      return c.json(items);
+    }
+  )
   // POST /api/foreshadowings/novel/:novelId - 伏線新規作成
   .post(
-    '/novel/:novelId',
-    zValidator('param', novelIdParamSchema),
-    zValidator('json', createForeshadowingSchema),
+    "/novel/:novelId",
+    zValidator("param", novelIdParamSchema),
+    zValidator("json", createForeshadowingSchema),
     async (c) => {
-      const { novelId } = c.req.valid('param');
-      const body = c.req.valid('json');
-      const item = await getServices(c).foreshadowing.createForeshadowing(novelId, body);
+      const { novelId } = c.req.valid("param");
+      const body = c.req.valid("json");
+      const item = await getServices(c).foreshadowing.createForeshadowing(
+        novelId,
+        body
+      );
       return c.json(item, 201);
-    },
+    }
   )
   // GET /api/foreshadowings/:id - 伏線個別取得
-  .get('/:id', zValidator('param', idParamSchema), async (c) => {
-    const { id } = c.req.valid('param');
+  .get("/:id", zValidator("param", idParamSchema), async (c) => {
+    const { id } = c.req.valid("param");
     const item = await getServices(c).foreshadowing.getForeshadowing(id);
     return c.json(item);
   })
   // PUT /api/foreshadowings/:id - 伏線更新
   .put(
-    '/:id',
-    zValidator('param', idParamSchema),
-    zValidator('json', updateForeshadowingSchema),
+    "/:id",
+    zValidator("param", idParamSchema),
+    zValidator("json", updateForeshadowingSchema),
     async (c) => {
-      const { id } = c.req.valid('param');
-      const body = c.req.valid('json');
-      const item = await getServices(c).foreshadowing.updateForeshadowing(id, body);
+      const { id } = c.req.valid("param");
+      const body = c.req.valid("json");
+      const item = await getServices(c).foreshadowing.updateForeshadowing(
+        id,
+        body
+      );
       return c.json(item);
-    },
+    }
   )
   // DELETE /api/foreshadowings/:id - 伏線削除
-  .delete('/:id', zValidator('param', idParamSchema), async (c) => {
-    const { id } = c.req.valid('param');
+  .delete("/:id", zValidator("param", idParamSchema), async (c) => {
+    const { id } = c.req.valid("param");
     await getServices(c).foreshadowing.deleteForeshadowing(id);
     return c.json({ success: true as const });
   });

@@ -1,55 +1,55 @@
 // フロント用の型定義。
 // エンティティ型は @novel-creator/shared/schemas を単一情報源とし、
 // ここではビューモデルと入力型のみを定義する。
-import type { LLMProviderType } from '@novel-creator/shared';
+import type { LLMProviderType } from "@novel-creator/shared";
 import type {
-  Novel,
   Chapter,
-  Section,
-  Content,
   Character,
-  Setting,
-  Timeline,
+  ChatMessageItem,
+  ChatSession,
+  Content,
+  CustomPrompt,
   Foreshadowing,
   ForeshadowingStatus,
   LlmInstruction,
-  ChatSession,
-  ChatMessageItem,
-  CustomPrompt,
-} from '@novel-creator/shared/schemas';
+  Novel,
+  Section,
+  Setting,
+  Timeline,
+} from "@novel-creator/shared/schemas";
 
 export type {
-  Novel,
   Chapter,
-  Section,
-  Content,
   Character,
-  Setting,
-  Timeline,
+  ChatMessageItem,
+  ChatSession,
+  Content,
+  CustomPrompt,
   Foreshadowing,
   ForeshadowingStatus,
   LlmInstruction,
-  ChatSession,
-  ChatMessageItem,
-  CustomPrompt,
+  Novel,
+  Section,
+  Setting,
+  Timeline,
 };
 
 export interface CreateForeshadowingInput {
-  title: string;
   category?: string;
   description?: string;
-  status?: ForeshadowingStatus;
   placedSectionId?: string | null;
   resolvedSectionId?: string | null;
+  status?: ForeshadowingStatus;
+  title: string;
 }
 
 export interface UpdateForeshadowingInput {
-  title?: string;
   category?: string;
   description?: string | null;
-  status?: ForeshadowingStatus;
   placedSectionId?: string | null;
   resolvedSectionId?: string | null;
+  status?: ForeshadowingStatus;
+  title?: string;
 }
 
 // 小説詳細（関連データ含む）
@@ -70,41 +70,41 @@ export interface SectionWithContent extends Section {
 
 // 入力型
 export interface CreateNovelInput {
-  title: string;
   description?: string;
-  styleGuide?: string | null;
   storyOutline?: string | null;
+  styleGuide?: string | null;
+  title: string;
 }
 
 export interface UpdateNovelInput {
-  title?: string;
   description?: string;
-  styleGuide?: string | null;
   storyOutline?: string | null;
+  styleGuide?: string | null;
+  title?: string;
 }
 
 export interface CreateChapterInput {
-  title: string;
   order?: number;
   summary?: string;
+  title: string;
 }
 
 export interface UpdateChapterInput {
-  title?: string;
   order?: number;
   summary?: string;
+  title?: string;
 }
 
 export interface CreateSectionInput {
-  title?: string;
   order?: number;
   summary?: string;
+  title?: string;
 }
 
 export interface UpdateSectionInput {
-  title?: string;
   order?: number;
   summary?: string;
+  title?: string;
 }
 
 export interface UpdateContentInput {
@@ -113,46 +113,46 @@ export interface UpdateContentInput {
 
 export interface CreateCharacterInput {
   category?: string;
-  name: string;
   description?: string;
-  traits?: string[];
+  name: string;
   relationships?: unknown;
+  traits?: string[];
 }
 
 export interface UpdateCharacterInput {
   category?: string;
-  name?: string;
   description?: string;
-  traits?: string[];
+  name?: string;
   relationships?: unknown;
+  traits?: string[];
 }
 
 export interface CreateSettingInput {
   category: string;
-  name: string;
   description?: string;
   metadata?: unknown;
+  name: string;
 }
 
 export interface UpdateSettingInput {
   category?: string;
-  name?: string;
   description?: string;
   metadata?: unknown;
+  name?: string;
 }
 
 export interface CreateTimelineInput {
   event: string;
   order?: number;
-  timestamp?: string;
   sectionId?: string;
+  timestamp?: string;
 }
 
 export interface UpdateTimelineInput {
   event?: string;
   order?: number;
-  timestamp?: string | null;
   sectionId?: string | null;
+  timestamp?: string | null;
 }
 
 export interface EditInstructionInput {
@@ -161,13 +161,13 @@ export interface EditInstructionInput {
 
 export interface SettingDraft {
   category: string;
-  name: string;
   description: string;
+  name: string;
 }
 
 export interface SettingDraftInput {
-  instruction: string;
   currentDraft?: { category: string; name: string; description?: string };
+  instruction: string;
 }
 
 export interface CreateLlmInstructionInput {
@@ -177,38 +177,38 @@ export interface CreateLlmInstructionInput {
 
 // 生成系レスポンス型
 export interface GeneratedPlot {
-  title: string;
-  description: string;
   chapters: {
     title: string;
     order: number;
     summary: string;
   }[];
+  description: string;
+  title: string;
 }
 
 export interface GeneratedSummary {
-  title: string;
   order: number;
   summary: string;
+  title: string;
 }
 
 export interface ExtractedTimelineItem {
-  id?: string;
   event: string;
+  id?: string;
   order: number;
   timestamp?: string | null;
 }
 
 export interface ExtractedSettingItem {
-  id?: string;
-  name: string;
   category: string;
   description?: string | null;
+  id?: string;
+  name: string;
 }
 
 export interface ExtractResult {
-  timelines: ExtractedTimelineItem[];
   settings: ExtractedSettingItem[];
+  timelines: ExtractedTimelineItem[];
 }
 
 export interface ApiSuccessResponse {
@@ -218,9 +218,9 @@ export interface ApiSuccessResponse {
 // 設定マークダウン一括保存レスポンス
 export interface SaveSettingsMarkdownResult {
   created: number;
-  updated: number;
   deleted: number;
   duplicateCount: number;
+  updated: number;
 }
 
 // 設定セクションLLM編集レスポンス
@@ -231,9 +231,9 @@ export interface EditSettingSectionResult {
 // 人物マークダウン一括保存レスポンス
 export interface SaveCharactersMarkdownResult {
   created: number;
-  updated: number;
   deleted: number;
   duplicateCount: number;
+  updated: number;
 }
 
 // 人物セクションLLM編集レスポンス
@@ -264,16 +264,16 @@ export interface UpdateChatSessionInput {
 
 // チャットからのエンティティ抽出型
 export interface ExtractedCharacterItem {
-  name: string;
   category: string;
   description: string;
+  name: string;
   traits: string[];
 }
 
 export interface ExtractedChatForeshadowingItem {
-  title: string;
   description: string;
-  status: 'unresolved' | 'resolved' | 'abandoned';
+  status: "unresolved" | "resolved" | "abandoned";
+  title: string;
 }
 
 export interface ExtractedChatTimelineItem {
@@ -282,24 +282,24 @@ export interface ExtractedChatTimelineItem {
 }
 
 export interface ExtractedChatPlotItem {
-  title: string;
   summary: string;
+  title: string;
 }
 
 export interface ExtractedChatEntities {
   characters: ExtractedCharacterItem[];
-  settings: ExtractedSettingItem[];
   foreshadowings?: ExtractedChatForeshadowingItem[];
-  timelines?: ExtractedChatTimelineItem[];
   plots?: ExtractedChatPlotItem[];
+  settings: ExtractedSettingItem[];
+  timelines?: ExtractedChatTimelineItem[];
 }
 
 // ---- バックアップ・リストア ----
 export interface BackupMeta {
-  version: number;
+  exportedAt: string;
   novelId: string;
   novelTitle: string;
-  exportedAt: string;
+  version: number;
 }
 
 export interface BackupData {
@@ -308,224 +308,235 @@ export interface BackupData {
 }
 
 export interface ImportResult {
-  success: true;
-  novelId: string;
   counts: Record<string, number>;
+  novelId: string;
+  success: true;
 }
 
 // ---- 校正・推敲 ----
 export interface ProofreadIssue {
-  type: 'viewpoint' | 'typo' | 'grammar' | 'pacing' | 'consistency' | 'other';
   originalText: string;
-  suggestion: string;
   reason: string;
+  suggestion: string;
+  type: "viewpoint" | "typo" | "grammar" | "pacing" | "consistency" | "other";
 }
 
 export interface ProofreadResult {
-  score: number;
-  critique: string;
   advice: string;
+  critique: string;
   issues: ProofreadIssue[];
   polishedBody: string;
+  score: number;
 }
 
 // ---- LLM 設定 ----
 export interface LLMConfig {
+  apiKeyMasked: string | null;
+  baseUrl: string | null;
+  createdAt: string | Date | null;
+  description: string | null;
+  hasApiKey: boolean;
   id: string;
+  isDefault: boolean;
+  modelId: string;
   name: string;
   provider: LLMProviderType;
-  modelId: string;
-  baseUrl: string | null;
-  apiKeyMasked: string | null;
-  hasApiKey: boolean;
-  isDefault: boolean;
-  description: string | null;
-  createdAt: string | Date | null;
   updatedAt: string | Date | null;
 }
 
 export interface CreateLLMConfigInput {
+  apiKey?: string | null;
+  baseUrl?: string | null;
+  description?: string | null;
+  isDefault?: boolean;
+  modelId: string;
   name: string;
   provider: LLMProviderType;
-  modelId: string;
-  baseUrl?: string | null;
-  apiKey?: string | null;
-  isDefault?: boolean;
-  description?: string | null;
 }
 
 export interface UpdateLLMConfigInput {
+  apiKey?: string | null;
+  baseUrl?: string | null;
+  description?: string | null;
+  isDefault?: boolean;
+  modelId?: string;
   name?: string;
   provider?: LLMProviderType;
-  modelId?: string;
-  baseUrl?: string | null;
-  apiKey?: string | null;
-  isDefault?: boolean;
-  description?: string | null;
 }
 
 export interface TestConnectionInput {
-  provider: LLMProviderType;
-  modelId: string;
-  baseUrl?: string | null;
   apiKey?: string | null;
+  baseUrl?: string | null;
+  modelId: string;
+  provider: LLMProviderType;
 }
 
 export interface TestConnectionResult {
-  success: boolean;
+  error?: string;
   latencyMs: number;
   message: string;
-  error?: string;
+  success: boolean;
 }
 
 // ---- Embedding 設定 ----
 export interface EmbeddingConfig {
+  apiKeyMasked: string | null;
+  baseUrl: string | null;
+  createdAt: string | Date | null;
+  description: string | null;
+  dimensions: number;
+  hasApiKey: boolean;
   id: string;
+  isDefault: boolean;
+  modelId: string;
   name: string;
   provider: LLMProviderType;
-  modelId: string;
-  dimensions: number;
-  baseUrl: string | null;
-  apiKeyMasked: string | null;
-  hasApiKey: boolean;
-  isDefault: boolean;
-  description: string | null;
-  createdAt: string | Date | null;
   updatedAt: string | Date | null;
 }
 
 export interface CreateEmbeddingConfigInput {
+  apiKey?: string | null;
+  baseUrl?: string | null;
+  description?: string | null;
+  dimensions?: number;
+  isDefault?: boolean;
+  modelId: string;
   name: string;
   provider: LLMProviderType;
-  modelId: string;
-  dimensions?: number;
-  baseUrl?: string | null;
-  apiKey?: string | null;
-  isDefault?: boolean;
-  description?: string | null;
 }
 
 export interface UpdateEmbeddingConfigInput {
+  apiKey?: string | null;
+  baseUrl?: string | null;
+  description?: string | null;
+  dimensions?: number;
+  isDefault?: boolean;
+  modelId?: string;
   name?: string;
   provider?: LLMProviderType;
-  modelId?: string;
-  dimensions?: number;
-  baseUrl?: string | null;
-  apiKey?: string | null;
-  isDefault?: boolean;
-  description?: string | null;
 }
 
 export interface TestEmbeddingConnectionInput {
-  provider: LLMProviderType;
-  modelId: string;
-  dimensions?: number;
-  baseUrl?: string | null;
   apiKey?: string | null;
+  baseUrl?: string | null;
+  dimensions?: number;
+  modelId: string;
+  provider: LLMProviderType;
 }
 
 export interface ReindexProgressEvent {
   current: number;
-  total: number;
+  error?: string;
+  itemTitle?: string;
   percent: number;
   stage: string;
-  itemTitle?: string;
-  error?: string;
+  total: number;
 }
 
 // ---- インラインAIアシスト ----
 export type InlineAssistAction =
-  'expand' | 'shorten' | 'emotional' | 'dialogue' | 'paraphrase' | 'custom' | 'template';
+  | "expand"
+  | "shorten"
+  | "emotional"
+  | "dialogue"
+  | "paraphrase"
+  | "custom"
+  | "template";
 
 export interface InlineAssistInput {
-  selectedText: string;
   action: InlineAssistAction;
   customInstruction?: string;
   customPromptId?: string | null;
-  surroundingText?: string;
   modelConfigId?: string | null;
+  selectedText: string;
+  surroundingText?: string;
   variantCount?: number;
 }
 
 export interface CreateCustomPromptInput {
-  novelId?: string | null;
-  name: string;
+  category?: "inline" | "generation" | "chat" | "general";
   description?: string | null;
   icon?: string | null;
-  category?: 'inline' | 'generation' | 'chat' | 'general';
+  name: string;
+  novelId?: string | null;
+  order?: number;
   systemPrompt?: string | null;
   userPrompt: string;
-  order?: number;
 }
 
 export interface UpdateCustomPromptInput {
-  name?: string;
+  category?: "inline" | "generation" | "chat" | "general";
   description?: string | null;
   icon?: string | null;
-  category?: 'inline' | 'generation' | 'chat' | 'general';
+  name?: string;
+  order?: number;
   systemPrompt?: string | null;
   userPrompt?: string;
-  order?: number;
 }
 
 // ---- 口調・一貫性チェック ----
 export interface CharacterVoiceIssue {
   characterName: string;
   dialogue: string;
-  issueType: 'firstPerson' | 'secondPerson' | 'speechPattern' | 'toneShift' | 'outOfCharacter';
+  issueType:
+    | "firstPerson"
+    | "secondPerson"
+    | "speechPattern"
+    | "toneShift"
+    | "outOfCharacter";
   reason: string;
   suggestion: string;
 }
 
 export interface CharacterVoiceCheckResult {
-  summary: string;
   issues: CharacterVoiceIssue[];
+  summary: string;
 }
 
 // ---- 設定変更影響分析 ----
 export interface SettingImpactItem {
-  targetType: 'plot' | 'section' | 'timeline' | 'foreshadowing';
-  targetTitle: string;
   issue: string;
   suggestedFix: string;
+  targetTitle: string;
+  targetType: "plot" | "section" | "timeline" | "foreshadowing";
 }
 
 export interface SettingImpactResult {
-  summary: string;
-  impactLevel: 'low' | 'medium' | 'high';
   affectedItems: SettingImpactItem[];
+  impactLevel: "low" | "medium" | "high";
+  summary: string;
 }
 
 // ---- ストーリーアーク・テンション分析 ----
 export interface StoryArcDataPoint {
+  advice: string;
   chapterId: string;
   chapterTitle: string;
+  keyEvent: string;
+  pacing: number;
   sectionId: string;
   sectionTitle: string;
   tension: number;
   valence: number;
-  pacing: number;
-  keyEvent: string;
-  advice: string;
 }
 
 export interface StoryArcResult {
-  summary: string;
-  pacingCritique: string;
   dataPoints: StoryArcDataPoint[];
+  pacingCritique: string;
+  summary: string;
 }
 
 // ---- 複数ペルソナ模擬読者レビュー ----
-export type ReaderPersonaType = 'editor' | 'casual' | 'lore' | 'critic';
+export type ReaderPersonaType = "editor" | "casual" | "lore" | "critic";
 
 export interface ReaderPersonaReview {
+  advice: string;
+  catchphrase: string;
+  criticism: string;
   persona: ReaderPersonaType;
   personaName: string;
-  rating: number;
-  catchphrase: string;
   praise: string;
-  criticism: string;
-  advice: string;
+  rating: number;
 }
 
 export interface MultiPersonaReviewResult {
@@ -534,22 +545,22 @@ export interface MultiPersonaReviewResult {
 }
 
 // ---- AI分析（ストーリーアーク / 口調チェック / ペルソナレビュー）----
-export type AnalysisType = 'story-arc' | 'check-voice' | 'persona-review';
+export type AnalysisType = "story-arc" | "check-voice" | "persona-review";
 
 /** SSE 進捗イベント。stage は表示用日本語ラベル。total が 0 の場合は不定間隔（インジケーター表示用）。 */
 export interface AnalysisProgress {
-  stage: string;
   current: number;
+  stage: string;
   total: number;
 }
 
 /** 保存済み分析結果の履歴エントリ。result の実際の型は analysisType で判別してキャストすること。 */
 export interface AnalysisHistoryEntry {
+  analysisType: AnalysisType;
+  createdAt: string;
   id: string;
   novelId: string;
-  analysisType: AnalysisType;
   result: StoryArcResult | CharacterVoiceCheckResult | MultiPersonaReviewResult;
-  targetSectionId: string | null;
   targetChapterId: string | null;
-  createdAt: string;
+  targetSectionId: string | null;
 }

@@ -1,14 +1,16 @@
-import type { Meta, StoryObj } from '@storybook/react-vite';
-import { fn } from 'storybook/test';
-import { ChatFloatingButton } from './ChatFloatingButton';
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { fn } from "storybook/test";
 import {
   ChatStreamingContext,
-  ChatUIContext,
   type ChatStreamingContextValue,
+  ChatUIContext,
   type ChatUIContextValue,
-} from '@/context/ChatContext.js';
+} from "@/context/ChatContext.js";
+import { ChatFloatingButton } from "./ChatFloatingButton";
 
-function makeUIValue(overrides: Partial<ChatUIContextValue>): ChatUIContextValue {
+function makeUIValue(
+  overrides: Partial<ChatUIContextValue>
+): ChatUIContextValue {
   return {
     isOpen: false,
     openChat: fn(),
@@ -37,12 +39,12 @@ function makeUIValue(overrides: Partial<ChatUIContextValue>): ChatUIContextValue
 }
 
 function makeStreamingValue(
-  overrides: Partial<ChatStreamingContextValue>,
+  overrides: Partial<ChatStreamingContextValue>
 ): ChatStreamingContextValue {
   return {
     messages: [],
     isStreaming: false,
-    streamingContent: '',
+    streamingContent: "",
     streamingParts: null,
     error: null,
     lastPrompt: null,
@@ -56,7 +58,7 @@ function makeStreamingValue(
 
 const meta = {
   component: ChatFloatingButton,
-  tags: ['autodocs'],
+  tags: ["autodocs"],
   decorators: [
     (Story, { parameters }) => (
       <ChatUIContext.Provider value={parameters.chatUIValue}>

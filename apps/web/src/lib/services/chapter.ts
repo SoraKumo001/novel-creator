@@ -1,5 +1,5 @@
-import { parseResponseError } from '../errors.js';
-import { apiClient } from '../api-client.js';
+import { apiClient } from "../api-client.js";
+import { parseResponseError } from "../errors.js";
 import type {
   Chapter,
   ChapterWithSections,
@@ -7,15 +7,23 @@ import type {
   CreateSectionInput,
   Section,
   UpdateChapterInput,
-} from '../types.js';
+} from "../types.js";
 
-export async function fetchChapters(novelId: string): Promise<ChapterWithSections[]> {
-  const res = await apiClient.novels[':id'].chapters.$get({ param: { id: novelId } });
-  if (!res.ok) throw await parseResponseError(res, '章一覧の取得');
+export async function fetchChapters(
+  novelId: string
+): Promise<ChapterWithSections[]> {
+  const res = await apiClient.novels[":id"].chapters.$get({
+    param: { id: novelId },
+  });
+  if (!res.ok) {
+    throw await parseResponseError(res, "章一覧の取得");
+  }
   const chapters = await res.json();
   const results: ChapterWithSections[] = [];
   for (const ch of chapters) {
-    const detailRes = await apiClient.chapters[':id'].$get({ param: { id: ch.id } });
+    const detailRes = await apiClient.chapters[":id"].$get({
+      param: { id: ch.id },
+    });
     if (detailRes.ok) {
       const detail = await detailRes.json();
       results.push({
@@ -42,8 +50,10 @@ export async function fetchChapters(novelId: string): Promise<ChapterWithSection
 }
 
 export async function fetchChapter(id: string): Promise<ChapterWithSections> {
-  const res = await apiClient.chapters[':id'].$get({ param: { id } });
-  if (!res.ok) throw await parseResponseError(res, '章詳細の取得');
+  const res = await apiClient.chapters[":id"].$get({ param: { id } });
+  if (!res.ok) {
+    throw await parseResponseError(res, "章詳細の取得");
+  }
   const detail = await res.json();
   return {
     id: detail.id,
@@ -65,8 +75,11 @@ export async function fetchChapter(id: string): Promise<ChapterWithSections> {
   };
 }
 
-export async function createChapter(novelId: string, input: CreateChapterInput): Promise<Chapter> {
-  const res = await apiClient.novels[':id'].chapters.$post({
+export async function createChapter(
+  novelId: string,
+  input: CreateChapterInput
+): Promise<Chapter> {
+  const res = await apiClient.novels[":id"].chapters.$post({
     param: { id: novelId },
     json: {
       title: input.title,
@@ -74,7 +87,9 @@ export async function createChapter(novelId: string, input: CreateChapterInput):
       summary: input.summary,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, '章の作成');
+  if (!res.ok) {
+    throw await parseResponseError(res, "章の作成");
+  }
   const row = await res.json();
   return {
     id: row.id,
@@ -87,8 +102,11 @@ export async function createChapter(novelId: string, input: CreateChapterInput):
   };
 }
 
-export async function updateChapter(id: string, input: UpdateChapterInput): Promise<Chapter> {
-  const res = await apiClient.chapters[':id'].$put({
+export async function updateChapter(
+  id: string,
+  input: UpdateChapterInput
+): Promise<Chapter> {
+  const res = await apiClient.chapters[":id"].$put({
     param: { id },
     json: {
       title: input.title,
@@ -96,7 +114,9 @@ export async function updateChapter(id: string, input: UpdateChapterInput): Prom
       summary: input.summary,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, '章の更新');
+  if (!res.ok) {
+    throw await parseResponseError(res, "章の更新");
+  }
   const row = await res.json();
   return {
     id: row.id,
@@ -110,15 +130,17 @@ export async function updateChapter(id: string, input: UpdateChapterInput): Prom
 }
 
 export async function deleteChapter(id: string): Promise<void> {
-  const res = await apiClient.chapters[':id'].$delete({ param: { id } });
-  if (!res.ok) throw await parseResponseError(res, '章の削除');
+  const res = await apiClient.chapters[":id"].$delete({ param: { id } });
+  if (!res.ok) {
+    throw await parseResponseError(res, "章の削除");
+  }
 }
 
 export async function createSection(
   chapterId: string,
-  input: CreateSectionInput,
+  input: CreateSectionInput
 ): Promise<Section> {
-  const res = await apiClient.chapters[':id'].sections.$post({
+  const res = await apiClient.chapters[":id"].sections.$post({
     param: { id: chapterId },
     json: {
       title: input.title,
@@ -126,7 +148,9 @@ export async function createSection(
       summary: input.summary,
     },
   });
-  if (!res.ok) throw await parseResponseError(res, '節の作成');
+  if (!res.ok) {
+    throw await parseResponseError(res, "節の作成");
+  }
   const row = await res.json();
   return {
     id: row.id,

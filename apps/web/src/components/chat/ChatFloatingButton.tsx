@@ -1,4 +1,4 @@
-import { useChatStreamingState, useChatUI } from '@/context/ChatContext.js';
+import { useChatStreamingState, useChatUI } from "@/context/ChatContext.js";
 
 export function ChatFloatingButton() {
   const { isOpen, toggleChat } = useChatUI();
@@ -12,7 +12,7 @@ export function ChatFloatingButton() {
     <button
       type="button"
       onClick={toggleChat}
-      className="group fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-tr from-indigo-600 to-violet-600 text-white shadow-xl shadow-indigo-500/25 transition-all duration-300 hover:scale-105 hover:shadow-indigo-500/40 active:scale-95 focus:outline-none focus:ring-4 focus:ring-primary/40"
+      className="group fixed right-6 bottom-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-tr from-indigo-600 to-violet-600 text-white shadow-indigo-500/25 shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-indigo-500/40 focus:outline-none focus:ring-4 focus:ring-primary/40 active:scale-95"
       aria-label="創作相談チャットを開く"
       title="創作相談チャット"
     >
@@ -38,7 +38,7 @@ export function ChatFloatingButton() {
       </svg>
 
       {/* ツールチップ */}
-      <span className="pointer-events-none absolute right-16 top-1/2 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2.5 py-1 text-xs font-medium text-background opacity-0 shadow-md transition-opacity duration-200 group-hover:opacity-100">
+      <span className="pointer-events-none absolute top-1/2 right-16 -translate-y-1/2 whitespace-nowrap rounded-md bg-foreground px-2.5 py-1 font-medium text-background text-xs opacity-0 shadow-md transition-opacity duration-200 group-hover:opacity-100">
         AI創作相談
       </span>
     </button>

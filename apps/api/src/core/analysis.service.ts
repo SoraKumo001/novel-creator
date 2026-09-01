@@ -1,4 +1,3 @@
-import { and, desc, eq } from 'drizzle-orm';
 import {
   analysisResults,
   chapters,
@@ -6,22 +5,23 @@ import {
   contents,
   novels,
   sections,
-} from '@novel-creator/db';
+} from "@novel-creator/db";
 import {
   analyzeStoryArcPrompt,
   checkCharacterVoicePrompt,
   generateJSON,
   multiPersonaReviewPrompt,
   type ReaderPersonaType,
-} from '@novel-creator/llm';
-import { resolveLLMModel } from './model-resolver.js';
-import { fetchNovelStructureWithContents } from './novel-structure.js';
-import { assertFound, type ServiceContext } from './types.js';
+} from "@novel-creator/llm";
+import { and, desc, eq } from "drizzle-orm";
+import { resolveLLMModel } from "./model-resolver.js";
+import { fetchNovelStructureWithContents } from "./novel-structure.js";
+import { assertFound, type ServiceContext } from "./types.js";
 
 export type AnalysisStreamEvent =
-  | { type: 'progress'; stage: string; current: number; total: number }
-  | { type: 'complete'; result: unknown; savedId: string }
-  | { type: 'error'; message: string };
+  | { type: "progress"; stage: string; current: number; total: number }
+  | { type: "complete"; result: unknown; savedId: string }
+  | { type: "error"; message: string };
 
 /** LLM 応答待ち中にハートビート進行イベントを流す間隔（ミリ秒）。 */
 const HEARTBEAT_INTERVAL_MS = 10_000;
@@ -40,24 +40,28 @@ export class AnalysisDomainService {
    * LLM promise の rejection はそのまま呼び出し元へ伝播する。
    */
   private async *runWithHeartbeat<T>(
-    llmPromise: Promise<T>,
+    llmPromise: Promise<T>
   ): AsyncGenerator<AnalysisStreamEvent, T, undefined> {
     type RaceOutcome<R> = { beat: true } | { beat: false; value: R };
 
     // 消費されない rejection による unhandled rejection を防止する。
     llmPromise.catch(() => {});
 
-    const settled: Promise<RaceOutcome<T>> = llmPromise.then((value): RaceOutcome<T> => ({
-      beat: false,
-      value,
-    }));
-    const beat: Promise<RaceOutcome<T>> = sleep(HEARTBEAT_INTERVAL_MS).then((): RaceOutcome<T> => ({
-      beat: true,
-    }));
+    const settled: Promise<RaceOutcome<T>> = llmPromise.then(
+      (value): RaceOutcome<T> => ({
+        beat: false,
+        value,
+      })
+    );
+    const beat: Promise<RaceOutcome<T>> = sleep(HEARTBEAT_INTERVAL_MS).then(
+      (): RaceOutcome<T> => ({
+        beat: true,
+      })
+    );
 
     let outcome = await Promise.race([settled, beat]);
     while (outcome.beat) {
-      yield { type: 'progress', stage: 'AIが分析中', current: 0, total: 0 };
+      yield { current: 0, stage: "AIが分析中", total: 0, type: "progress" };
       outcome = await Promise.race([settled, beat]);
     }
 
@@ -70,33 +74,45 @@ export class AnalysisDomainService {
    * 章・節・本文は共通ヘルパでバルク取得する（N+1 解消）。
    */
   private async assembleWholeNovelBody(novelId: string): Promise<string> {
-    const structure = await fetchNovelStructureWithContents(this.ctx.db, [novelId]);
+    const structure = await fetchNovelStructureWithContents(this.ctx.db, [
+      novelId,
+    ]);
 
     const parts: string[] = [];
-    for (const { chapter, sections: sectionNodes } of structure.get(novelId) ?? []) {
+    for (const { chapter, sections: sectionNodes } of structure.get(novelId) ??
+      []) {
       for (const { section, body } of sectionNodes) {
         if (body) {
-          parts.push(`【${chapter.title} / ${section.title ?? `節 ${section.order}`}】\n${body}`);
+          parts.push(
+            `【${chapter.title} / ${section.title ?? `節 ${section.order}`}】\n${body}`
+          );
         }
       }
     }
 
-    return parts.join('\n\n');
+    return parts.join("\n\n");
   }
 
   async *streamStoryArc(
     novelId: string,
-    modelConfigId?: string | null,
+    modelConfigId?: string | null
   ): AsyncGenerator<AnalysisStreamEvent, void, undefined> {
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
-    assertFound(novel, 'Novel not found');
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, novelId));
+    assertFound(novel, "Novel not found");
 
     // プロンプトには節本文の先頭 300 文字スニペットのみ使うため、
     // DB 側で切り詰めたスニペット取得にして全文の過剰フェッチを避ける。
-    const structure = await fetchNovelStructureWithContents(this.ctx.db, [novelId], {
-      contentMode: 'snippet',
-      snippetLength: 300,
-    });
+    const structure = await fetchNovelStructureWithContents(
+      this.ctx.db,
+      [novelId],
+      {
+        contentMode: "snippet",
+        snippetLength: 300,
+      }
+    );
     const chapterNodes = structure.get(novelId) ?? [];
 
     const chaptersWithSections: Array<{
@@ -114,38 +130,38 @@ export class AnalysisDomainService {
 
     for (const node of chapterNodes) {
       const sectionsData = node.sections.map(({ section, body }) => ({
-        id: section.id,
-        title: section.title ?? `節 ${section.order}`,
-        summary: section.summary,
         contentSnippet: body || undefined,
+        id: section.id,
+        summary: section.summary,
+        title: section.title ?? `節 ${section.order}`,
       }));
 
       sectionCount += sectionsData.length;
       chaptersWithSections.push({
         id: node.chapter.id,
-        title: node.chapter.title,
         sections: sectionsData,
+        title: node.chapter.title,
       });
 
       current += 1;
       yield {
-        type: 'progress',
-        stage: '章・節の本文を収集中',
         current,
+        stage: "章・節の本文を収集中",
         total: chapterNodes.length,
+        type: "progress",
       };
     }
 
     if (chapterNodes.length === 0 || sectionCount === 0) {
-      throw new Error('章・節が登録されていないため分析できません');
+      throw new Error("章・節が登録されていないため分析できません");
     }
 
     const prompt = analyzeStoryArcPrompt({
-      novelTitle: novel.title,
       chapters: chaptersWithSections,
+      novelTitle: novel.title,
     });
 
-    const llm = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
+    const llm = await resolveLLMModel(this.ctx, modelConfigId, "throw");
     const llmPromise = generateJSON<{
       summary: string;
       pacingCritique: string;
@@ -163,23 +179,26 @@ export class AnalysisDomainService {
     }>(llm, prompt);
     const result = yield* this.runWithHeartbeat(llmPromise);
 
-    yield { type: 'progress', stage: '分析結果を保存中', current: 0, total: 0 };
+    yield { current: 0, stage: "分析結果を保存中", total: 0, type: "progress" };
     const [row] = await this.ctx.db
       .insert(analysisResults)
-      .values({ novelId, analysisType: 'story-arc', result })
+      .values({ analysisType: "story-arc", novelId, result })
       .returning();
 
-    yield { type: 'complete', result, savedId: row.id };
+    yield { result, savedId: row.id, type: "complete" };
   }
 
   async *streamCheckVoice(
     novelId: string,
     sectionId?: string,
     customBody?: string,
-    modelConfigId?: string | null,
+    modelConfigId?: string | null
   ): AsyncGenerator<AnalysisStreamEvent, void, undefined> {
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
-    assertFound(novel, 'Novel not found');
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, novelId));
+    assertFound(novel, "Novel not found");
 
     const characterRows = await this.ctx.db
       .select()
@@ -192,14 +211,14 @@ export class AnalysisDomainService {
         .select()
         .from(contents)
         .where(eq(contents.sectionId, sectionId));
-      bodyText = content?.body ?? '';
+      bodyText = content?.body ?? "";
     }
     if (!bodyText) {
       // 本文指定・節指定が双方ない場合は小説全体を対象にする。
       bodyText = await this.assembleWholeNovelBody(novelId);
     }
     if (!bodyText.trim()) {
-      throw new Error('分析対象の本文が空です。執筆後に実行してください');
+      throw new Error("分析対象の本文が空です。執筆後に実行してください");
     }
 
     const charactersFormatted = characterRows.map((char) => {
@@ -209,54 +228,62 @@ export class AnalysisDomainService {
 
       if (Array.isArray(char.traits)) {
         for (const trait of char.traits as string[]) {
-          if (trait.includes('一人称')) firstPerson = trait;
-          else if (trait.includes('二人称')) secondPerson = trait;
-          else if (trait.includes('口調') || trait.includes('語尾')) speechPattern = trait;
+          if (trait.includes("一人称")) {
+            firstPerson = trait;
+          } else if (trait.includes("二人称")) {
+            secondPerson = trait;
+          } else if (trait.includes("口調") || trait.includes("語尾")) {
+            speechPattern = trait;
+          }
         }
       }
 
       return {
-        name: char.name,
         category: char.category,
+        description: char.description,
         firstPerson,
+        name: char.name,
         secondPerson,
         speechPattern,
-        description: char.description,
       };
     });
 
     const prompt = checkCharacterVoicePrompt({
-      novelTitle: novel.title,
-      characters: charactersFormatted,
       body: bodyText,
+      characters: charactersFormatted,
+      novelTitle: novel.title,
     });
 
-    const llm = await resolveLLMModel(this.ctx, modelConfigId, 'throw');
+    const llm = await resolveLLMModel(this.ctx, modelConfigId, "throw");
     const llmPromise = generateJSON<{
       summary: string;
       issues: Array<{
         characterName: string;
         dialogue: string;
         issueType:
-          'firstPerson' | 'secondPerson' | 'speechPattern' | 'toneShift' | 'outOfCharacter';
+          | "firstPerson"
+          | "secondPerson"
+          | "speechPattern"
+          | "toneShift"
+          | "outOfCharacter";
         reason: string;
         suggestion: string;
       }>;
     }>(llm, prompt);
     const result = yield* this.runWithHeartbeat(llmPromise);
 
-    yield { type: 'progress', stage: '分析結果を保存中', current: 0, total: 0 };
+    yield { current: 0, stage: "分析結果を保存中", total: 0, type: "progress" };
     const [row] = await this.ctx.db
       .insert(analysisResults)
       .values({
+        analysisType: "check-voice",
         novelId,
-        analysisType: 'check-voice',
-        targetSectionId: sectionId ?? null,
         result,
+        targetSectionId: sectionId ?? null,
       })
       .returning();
 
-    yield { type: 'complete', result, savedId: row.id };
+    yield { result, savedId: row.id, type: "complete" };
   }
 
   async *streamPersonaReview(
@@ -266,12 +293,15 @@ export class AnalysisDomainService {
       chapterId?: string;
       customBody?: string;
       modelConfigId?: string | null;
-    },
+    }
   ): AsyncGenerator<AnalysisStreamEvent, void, undefined> {
-    const [novel] = await this.ctx.db.select().from(novels).where(eq(novels.id, novelId));
-    assertFound(novel, 'Novel not found');
+    const [novel] = await this.ctx.db
+      .select()
+      .from(novels)
+      .where(eq(novels.id, novelId));
+    assertFound(novel, "Novel not found");
 
-    let bodyText = input.customBody ?? '';
+    let bodyText = input.customBody ?? "";
     let chapterTitle: string | undefined;
     let sectionTitle: string | undefined;
 
@@ -287,13 +317,15 @@ export class AnalysisDomainService {
             .select()
             .from(contents)
             .where(eq(contents.sectionId, sec.id));
-          bodyText = content?.body ?? '';
+          bodyText = content?.body ?? "";
         }
         const [ch] = await this.ctx.db
           .select()
           .from(chapters)
           .where(eq(chapters.id, sec.chapterId));
-        if (ch) chapterTitle = ch.title;
+        if (ch) {
+          chapterTitle = ch.title;
+        }
       }
     } else if (input.chapterId) {
       const [ch] = await this.ctx.db
@@ -304,19 +336,23 @@ export class AnalysisDomainService {
         chapterTitle = ch.title;
         if (!bodyText) {
           // 章内の節本文をヘルパでバルク取得（従来の節ごとの個別 SELECT を解消）
-          const structure = await fetchNovelStructureWithContents(this.ctx.db, [ch.novelId]);
+          const structure = await fetchNovelStructureWithContents(this.ctx.db, [
+            ch.novelId,
+          ]);
           const chapterNode = (structure.get(ch.novelId) ?? []).find(
-            (candidate) => candidate.chapter.id === ch.id,
+            (candidate) => candidate.chapter.id === ch.id
           );
           const bodies: string[] = [];
           if (chapterNode) {
             for (const { section, body } of chapterNode.sections) {
               if (body) {
-                bodies.push(`【${section.title ?? `節 ${section.order}`}】\n${body}`);
+                bodies.push(
+                  `【${section.title ?? `節 ${section.order}`}】\n${body}`
+                );
               }
             }
           }
-          bodyText = bodies.join('\n\n');
+          bodyText = bodies.join("\n\n");
         }
       }
     } else if (!bodyText) {
@@ -325,17 +361,17 @@ export class AnalysisDomainService {
     }
 
     if (!bodyText.trim()) {
-      throw new Error('分析対象の本文が空です。執筆後に実行してください');
+      throw new Error("分析対象の本文が空です。執筆後に実行してください");
     }
 
     const prompt = multiPersonaReviewPrompt({
-      novelTitle: novel.title,
       chapterTitle,
+      novelTitle: novel.title,
       sectionTitle,
       text: bodyText,
     });
 
-    const llm = await resolveLLMModel(this.ctx, input.modelConfigId, 'throw');
+    const llm = await resolveLLMModel(this.ctx, input.modelConfigId, "throw");
     const llmPromise = generateJSON<{
       overallImpression: string;
       reviews: Array<{
@@ -350,24 +386,24 @@ export class AnalysisDomainService {
     }>(llm, prompt);
     const result = yield* this.runWithHeartbeat(llmPromise);
 
-    yield { type: 'progress', stage: '分析結果を保存中', current: 0, total: 0 };
+    yield { current: 0, stage: "分析結果を保存中", total: 0, type: "progress" };
     const [row] = await this.ctx.db
       .insert(analysisResults)
       .values({
+        analysisType: "persona-review",
         novelId,
-        analysisType: 'persona-review',
-        targetSectionId: input.sectionId ?? null,
-        targetChapterId: input.chapterId ?? null,
         result,
+        targetChapterId: input.chapterId ?? null,
+        targetSectionId: input.sectionId ?? null,
       })
       .returning();
 
-    yield { type: 'complete', result, savedId: row.id };
+    yield { result, savedId: row.id, type: "complete" };
   }
 
   async listResults(
     novelId: string,
-    analysisType?: 'story-arc' | 'check-voice' | 'persona-review',
+    analysisType?: "story-arc" | "check-voice" | "persona-review"
   ) {
     const conditions = [eq(analysisResults.novelId, novelId)];
     if (analysisType) {
@@ -382,19 +418,24 @@ export class AnalysisDomainService {
       .limit(50);
 
     return rows.map((row) => ({
+      analysisType: row.analysisType,
+      createdAt: row.createdAt?.toISOString() ?? null,
       id: row.id,
       novelId: row.novelId,
-      analysisType: row.analysisType,
-      targetSectionId: row.targetSectionId,
-      targetChapterId: row.targetChapterId,
       result: row.result,
-      createdAt: row.createdAt?.toISOString() ?? null,
+      targetChapterId: row.targetChapterId,
+      targetSectionId: row.targetSectionId,
     }));
   }
 
   async deleteResult(novelId: string, resultId: string) {
     await this.ctx.db
       .delete(analysisResults)
-      .where(and(eq(analysisResults.id, resultId), eq(analysisResults.novelId, novelId)));
+      .where(
+        and(
+          eq(analysisResults.id, resultId),
+          eq(analysisResults.novelId, novelId)
+        )
+      );
   }
 }

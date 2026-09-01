@@ -1,15 +1,15 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toErrorMessage } from '@/lib/errors.js';
-import { sectionKeys } from '@/lib/queryKeys.js';
-import { fetchContent, updateContent } from '@/lib/services/index.js';
-import type { Content } from '@/lib/types.js';
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toErrorMessage } from "@/lib/errors.js";
+import { sectionKeys } from "@/lib/queryKeys.js";
+import { fetchContent, updateContent } from "@/lib/services/index.js";
+import type { Content } from "@/lib/types.js";
 
 interface UseContentReturn {
   content: Content | null;
-  loading: boolean;
-  saving: boolean;
   error: string | null;
+  loading: boolean;
   refetch: () => Promise<void>;
+  saving: boolean;
   updateContent: (body: string) => Promise<Content>;
 }
 
@@ -29,7 +29,10 @@ export function useContent(sectionId: string): UseContentReturn {
 
   const updateMutation = useMutation({
     mutationFn: (body: string) => updateContent(sectionId, { body }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: sectionKeys.content(sectionId) }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: sectionKeys.content(sectionId),
+      }),
   });
 
   return {

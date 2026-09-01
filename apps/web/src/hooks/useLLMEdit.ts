@@ -1,11 +1,11 @@
-import { useMutation } from '@tanstack/react-query';
-import { editCharacter, editSetting } from '@/lib/services/index.js';
-import type { Character, Setting } from '@/lib/types.js';
+import { useMutation } from "@tanstack/react-query";
+import { editCharacter, editSetting } from "@/lib/services/index.js";
+import type { Character, Setting } from "@/lib/types.js";
 
 interface UseLLMEditReturn {
+  editCharacter: (id: string, instruction: string) => Promise<Character>;
   editingCharacter: boolean;
   editingSetting: boolean;
-  editCharacter: (id: string, instruction: string) => Promise<Character>;
   editSetting: (id: string, instruction: string) => Promise<Setting>;
 }
 
@@ -23,7 +23,9 @@ export function useLLMEdit(): UseLLMEditReturn {
   return {
     editingCharacter: editCharacterMutation.isPending,
     editingSetting: editSettingMutation.isPending,
-    editCharacter: (id, instruction) => editCharacterMutation.mutateAsync({ id, instruction }),
-    editSetting: (id, instruction) => editSettingMutation.mutateAsync({ id, instruction }),
+    editCharacter: (id, instruction) =>
+      editCharacterMutation.mutateAsync({ id, instruction }),
+    editSetting: (id, instruction) =>
+      editSettingMutation.mutateAsync({ id, instruction }),
   };
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode } from "react";
 
 export function IconButton({
   label,
@@ -33,7 +33,11 @@ export function PlusIcon() {
       stroke="currentColor"
       className="h-4 w-4"
     >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 4.5v15m7.5-7.5h-15"
+      />
     </svg>
   );
 }
@@ -105,7 +109,11 @@ export function ChevronDownIcon() {
       stroke="currentColor"
       className="h-4 w-4"
     >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+      />
     </svg>
   );
 }
@@ -120,7 +128,11 @@ export function ChevronUpIcon() {
       stroke="currentColor"
       className="h-4 w-4"
     >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4.5 15.75l7.5-7.5 7.5 7.5"
+      />
     </svg>
   );
 }
@@ -135,7 +147,11 @@ export function ArrowUpIcon() {
       stroke="currentColor"
       className="h-3.5 w-3.5"
     >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4.5 10.5 12 3m0 0 7.5 7.5M12 3v18"
+      />
     </svg>
   );
 }
@@ -150,7 +166,11 @@ export function ArrowDownIcon() {
       stroke="currentColor"
       className="h-3.5 w-3.5"
     >
-      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M19.5 13.5 12 21m0 0-7.5-7.5M12 21V3"
+      />
     </svg>
   );
 }

@@ -1,22 +1,22 @@
-import { useCallback, useEffect, useState, type ComponentType } from 'react';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import type { NovelExportData } from '@novel-creator/shared';
-import { Button } from '@/components/Button.js';
-import { ExportModal } from '@/components/ExportModal.js';
-import { Loading } from '@/components/Loading.js';
-import { MarkdownText } from '@/components/MarkdownText.js';
-import { useChatUI } from '@/context/ChatContext.js';
-import { useNovel } from '@/hooks/useNovel.js';
-import { useToast } from '@/hooks/useToast.js';
-import { toErrorMessage } from '@/lib/errors.js';
-import { fetchNovelExportData } from '@/lib/services/index.js';
-import { CharactersTab } from '../_components/-CharactersTab.js';
-import { EditorTab } from '../_components/-EditorTab.js';
-import { OverviewTab } from '../_components/-OverviewTab.js';
-import { PlotTab } from '../_components/-PlotTab.js';
-import { SettingsTab } from '../_components/-SettingsTab.js';
-import { TimelineTab } from '../_components/-TimelineTab.js';
-import { ForeshadowingTab } from '../_components/-ForeshadowingTab.js';
+import type { NovelExportData } from "@novel-creator/shared";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { type ComponentType, useCallback, useEffect, useState } from "react";
+import { Button } from "@/components/Button.js";
+import { ExportModal } from "@/components/ExportModal.js";
+import { Loading } from "@/components/Loading.js";
+import { MarkdownText } from "@/components/MarkdownText.js";
+import { useChatUI } from "@/context/ChatContext.js";
+import { useNovel } from "@/hooks/useNovel.js";
+import { useToast } from "@/hooks/useToast.js";
+import { toErrorMessage } from "@/lib/errors.js";
+import { fetchNovelExportData } from "@/lib/services/index.js";
+import { CharactersTab } from "../_components/-CharactersTab.js";
+import { EditorTab } from "../_components/-EditorTab.js";
+import { ForeshadowingTab } from "../_components/-ForeshadowingTab.js";
+import { OverviewTab } from "../_components/-OverviewTab.js";
+import { PlotTab } from "../_components/-PlotTab.js";
+import { SettingsTab } from "../_components/-SettingsTab.js";
+import { TimelineTab } from "../_components/-TimelineTab.js";
 
 /**
  * タブ定義（単一の情報源）。
@@ -25,16 +25,16 @@ import { ForeshadowingTab } from '../_components/-ForeshadowingTab.js';
  * 表示順がそのまま Alt+N ショートカットの番号に対応する。
  */
 const TAB_DEFS = [
-  { id: 'overview', label: '概要', icon: '📋', shortcut: '1' },
-  { id: 'characters', label: '人物', icon: '👥', shortcut: '2' },
-  { id: 'settings', label: '設定', icon: '🌍', shortcut: '3' },
-  { id: 'foreshadowing', label: '伏線', icon: '🚩', shortcut: '4' },
-  { id: 'timeline', label: 'タイムライン', icon: '⏱️', shortcut: '5' },
-  { id: 'plot', label: 'プロット', icon: '🗺️', shortcut: '6' },
-  { id: 'editor', label: '本文', icon: '✍️', shortcut: '7' },
+  { id: "overview", label: "概要", icon: "📋", shortcut: "1" },
+  { id: "characters", label: "人物", icon: "👥", shortcut: "2" },
+  { id: "settings", label: "設定", icon: "🌍", shortcut: "3" },
+  { id: "foreshadowing", label: "伏線", icon: "🚩", shortcut: "4" },
+  { id: "timeline", label: "タイムライン", icon: "⏱️", shortcut: "5" },
+  { id: "plot", label: "プロット", icon: "🗺️", shortcut: "6" },
+  { id: "editor", label: "本文", icon: "✍️", shortcut: "7" },
 ] as const;
 
-type TabId = (typeof TAB_DEFS)[number]['id'];
+type TabId = (typeof TAB_DEFS)[number]["id"];
 
 /** タブID一覧（validateSearch のバリデーションに使用） */
 const TAB_IDS: readonly TabId[] = TAB_DEFS.map((t) => t.id);
@@ -43,7 +43,7 @@ const TAB_IDS: readonly TabId[] = TAB_DEFS.map((t) => t.id);
 const TAB_CONTENT: Record<
   TabId,
   ComponentType<{
-    novel: NonNullable<ReturnType<typeof useNovel>['novel']>;
+    novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;
     onRefresh: () => Promise<void>;
   }>
 > = {
@@ -58,16 +58,18 @@ const TAB_CONTENT: Record<
 
 /** 本文コンテンツをスクロールラッパーで包むタブ */
 const SCROLLABLE_TABS: ReadonlySet<TabId> = new Set<TabId>([
-  'overview',
-  'plot',
-  'timeline',
-  'foreshadowing',
+  "overview",
+  "plot",
+  "timeline",
+  "foreshadowing",
 ]);
 
-export const Route = createFileRoute('/novels/$novelId/')({
+export const Route = createFileRoute("/novels/$novelId/")({
   validateSearch: (search: Record<string, unknown>) =>
     ({
-      tab: (TAB_IDS.includes(search.tab as TabId) ? search.tab : undefined) as TabId | undefined,
+      tab: (TAB_IDS.includes(search.tab as TabId) ? search.tab : undefined) as
+        | TabId
+        | undefined,
     }) as { tab?: TabId },
   component: NovelDetailPage,
 });
@@ -76,7 +78,7 @@ function NovelDetailPage() {
   const { novelId } = Route.useParams();
   const { novel, loading, error, refetch } = useNovel(novelId);
   const { tab } = Route.useSearch();
-  const activeTab: TabId = tab ?? 'overview';
+  const activeTab: TabId = tab ?? "overview";
   const navigate = useNavigate();
   const { toggleChat } = useChatUI();
   const toast = useToast();
@@ -86,7 +88,9 @@ function NovelDetailPage() {
   const [exportData, setExportData] = useState<NovelExportData | null>(null);
 
   const handleOpenExport = useCallback(async () => {
-    if (!novelId) return;
+    if (!novelId) {
+      return;
+    }
     setExportLoading(true);
     try {
       const data = await fetchNovelExportData(novelId);
@@ -103,7 +107,7 @@ function NovelDetailPage() {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+J または Cmd+J でチャット開閉
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'j') {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
         e.preventDefault();
         toggleChat();
         return;
@@ -111,12 +115,12 @@ function NovelDetailPage() {
 
       // Alt+1 ~ Alt+{TAB_DEFS.length} でタブ切り替え（TAB_DEFS の表示順がそのまま番号）
       if (e.altKey && !e.ctrlKey && !e.metaKey) {
-        const num = parseInt(e.key, 10);
+        const num = Number.parseInt(e.key, 10);
         if (num >= 1 && num <= TAB_DEFS.length) {
           e.preventDefault();
           const targetTab = TAB_DEFS[num - 1].id;
           void navigate({
-            to: '/novels/$novelId',
+            to: "/novels/$novelId",
             params: { novelId },
             search: { tab: targetTab },
           });
@@ -124,8 +128,8 @@ function NovelDetailPage() {
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [navigate, novelId, toggleChat]);
 
   // 描画するタブ本文コンテンツとスクロールラッパーの要否（TAB_CONTENT / SCROLLABLE_TABS から導出）
@@ -133,38 +137,42 @@ function NovelDetailPage() {
   const isScrollable = SCROLLABLE_TABS.has(activeTab);
 
   return (
-    <div className="flex h-full w-full flex-col min-h-0 overflow-hidden">
+    <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
       {loading && <Loading message="小説を読み込み中..." />}
       {!loading && error && (
-        <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive shrink-0">
+        <div className="shrink-0 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive text-sm">
           {error}
         </div>
       )}
       {novel && (
         <>
-          <header className="mb-4 shrink-0 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <header className="mb-4 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
+              <div className="mb-1 font-semibold text-primary text-xs uppercase tracking-wider">
                 小説ワークスペース
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              <h1 className="font-bold text-2xl text-foreground tracking-tight sm:text-3xl">
                 {novel.title}
               </h1>
               {novel.description && (
                 <MarkdownText
                   content={novel.description}
-                  className="mt-1 max-w-4xl text-sm text-muted-foreground line-clamp-2 [&_p]:my-0"
+                  className="mt-1 line-clamp-2 max-w-4xl text-muted-foreground text-sm [&_p]:my-0"
                 />
               )}
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <Button variant="secondary" onClick={handleOpenExport} isLoading={exportLoading}>
+            <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={handleOpenExport}
+                isLoading={exportLoading}
+              >
                 📤 全文エクスポート
               </Button>
             </div>
           </header>
 
-          <nav className="mb-4 shrink-0 border-b border-border">
+          <nav className="mb-4 shrink-0 border-border border-b">
             <div className="flex gap-1 overflow-x-auto">
               {TAB_DEFS.map((t) => {
                 const isActive = activeTab === t.id;
@@ -173,21 +181,21 @@ function NovelDetailPage() {
                     key={t.id}
                     onClick={() =>
                       navigate({
-                        to: '/novels/$novelId',
+                        to: "/novels/$novelId",
                         params: { novelId },
                         search: { tab: t.id },
                       })
                     }
-                    className={`group flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3.5 py-2 text-sm font-medium transition cursor-pointer ${
+                    className={`group flex cursor-pointer items-center gap-1.5 whitespace-nowrap border-b-2 px-3.5 py-2 font-medium text-sm transition ${
                       isActive
-                        ? 'border-primary text-primary font-bold bg-primary/5'
-                        : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground hover:bg-surface-hover'
+                        ? "border-primary bg-primary/5 font-bold text-primary"
+                        : "border-transparent text-muted-foreground hover:border-border hover:bg-surface-hover hover:text-foreground"
                     }`}
                     title={`Alt + ${t.shortcut}`}
                   >
                     <span>{t.icon}</span>
                     <span>{t.label}</span>
-                    <span className="hidden sm:inline-block rounded px-1 text-[10px] text-muted-foreground opacity-60 group-hover:opacity-100">
+                    <span className="hidden rounded px-1 text-[10px] text-muted-foreground opacity-60 group-hover:opacity-100 sm:inline-block">
                       Alt+{t.shortcut}
                     </span>
                   </button>
@@ -209,7 +217,11 @@ function NovelDetailPage() {
       )}
 
       {exportData && (
-        <ExportModal isOpen={exportOpen} onClose={() => setExportOpen(false)} novel={exportData} />
+        <ExportModal
+          isOpen={exportOpen}
+          onClose={() => setExportOpen(false)}
+          novel={exportData}
+        />
       )}
     </div>
   );

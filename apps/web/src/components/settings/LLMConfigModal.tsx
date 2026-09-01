@@ -1,29 +1,31 @@
-import { useEffect, useState } from 'react';
-import { Button } from '@/components/Button.js';
-import { Input } from '@/components/Input.js';
-import { Modal } from '@/components/Modal.js';
-import { Select } from '@/components/Select.js';
-import { Textarea } from '@/components/Textarea.js';
-import { useToast } from '@/hooks/useToast.js';
-import { toErrorMessage } from '@/lib/errors.js';
+import { useEffect, useState } from "react";
+import { Button } from "@/components/Button.js";
+import { Input } from "@/components/Input.js";
+import { Modal } from "@/components/Modal.js";
+import { Select } from "@/components/Select.js";
+import { Textarea } from "@/components/Textarea.js";
+import { useToast } from "@/hooks/useToast.js";
+import { toErrorMessage } from "@/lib/errors.js";
 import type {
   CreateLLMConfigInput,
   LLMConfig,
   TestConnectionInput,
   TestConnectionResult,
   UpdateLLMConfigInput,
-} from '@/lib/types.js';
-import { LLM_PRESETS, type LLMPreset } from './presets.js';
+} from "@/lib/types.js";
+import { LLM_PRESETS, type LLMPreset } from "./presets.js";
 
 interface LLMConfigModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  editingConfig: LLMConfig | null;
   configsCount: number;
-  onCreate: (input: CreateLLMConfigInput) => Promise<LLMConfig>;
-  onUpdate: (id: string, input: UpdateLLMConfigInput) => Promise<LLMConfig>;
-  onTestConnection: (input: TestConnectionInput) => Promise<TestConnectionResult>;
+  editingConfig: LLMConfig | null;
+  isOpen: boolean;
   isSubmitting: boolean;
+  onClose: () => void;
+  onCreate: (input: CreateLLMConfigInput) => Promise<LLMConfig>;
+  onTestConnection: (
+    input: TestConnectionInput
+  ) => Promise<TestConnectionResult>;
+  onUpdate: (id: string, input: UpdateLLMConfigInput) => Promise<LLMConfig>;
 }
 
 export function LLMConfigModal({
@@ -38,38 +40,42 @@ export function LLMConfigModal({
 }: LLMConfigModalProps) {
   const toast = useToast();
 
-  const [name, setName] = useState('');
+  const [name, setName] = useState("");
   const [provider, setProvider] = useState<
-    'openai' | 'anthropic' | 'google' | 'ollama' | 'custom_openai'
-  >('openai');
-  const [modelId, setModelId] = useState('');
-  const [baseUrl, setBaseUrl] = useState('');
-  const [apiKey, setApiKey] = useState('');
+    "openai" | "anthropic" | "google" | "ollama" | "custom_openai"
+  >("openai");
+  const [modelId, setModelId] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
   const [isDefault, setIsDefault] = useState(false);
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState("");
 
   const [testingInline, setTestingInline] = useState(false);
-  const [testResult, setTestResult] = useState<TestConnectionResult | null>(null);
+  const [testResult, setTestResult] = useState<TestConnectionResult | null>(
+    null
+  );
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      return;
+    }
 
     if (editingConfig) {
       setName(editingConfig.name);
       setProvider(editingConfig.provider);
       setModelId(editingConfig.modelId);
-      setBaseUrl(editingConfig.baseUrl ?? '');
-      setApiKey('');
+      setBaseUrl(editingConfig.baseUrl ?? "");
+      setApiKey("");
       setIsDefault(editingConfig.isDefault);
-      setDescription(editingConfig.description ?? '');
+      setDescription(editingConfig.description ?? "");
     } else {
-      setName('');
-      setProvider('openai');
-      setModelId('');
-      setBaseUrl('');
-      setApiKey('');
+      setName("");
+      setProvider("openai");
+      setModelId("");
+      setBaseUrl("");
+      setApiKey("");
       setIsDefault(configsCount === 0);
-      setDescription('');
+      setDescription("");
     }
     setTestResult(null);
   }, [isOpen, editingConfig, configsCount]);
@@ -78,12 +84,12 @@ export function LLMConfigModal({
     setName(p.name);
     setProvider(p.provider);
     setModelId(p.modelId);
-    setBaseUrl(p.baseUrl ?? '');
+    setBaseUrl(p.baseUrl ?? "");
   }
 
   async function handleTest() {
     if (!modelId.trim()) {
-      toast.error('モデルIDを入力してください');
+      toast.error("モデルIDを入力してください");
       return;
     }
     setTestingInline(true);
@@ -99,7 +105,7 @@ export function LLMConfigModal({
       if (res.success) {
         toast.success(`接続成功 (${res.latencyMs}ms)`);
       } else {
-        toast.error(`接続失敗: ${res.error ?? '応答なし'}`);
+        toast.error(`接続失敗: ${res.error ?? "応答なし"}`);
       }
     } catch (e) {
       toast.error(toErrorMessage(e));
@@ -110,8 +116,12 @@ export function LLMConfigModal({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return toast.error('表示名を入力してください');
-    if (!modelId.trim()) return toast.error('モデルIDを入力してください');
+    if (!name.trim()) {
+      return toast.error("表示名を入力してください");
+    }
+    if (!modelId.trim()) {
+      return toast.error("モデルIDを入力してください");
+    }
 
     try {
       if (editingConfig) {
@@ -123,9 +133,11 @@ export function LLMConfigModal({
           isDefault,
           description: description.trim() || null,
         };
-        if (apiKey.trim()) input.apiKey = apiKey.trim();
+        if (apiKey.trim()) {
+          input.apiKey = apiKey.trim();
+        }
         await onUpdate(editingConfig.id, input);
-        toast.success('LLM設定を更新しました');
+        toast.success("LLM設定を更新しました");
       } else {
         const input: CreateLLMConfigInput = {
           name: name.trim(),
@@ -137,7 +149,7 @@ export function LLMConfigModal({
           description: description.trim() || null,
         };
         await onCreate(input);
-        toast.success('新しいLLMを追加しました');
+        toast.success("新しいLLMを追加しました");
       }
       onClose();
     } catch (err) {
@@ -149,12 +161,12 @@ export function LLMConfigModal({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={editingConfig ? 'LLM設定の編集' : '新しいLLMを追加'}
+      title={editingConfig ? "LLM設定の編集" : "新しいLLMを追加"}
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {!editingConfig && (
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-foreground-secondary">
+            <label className="mb-1.5 block font-medium text-foreground-secondary text-xs">
               プリセットから素早く入力
             </label>
             <div className="flex flex-wrap gap-1.5">
@@ -163,7 +175,7 @@ export function LLMConfigModal({
                   key={p.label}
                   type="button"
                   onClick={() => applyPreset(p)}
-                  className="rounded-md border border-border bg-surface-raised px-2 py-1 text-xs text-foreground transition hover:border-primary hover:text-primary"
+                  className="rounded-md border border-border bg-surface-raised px-2 py-1 text-foreground text-xs transition hover:border-primary hover:text-primary"
                 >
                   {p.label}
                 </button>
@@ -181,19 +193,25 @@ export function LLMConfigModal({
         />
 
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-foreground-secondary">
+          <label className="mb-1.5 block font-medium text-foreground-secondary text-sm">
             プロバイダ種別
           </label>
           <Select
             value={provider}
-            onChange={(e) => setProvider(e.target.value as CreateLLMConfigInput['provider'])}
+            onChange={(e) =>
+              setProvider(e.target.value as CreateLLMConfigInput["provider"])
+            }
             className="w-full px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
           >
             <option value="openai">OpenAI (GPT-4o, o3-miniなど)</option>
-            <option value="anthropic">Anthropic (Claude 3.7 Sonnet, Claude 3.5 Haikuなど)</option>
+            <option value="anthropic">
+              Anthropic (Claude 3.7 Sonnet, Claude 3.5 Haikuなど)
+            </option>
             <option value="google">Google (Gemini 2.5 Pro, Flashなど)</option>
             <option value="ollama">Ollama (ローカル/Cloud LLM)</option>
-            <option value="custom_openai">OpenAI互換 (OpenRouter, Groq, vLLM等)</option>
+            <option value="custom_openai">
+              OpenAI互換 (OpenRouter, Groq, vLLM等)
+            </option>
           </Select>
         </div>
 
@@ -218,9 +236,9 @@ export function LLMConfigModal({
           placeholder={
             editingConfig
               ? editingConfig.hasApiKey
-                ? '登録済みキーを維持'
-                : '未設定 (環境変数を使用)'
-              : '未入力の場合はサーバー環境変数を使用'
+                ? "登録済みキーを維持"
+                : "未設定 (環境変数を使用)"
+              : "未入力の場合はサーバー環境変数を使用"
           }
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
@@ -234,7 +252,10 @@ export function LLMConfigModal({
             onChange={(e) => setIsDefault(e.target.checked)}
             className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
           />
-          <label htmlFor="isDefaultCheck" className="text-sm text-foreground select-none">
+          <label
+            htmlFor="isDefaultCheck"
+            className="select-none text-foreground text-sm"
+          >
             デフォルトモデルに設定する
           </label>
         </div>
@@ -251,19 +272,25 @@ export function LLMConfigModal({
           <div
             className={`rounded-lg border p-3 text-xs ${
               testResult.success
-                ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-                : 'border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                : "border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400"
             }`}
           >
             <div className="font-semibold">
-              {testResult.success ? '✓ 接続成功' : '✗ 接続失敗'} ({testResult.latencyMs}ms)
+              {testResult.success ? "✓ 接続成功" : "✗ 接続失敗"} (
+              {testResult.latencyMs}ms)
             </div>
             <div className="mt-1 break-all">{testResult.message}</div>
           </div>
         )}
 
-        <div className="flex items-center justify-between pt-3 border-t border-border">
-          <Button type="button" variant="secondary" onClick={handleTest} isLoading={testingInline}>
+        <div className="flex items-center justify-between border-border border-t pt-3">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleTest}
+            isLoading={testingInline}
+          >
             接続テスト
           </Button>
           <div className="flex items-center gap-2">
@@ -271,7 +298,7 @@ export function LLMConfigModal({
               キャンセル
             </Button>
             <Button type="submit" isLoading={isSubmitting}>
-              {editingConfig ? '保存する' : '追加する'}
+              {editingConfig ? "保存する" : "追加する"}
             </Button>
           </div>
         </div>

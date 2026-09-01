@@ -1,17 +1,17 @@
-import { useNavigate } from '@tanstack/react-router';
-import { MarkdownText } from '@/components/MarkdownText.js';
-import { Tag } from '@/components/Tag.js';
-import { useCharacters } from '@/hooks/useCharacters.js';
-import { useNovel } from '@/hooks/useNovel.js';
-import type { Character } from '@/lib/types.js';
-import { CharactersMarkdownEditor } from './-CharactersMarkdownEditor.js';
-import { EntityListTab } from './-EntityListTab.js';
+import { useNavigate } from "@tanstack/react-router";
+import { MarkdownText } from "@/components/MarkdownText.js";
+import { Tag } from "@/components/Tag.js";
+import { useCharacters } from "@/hooks/useCharacters.js";
+import { useNovel } from "@/hooks/useNovel.js";
+import type { Character } from "@/lib/types.js";
+import { CharactersMarkdownEditor } from "./-CharactersMarkdownEditor.js";
+import { EntityListTab } from "./-EntityListTab.js";
 
 export function CharactersTab({
   novel,
   onRefresh,
 }: {
-  novel: NonNullable<ReturnType<typeof useNovel>['novel']>;
+  novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;
   onRefresh: () => Promise<void>;
 }) {
   const {
@@ -38,31 +38,39 @@ export function CharactersTab({
       deleting={deleting}
       onDelete={deleteCharacter}
       config={{
-        title: '人物一覧',
-        newLabel: '新規作成',
-        sidebarLabel: '目次 (カテゴリ / 人物)',
-        sidebarEmpty: '人物が見つかりません',
-        loadingMessage: '人物を読み込み中...',
-        emptyTitle: '人物が登録されていません',
-        emptyDescription: '主人公や脇役を登録して、物語を豊かにしましょう。',
-        idPrefix: 'char',
-        cardHeight: 'h-64',
-        categoryOf: (c) => c.category || '未分類',
+        title: "人物一覧",
+        newLabel: "新規作成",
+        sidebarLabel: "目次 (カテゴリ / 人物)",
+        sidebarEmpty: "人物が見つかりません",
+        loadingMessage: "人物を読み込み中...",
+        emptyTitle: "人物が登録されていません",
+        emptyDescription: "主人公や脇役を登録して、物語を豊かにしましょう。",
+        idPrefix: "char",
+        cardHeight: "h-64",
+        categoryOf: (c) => c.category || "未分類",
         onNew: () =>
-          navigate({ to: '/novels/$novelId/characters/new', params: { novelId: novel.id } }),
+          navigate({
+            to: "/novels/$novelId/characters/new",
+            params: { novelId: novel.id },
+          }),
         onEdit: (character) =>
           navigate({
-            to: '/novels/$novelId/characters/$characterId',
+            to: "/novels/$novelId/characters/$characterId",
             params: { novelId: novel.id, characterId: character.id },
           }),
         renderCardBody: (character) => (
-          <MarkdownText content={character.description || '説明なし'} className="text-sm" />
+          <MarkdownText
+            content={character.description || "説明なし"}
+            className="text-sm"
+          />
         ),
         renderCardFooter: (character) =>
           character.traits && character.traits.length > 0 ? (
             character.traits.map((t) => <Tag key={t}>{t}</Tag>)
           ) : (
-            <span className="text-[11px] text-muted-foreground italic">特徴なし</span>
+            <span className="text-[11px] text-muted-foreground italic">
+              特徴なし
+            </span>
           ),
         renderMarkdownEditor: (novelId) => (
           <CharactersMarkdownEditor
@@ -76,9 +84,9 @@ export function CharactersTab({
             editingDocument={editingDocument}
           />
         ),
-        deleteTitle: '人物を削除しますか？',
-        deleteMessage: 'この操作は元に戻せません。',
-        deleteConfirmLabel: '削除',
+        deleteTitle: "人物を削除しますか？",
+        deleteMessage: "この操作は元に戻せません。",
+        deleteConfirmLabel: "削除",
       }}
     />
   );

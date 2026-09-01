@@ -1,18 +1,18 @@
-import type { StorybookConfig } from '@storybook/react-vite';
+import type { StorybookConfig } from "@storybook/react-vite";
 
 const config: StorybookConfig = {
-  stories: ['../src/**/*.stories.@(ts|tsx)'],
+  stories: ["../src/**/*.stories.@(ts|tsx)"],
   addons: [
-    '@storybook/addon-docs',
+    "@storybook/addon-docs",
     {
-      name: '@storybook/addon-mcp',
+      name: "@storybook/addon-mcp",
       options: {
-        endpoint: '/mcp',
+        endpoint: "/mcp",
       },
     },
   ],
   framework: {
-    name: '@storybook/react-vite',
+    name: "@storybook/react-vite",
     options: {},
   },
 };

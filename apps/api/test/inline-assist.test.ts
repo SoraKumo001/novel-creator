@@ -1,55 +1,67 @@
-import { Hono } from 'hono';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  chapters,
+  customPrompts,
+  llmConfigs,
+  novels,
+  sections,
+} from "@novel-creator/db";
+import { Hono } from "hono";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { chapters, customPrompts, llmConfigs, novels, sections } from '@novel-creator/db';
-
-import type { AppContext } from '../src/context.js';
+import type { AppContext } from "../src/context.js";
 
 // ---- モック準備 ----
 
 // RAG 検索をスタブ（inlineAssist / proofreadContent が import しているモジュール）
-vi.mock('../src/rag.js', () => ({
+vi.mock("../src/rag.js", () => ({
   searchContext: vi.fn(),
   upsertEntityEmbedding: vi.fn(),
 }));
 
 // streamText のみモック化し、プロンプト組立（inlineAssistPrompt 等）は実物を使う
-vi.mock('@novel-creator/llm', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@novel-creator/llm')>();
+vi.mock("@novel-creator/llm", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@novel-creator/llm")>();
   return {
     ...actual,
     streamText: vi.fn(),
   };
 });
 
-import { streamText } from '@novel-creator/llm';
-import { GenerateDomainService } from '../src/core/generate.service.js';
-import type { ServiceContext } from '../src/core/types.js';
-import { searchContext } from '../src/rag.js';
+import { streamText } from "@novel-creator/llm";
+import { GenerateDomainService } from "../src/core/generate.service.js";
+import type { ServiceContext } from "../src/core/types.js";
+import { searchContext } from "../src/rag.js";
 
 const mockStreamText = vi.mocked(streamText);
 const mockSearchContext = vi.mocked(searchContext);
 
 // ---- センチネル（モック渡しの確認用） ----
 
-const LLM_SENTINEL = { __kind: 'llm' } as unknown;
-const EMBEDDING_SENTINEL = { __kind: 'embedding' } as unknown;
-const VECTOR_STORE_SENTINEL = { __kind: 'vectorStore' } as unknown;
-const ENV_SENTINEL = { __kind: 'env' } as unknown;
+const LLM_SENTINEL = { __kind: "llm" } as unknown;
+const EMBEDDING_SENTINEL = { __kind: "embedding" } as unknown;
+const VECTOR_STORE_SENTINEL = { __kind: "vectorStore" } as unknown;
+const ENV_SENTINEL = { __kind: "env" } as unknown;
 
 // ---- フィクスチャ ----
 
-const NOVEL_ID = '22222222-2222-4222-8222-222222222222';
-const CHAPTER_ID = '44444444-4444-4444-8444-444444444444';
-const SECTION_ID = '33333333-3333-4333-8333-333333333333';
+const NOVEL_ID = "22222222-2222-4222-8222-222222222222";
+const CHAPTER_ID = "44444444-4444-4444-8444-444444444444";
+const SECTION_ID = "33333333-3333-4333-8333-333333333333";
 
 const baseRows = {
-  sections: [{ id: SECTION_ID, chapterId: CHAPTER_ID, title: '節1', summary: '節のあらすじ' }],
-  chapters: [{ id: CHAPTER_ID, novelId: NOVEL_ID, title: '章1' }],
-  novels: [{ id: NOVEL_ID, title: '小説1', styleGuide: '文体ガイド' }],
+  chapters: [{ id: CHAPTER_ID, novelId: NOVEL_ID, title: "章1" }],
   customPrompts: [],
   // llmConfigs を空にして resolveLLMModel が ctx.llm（センチネル）へフォールバックするようにする
   llmConfigs: [],
+  novels: [{ id: NOVEL_ID, styleGuide: "文体ガイド", title: "小説1" }],
+  sections: [
+    {
+      chapterId: CHAPTER_ID,
+      id: SECTION_ID,
+      summary: "節のあらすじ",
+      title: "節1",
+    },
+  ],
 };
 
 type MockTables = {
@@ -81,10 +93,10 @@ function createMockDb(rows: MockTables) {
 function createService(db: unknown) {
   const ctx = {
     db,
-    llm: LLM_SENTINEL,
     embedding: EMBEDDING_SENTINEL,
-    vectorStore: VECTOR_STORE_SENTINEL,
     env: ENV_SENTINEL,
+    llm: LLM_SENTINEL,
+    vectorStore: VECTOR_STORE_SENTINEL,
   } as unknown as ServiceContext;
   return new GenerateDomainService(ctx);
 }
@@ -111,32 +123,44 @@ type StreamAction = { gate?: Promise<void>; emit?: string; fail?: unknown };
  * 指定されたアクション列に従ってチャンクを流す（または失敗する）ストリーム。
  * gate を指定すると、open されるまでそのアクションへ進まない。
  */
-async function* scriptedStream(actions: StreamAction[]): AsyncGenerator<string> {
+async function* scriptedStream(
+  actions: StreamAction[]
+): AsyncGenerator<string> {
   for (const action of actions) {
-    if (action.gate) await action.gate;
-    if (action.fail !== undefined) throw action.fail;
-    if (action.emit !== undefined) yield action.emit;
+    if (action.gate) {
+      await action.gate;
+    }
+    if (action.fail !== undefined) {
+      throw action.fail;
+    }
+    if (action.emit !== undefined) {
+      yield action.emit;
+    }
   }
 }
 
 /** 複数バリアント時のプロンプトに含まれるバリエーション方針（案1〜案3） */
 const VARIANT_MARKERS = [
-  '【バリエーション方針 案1】',
-  '【バリエーション方針 案2】',
-  '【バリエーション方針 案3】',
+  "【バリエーション方針 案1】",
+  "【バリエーション方針 案2】",
+  "【バリエーション方針 案3】",
 ] as const;
 
 /**
  * プロンプト中のバリエーション方針からバリアント番号を判別し、対応するスクリプトを返す。
  * キーは 0 始まりのバリアントインデックス。
  */
-function registerVariantScripts(scripts: Record<number, AsyncGenerator<string>>) {
+function registerVariantScripts(
+  scripts: Record<number, AsyncGenerator<string>>
+) {
   mockStreamText.mockImplementation((_model, prompt) => {
-    const index = VARIANT_MARKERS.findIndex((marker) => prompt.includes(marker));
+    const index = VARIANT_MARKERS.findIndex((marker) =>
+      prompt.includes(marker)
+    );
     const script = scripts[index];
     if (!script) {
       throw new Error(
-        `予期しないプロンプトです（バリアント ${index + 1}）: ${prompt.slice(0, 60)}`,
+        `予期しないプロンプトです（バリアント ${index + 1}）: ${prompt.slice(0, 60)}`
       );
     }
     return script;
@@ -153,46 +177,53 @@ async function collect(iter: AsyncIterable<{ text: string; variant: number }>) {
 
 // ---- テスト ----
 
-describe('GenerateDomainService.inlineAssist', () => {
+describe("GenerateDomainService.inlineAssist", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mockSearchContext.mockResolvedValue({
-      characters: ['キャラAの説明'],
-      settings: ['設定Bの説明'],
+      characters: ["キャラAの説明"],
+      settings: ["設定Bの説明"],
     });
   });
 
-  describe('単一バリアント', () => {
-    it('variantCount 未指定では variant: 0 のチャンクを順序通りに返すこと', async () => {
+  describe("単一バリアント", () => {
+    it("variantCount 未指定では variant: 0 のチャンクを順序通りに返すこと", async () => {
       mockStreamText.mockImplementation(() =>
-        scriptedStream([{ emit: '書き' }, { emit: '出し' }, { emit: '結果' }]),
+        scriptedStream([{ emit: "書き" }, { emit: "出し" }, { emit: "結果" }])
       );
       const service = createService(createMockDb(baseRows));
 
       const chunks = await collect(
-        service.inlineAssist(SECTION_ID, { selectedText: '対象テキスト', action: 'expand' }),
+        service.inlineAssist(SECTION_ID, {
+          action: "expand",
+          selectedText: "対象テキスト",
+        })
       );
 
       expect(chunks).toEqual([
-        { text: '書き', variant: 0 },
-        { text: '出し', variant: 0 },
-        { text: '結果', variant: 0 },
+        { text: "書き", variant: 0 },
+        { text: "出し", variant: 0 },
+        { text: "結果", variant: 0 },
       ]);
       expect(mockStreamText).toHaveBeenCalledTimes(1);
       // 単一生成のプロンプトにはバリエーション方針が含まれない
-      expect(mockStreamText.mock.calls[0]?.[1]).not.toContain('【バリエーション方針');
+      expect(mockStreamText.mock.calls[0]?.[1]).not.toContain(
+        "【バリエーション方針"
+      );
     });
 
-    it('RAG 検索とプロンプト組立に節・章・小説の文脈が反映されること', async () => {
-      mockStreamText.mockImplementation(() => scriptedStream([{ emit: '結果' }]));
+    it("RAG 検索とプロンプト組立に節・章・小説の文脈が反映されること", async () => {
+      mockStreamText.mockImplementation(() =>
+        scriptedStream([{ emit: "結果" }])
+      );
       const service = createService(createMockDb(baseRows));
 
       await collect(
         service.inlineAssist(SECTION_ID, {
-          selectedText: '選択範囲',
-          action: 'emotional',
-          surroundingText: '前後の文脈',
-        }),
+          action: "emotional",
+          selectedText: "選択範囲",
+          surroundingText: "前後の文脈",
+        })
       );
 
       // RAG への渡し方: 選択テキストをクエリにして novel スコープで検索する
@@ -200,26 +231,26 @@ describe('GenerateDomainService.inlineAssist', () => {
         VECTOR_STORE_SENTINEL,
         EMBEDDING_SENTINEL,
         NOVEL_ID,
-        { query: '選択範囲' },
-        ENV_SENTINEL,
+        { query: "選択範囲" },
+        ENV_SENTINEL
       );
       // モデルは resolveLLMModel のフォールバック（ctx.llm）が渡る
       expect(mockStreamText.mock.calls[0]?.[0]).toBe(LLM_SENTINEL);
 
-      const prompt = mockStreamText.mock.calls[0]?.[1] ?? '';
-      expect(prompt).toContain('小説1'); // novelTitle
-      expect(prompt).toContain('文体ガイド'); // styleGuide
-      expect(prompt).toContain('キャラAの説明'); // characters（RAG 結果）
-      expect(prompt).toContain('前後の文脈'); // surroundingText
-      expect(prompt).toContain('選択範囲'); // selectedText
+      const prompt = mockStreamText.mock.calls[0]?.[1] ?? "";
+      expect(prompt).toContain("小説1"); // novelTitle
+      expect(prompt).toContain("文体ガイド"); // styleGuide
+      expect(prompt).toContain("キャラAの説明"); // characters（RAG 結果）
+      expect(prompt).toContain("前後の文脈"); // surroundingText
+      expect(prompt).toContain("選択範囲"); // selectedText
       // 現行挙動: 非テンプレートのプロンプトには settings は含まれない
       //（settings は customTemplate 経由でのみプロンプトへ反映される）
-      expect(prompt).not.toContain('設定Bの説明');
+      expect(prompt).not.toContain("設定Bの説明");
     });
   });
 
-  describe('複数バリアントの並列マージ', () => {
-    it('バリアントのストリームがインターリーブしても到着順・内容が保たれること', async () => {
+  describe("複数バリアントの並列マージ", () => {
+    it("バリアントのストリームがインターリーブしても到着順・内容が保たれること", async () => {
       const gateA1 = createGate();
       const gateA2 = createGate();
       const gateB1 = createGate();
@@ -227,60 +258,84 @@ describe('GenerateDomainService.inlineAssist', () => {
       const gateC1 = createGate();
       registerVariantScripts({
         0: scriptedStream([
-          { gate: gateA1.wait, emit: 'A1' },
-          { gate: gateA2.wait, emit: 'A2' },
+          { emit: "A1", gate: gateA1.wait },
+          { emit: "A2", gate: gateA2.wait },
         ]),
         1: scriptedStream([
-          { gate: gateB1.wait, emit: 'B1' },
-          { gate: gateB2.wait, emit: 'B2' },
+          { emit: "B1", gate: gateB1.wait },
+          { emit: "B2", gate: gateB2.wait },
         ]),
-        2: scriptedStream([{ gate: gateC1.wait, emit: 'C1' }]),
+        2: scriptedStream([{ emit: "C1", gate: gateC1.wait }]),
       });
       const service = createService(createMockDb(baseRows));
 
       const iter = service.inlineAssist(SECTION_ID, {
-        selectedText: '対象',
-        action: 'expand',
+        action: "expand",
+        selectedText: "対象",
         variantCount: 3,
       });
 
       // ゲートを開く順序で到着順を制御する
       gateA1.open();
-      expect(await iter.next()).toEqual({ value: { text: 'A1', variant: 0 }, done: false });
+      expect(await iter.next()).toEqual({
+        done: false,
+        value: { text: "A1", variant: 0 },
+      });
       gateB1.open();
-      expect(await iter.next()).toEqual({ value: { text: 'B1', variant: 1 }, done: false });
+      expect(await iter.next()).toEqual({
+        done: false,
+        value: { text: "B1", variant: 1 },
+      });
       gateA2.open();
-      expect(await iter.next()).toEqual({ value: { text: 'A2', variant: 0 }, done: false });
+      expect(await iter.next()).toEqual({
+        done: false,
+        value: { text: "A2", variant: 0 },
+      });
       gateC1.open();
-      expect(await iter.next()).toEqual({ value: { text: 'C1', variant: 2 }, done: false });
+      expect(await iter.next()).toEqual({
+        done: false,
+        value: { text: "C1", variant: 2 },
+      });
       gateB2.open();
-      expect(await iter.next()).toEqual({ value: { text: 'B2', variant: 1 }, done: false });
+      expect(await iter.next()).toEqual({
+        done: false,
+        value: { text: "B2", variant: 1 },
+      });
 
       // 全バリアント完了後のみストリームが終了する
       expect((await iter.next()).done).toBe(true);
 
       expect(mockStreamText).toHaveBeenCalledTimes(3);
       // プロンプトはバリアントごとに方針（案1〜案3）が使い分けられる
-      expect(mockStreamText.mock.calls[0]?.[1]).toContain('【バリエーション方針 案1】');
-      expect(mockStreamText.mock.calls[1]?.[1]).toContain('【バリエーション方針 案2】');
-      expect(mockStreamText.mock.calls[2]?.[1]).toContain('【バリエーション方針 案3】');
+      expect(mockStreamText.mock.calls[0]?.[1]).toContain(
+        "【バリエーション方針 案1】"
+      );
+      expect(mockStreamText.mock.calls[1]?.[1]).toContain(
+        "【バリエーション方針 案2】"
+      );
+      expect(mockStreamText.mock.calls[2]?.[1]).toContain(
+        "【バリエーション方針 案3】"
+      );
     });
 
-    it('先に完了したバリアントがあっても、全バリアント完了後にストリームが終了すること', async () => {
+    it("先に完了したバリアントがあっても、全バリアント完了後にストリームが終了すること", async () => {
       const gateB1 = createGate();
       registerVariantScripts({
-        0: scriptedStream([{ emit: 'A1' }]), // 即完了
-        1: scriptedStream([{ gate: gateB1.wait, emit: 'B1' }]),
+        0: scriptedStream([{ emit: "A1" }]), // 即完了
+        1: scriptedStream([{ emit: "B1", gate: gateB1.wait }]),
       });
       const service = createService(createMockDb(baseRows));
 
       const iter = service.inlineAssist(SECTION_ID, {
-        selectedText: '対象',
-        action: 'expand',
+        action: "expand",
+        selectedText: "対象",
         variantCount: 2,
       });
 
-      expect(await iter.next()).toEqual({ value: { text: 'A1', variant: 0 }, done: false });
+      expect(await iter.next()).toEqual({
+        done: false,
+        value: { text: "A1", variant: 0 },
+      });
 
       // バリアント1（案2）が未完了のうちはストリームが終了しない
       const pending = iter.next();
@@ -292,22 +347,25 @@ describe('GenerateDomainService.inlineAssist', () => {
       expect(settled).toBe(false);
 
       gateB1.open();
-      expect(await pending).toEqual({ value: { text: 'B1', variant: 1 }, done: false });
+      expect(await pending).toEqual({
+        done: false,
+        value: { text: "B1", variant: 1 },
+      });
       expect((await iter.next()).done).toBe(true);
     });
 
-    it('一部バリアントがエラーになるとストリーム全体がそのエラーで reject すること（現行挙動）', async () => {
+    it("一部バリアントがエラーになるとストリーム全体がそのエラーで reject すること（現行挙動）", async () => {
       const gateB1 = createGate();
-      const failure = new Error('variant 1 でエラー');
+      const failure = new Error("variant 1 でエラー");
       registerVariantScripts({
         0: scriptedStream([{ fail: failure }]),
-        1: scriptedStream([{ gate: gateB1.wait, emit: 'B1' }]),
+        1: scriptedStream([{ emit: "B1", gate: gateB1.wait }]),
       });
       const service = createService(createMockDb(baseRows));
 
       const iter = service.inlineAssist(SECTION_ID, {
-        selectedText: '対象',
-        action: 'expand',
+        action: "expand",
+        selectedText: "対象",
         variantCount: 2,
       });
 
@@ -321,50 +379,59 @@ describe('GenerateDomainService.inlineAssist', () => {
       await flushAsync();
     });
 
-    it('エラー以前に到着したチャンクは先に取りり出せてから reject すること（現行挙動）', async () => {
+    it("エラー以前に到着したチャンクは先に取りり出せてから reject すること（現行挙動）", async () => {
       const gateA2 = createGate();
       const gateB1 = createGate();
-      const failure = new Error('variant 1 でエラー');
+      const failure = new Error("variant 1 でエラー");
       registerVariantScripts({
-        0: scriptedStream([{ emit: 'A1' }, { gate: gateA2.wait, fail: failure }]),
-        1: scriptedStream([{ gate: gateB1.wait, emit: 'B1' }]),
+        0: scriptedStream([
+          { emit: "A1" },
+          { fail: failure, gate: gateA2.wait },
+        ]),
+        1: scriptedStream([{ emit: "B1", gate: gateB1.wait }]),
       });
       const service = createService(createMockDb(baseRows));
 
       const iter = service.inlineAssist(SECTION_ID, {
-        selectedText: '対象',
-        action: 'expand',
+        action: "expand",
+        selectedText: "対象",
         variantCount: 2,
       });
 
       // エラーは到着順の1項目として扱われるため、先に到着したチャンクは取りり出せる
-      expect(await iter.next()).toEqual({ value: { text: 'A1', variant: 0 }, done: false });
+      expect(await iter.next()).toEqual({
+        done: false,
+        value: { text: "A1", variant: 0 },
+      });
       gateB1.open();
-      expect(await iter.next()).toEqual({ value: { text: 'B1', variant: 1 }, done: false });
+      expect(await iter.next()).toEqual({
+        done: false,
+        value: { text: "B1", variant: 1 },
+      });
       gateA2.open();
       await expect(iter.next()).rejects.toBe(failure);
     });
 
-    it('消費側が break で早期終了してもエラーにならず、後続チャンクは破棄されること（現行挙動）', async () => {
+    it("消費側が break で早期終了してもエラーにならず、後続チャンクは破棄されること（現行挙動）", async () => {
       const gateA2 = createGate();
       const gateB1 = createGate();
       registerVariantScripts({
-        0: scriptedStream([{ emit: 'A1' }, { gate: gateA2.wait, emit: 'A2' }]),
-        1: scriptedStream([{ gate: gateB1.wait, emit: 'B1' }]),
+        0: scriptedStream([{ emit: "A1" }, { emit: "A2", gate: gateA2.wait }]),
+        1: scriptedStream([{ emit: "B1", gate: gateB1.wait }]),
       });
       const service = createService(createMockDb(baseRows));
 
       const received: Array<{ text: string; variant: number }> = [];
       for await (const chunk of service.inlineAssist(SECTION_ID, {
-        selectedText: '対象',
-        action: 'expand',
+        action: "expand",
+        selectedText: "対象",
         variantCount: 2,
       })) {
         received.push(chunk);
         break; // 早期終了
       }
 
-      expect(received).toEqual([{ text: 'A1', variant: 0 }]);
+      expect(received).toEqual([{ text: "A1", variant: 0 }]);
 
       // バックグラウンドタスクはキャンセルされず最後まで走る。
       // 未処理 rejection が発生しないことを確認しつつ後始末する。
@@ -383,65 +450,74 @@ const mockServices = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('../src/core/services.js', () => ({
+vi.mock("../src/core/services.js", () => ({
   getServices: () => mockServices,
 }));
 
-import sectionsRouter from '../src/routes/sections.js';
+import sectionsRouter from "../src/routes/sections.js";
 
 function createSseTestApp() {
   const app = new Hono<AppContext>();
-  app.use('*', async (c, next) => {
-    c.set('env', {} as never);
-    c.set('db', {} as never);
-    c.set('llm', {} as never);
-    c.set('embedding', {} as never);
-    c.set('vectorStore', {} as never);
+  app.use("*", async (c, next) => {
+    c.set("env", {} as never);
+    c.set("db", {} as never);
+    c.set("llm", {} as never);
+    c.set("embedding", {} as never);
+    c.set("vectorStore", {} as never);
     await next();
   });
-  app.route('/api/sections', sectionsRouter);
+  app.route("/api/sections", sectionsRouter);
   return app;
 }
 
 async function readStreamText(res: Response): Promise<string> {
-  const reader = res.body!.getReader();
+  const reader = res.body?.getReader();
   const decoder = new TextDecoder();
-  let text = '';
+  let text = "";
   for (;;) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {
+      break;
+    }
     text += decoder.decode(value, { stream: true });
   }
   text += decoder.decode();
   return text;
 }
 
-describe('inline-assist SSE のワイヤ契約', () => {
+describe("inline-assist SSE のワイヤ契約", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('data 行のみで { text, variant } を返し、全チャンク後に { done: true } を返すこと', async () => {
+  it("data 行のみで { text, variant } を返し、全チャンク後に { done: true } を返すこと", async () => {
     mockServices.generate.inlineAssist.mockImplementation(async function* () {
-      yield { text: 'A1', variant: 0 };
-      yield { text: 'B1', variant: 1 };
+      yield { text: "A1", variant: 0 };
+      yield { text: "B1", variant: 1 };
     });
 
     const app = createSseTestApp();
-    const res = await app.request(`/api/sections/${SECTION_ID}/generate/inline-assist`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ selectedText: '対象', action: 'expand', variantCount: 2 }),
-    });
+    const res = await app.request(
+      `/api/sections/${SECTION_ID}/generate/inline-assist`,
+      {
+        body: JSON.stringify({
+          action: "expand",
+          selectedText: "対象",
+          variantCount: 2,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      }
+    );
 
     expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toContain('text/event-stream');
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
 
     const raw = await readStreamText(res);
     const dataLines = raw
-      .split('\n')
-      .filter((line) => line.startsWith('data: '))
-      .map((line) => line.slice('data: '.length));
+      .split("\n")
+      .filter((line) => line.startsWith("data: "))
+      .map((line) => line.slice("data: ".length));
 
     // チャンクは text / variant 付きで、最後に done イベントが1件
     expect(dataLines).toEqual([
@@ -450,12 +526,16 @@ describe('inline-assist SSE のワイヤ契約', () => {
       '{"done":true}',
     ]);
     // inline-assist の SSE は event 名を使わない（data 行のみ）
-    expect(raw).not.toContain('event:');
+    expect(raw).not.toContain("event:");
 
     // ルートからサービスへの受け渡し（SSE 契約の入力側）
     expect(mockServices.generate.inlineAssist).toHaveBeenCalledWith(
       SECTION_ID,
-      expect.objectContaining({ selectedText: '対象', action: 'expand', variantCount: 2 }),
+      expect.objectContaining({
+        action: "expand",
+        selectedText: "対象",
+        variantCount: 2,
+      })
     );
   });
 });

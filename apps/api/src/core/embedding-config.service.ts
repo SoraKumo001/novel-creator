@@ -1,24 +1,34 @@
-import { eq, desc } from 'drizzle-orm';
-import { embeddingConfigs, type EmbeddingConfig, type NewEmbeddingConfig } from '@novel-creator/db';
-import { testEmbeddingConnection, type EmbeddingConfigInput } from '@novel-creator/llm';
 import {
-  resolveEmbeddingModel as resolveEmbeddingModelShared,
+  type EmbeddingConfig,
+  embeddingConfigs,
+  type NewEmbeddingConfig,
+} from "@novel-creator/db";
+import {
+  type EmbeddingConfigInput,
+  testEmbeddingConnection,
+} from "@novel-creator/llm";
+import { desc, eq } from "drizzle-orm";
+import {
   type ResolvedEmbeddingModel,
-} from './model-resolver.js';
-import { assertFound, ValidationError, type ServiceContext } from './types.js';
+  resolveEmbeddingModel as resolveEmbeddingModelShared,
+} from "./model-resolver.js";
+import { assertFound, type ServiceContext, ValidationError } from "./types.js";
 
-export interface MaskedEmbeddingConfig extends Omit<EmbeddingConfig, 'apiKey'> {
+export interface MaskedEmbeddingConfig extends Omit<EmbeddingConfig, "apiKey"> {
   apiKeyMasked: string | null;
   hasApiKey: boolean;
 }
 
-function maskApiKey(key?: string | null): { apiKeyMasked: string | null; hasApiKey: boolean } {
-  if (!key || !key.trim()) {
+function maskApiKey(key?: string | null): {
+  apiKeyMasked: string | null;
+  hasApiKey: boolean;
+} {
+  if (!key?.trim()) {
     return { apiKeyMasked: null, hasApiKey: false };
   }
   const trimmed = key.trim();
   if (trimmed.length <= 8) {
-    return { apiKeyMasked: '********', hasApiKey: true };
+    return { apiKeyMasked: "********", hasApiKey: true };
   }
   const prefix = trimmed.slice(0, 4);
   const suffix = trimmed.slice(-4);
@@ -32,7 +42,10 @@ export class EmbeddingConfigDomainService {
     const rows = await this.ctx.db
       .select()
       .from(embeddingConfigs)
-      .orderBy(desc(embeddingConfigs.isDefault), desc(embeddingConfigs.createdAt));
+      .orderBy(
+        desc(embeddingConfigs.isDefault),
+        desc(embeddingConfigs.createdAt)
+      );
 
     return rows.map((row) => {
       const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
@@ -51,18 +64,18 @@ export class EmbeddingConfigDomainService {
       .select()
       .from(embeddingConfigs)
       .where(eq(embeddingConfigs.id, id));
-    assertFound(row, 'Embedding Config not found');
+    assertFound(row, "Embedding Config not found");
     return row;
   }
 
   async createConfig(
-    data: Omit<NewEmbeddingConfig, 'id' | 'createdAt' | 'updatedAt'>,
+    data: Omit<NewEmbeddingConfig, "id" | "createdAt" | "updatedAt">
   ): Promise<MaskedEmbeddingConfig> {
     if (!data.name?.trim()) {
-      throw new ValidationError('Name is required');
+      throw new ValidationError("Name is required");
     }
     if (!data.modelId?.trim()) {
-      throw new ValidationError('Model ID is required');
+      throw new ValidationError("Model ID is required");
     }
 
     const existingCount = await this.ctx.db.select().from(embeddingConfigs);
@@ -89,7 +102,7 @@ export class EmbeddingConfigDomainService {
 
   async updateConfig(
     id: string,
-    data: Partial<Omit<NewEmbeddingConfig, 'id' | 'createdAt' | 'updatedAt'>>,
+    data: Partial<Omit<NewEmbeddingConfig, "id" | "createdAt" | "updatedAt">>
   ): Promise<MaskedEmbeddingConfig> {
     const current = await this.getConfig(id);
 
@@ -97,7 +110,7 @@ export class EmbeddingConfigDomainService {
       await this.ctx.db.update(embeddingConfigs).set({ isDefault: false });
     }
 
-    const apiKey = data.apiKey !== undefined ? data.apiKey : current.apiKey;
+    const apiKey = data.apiKey === undefined ? current.apiKey : data.apiKey;
 
     const [row] = await this.ctx.db
       .update(embeddingConfigs)
@@ -109,7 +122,7 @@ export class EmbeddingConfigDomainService {
       .where(eq(embeddingConfigs.id, id))
       .returning();
 
-    assertFound(row, 'Embedding Config not found');
+    assertFound(row, "Embedding Config not found");
     const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
 
     const { apiKey: _, ...rest } = row;
@@ -122,7 +135,7 @@ export class EmbeddingConfigDomainService {
       .delete(embeddingConfigs)
       .where(eq(embeddingConfigs.id, id))
       .returning();
-    assertFound(deleted, 'Embedding Config not found');
+    assertFound(deleted, "Embedding Config not found");
 
     if (current.isDefault) {
       const [latest] = await this.ctx.db
@@ -146,7 +159,7 @@ export class EmbeddingConfigDomainService {
       .set({ isDefault: true, updatedAt: new Date() })
       .where(eq(embeddingConfigs.id, id))
       .returning();
-    assertFound(row, 'Embedding Config not found');
+    assertFound(row, "Embedding Config not found");
 
     const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
 
@@ -162,7 +175,13 @@ export class EmbeddingConfigDomainService {
    * 指定された設定（未指定・不明時はデフォルト設定、それも無ければ環境変数の Embedding）から
    * モデルと次元数を解決する。共通リゾルバへの委譲（従来の id→miss→default 挙動を維持）。
    */
-  async resolveEmbeddingModel(embeddingConfigId?: string | null): Promise<ResolvedEmbeddingModel> {
-    return resolveEmbeddingModelShared(this.ctx, embeddingConfigId, 'useDefault');
+  async resolveEmbeddingModel(
+    embeddingConfigId?: string | null
+  ): Promise<ResolvedEmbeddingModel> {
+    return resolveEmbeddingModelShared(
+      this.ctx,
+      embeddingConfigId,
+      "useDefault"
+    );
   }
 }

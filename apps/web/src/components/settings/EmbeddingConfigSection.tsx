@@ -1,30 +1,32 @@
-import { useState } from 'react';
-import { Button } from '@/components/Button.js';
-import { Card } from '@/components/Card.js';
-import { ConfirmDialog } from '@/components/ConfirmDialog.js';
-import { Loading } from '@/components/Loading.js';
-import { Tag } from '@/components/Tag.js';
-import { getProviderBadge } from '@/components/LLMModelSelector.js';
-import { useToast } from '@/hooks/useToast.js';
-import { toErrorMessage } from '@/lib/errors.js';
+import { useState } from "react";
+import { Button } from "@/components/Button.js";
+import { Card } from "@/components/Card.js";
+import { ConfirmDialog } from "@/components/ConfirmDialog.js";
+import { getProviderBadge } from "@/components/LLMModelSelector.js";
+import { Loading } from "@/components/Loading.js";
+import { Tag } from "@/components/Tag.js";
+import { useToast } from "@/hooks/useToast.js";
+import { toErrorMessage } from "@/lib/errors.js";
 import type {
   EmbeddingConfig,
   TestConnectionResult,
   TestEmbeddingConnectionInput,
-} from '@/lib/types.js';
+} from "@/lib/types.js";
 
 interface EmbeddingConfigSectionProps {
   configs: EmbeddingConfig[];
-  loading: boolean;
   error: string | null;
+  isDeleting: boolean;
+  isSettingDefault: boolean;
+  loading: boolean;
+  onDelete: (id: string) => Promise<void>;
   onOpenCreateModal: () => void;
   onOpenEditModal: (config: EmbeddingConfig) => void;
-  onSetDefault: (id: string) => Promise<EmbeddingConfig>;
-  onDelete: (id: string) => Promise<void>;
   onOpenReindexModal: () => void;
-  onTestConnection: (input: TestEmbeddingConnectionInput) => Promise<TestConnectionResult>;
-  isSettingDefault: boolean;
-  isDeleting: boolean;
+  onSetDefault: (id: string) => Promise<EmbeddingConfig>;
+  onTestConnection: (
+    input: TestEmbeddingConnectionInput
+  ) => Promise<TestConnectionResult>;
 }
 
 export function EmbeddingConfigSection({
@@ -50,7 +52,7 @@ export function EmbeddingConfigSection({
 
   if (error) {
     return (
-      <div className="rounded-lg border border-danger-border bg-danger-subtle p-4 text-sm text-danger-subtle-fg">
+      <div className="rounded-lg border border-danger-border bg-danger-subtle p-4 text-danger-subtle-fg text-sm">
         {error}
       </div>
     );
@@ -59,9 +61,9 @@ export function EmbeddingConfigSection({
   return (
     <>
       <div className="space-y-4">
-        <div className="rounded-xl border border-border bg-surface-raised p-4 text-xs text-muted-foreground flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex flex-col gap-3 rounded-xl border border-border bg-surface-raised p-4 text-muted-foreground text-xs sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <strong className="text-foreground font-semibold">
+            <strong className="font-semibold text-foreground">
               🧬 埋め込みモデル（Embedding）とベクトルインデックス
             </strong>
             <p className="mt-0.5">
@@ -79,10 +81,10 @@ export function EmbeddingConfigSection({
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary-subtle text-2xl">
                 🧬
               </div>
-              <h3 className="text-lg font-medium text-foreground">
+              <h3 className="font-medium text-foreground text-lg">
                 登録済み埋め込みモデルがありません
               </h3>
-              <p className="mt-1 text-sm text-muted">
+              <p className="mt-1 text-muted text-sm">
                 現在はサーバー環境変数（.env）に設定された埋め込みモデルが使用されています。
                 <br />
                 OpenAI、Google Gemini、Ollama などを登録して切り替えられます。
@@ -101,53 +103,60 @@ export function EmbeddingConfigSection({
               const isRowTesting = testingId === cfg.id;
 
               return (
-                <Card key={cfg.id} className="transition hover:border-border-hover">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                    <div className="space-y-1.5 min-w-0">
+                <Card
+                  key={cfg.id}
+                  className="transition hover:border-border-hover"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0 space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-lg font-semibold text-foreground truncate">
+                        <span className="truncate font-semibold text-foreground text-lg">
                           {cfg.name}
                         </span>
                         <span
-                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.bg}`}
+                          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-medium text-xs ${badge.bg}`}
                         >
                           {badge.icon} {badge.label}
                         </span>
-                        <span className="rounded-full bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 text-xs font-semibold">
+                        <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 font-semibold text-primary text-xs">
                           {cfg.dimensions} 次元
                         </span>
                         {cfg.isDefault && <Tag>★ デフォルト</Tag>}
                       </div>
 
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-foreground-secondary">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-foreground-secondary text-xs">
                         <div>
-                          <span className="text-muted">Model ID:</span>{' '}
+                          <span className="text-muted">Model ID:</span>{" "}
                           <code className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-foreground">
                             {cfg.modelId}
                           </code>
                         </div>
                         {cfg.baseUrl && (
                           <div>
-                            <span className="text-muted">Base URL:</span>{' '}
-                            <span className="truncate max-w-xs font-mono">{cfg.baseUrl}</span>
+                            <span className="text-muted">Base URL:</span>{" "}
+                            <span className="max-w-xs truncate font-mono">
+                              {cfg.baseUrl}
+                            </span>
                           </div>
                         )}
                         <div>
-                          <span className="text-muted">API Key:</span>{' '}
+                          <span className="text-muted">API Key:</span>{" "}
                           <span>
                             {cfg.hasApiKey
-                              ? (cfg.apiKeyMasked ?? '登録済み')
-                              : '環境変数をフォールバック利用'}
+                              ? (cfg.apiKeyMasked ?? "登録済み")
+                              : "環境変数をフォールバック利用"}
                           </span>
                         </div>
                       </div>
 
                       {cfg.description && (
-                        <p className="text-xs text-muted mt-1">{cfg.description}</p>
+                        <p className="mt-1 text-muted text-xs">
+                          {cfg.description}
+                        </p>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex shrink-0 items-center gap-2">
                       <Button
                         variant="secondary"
                         size="sm"
@@ -160,8 +169,13 @@ export function EmbeddingConfigSection({
                               dimensions: cfg.dimensions,
                               baseUrl: cfg.baseUrl ?? undefined,
                             });
-                            if (res.success) toast.success(`接続成功 (${res.latencyMs}ms)`);
-                            else toast.error(`接続失敗: ${res.error ?? '応答なし'}`);
+                            if (res.success) {
+                              toast.success(`接続成功 (${res.latencyMs}ms)`);
+                            } else {
+                              toast.error(
+                                `接続失敗: ${res.error ?? "応答なし"}`
+                              );
+                            }
                           } finally {
                             setTestingId(null);
                           }
@@ -177,7 +191,9 @@ export function EmbeddingConfigSection({
                           size="sm"
                           onClick={async () => {
                             await onSetDefault(cfg.id);
-                            toast.success('デフォルト埋め込みモデルを変更しました');
+                            toast.success(
+                              "デフォルト埋め込みモデルを変更しました"
+                            );
                             onOpenReindexModal();
                           }}
                           isLoading={isSettingDefault}
@@ -186,7 +202,11 @@ export function EmbeddingConfigSection({
                         </Button>
                       )}
 
-                      <Button variant="secondary" size="sm" onClick={() => onOpenEditModal(cfg)}>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => onOpenEditModal(cfg)}
+                      >
                         編集
                       </Button>
 
@@ -211,10 +231,12 @@ export function EmbeddingConfigSection({
         isOpen={!!deletingId}
         onClose={() => setDeletingId(null)}
         onConfirm={async () => {
-          if (!deletingId) return;
+          if (!deletingId) {
+            return;
+          }
           try {
             await onDelete(deletingId);
-            toast.success('埋め込み設定を削除しました');
+            toast.success("埋め込み設定を削除しました");
             setDeletingId(null);
           } catch (err) {
             toast.error(toErrorMessage(err));
