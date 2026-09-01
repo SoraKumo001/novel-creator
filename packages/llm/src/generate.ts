@@ -11,6 +11,7 @@ import {
   generateText as aiGenerateText,
   streamText as aiStreamText,
   embed,
+  embedMany,
 } from "ai";
 
 /**
@@ -228,5 +229,31 @@ export async function generateEmbedding(
       ...(providerOptions ? { providerOptions } : {}),
     });
     return result.embedding;
+  }, retryOptions);
+}
+
+/**
+ * AI SDK の embedMany 関数ラッパー。複数テキストの埋め込みベクトル配列を一括で返す。
+ * ネットワークエラー・429・500 系エラーはリトライする。
+ */
+export async function generateEmbeddings(
+  model: EmbeddingModel,
+  texts: string[],
+  options: RetryOptions & {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    providerOptions?: Record<string, any>;
+  } = {}
+): Promise<number[][]> {
+  if (texts.length === 0) {
+    return [];
+  }
+  const { providerOptions, ...retryOptions } = options;
+  return withRetry(async () => {
+    const result = await embedMany({
+      model,
+      values: texts,
+      ...(providerOptions ? { providerOptions } : {}),
+    });
+    return result.embeddings;
   }, retryOptions);
 }

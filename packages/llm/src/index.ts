@@ -2,6 +2,7 @@
 
 export {
   generateEmbedding,
+  generateEmbeddings,
   generateJSON,
   generateText,
   streamText,

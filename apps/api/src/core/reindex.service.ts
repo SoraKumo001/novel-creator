@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { characters, novels, settings } from "@novel-creator/db";
-import { generateEmbedding } from "@novel-creator/llm";
+import { generateEmbedding, generateEmbeddings } from "@novel-creator/llm";
 import type { VectorRecord } from "@novel-creator/vector";
 import { eq } from "drizzle-orm";
+import { chunkText } from "./chunking.js";
 import { EmbeddingConfigDomainService } from "./embedding-config.service.js";
 import { fetchNovelStructureWithContents } from "./novel-structure.js";
 import type { ServiceContext } from "./types.js";
@@ -21,6 +22,7 @@ export interface EntityToEmbed {
   entityId: string;
   entityType: "character" | "setting" | "content";
   id: string;
+  metadata?: Record<string, unknown>;
   novelId: string;
   title: string;
 }
@@ -122,17 +124,34 @@ export class ReindexDomainService {
         });
       }
 
-      // 章および節の本文（章・節・本文は structureMap にバルク取得済み）
+      // 章および節の本文（長文の場合はチャンキング）
       for (const chapterNode of structureMap.get(novel.id) ?? []) {
         for (const { section: sect, body: cntBody } of chapterNode.sections) {
           if (cntBody?.trim()) {
-            itemsToEmbed.push({
-              content: cntBody.trim(),
-              entityId: sect.id,
-              entityType: "content",
-              id: randomUUID(),
-              novelId: novel.id,
-              title: `本文: ${sect.title || `第${sect.order}節`}`,
+            const chunks = chunkText(cntBody.trim(), {
+              maxChunkSize: 800,
+              overlap: 100,
+            });
+            const totalChunks = chunks.length;
+            chunks.forEach((chunk, chunkIndex) => {
+              const partSuffix =
+                totalChunks > 1 ? ` (${chunkIndex + 1}/${totalChunks})` : "";
+              itemsToEmbed.push({
+                content: chunk,
+                entityId: sect.id,
+                entityType: "content",
+                id: randomUUID(),
+                ...(totalChunks > 1
+                  ? {
+                      metadata: {
+                        chunkIndex,
+                        totalChunks,
+                      },
+                    }
+                  : {}),
+                novelId: novel.id,
+                title: `本文: ${sect.title || `第${sect.order}節`}${partSuffix}`,
+              });
             });
           }
         }
@@ -150,16 +169,36 @@ export class ReindexDomainService {
       return { dimensions, totalIndexed: 0 };
     }
 
-    // 4. バッチサイズ（例: 10件ずつ）で Embedding 生成 & upsertBatch
-    const batchSize = 10;
+    // 4. バッチサイズ（25件ずつ）で embedMany（generateEmbeddings）を一括実行 & upsertBatch
+    const batchSize = 25;
     let completedCount = 0;
 
     for (let i = 0; i < itemsToEmbed.length; i += batchSize) {
       const batch = itemsToEmbed.slice(i, i + batchSize);
-      const vectorRecords: VectorRecord[] = [];
+      let vectorRecords: VectorRecord[] = [];
 
-      await Promise.all(
-        batch.map(async (item) => {
+      try {
+        const embeddings = await generateEmbeddings(
+          model,
+          batch.map((item) => item.content)
+        );
+
+        vectorRecords = batch.map((item, idx) => ({
+          content: item.content,
+          embedding: embeddings[idx],
+          entityId: item.entityId,
+          entityType: item.entityType,
+          id: item.id,
+          ...(item.metadata ? { metadata: item.metadata } : {}),
+          novelId: item.novelId,
+        }));
+      } catch (batchErr) {
+        console.warn(
+          "[reindex] Batch embedding failed, falling back to individual calls:",
+          batchErr
+        );
+        // 一括取得が失敗した場合はフォールバックとして個別実行
+        for (const item of batch) {
           try {
             const vector = await generateEmbedding(model, item.content);
             vectorRecords.push({
@@ -168,13 +207,14 @@ export class ReindexDomainService {
               entityId: item.entityId,
               entityType: item.entityType,
               id: item.id,
+              ...(item.metadata ? { metadata: item.metadata } : {}),
               novelId: item.novelId,
             });
           } catch (e) {
             console.error(`[reindex] Failed to embed ${item.title}:`, e);
           }
-        })
-      );
+        }
+      }
 
       if (vectorRecords.length > 0) {
         await this.ctx.vectorStore.upsertBatch(vectorRecords);

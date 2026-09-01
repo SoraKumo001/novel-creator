@@ -84,4 +84,83 @@ describe("PgVectorStore 次元検証", () => {
     expect(callsContaining("atttypmod")).toHaveLength(1);
     expect(callsContaining("CREATE TABLE")).toHaveLength(1);
   });
+
+  it("upsert が呼び出されること", async () => {
+    stubDimensionQuery(1536);
+    const store = createPgVectorStore("postgres://mock", 1536);
+    await store.upsert({
+      content: "アリス",
+      embedding: [0.1, 0.2, 0.3],
+      entityId: "33333333-3333-3333-3333-333333333333",
+      entityType: "character",
+      id: "11111111-1111-4111-8111-111111111111",
+      novelId: "22222222-2222-2222-2222-222222222222",
+    });
+    expect(mockQuery).toHaveBeenCalled();
+  });
+
+  it("search が呼び出され、スコアが計算されること", async () => {
+    mockQuery.mockImplementation((...args: unknown[]) => {
+      const text = sqlTextOf(args as unknown[]);
+      if (text.includes("atttypmod")) {
+        return Promise.resolve({ rowCount: 1, rows: [{ dimensions: 1536 }] });
+      }
+      return Promise.resolve({
+        rowCount: 1,
+        rows: [
+          [
+            "アリス",
+            0.2,
+            "33333333-3333-3333-3333-333333333333",
+            "character",
+            "11111111-1111-4111-8111-111111111111",
+            null,
+          ],
+        ],
+      });
+    });
+    const store = createPgVectorStore("postgres://mock", 1536);
+    const results = await store.search([0.1, 0.2, 0.3], {
+      novelId: "22222222-2222-2222-2222-222222222222",
+      topK: 5,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0]?.score).toBeCloseTo(0.8);
+  });
+
+  it("minScore による足切りフィルタが機能すること", async () => {
+    mockQuery.mockImplementation((...args: unknown[]) => {
+      const text = sqlTextOf(args as unknown[]);
+      if (text.includes("atttypmod")) {
+        return Promise.resolve({ rowCount: 1, rows: [{ dimensions: 1536 }] });
+      }
+      return Promise.resolve({
+        rowCount: 2,
+        rows: [
+          [
+            "高スコア",
+            0.2, // score = 0.8
+            "33333333-3333-3333-3333-333333333333",
+            "character",
+            "11111111-1111-4111-8111-111111111111",
+            null,
+          ],
+          [
+            "低スコア",
+            0.7, // score = 0.3
+            "44444444-4444-4444-4444-444444444444",
+            "character",
+            "22222222-2222-4222-8222-222222222222",
+            null,
+          ],
+        ],
+      });
+    });
+    const store = createPgVectorStore("postgres://mock", 1536);
+    const results = await store.search([0.1, 0.2, 0.3], {
+      minScore: 0.5,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0]?.content).toBe("高スコア");
+  });
 });

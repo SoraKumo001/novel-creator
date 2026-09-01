@@ -179,7 +179,12 @@ export function createPgVectorStore(
 
     async search(
       query: number[],
-      options: { novelId?: string; entityType?: string; topK?: number } = {}
+      options: {
+        minScore?: number;
+        novelId?: string;
+        entityType?: string;
+        topK?: number;
+      } = {}
     ): Promise<VectorSearchResult[]> {
       await ensureSchema();
       const topK = options.topK ?? 10;
@@ -209,7 +214,7 @@ export function createPgVectorStore(
         .orderBy((fields) => fields.distance)
         .limit(topK);
 
-      return rows.map((row) => ({
+      const results = rows.map((row) => ({
         content: row.content,
         entityId: row.entityId,
         entityType: row.entityType,
@@ -217,6 +222,11 @@ export function createPgVectorStore(
         metadata: row.metadata ?? undefined,
         score: 1 - (row.distance as number),
       }));
+
+      if (options.minScore !== undefined) {
+        return results.filter((r) => r.score >= (options.minScore as number));
+      }
+      return results;
     },
     async upsert(record: VectorRecord): Promise<void> {
       await ensureSchema();

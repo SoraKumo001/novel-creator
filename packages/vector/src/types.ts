@@ -26,6 +26,7 @@ export interface VectorStore {
   search(
     query: number[],
     options: {
+      minScore?: number;
       novelId?: string;
       entityType?: string;
       topK?: number;

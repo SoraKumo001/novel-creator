@@ -5,6 +5,7 @@ import type { VectorStore } from "@novel-creator/vector";
 import type { EmbeddingModel } from "ai";
 
 export interface SearchContextOptions {
+  minScore?: number;
   previousContent?: string;
   query: string;
   topK?: number;
@@ -43,6 +44,7 @@ export async function searchContext(
   env: Env
 ): Promise<SearchContextResult> {
   const topK = options.topK ?? 5;
+  const minScore = options.minScore;
   const providerOptions = buildEmbeddingProviderOptions(env);
   const queryVector = await generateEmbedding(embedding, options.query, {
     providerOptions,
@@ -51,11 +53,13 @@ export async function searchContext(
   const [characterResults, settingResults] = await Promise.all([
     vectorStore.search(queryVector, {
       entityType: "character",
+      minScore,
       novelId,
       topK,
     }),
     vectorStore.search(queryVector, {
       entityType: "setting",
+      minScore,
       novelId,
       topK,
     }),

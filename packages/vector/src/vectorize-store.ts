@@ -46,7 +46,12 @@ export function createVectorizeStore(
 
     async search(
       query: number[],
-      options: { novelId?: string; entityType?: string; topK?: number } = {}
+      options: {
+        minScore?: number;
+        novelId?: string;
+        entityType?: string;
+        topK?: number;
+      } = {}
     ): Promise<VectorSearchResult[]> {
       const topK = options.topK ?? 10;
       const filter: Record<string, unknown> = {};
@@ -64,7 +69,7 @@ export function createVectorizeStore(
       });
 
       const matches = result.matches ?? [];
-      return matches.map(
+      const results = matches.map(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (match: any) => ({
           content: match.metadata?.content ?? "",
@@ -75,6 +80,13 @@ export function createVectorizeStore(
           score: match.score ?? 0,
         })
       );
+
+      if (options.minScore !== undefined) {
+        return results.filter(
+          (r: VectorSearchResult) => r.score >= (options.minScore as number)
+        );
+      }
+      return results;
     },
     async upsert(record: VectorRecord): Promise<void> {
       await binding.upsert([
