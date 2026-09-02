@@ -128,12 +128,15 @@ describe("editSetting", () => {
 });
 
 describe("extractChatEntities", () => {
-  it("チャットテキストとJSON出力形式が含まれること", () => {
+  it("登場人物、設定、特徴、伏線、年表、プロットの出力指示が含まれること", () => {
     const prompt = extractChatEntities("勇者アリスと魔王の剣についての相談");
     expect(prompt).toContain("勇者アリスと魔王の剣についての相談");
     expect(prompt).toContain('"characters"');
     expect(prompt).toContain('"settings"');
     expect(prompt).toContain('"traits"');
+    expect(prompt).toContain('"foreshadowings"');
+    expect(prompt).toContain('"timelines"');
+    expect(prompt).toContain('"plots"');
   });
 });
 
@@ -192,17 +195,5 @@ describe("creativeChatSystemPrompt", () => {
 
   it("機能カタログは700文字未満であること", () => {
     expect(APP_USAGE_GUIDE.length).toBeLessThan(700);
-  });
-});
-
-describe("extractChatEntities", () => {
-  it("登場人物、設定、伏線、年表、プロットの出力指示が含まれること", () => {
-    const prompt = extractChatEntities("会話テキスト内容");
-    expect(prompt).toContain("会話テキスト内容");
-    expect(prompt).toContain('"characters"');
-    expect(prompt).toContain('"settings"');
-    expect(prompt).toContain('"foreshadowings"');
-    expect(prompt).toContain('"timelines"');
-    expect(prompt).toContain('"plots"');
   });
 });
