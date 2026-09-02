@@ -27,6 +27,59 @@ export interface ChatMessage {
   role: "user" | "assistant";
 }
 
+/** バックエンド（SSE data-progress パーツ）から届く一時的な進捗ペイロード */
+export type ChatProgressPhase = "start" | "step-start" | "step-finish" | "done";
+
+export interface ChatProgress {
+  finishReason?: string;
+  /** 想定される総ステップ数 */
+  maxSteps: number;
+  phase: ChatProgressPhase;
+  /** 1-based。先頭ステップ前は 0 */
+  step: number;
+}
+
+/** フックが公開する進捗状態（開始時刻を記録したもの）。isStreaming 中のみ非 null になる */
+export interface StreamingProgress {
+  maxSteps: number;
+  phase: ChatProgressPhase;
+  /** 経過時間の基準時刻（EPOCH ms）。最初の data-progress 到着 or status が submitted になった時点 */
+  startedAt: number;
+  step: number;
+}
+
+const PROGRESS_PHASES: ReadonlyArray<ChatProgressPhase> = [
+  "start",
+  "step-start",
+  "step-finish",
+  "done",
+];
+
+/** 未知の値（data-progress の data フィールド）を ChatProgress に絞り込む */
+function toChatProgress(value: unknown): ChatProgress | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const v = value as Record<string, unknown>;
+  const phase = v.phase;
+  if (
+    typeof phase !== "string" ||
+    !PROGRESS_PHASES.includes(phase as ChatProgressPhase)
+  ) {
+    return null;
+  }
+  if (typeof v.step !== "number" || typeof v.maxSteps !== "number") {
+    return null;
+  }
+  return {
+    phase: phase as ChatProgressPhase,
+    step: v.step,
+    maxSteps: v.maxSteps,
+    finishReason:
+      typeof v.finishReason === "string" ? v.finishReason : undefined,
+  };
+}
+
 /** チャットのストリーミング状態機械に必要なセッション層の入力 */
 export interface UseChatStreamingInput {
   /** セッション一覧のリフレッシュ（クエリの invalidate をラップしたもの） */
@@ -139,6 +192,41 @@ export function useChatStreaming({
     }
   }, []);
 
+  // 進捗状態（バックエンドの data-progress パーツ由来）。
+  // 経過時間の開始時刻は「最初の data-progress 到着」または「status が submitted になった
+  // 時点」のどちらか早い方で確定する。進行中のストリームが変わっても開始時刻を維持するため
+  // ref で保持し、isStreaming の終了時にリセットする。
+  const [progress, setProgress] = useState<StreamingProgress | null>(null);
+  const progressStartedAtRef = useRef<number | null>(null);
+
+  const ensureProgressStarted = useCallback((): number => {
+    if (progressStartedAtRef.current === null) {
+      progressStartedAtRef.current = Date.now();
+    }
+    return progressStartedAtRef.current;
+  }, []);
+
+  // data-progress パーツ（transient SSE data）を受信して進捗状態を更新する。
+  // このコールバックは useChat の onData に渡され、ストリーム中の一時データパーツを観測できる。
+  const handleProgressData = useCallback(
+    (dataPart: { type: string; data: unknown }) => {
+      if (dataPart.type !== "data-progress") {
+        return;
+      }
+      const payload = toChatProgress(dataPart.data);
+      if (!payload) {
+        return;
+      }
+      setProgress({
+        phase: payload.phase,
+        step: payload.step,
+        maxSteps: payload.maxSteps,
+        startedAt: ensureProgressStarted(),
+      });
+    },
+    [ensureProgressStarted]
+  );
+
   // 送信時に毎回 sessionId / novelId / modelConfigId を ref 経由で最新値を埋め込む。
   const transport = useMemo(
     () =>
@@ -166,6 +254,7 @@ export function useChatStreaming({
   } = useChat({
     id: "main-chat",
     transport,
+    onData: handleProgressData,
     onError: (err) => {
       setError(
         err instanceof Error ? err.message : "チャットエラーが発生しました"
@@ -208,13 +297,45 @@ export function useChatStreaming({
   const isStreamingRef = useRef(isStreaming);
   isStreamingRef.current = isStreaming;
 
+  // isStreaming の開始/終了に合わせて進捗状態を初期化/クリアする。
+  // 開始時（status が submitted になった時点）に開始時刻を確定して進捗を既定値で立て、
+  // 終了時には progress を null に戻す。data-progress パーツは常にこの既定値より後の値で上書きする。
+  useEffect(() => {
+    if (isStreaming) {
+      const startedAt = ensureProgressStarted();
+      setProgress((prev) =>
+        prev
+          ? prev
+          : {
+              phase: "start",
+              step: 0,
+              maxSteps: 8,
+              startedAt,
+            }
+      );
+    } else {
+      progressStartedAtRef.current = null;
+      setProgress(null);
+    }
+  }, [isStreaming, ensureProgressStarted]);
+
   // 画面に表示する確定済みメッセージ。
-  // ストリーミング中のアシスタント部分応答は streamingContent 側で表示するため除外する。
+  // ストリーミング中は最後のアシスタント応答（進行中）を丸ごと除外し、
+  // streamingContent / streamingParts 側で表示する（二重表示防止）。
+  // 多段ツール実行で text パーツがまだ流れていない間も、この除外により同じツールカードが
+  // メッセージ一覧 と ストリーミングバブル に二重表示されない。
   const messages: ChatMessage[] = useMemo(() => {
     return uiMessages
-      .filter((m) => {
-        // ストリーミング中（state==='streaming' の text パーツを持つ）の
-        // アシスタントメッセージは streamingContent で表示するため除外する
+      .filter((m, index) => {
+        // ストリーミング中: 最後のアシスタント応答（進行中のチャンク）を除外する
+        if (
+          isStreaming &&
+          index === uiMessages.length - 1 &&
+          m.role === "assistant"
+        ) {
+          return false;
+        }
+        // 旧来の除外条件（streaming text パーツを持つメッセージ）。残骸があれば引き続き除外する。
         const hasStreamingText = m.parts.some(
           (p) => p.type === "text" && p.state === "streaming"
         );
@@ -230,7 +351,7 @@ export function useChatStreaming({
         parts: m.parts,
       }))
       .filter((m) => m.content !== "" || hasToolPart(m.parts));
-  }, [uiMessages]);
+  }, [uiMessages, isStreaming]);
 
   // ストリーミング中のリアルタイム表示用テキスト
   const streamingContent = useMemo(() => {
@@ -417,6 +538,7 @@ export function useChatStreaming({
       isStreamingRef,
       streamingContent,
       streamingParts,
+      progress,
       error,
       setError,
       clearError,
@@ -441,6 +563,7 @@ export function useChatStreaming({
       isStreamingRef,
       streamingContent,
       streamingParts,
+      progress,
       error,
       setError,
       clearError,

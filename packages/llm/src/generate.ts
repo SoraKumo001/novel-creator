@@ -1,5 +1,7 @@
+import type { LLMProviderType } from "@novel-creator/shared";
 import type {
   EmbeddingModel,
+  JSONValue,
   LanguageModel,
   OutputInterface,
   StopCondition,
@@ -128,11 +130,81 @@ export async function* streamText(
  */
 type Arrayable<T> = T | T[] | undefined;
 
+/**
+ * プロバイダ固有オプション（AI SDK の ProviderOptions）。
+ * `ai` パッケージは ProviderOptions（@ai-sdk/provider-utils 由来の
+ * `Record<string, JSONObject>` 同型）を再エクスポートしないため、
+ * 同型をローカルで定義している。
+ */
+export type ProviderOptions = Record<string, Record<string, JSONValue>>;
+
+/**
+ * streamText の各 LLM ステップの進捗情報。
+ * - step: 1 始まりのステップ番号
+ * - finishReason: phase が "step-finish" のときのみ設定される
+ */
+export interface StepProgress {
+  finishReason?: string;
+  phase: "step-start" | "step-finish";
+  step: number;
+}
+
 export interface StreamTextOptions extends RetryOptions {
+  /** 各 LLM ステップの開始・終了時に呼ばれる進捗コールバック */
+  onStep?: (progress: StepProgress) => void;
+  /** プロバイダ固有オプション（例: reasoning / thinking の有効化） */
+  providerOptions?: ProviderOptions;
   /** ツールループの停止条件。未指定時は AI SDK デフォルト（isStepCount(1)） */
   stopWhen?: Arrayable<StopCondition<ToolSet, Record<string, unknown>>>;
   /** LLM に渡すツール群（AI SDK の tool() 形式） */
   tools?: ToolSet;
+}
+
+/** 推論（reasoning）を有効化する対象の OpenAI モデル ID パターン（o1 / o3 / o4 / gpt-5 系） */
+const OPENAI_REASONING_MODEL_PATTERN = /^(o[134](-|$)|gpt-5)/;
+
+/** Anthropic の thinking 予算トークン数 */
+const ANTHROPIC_THINKING_BUDGET_TOKENS = 4000;
+
+/**
+ * 解決されたプロバイダ・モデル ID から、推論（reasoning / thinking）を
+ * 有効化するためのプロバイダ固有オプションを構築する。
+ * - openai: reasoning モデル（o1 / o3 / o4 / gpt-5 系）のみ reasoningEffort を設定
+ * - anthropic: thinking を enabled（budgetTokens 付き）で設定
+ * - google: thinkingConfig.includeThoughts を設定
+ * - ollama / custom_openai: 対応しない（DeepSeek-R1 等は reasoning をネイティブに返す）
+ *
+ * 対象外のプロバイダ・モデルでは undefined を返す。
+ */
+export function buildReasoningProviderOptions(
+  provider: LLMProviderType,
+  modelId: string
+): ProviderOptions | undefined {
+  switch (provider) {
+    case "openai":
+      return OPENAI_REASONING_MODEL_PATTERN.test(modelId)
+        ? { openai: { reasoningEffort: "medium" } }
+        : undefined;
+    case "anthropic":
+      return {
+        anthropic: {
+          thinking: {
+            budgetTokens: ANTHROPIC_THINKING_BUDGET_TOKENS,
+            type: "enabled",
+          },
+        },
+      };
+    case "google":
+      return { google: { thinkingConfig: { includeThoughts: true } } };
+    case "ollama":
+    case "custom_openai":
+      return undefined;
+    default:
+      // LLMProviderType は上で全ケース網羅済み。default は実行時に provider が
+      // 未解決（undefined 等）の場合のみ到達する。reasoning 未対応＝オプション無し
+      // として undefined を返し、プロバイダ値自体の検証は provider.ts の構築処理が担う。
+      return undefined;
+  }
 }
 
 export async function streamTextResult<
@@ -153,6 +225,28 @@ export async function streamTextResult<
               stopWhen: options.stopWhen as NonNullable<
                 StreamTextOptions["stopWhen"]
               >,
+            }
+          : {}),
+        ...(options.providerOptions
+          ? { providerOptions: options.providerOptions }
+          : {}),
+        ...(options.onStep
+          ? {
+              // AI SDK v7 では onStepStart / onStepEnd が各ステップの進捗フック
+              // （onStepFinish は onStepEnd の非推奨エイリアス）。
+              onStepStart: ({ stepNumber }) => {
+                options.onStep?.({
+                  phase: "step-start",
+                  step: stepNumber + 1,
+                });
+              },
+              onStepEnd: ({ finishReason, stepNumber }) => {
+                options.onStep?.({
+                  finishReason,
+                  phase: "step-finish",
+                  step: stepNumber + 1,
+                });
+              },
             }
           : {}),
       }),

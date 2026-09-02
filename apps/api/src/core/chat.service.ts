@@ -1,12 +1,15 @@
 import { chatMessages, chatSessions, novels } from "@novel-creator/db";
 import {
+  buildReasoningProviderOptions,
   creativeChatSystemPrompt,
   extractChatEntities,
   generateText,
+  type ProviderOptions,
   streamTextResult,
 } from "@novel-creator/llm";
-import type { LanguageModel, ToolSet } from "ai";
+import type { ToolSet } from "ai";
 import {
+  createUIMessageStream,
   createUIMessageStreamResponse,
   isStepCount,
   toUIMessageStream,
@@ -16,7 +19,10 @@ import type { z } from "zod";
 import { formatErrorMessage } from "../middleware/error-handler.js";
 import { searchContext } from "../rag.js";
 import type { chatRequestSchema } from "../schemas/index.js";
-import { resolveLLMModel } from "./model-resolver.js";
+import {
+  type ResolvedLLMModel,
+  resolveLLMModelWithInfo,
+} from "./model-resolver.js";
 import { createProposeTools } from "./tools/proposeTools.js";
 import { createReadTools } from "./tools/readTools.js";
 import {
@@ -24,6 +30,24 @@ import {
   type ServiceContext,
   ValidationError,
 } from "./types.js";
+
+/** 創作相談チャットのツールループ最大ステップ数 */
+const CHAT_MAX_STEPS = 8;
+
+/** 進捗データパーツ（data-progress）の data 部。step は start 時 0、ステップ進行時は 1 始まり */
+interface ChatProgressData {
+  finishReason?: string;
+  maxSteps: number;
+  phase: "start" | "step-start" | "step-finish" | "done";
+  step: number;
+}
+
+/** 進捗データパーツ。transient 付きのためクライアントへは配信されるがメッセージ parts には保存されない */
+interface ChatProgressPart {
+  data: ChatProgressData;
+  transient: true;
+  type: "data-progress";
+}
 
 export class ChatDomainService {
   constructor(private readonly ctx: ServiceContext) {}
@@ -244,13 +268,29 @@ export class ChatDomainService {
     // 使用する LLM モデルを解決（modelConfigId 指定 or デフォルト設定 or 環境変数）。
     // ユーザー指定の modelConfigId が存在しない場合は黙って別モデルへ
     // フォールバックさせずエラーにする（'throw'）。
-    const llmModel = await resolveLLMModel(this.ctx, modelConfigId, "throw");
+    const resolvedModel = await resolveLLMModelWithInfo(
+      this.ctx,
+      modelConfigId,
+      "throw"
+    );
+
+    // 推論（reasoning / thinking）対応モデル向けのプロバイダ固有オプションを構築
+    const providerOptions = buildReasoningProviderOptions(
+      resolvedModel.provider,
+      resolvedModel.modelId
+    );
 
     // ツール群（読み取りツール ＋ 設定提案ツール）を構築する
     const tools = this.buildChatTools(effectiveNovelId);
 
     // ストリームを生成し、完了時に assistant メッセージを永続化する
-    return this.streamAssistantResponse(sessionId, llmModel, prompt, tools);
+    return this.streamAssistantResponse(
+      sessionId,
+      resolvedModel,
+      prompt,
+      tools,
+      providerOptions
+    );
   }
 
   /**
@@ -399,17 +439,33 @@ export class ChatDomainService {
 
   /**
    * 生の StreamTextResult を取得（接続時リトライ付き）し、UI Message Stream レスポンスへ変換する。
+   * モデルストリームに加えて data-progress データパーツ（transient、永続化対象外）を出力し、
+   * クライアントがマルチステップ実行中の進捗を表示できるようにする。
    * 完了時（正常終了・クライアント中断の両方）に assistant メッセージを永続化する。
    * onEnd は flush / cancel のいずれかで必ず一度だけ呼ばれるため、二重保存防止フラグで保護する。
    */
   private async streamAssistantResponse(
     sessionId: string,
-    llmModel: LanguageModel,
+    resolvedModel: ResolvedLLMModel,
     prompt: string,
-    tools: ToolSet | undefined
+    tools: ToolSet | undefined,
+    providerOptions: ProviderOptions | undefined
   ): Promise<Response> {
-    const result = await streamTextResult(llmModel, prompt, {
-      stopWhen: isStepCount(8),
+    let lastStep = 0;
+    // execute 内の writer へ onStep コールバックから進捗パーツを書き込むためのフック
+    let writeProgressPart: ((part: ChatProgressPart) => void) | undefined;
+
+    const result = await streamTextResult(resolvedModel.model, prompt, {
+      onStep: (progress) => {
+        lastStep = progress.step;
+        writeProgressPart?.({
+          data: { ...progress, maxSteps: CHAT_MAX_STEPS },
+          transient: true,
+          type: "data-progress",
+        });
+      },
+      providerOptions,
+      stopWhen: isStepCount(CHAT_MAX_STEPS),
       tools,
     });
 
@@ -453,6 +509,46 @@ export class ChatDomainService {
       tools,
     });
 
-    return createUIMessageStreamResponse({ stream: uiStream });
+    // モデルストリームを writer へ合成しつつ、進捗データパーツを横書き込みする。
+    // writer.merge はマージ元ストリームの完了を待機する手段を提供しないため、
+    // done パーツを確実にストリーム末尾へ配置するために手動でドレインする。
+    return createUIMessageStreamResponse({
+      stream: createUIMessageStream({
+        execute: async ({ writer }) => {
+          writeProgressPart = (part) => {
+            writer.write(part);
+          };
+          writeProgressPart({
+            data: { maxSteps: CHAT_MAX_STEPS, phase: "start", step: 0 },
+            transient: true,
+            type: "data-progress",
+          });
+
+          const reader = uiStream.getReader();
+          try {
+            for (;;) {
+              const { done, value } = await reader.read();
+              if (done) {
+                break;
+              }
+              writer.write(value);
+            }
+          } finally {
+            reader.releaseLock();
+          }
+
+          writeProgressPart({
+            data: {
+              maxSteps: CHAT_MAX_STEPS,
+              phase: "done",
+              step: lastStep,
+            },
+            transient: true,
+            type: "data-progress",
+          });
+        },
+        onError: (error) => formatErrorMessage(error),
+      }),
+    });
   }
 }

@@ -61,16 +61,15 @@ export function StoryOutlineMarkdownEditor({
       setSavingMarkdown(true);
       try {
         await saveStoryOutline(novelId, markdown);
-        toast.success("ストーリー構想を保存しました");
         if (onRefresh) {
           await onRefresh();
         }
-        return { updated: 1 };
+        return {};
       } finally {
         setSavingMarkdown(false);
       }
     },
-    [novelId, onRefresh, toast]
+    [novelId, onRefresh]
   );
 
   const handleEditSection = useCallback(

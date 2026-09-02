@@ -46,6 +46,7 @@ function makeStreamingValue(
     isStreaming: false,
     streamingContent: "",
     streamingParts: null,
+    progress: null,
     error: null,
     lastPrompt: null,
     sendMessage: fn(),

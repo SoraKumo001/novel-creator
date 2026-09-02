@@ -8,6 +8,7 @@ import {
   createEmbeddingModelFromConfig,
   createLanguageModelFromConfig,
 } from "@novel-creator/llm";
+import type { LLMProviderType } from "@novel-creator/shared";
 import type { EmbeddingModel, LanguageModel } from "ai";
 import { eq } from "drizzle-orm";
 import { NotFoundError, type ServiceContext } from "./types.js";
@@ -63,24 +64,39 @@ async function resolveFromConfigTable<TConfig, TResult>(
 }
 
 /**
- * LLM モデルを解決する。
+ * resolveLLMModelWithInfo の戻り値。解決されたモデルに加えて
+ * プロバイダ種別・モデル ID を返す（例: 推論オプションの構築に使用する）。
+ */
+export interface ResolvedLLMModel {
+  model: LanguageModel;
+  modelId: string;
+  provider: LLMProviderType;
+}
+
+/**
+ * LLM モデルをプロバイダ情報込みで解決する。
+ * 解決フローは resolveLLMModel と同一（モデル ID とプロバイダも返す点が異なる）。
  * 1. modelConfigId が指定されていればその設定でモデルを生成
  * 2. 見つからない場合は onMissing ポリシーに従う（'throw' なら NotFoundError）
  * 3. デフォルト設定（isDefault = true）があればそれを使用
  * 4. DB に設定がなければ ctx.llm（環境変数由来の既定モデル）を使用
  */
-export async function resolveLLMModel(
+export async function resolveLLMModelWithInfo(
   ctx: ServiceContext,
   modelConfigId?: string | null,
   onMissing: ResolveMissingPolicy = "throw"
-): Promise<LanguageModel> {
-  return resolveFromConfigTable<LLMConfig, LanguageModel>(
+): Promise<ResolvedLLMModel> {
+  return resolveFromConfigTable<LLMConfig, ResolvedLLMModel>(
     ctx,
     modelConfigId,
     onMissing,
     {
       configLabel: "LLM Config",
-      fallback: (context) => context.llm,
+      fallback: (context) => ({
+        model: context.llm,
+        modelId: context.env.LLM_MODEL,
+        provider: context.env.LLM_PROVIDER,
+      }),
       async findById(context, id) {
         const [config] = await context.db
           .select()
@@ -95,10 +111,28 @@ export async function resolveLLMModel(
           .where(eq(llmConfigs.isDefault, true));
         return config;
       },
-      toResult: (config, context) =>
-        createLanguageModelFromConfig(config, context.env),
+      toResult: (config, context) => ({
+        model: createLanguageModelFromConfig(config, context.env),
+        modelId: config.modelId,
+        provider: config.provider,
+      }),
     }
   );
+}
+
+/**
+ * LLM モデルを解決する。
+ * 1. modelConfigId が指定されていればその設定でモデルを生成
+ * 2. 見つからない場合は onMissing ポリシーに従う（'throw' なら NotFoundError）
+ * 3. デフォルト設定（isDefault = true）があればそれを使用
+ * 4. DB に設定がなければ ctx.llm（環境変数由来の既定モデル）を使用
+ */
+export async function resolveLLMModel(
+  ctx: ServiceContext,
+  modelConfigId?: string | null,
+  onMissing: ResolveMissingPolicy = "throw"
+): Promise<LanguageModel> {
+  return (await resolveLLMModelWithInfo(ctx, modelConfigId, onMissing)).model;
 }
 
 /** resolveEmbeddingModel の戻り値。DB 設定から解決した場合は元の設定行も返す。 */

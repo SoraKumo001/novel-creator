@@ -8,7 +8,19 @@ vi.mock("../src/components/HistoryDiffModal.js", () => ({
 }));
 
 vi.mock("../src/routes/novels/_components/-MonacoEditor.js", () => ({
-  MonacoEditor: () => <div data-testid="monaco-editor" />,
+  MonacoEditor: ({
+    onChange,
+    value,
+  }: {
+    onChange?: (val: string) => void;
+    value: string;
+  }) => (
+    <textarea
+      data-testid="monaco-editor"
+      value={value}
+      onChange={(e) => onChange?.(e.target.value)}
+    />
+  ),
 }));
 
 vi.mock("@/context/ChatContext.js", () => ({
@@ -18,13 +30,15 @@ vi.mock("@/context/ChatContext.js", () => ({
   }),
 }));
 
+const mockToast = {
+  error: vi.fn(),
+  info: vi.fn(),
+  success: vi.fn(),
+  warning: vi.fn(),
+};
+
 vi.mock("@/hooks/useToast.js", () => ({
-  useToast: () => ({
-    success: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    warning: vi.fn(),
-  }),
+  useToast: () => mockToast,
 }));
 
 describe("EntityMarkdownEditor", () => {
@@ -69,5 +83,55 @@ describe("EntityMarkdownEditor", () => {
     expect(
       await screen.findByText(/AIが「人物」を推敲・編集案を生成中.../)
     ).toBeInTheDocument();
+  });
+
+  it("保存成功時に一部項目がundefinedでも0件に補正され、undefinedと表示されないこと", async () => {
+    const saveMarkdown = vi.fn().mockResolvedValue({ updated: 1 });
+    render(
+      <EntityMarkdownEditor {...defaultProps} saveMarkdown={saveMarkdown} />
+    );
+
+    const editor = await screen.findByTestId("monaco-editor");
+    const { act, fireEvent } = await import("@testing-library/react");
+    await act(async () => {
+      fireEvent.change(editor, {
+        target: { value: "# 主要人物\n\n## ボブ\n説明" },
+      });
+    });
+
+    const saveButton = screen.getByRole("button", { name: "保存" });
+    await act(async () => {
+      fireEvent.click(saveButton);
+    });
+
+    await vi.waitFor(() => {
+      expect(mockToast.success).toHaveBeenCalledWith(
+        "保存しました (作成: 0件, 更新: 1件, 削除: 0件)"
+      );
+    });
+  });
+
+  it("件数情報がない場合はシンプルな「保存しました」と表示されること", async () => {
+    const saveMarkdown = vi.fn().mockResolvedValue({});
+    render(
+      <EntityMarkdownEditor {...defaultProps} saveMarkdown={saveMarkdown} />
+    );
+
+    const editor = await screen.findByTestId("monaco-editor");
+    const { act, fireEvent } = await import("@testing-library/react");
+    await act(async () => {
+      fireEvent.change(editor, {
+        target: { value: "# 主要人物\n\n## キャロル\n説明" },
+      });
+    });
+
+    const saveButton = screen.getByRole("button", { name: "保存" });
+    await act(async () => {
+      fireEvent.click(saveButton);
+    });
+
+    await vi.waitFor(() => {
+      expect(mockToast.success).toHaveBeenCalledWith("保存しました");
+    });
   });
 });

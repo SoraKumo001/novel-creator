@@ -1,10 +1,12 @@
 // Phase 1B: LLM ラッパー
 
 export {
+  buildReasoningProviderOptions,
   generateEmbedding,
   generateEmbeddings,
   generateJSON,
   generateText,
+  type ProviderOptions,
   streamText,
   streamTextResult,
 } from "./generate.js";

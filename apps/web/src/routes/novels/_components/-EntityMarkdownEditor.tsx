@@ -222,9 +222,17 @@ export function EntityMarkdownEditor<
       const res = await saveMarkdown(markdown);
       setSavedMarkdown(markdown);
       clearDraft();
-      toast.success(
-        `保存しました (作成: ${res.created}件, 更新: ${res.updated}件, 削除: ${res.deleted}件)`
-      );
+      if (
+        res?.created !== undefined ||
+        res?.updated !== undefined ||
+        res?.deleted !== undefined
+      ) {
+        toast.success(
+          `保存しました (作成: ${res.created ?? 0}件, 更新: ${res.updated ?? 0}件, 削除: ${res.deleted ?? 0}件)`
+        );
+      } else {
+        toast.success("保存しました");
+      }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "保存に失敗しました");
     }

@@ -14,6 +14,7 @@ import { usePinnedSessions } from "@/hooks/usePinnedSessions.js";
 import { useToast } from "@/hooks/useToast.js";
 import { ChatInsertEntityModal } from "./ChatInsertEntityModal.js";
 import { ChatSessionList } from "./ChatSessionList.js";
+import { StreamingStatus } from "./StreamingStatus.js";
 import { ToolActivity } from "./ToolActivity.js";
 
 type DrawerWidth = "normal" | "wide" | "full";
@@ -61,6 +62,7 @@ export function ChatDrawer() {
     isStreaming,
     streamingContent,
     streamingParts,
+    progress,
     error,
     lastPrompt,
     sendMessage,
@@ -572,31 +574,11 @@ export function ChatDrawer() {
 
             {/* ストリーミング中のリアルタイム表示 */}
             {isStreaming && (
-              <div className="flex flex-col items-start space-y-1">
-                {streamingContent ||
-                (streamingParts && streamingParts.length > 0) ? (
-                  <>
-                    <div className="mb-1 flex items-center gap-1.5 px-1 font-medium text-[11px] text-primary">
-                      <span className="h-1.5 w-1.5 animate-ping rounded-full bg-primary" />
-                      <span>AIパートナーが入力中...</span>
-                    </div>
-                    <div className="max-w-[88%] rounded-2xl rounded-bl-xs border border-primary/30 bg-surface-raised px-4 py-2.5 text-foreground text-sm shadow-xs">
-                      {/* 思考プロセス & ツール呼び出しはテキスト生成前でもリアルタイムに表示 */}
-                      <ToolActivity parts={streamingParts} isStreaming={true} />
-                      {streamingContent && (
-                        <MarkdownText content={streamingContent} />
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex animate-pulse items-center gap-2 rounded-2xl rounded-bl-xs border border-border bg-surface-raised px-4 py-3 text-muted-foreground text-xs shadow-xs">
-                    <span className="h-2 w-2 animate-ping rounded-full bg-primary" />
-                    <span>
-                      AIパートナーが思考中...（小説データと文脈を参照しています）
-                    </span>
-                  </div>
-                )}
-              </div>
+              <StreamingStatus
+                streamingContent={streamingContent}
+                streamingParts={streamingParts}
+                progress={progress}
+              />
             )}
 
             {loadingMessages && (

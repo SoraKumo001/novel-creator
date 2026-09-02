@@ -12,6 +12,7 @@ import {
 import {
   type ChatMessage,
   rowToUIMessage,
+  type StreamingProgress,
   useChatStreaming,
 } from "@/hooks/useChatStreaming.js";
 import { chatKeys } from "@/lib/queryKeys.js";
@@ -146,6 +147,8 @@ export interface ChatStreamingContextValue {
   isStreaming: boolean;
   lastPrompt: string | null;
   messages: ChatMessage[];
+  /** バックエンド（data-progress パーツ）由来のリアルタイム進捗。isStreaming 中のみ非 null */
+  progress: StreamingProgress | null;
   retryLastMessage: () => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
   streamingContent: string;
@@ -201,6 +204,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     isStreamingRef,
     streamingContent,
     streamingParts,
+    progress,
     error,
     setError,
     clearError,
@@ -407,6 +411,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       isStreaming,
       streamingContent,
       streamingParts,
+      progress,
       error,
       lastPrompt,
       sendMessage,
@@ -419,6 +424,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       isStreaming,
       streamingContent,
       streamingParts,
+      progress,
       error,
       lastPrompt,
       sendMessage,
