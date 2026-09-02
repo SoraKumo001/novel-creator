@@ -247,22 +247,22 @@ export function ChatSessionList({
 
                 {/* 削除確認モーダル風インライン表示 */}
                 {isDeleting && (
-                  <div className="mt-2 rounded-lg border border-destructive/20 bg-destructive/10 p-2 text-xs">
-                    <p className="mb-1 font-semibold text-destructive">
+                  <div className="mt-2 rounded-lg border border-destructive/20 bg-destructive/10 p-2.5 text-xs">
+                    <p className="mb-2 font-semibold text-destructive">
                       この相談履歴を削除しますか？
                     </p>
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
                         onClick={() => setDeletingSessionId(null)}
-                        className="rounded bg-surface px-2 py-1 text-foreground"
+                        className="cursor-pointer rounded border border-border bg-surface px-2.5 py-1 font-medium text-foreground transition hover:bg-surface-hover"
                       >
                         キャンセル
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeleteSession(sess.id)}
-                        className="rounded bg-destructive px-2 py-1 text-white"
+                        className="cursor-pointer rounded bg-destructive px-2.5 py-1 font-medium text-white shadow-xs transition hover:bg-destructive-hover"
                       >
                         削除する
                       </button>

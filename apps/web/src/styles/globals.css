@@ -28,6 +28,10 @@
   --color-danger-subtle-fg: var(--color-rose-700);
   --color-danger-border: var(--color-rose-200);
 
+  --color-destructive: var(--color-rose-600);
+  --color-destructive-hover: var(--color-rose-700);
+  --color-destructive-foreground: #ffffff;
+
   --color-warning: var(--color-amber-600);
   --color-warning-subtle: var(--color-amber-50);
   --color-warning-subtle-fg: var(--color-amber-800);
@@ -64,6 +68,10 @@
   --color-danger-subtle-fg: var(--color-rose-300);
   --color-danger-border: rgba(159, 18, 57, 0.4);
 
+  --color-destructive: var(--color-rose-500);
+  --color-destructive-hover: var(--color-rose-400);
+  --color-destructive-foreground: #ffffff;
+
   --color-warning: var(--color-amber-500);
   --color-warning-subtle: rgba(120, 53, 15, 0.25);
   --color-warning-subtle-fg: var(--color-amber-200);
@@ -99,6 +107,10 @@
   --color-danger-subtle: var(--color-danger-subtle);
   --color-danger-subtle-fg: var(--color-danger-subtle-fg);
   --color-danger-border: var(--color-danger-border);
+
+  --color-destructive: var(--color-destructive);
+  --color-destructive-hover: var(--color-destructive-hover);
+  --color-destructive-foreground: var(--color-destructive-foreground);
 
   --color-warning: var(--color-warning);
   --color-warning-subtle: var(--color-warning-subtle);
