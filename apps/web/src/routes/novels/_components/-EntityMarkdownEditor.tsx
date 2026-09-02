@@ -6,25 +6,19 @@ import {
   type MarkdownCategoryNode,
 } from "@novel-creator/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AIProgressIndicator } from "@/components/AIProgressIndicator.js";
 import { Button } from "@/components/Button.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { HistoryDiffModal } from "@/components/HistoryDiffModal.js";
-import { Input } from "@/components/Input.js";
 import { Loading } from "@/components/Loading.js";
 import { useChatUI } from "@/context/ChatContext.js";
 import { useMarkdownEntityEditor } from "@/hooks/useMarkdownEntityEditor.js";
 import { useToast } from "@/hooks/useToast.js";
-import { toErrorMessage } from "@/lib/errors.js";
 import { MonacoEditor } from "./-MonacoEditor.js";
 
 export interface EntityMarkdownEditorProps<
   TSection extends { category: string; name: string },
 > {
   buildTree: (markdown: string) => MarkdownCategoryNode[];
-  documentPlaceholder?: string;
-  editingDocument: boolean;
-  editingSection: boolean;
   entityTitle: string;
   entityType:
     | "characters_markdown"
@@ -36,20 +30,10 @@ export interface EntityMarkdownEditorProps<
   fetchMarkdown: () => Promise<string>;
   findSectionAtLine: (markdown: string, lineNumber: number) => TSection | null;
   novelId: string;
-  onEditDocument: (params: {
-    instruction: string;
-    markdown: string;
-  }) => Promise<string>;
-  onEditSection: (params: {
-    activeSection: TSection;
-    instruction: string;
-    markdown: string;
-  }) => Promise<string>;
   saveMarkdown: (
     markdown: string
   ) => Promise<{ created?: number; updated?: number; deleted?: number }>;
   savingMarkdown: boolean;
-  sectionPlaceholder?: (activeSection: TSection | null) => string;
   storageKey: string;
 }
 
@@ -64,13 +48,7 @@ export function EntityMarkdownEditor<
   saveMarkdown,
   buildTree,
   findSectionAtLine,
-  onEditSection,
-  onEditDocument,
   savingMarkdown,
-  editingSection,
-  editingDocument,
-  sectionPlaceholder,
-  documentPlaceholder,
   extraToolbarActions,
 }: EntityMarkdownEditorProps<TSection>) {
   const {
@@ -78,10 +56,6 @@ export function EntityMarkdownEditor<
     setMarkdown,
     setSavedMarkdown,
     loading,
-    instruction,
-    setInstruction,
-    editScope,
-    setEditScope,
     activeSection,
     discardOpen,
     setDiscardOpen,
@@ -112,9 +86,7 @@ export function EntityMarkdownEditor<
 
   const { openChat } = useChatUI();
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
   const toast = useToast();
-  const runStartedAtRef = useRef<number>(Date.now());
 
   // チャット画面でストーリー構想が更新された際のリアルタイム同期リスナー
   useEffect(() => {
@@ -214,54 +186,6 @@ export function EntityMarkdownEditor<
     });
   }, [activeSection, entityTitle, markdown, novelId, openChat, selectedText]);
 
-  const handleRun = useCallback(async () => {
-    if (!instruction.trim()) {
-      toast.error("指示を入力してください");
-      return;
-    }
-
-    setAiError(null);
-    runStartedAtRef.current = Date.now();
-    try {
-      if (editScope === "document") {
-        const next = await onEditDocument({ markdown, instruction });
-        setMarkdown(next);
-        toast.success("全体のAI編集が完了しました");
-        return;
-      }
-
-      if (!activeSection) {
-        toast.error(
-          `カーソルを編集対象の${entityTitle}セクション（## 見出し配下）に移動してください`
-        );
-        return;
-      }
-
-      const nextSummary = await onEditSection({
-        activeSection,
-        instruction,
-        markdown,
-      });
-
-      setMarkdown(nextSummary);
-      toast.success(`「${activeSection.name}」のAI編集が完了しました`);
-    } catch (e) {
-      const errMsg = toErrorMessage(e);
-      setAiError(errMsg);
-      toast.error(errMsg);
-    }
-  }, [
-    activeSection,
-    entityTitle,
-    editScope,
-    instruction,
-    markdown,
-    onEditDocument,
-    onEditSection,
-    setMarkdown,
-    toast,
-  ]);
-
   const handleFormat = useCallback(() => {
     let formatted = markdown;
     if (entityType === "characters_markdown") {
@@ -307,7 +231,7 @@ export function EntityMarkdownEditor<
     }
   }, [clearDraft, markdown, saveMarkdown, setSavedMarkdown, toast]);
 
-  const isBusy = savingMarkdown || editingSection || editingDocument;
+  const isBusy = savingMarkdown;
 
   // Ctrl+S / Cmd+S ショートカットで保存、Shift+Alt+F で整形
   useEffect(() => {
@@ -359,68 +283,66 @@ export function EntityMarkdownEditor<
           className="truncate font-bold text-foreground"
           title={`目次 (カテゴリ / ${entityTitle})`}
         >
-          目次
+          目次 (カテゴリ / {entityTitle})
         </span>
-        <div className="flex shrink-0 items-center gap-0.5">
-          <button
-            type="button"
-            onClick={toggleSidebarMode}
-            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition hover:bg-surface-raised hover:text-foreground"
-            title={
-              sidebarMode === "pinned"
-                ? "フロート表示にする（表示領域を節約）"
-                : "固定表示にする"
-            }
-            aria-label={sidebarMode === "pinned" ? "フロート表示" : "固定表示"}
-          >
-            {sidebarMode === "pinned" ? "🪟" : "📌"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={toggleSidebarMode}
+          title={
+            sidebarMode === "pinned"
+              ? "オーバーラップ表示に切替"
+              : "ピン留め表示に切替"
+          }
+          className="cursor-pointer rounded p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+        >
+          {sidebarMode === "pinned" ? "📌" : "🔓"}
+        </button>
       </div>
-      {tree.length === 0 ? (
-        <div className="p-2 text-muted-foreground italic">
-          {entityTitle}が見つかりません
-        </div>
-      ) : (
-        tree.map((cat) => (
-          <div key={cat.category} className="mb-2">
-            <div className="rounded bg-surface-raised px-2 py-1 font-bold text-foreground">
-              {cat.category}
-            </div>
-            <div className="mt-1 ml-2 space-y-0.5">
-              {cat.children.map((item) => {
-                const isActive =
-                  activeSection?.category === cat.category &&
-                  activeSection?.name === item.name;
-                return (
-                  <button
-                    key={item.name}
-                    type="button"
-                    onClick={() => handleTreeClick(item.headingLine)}
-                    className={`block w-full truncate rounded px-2 py-1 text-left transition-colors ${
-                      isActive
-                        ? "bg-primary font-semibold text-primary-foreground"
-                        : "text-foreground hover:bg-surface-raised"
-                    }`}
-                    title={item.name}
-                  >
-                    {item.name}
-                  </button>
-                );
-              })}
-            </div>
+      <nav className="space-y-1">
+        {tree.length === 0 ? (
+          <div className="py-2 text-center text-muted-foreground text-xs">
+            見出しがありません
           </div>
-        ))
-      )}
+        ) : (
+          tree.map((cat) => (
+            <div key={cat.category} className="space-y-0.5">
+              <div
+                className="cursor-pointer truncate px-2 py-1 font-semibold text-muted-foreground text-xs hover:text-foreground"
+                onClick={() => handleTreeClick(cat.headingLine)}
+                title={`# ${cat.category}`}
+              >
+                # {cat.category}
+              </div>
+              <div className="ml-2 space-y-0.5 border-border border-l pl-2">
+                {cat.children.map((item) => (
+                  <div
+                    key={`${cat.category}-${item.name}-${item.headingLine}`}
+                    className={`cursor-pointer truncate rounded px-2 py-0.5 text-xs transition-colors ${
+                      activeSection?.name === item.name &&
+                      activeSection?.category === cat.category
+                        ? "bg-primary/10 font-bold text-primary"
+                        : "text-foreground hover:bg-surface-hover"
+                    }`}
+                    onClick={() => handleTreeClick(item.headingLine)}
+                    title={`## ${item.name}`}
+                  >
+                    ## {item.name}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
+        )}
+      </nav>
     </>
   );
 
   if (loading) {
-    return <Loading message={`${entityTitle}マークダウンを読み込み中...`} />;
+    return <Loading />;
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-background text-foreground">
       {hasDraft && (
         <div
           role="region"
@@ -439,15 +361,44 @@ export function EntityMarkdownEditor<
         </div>
       )}
 
-      <div className="flex items-center justify-between border-border border-b bg-surface px-4 py-2">
+      {/* ツールバー */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-border border-b bg-surface px-4 py-2">
         <div className="flex items-center gap-2">
+          {/* 目次トグルボタン */}
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen((prev) => !prev)}
+            onMouseEnter={handleMouseEnter}
+            title="目次サイドバーを開閉"
+            className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
+              isSidebarOpen || isHovered
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+            }`}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="h-4 w-4"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+              />
+            </svg>
+            <span className="font-medium">目次</span>
+          </button>
+
           <Button
             size="sm"
             variant="primary"
             onClick={handleSave}
             disabled={!isDirty || isBusy}
-            isLoading={savingMarkdown}
-            title="保存 (Ctrl+S)"
+            isLoading={isBusy}
           >
             保存
           </Button>
@@ -456,7 +407,7 @@ export function EntityMarkdownEditor<
             variant="secondary"
             onClick={handleFormat}
             disabled={isBusy}
-            title="マークダウンを整形 (Shift+Alt+F)"
+            title="マークダウンのフォーマットを整形 (Shift+Alt+F)"
           >
             🧹 整形
           </Button>
@@ -492,110 +443,6 @@ export function EntityMarkdownEditor<
           >
             💬 チャットで相談
           </Button>
-        </div>
-      </div>
-
-      <div className="border-border border-b bg-surface p-4">
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-4 text-xs">
-            <span className="font-semibold text-muted-foreground">
-              編集対象:
-            </span>
-            <label className="flex cursor-pointer items-center gap-1.5 text-foreground">
-              <input
-                type="radio"
-                name={`${entityType}-edit-scope`}
-                value="section"
-                checked={editScope === "section"}
-                onChange={() => setEditScope("section")}
-                disabled={isBusy}
-              />
-              選択セクション
-              {activeSection && (
-                <span className="ml-1 font-mono text-primary">
-                  [{activeSection.category}] {activeSection.name}
-                </span>
-              )}
-            </label>
-            <label className="flex cursor-pointer items-center gap-1.5 text-foreground">
-              <input
-                type="radio"
-                name={`${entityType}-edit-scope`}
-                value="document"
-                checked={editScope === "document"}
-                onChange={() => setEditScope("document")}
-                disabled={isBusy}
-              />
-              ドキュメント全体
-            </label>
-          </div>
-
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <Input
-                placeholder={
-                  editScope === "section"
-                    ? sectionPlaceholder
-                      ? sectionPlaceholder(activeSection)
-                      : activeSection
-                        ? `「${activeSection.name}」への指示`
-                        : `カーソルを${entityTitle}セクション内に置いてください`
-                    : (documentPlaceholder ?? "全体への指示")
-                }
-                value={instruction}
-                onChange={(e) => {
-                  setInstruction(e.target.value);
-                  if (aiError) {
-                    setAiError(null);
-                  }
-                }}
-                disabled={isBusy}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-                    void handleRun();
-                  }
-                }}
-              />
-            </div>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={handleRun}
-              disabled={isBusy || !instruction.trim()}
-              isLoading={editingSection || editingDocument}
-            >
-              LLMで編集
-            </Button>
-          </div>
-
-          {aiError && (
-            <div
-              role="alert"
-              className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-destructive text-xs"
-            >
-              <span>{aiError}</span>
-              <button
-                type="button"
-                onClick={() => setAiError(null)}
-                className="cursor-pointer font-bold hover:underline"
-              >
-                ✕
-              </button>
-            </div>
-          )}
-
-          {isBusy && (
-            <AIProgressIndicator
-              variant="inline"
-              stage={
-                editingDocument || editScope === "document"
-                  ? `AIが${entityTitle}マークダウン全体を再編成・推敲中...`
-                  : `AIが「${activeSection?.name ?? entityTitle}」を推敲・編集案を生成中...`
-              }
-              description="指示内容に基づいてマークダウンを生成しています。完了までしばらくお待ちください。"
-              startedAt={runStartedAtRef.current}
-            />
-          )}
         </div>
       </div>
 

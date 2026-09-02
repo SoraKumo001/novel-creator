@@ -54,11 +54,7 @@ export function ForeshadowingTab({ novel, onRefresh }: ForeshadowingTabProps) {
     deleting,
     fetchForeshadowingsMarkdown,
     saveForeshadowingsMarkdown,
-    editForeshadowingSection,
-    editForeshadowingDocument,
     savingMarkdown,
-    editingSection,
-    editingDocument,
   } = useForeshadowings(novel.id);
   const { chapters } = useChapters(novel.id);
   const navigate = useNavigate();
@@ -181,11 +177,7 @@ export function ForeshadowingTab({ novel, onRefresh }: ForeshadowingTabProps) {
             novelId={novelId}
             fetchForeshadowingsMarkdown={fetchForeshadowingsMarkdown}
             saveForeshadowingsMarkdown={saveForeshadowingsMarkdown}
-            editForeshadowingSection={editForeshadowingSection}
-            editForeshadowingDocument={editForeshadowingDocument}
             savingMarkdown={savingMarkdown}
-            editingSection={editingSection}
-            editingDocument={editingDocument}
           />
         ),
         deleteTitle: "伏線を削除しますか？",

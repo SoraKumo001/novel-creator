@@ -20,11 +20,7 @@ export function SettingsTab({
     deleting,
     fetchSettingsMarkdown,
     saveSettingsMarkdown,
-    editSettingSection,
-    editSettingDocument,
     savingMarkdown,
-    editingSection,
-    editingDocument,
   } = useSettings(novel.id);
   const navigate = useNavigate();
 
@@ -68,11 +64,7 @@ export function SettingsTab({
             novelId={novelId}
             fetchSettingsMarkdown={fetchSettingsMarkdown}
             saveSettingsMarkdown={saveSettingsMarkdown}
-            editSettingSection={editSettingSection}
-            editSettingDocument={editSettingDocument}
             savingMarkdown={savingMarkdown}
-            editingSection={editingSection}
-            editingDocument={editingDocument}
           />
         ),
         deleteTitle: "設定を削除しますか？",

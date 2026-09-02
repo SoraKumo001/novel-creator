@@ -396,6 +396,8 @@ describe("Chat API", () => {
       "proposeBulkCreate",
       "proposeCreateCharacter",
       "proposeCreateSetting",
+      "proposeDeleteCharacter",
+      "proposeDeleteSetting",
       "proposeUpdatePlot",
       "proposeUpdateStoryOutline",
       "searchNovelKnowledge",

@@ -26,7 +26,6 @@ export interface UseMarkdownEntityEditorReturn<
   clearDraft: () => void;
   discardOpen: boolean;
   editorRef: MutableRefObject<MonacoEditorInstance | null>;
-  editScope: "section" | "document";
   error: string | null;
   handleDiscard: () => Promise<void>;
   handleDiscardDraft: () => void;
@@ -37,7 +36,6 @@ export interface UseMarkdownEntityEditorReturn<
   handleSplitterMouseDown: (e: React.MouseEvent) => void;
   handleTreeClick: (headingLine: number) => void;
   hasDraft: boolean;
-  instruction: string;
   isDirty: boolean;
   isSidebarOpen: boolean;
   loading: boolean;
@@ -47,9 +45,7 @@ export interface UseMarkdownEntityEditorReturn<
   selectedText: string;
   setActiveSection: (sec: TSection | null) => void;
   setDiscardOpen: (open: boolean) => void;
-  setEditScope: (scope: "section" | "document") => void;
   setError: (err: string | null) => void;
-  setInstruction: (ins: string) => void;
   setIsSidebarOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setMarkdown: (value: string) => void;
   setMessage: (msg: string | null) => void;
@@ -82,8 +78,6 @@ export function useMarkdownEntityEditor<
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [instruction, setInstruction] = useState("");
-  const [editScope, setEditScope] = useState<"section" | "document">("section");
   const [activeSection, setActiveSection] = useState<TSection | null>(null);
   const [savedMarkdown, setSavedMarkdown] = useState("");
   const [discardOpen, setDiscardOpen] = useState(false);
@@ -326,10 +320,6 @@ export function useMarkdownEntityEditor<
     setError,
     message,
     setMessage,
-    instruction,
-    setInstruction,
-    editScope,
-    setEditScope,
     activeSection,
     setActiveSection,
     discardOpen,

@@ -20,12 +20,8 @@ export function CharactersTab({
     deleteCharacter,
     fetchCharactersMarkdown,
     saveCharactersMarkdown,
-    editCharacterSection,
-    editCharacterDocument,
     deleting,
     savingMarkdown,
-    editingSection,
-    editingDocument,
   } = useCharacters(novel.id);
   const navigate = useNavigate();
 
@@ -77,11 +73,7 @@ export function CharactersTab({
             novelId={novelId}
             fetchCharactersMarkdown={fetchCharactersMarkdown}
             saveCharactersMarkdown={saveCharactersMarkdown}
-            editCharacterSection={editCharacterSection}
-            editCharacterDocument={editCharacterDocument}
             savingMarkdown={savingMarkdown}
-            editingSection={editingSection}
-            editingDocument={editingDocument}
           />
         ),
         deleteTitle: "人物を削除しますか？",

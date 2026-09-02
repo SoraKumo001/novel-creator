@@ -3,7 +3,6 @@ import {
   findStoryOutlineSectionByLine,
   STORY_OUTLINE_TEMPLATES,
   type StoryOutlineSectionRange,
-  scanStoryOutlineSectionRanges,
 } from "@novel-creator/shared";
 import { useCallback, useState } from "react";
 import { Button } from "@/components/Button.js";
@@ -12,8 +11,6 @@ import { useChapters } from "@/hooks/useChapters.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import {
-  editStoryOutlineDocument,
-  editStoryOutlineSection,
   fetchStoryOutline,
   generatePlotFromStoryOutline,
   saveStoryOutline,
@@ -31,8 +28,6 @@ export function StoryOutlineMarkdownEditor({
   onRefresh,
 }: StoryOutlineMarkdownEditorProps) {
   const [savingMarkdown, setSavingMarkdown] = useState(false);
-  const [editingSectionState, setEditingSectionState] = useState(false);
-  const [editingDocumentState, setEditingDocumentState] = useState(false);
   const [templateModalOpen, setTemplateModalOpen] = useState(false);
   const [generatingPlot, setGeneratingPlot] = useState(false);
   const [plotPreview, setPlotPreview] = useState<{
@@ -72,73 +67,6 @@ export function StoryOutlineMarkdownEditor({
     [novelId, onRefresh]
   );
 
-  const handleEditSection = useCallback(
-    async ({
-      activeSection,
-      instruction,
-      markdown,
-    }: {
-      activeSection: StoryOutlineSectionRange;
-      instruction: string;
-      markdown: string;
-    }) => {
-      setEditingSectionState(true);
-      try {
-        const sections = scanStoryOutlineSectionRanges(markdown);
-        const target = sections.find(
-          (s) =>
-            s.category === activeSection.category &&
-            s.name === activeSection.name
-        );
-
-        if (!target) {
-          throw new Error(
-            `セクション「${activeSection.name}」が見つかりません`
-          );
-        }
-
-        const nextContent = await editStoryOutlineSection(novelId, {
-          activeSection: {
-            category: target.category,
-            name: target.name,
-            content: target.content,
-          },
-          instruction,
-          markdown,
-        });
-
-        const lines = markdown.split("\n");
-        const before = lines.slice(0, target.startLine);
-        const after = lines.slice(target.endLine + 1);
-        return [...before, nextContent.trim(), ...after].join("\n");
-      } finally {
-        setEditingSectionState(false);
-      }
-    },
-    [novelId]
-  );
-
-  const handleEditDocument = useCallback(
-    async ({
-      markdown,
-      instruction,
-    }: {
-      markdown: string;
-      instruction: string;
-    }) => {
-      setEditingDocumentState(true);
-      try {
-        return await editStoryOutlineDocument(novelId, {
-          markdown,
-          instruction,
-        });
-      } finally {
-        setEditingDocumentState(false);
-      }
-    },
-    [novelId]
-  );
-
   const handleGeneratePlot = async (currentMarkdown: string) => {
     if (!currentMarkdown || currentMarkdown.trim().length < 20) {
       toast.error(
@@ -148,14 +76,11 @@ export function StoryOutlineMarkdownEditor({
     }
     setGeneratingPlot(true);
     try {
-      const result = await generatePlotFromStoryOutline(novelId, {
-        storyOutline: currentMarkdown,
-      });
-      setPlotPreview(result);
-      setSelectedPlotIndices(new Set(result.chapters.map((_, i) => i)));
-    } catch (err) {
-      const msg = toErrorMessage(err);
-      toast.error(msg);
+      const plot = await generatePlotFromStoryOutline(novelId, currentMarkdown);
+      setPlotPreview(plot);
+      setSelectedPlotIndices(new Set(plot.chapters.map((_, index) => index)));
+    } catch (e) {
+      toast.error(toErrorMessage(e));
     } finally {
       setGeneratingPlot(false);
     }
@@ -165,8 +90,8 @@ export function StoryOutlineMarkdownEditor({
     if (!plotPreview) {
       return;
     }
-    const selectedChapters = plotPreview.chapters.filter((_, i) =>
-      selectedPlotIndices.has(i)
+    const selectedChapters = plotPreview.chapters.filter((_, index) =>
+      selectedPlotIndices.has(index)
     );
     for (const ch of selectedChapters) {
       await createChapter({
@@ -194,17 +119,7 @@ export function StoryOutlineMarkdownEditor({
         saveMarkdown={handleSaveMarkdown}
         buildTree={buildStoryOutlineCategoryTree}
         findSectionAtLine={findStoryOutlineSectionByLine}
-        onEditSection={handleEditSection}
-        onEditDocument={handleEditDocument}
         savingMarkdown={savingMarkdown}
-        editingSection={editingSectionState}
-        editingDocument={editingDocumentState}
-        sectionPlaceholder={(active: StoryOutlineSectionRange | null) =>
-          active
-            ? `「${active.name}」への指示（例: 結末をビターエンドに / 中盤の事件案を3つ提案して）`
-            : "カーソルを見出しやセクション内に置いてください"
-        }
-        documentPlaceholder="ストーリー構想全体への指示（例: 全体を三幕構成に再編して / ログラインをキャッチーに推敲して）"
         extraToolbarActions={
           <>
             <Button

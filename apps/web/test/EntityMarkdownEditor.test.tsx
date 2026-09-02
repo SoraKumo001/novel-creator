@@ -23,9 +23,10 @@ vi.mock("../src/routes/novels/_components/-MonacoEditor.js", () => ({
   ),
 }));
 
+const mockOpenChat = vi.fn();
 vi.mock("@/context/ChatContext.js", () => ({
   useChatUI: () => ({
-    openChat: vi.fn(),
+    openChat: mockOpenChat,
     isOpen: false,
   }),
 }));
@@ -61,28 +62,42 @@ describe("EntityMarkdownEditor", () => {
     findSectionAtLine: vi
       .fn()
       .mockReturnValue({ category: "主要人物", name: "アリス" }),
-    onEditSection: vi.fn().mockResolvedValue("更新後"),
-    onEditDocument: vi.fn().mockResolvedValue("更新後全体"),
     savingMarkdown: false,
-    editingSection: false,
-    editingDocument: false,
   };
 
-  it("LLM編集実行中（editingDocument=true）に AIProgressIndicator が表示されること", async () => {
-    render(<EntityMarkdownEditor {...defaultProps} editingDocument={true} />);
+  it("ツールバーボタン（保存、整形、破棄、履歴、チャットで相談）が描画されること", async () => {
+    render(<EntityMarkdownEditor {...defaultProps} />);
 
-    // マークダウン読み込み完了後、AIProgressIndicator のメッセージが表示される
     expect(
-      await screen.findByText(/AIが人物マークダウン全体を再編成・推敲中.../)
+      await screen.findByRole("button", { name: "保存" })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /整形/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /変更を破棄/ })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /履歴/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /チャットで相談/ })
     ).toBeInTheDocument();
   });
 
-  it("LLM編集実行中（editingSection=true）にセクション名付きのプログレスが表示されること", async () => {
-    render(<EntityMarkdownEditor {...defaultProps} editingSection={true} />);
+  it("「チャットで相談」をクリックすると openChat が呼び出されること", async () => {
+    render(<EntityMarkdownEditor {...defaultProps} />);
 
-    expect(
-      await screen.findByText(/AIが「人物」を推敲・編集案を生成中.../)
-    ).toBeInTheDocument();
+    const chatButton = await screen.findByRole("button", {
+      name: /チャットで相談/,
+    });
+    const { act, fireEvent } = await import("@testing-library/react");
+    await act(async () => {
+      fireEvent.click(chatButton);
+    });
+
+    expect(mockOpenChat).toHaveBeenCalledWith(
+      "novel-1",
+      expect.objectContaining({
+        title: expect.stringContaining("人物"),
+      })
+    );
   });
 
   it("保存成功時に一部項目がundefinedでも0件に補正され、undefinedと表示されないこと", async () => {
