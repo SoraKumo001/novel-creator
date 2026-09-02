@@ -1,4 +1,10 @@
-import type { MarkdownCategoryNode } from "@novel-creator/shared";
+import {
+  formatCharactersMarkdown,
+  formatForeshadowingsMarkdown,
+  formatSettingsMarkdown,
+  formatStoryOutlineMarkdown,
+  type MarkdownCategoryNode,
+} from "@novel-creator/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AIProgressIndicator } from "@/components/AIProgressIndicator.js";
 import { Button } from "@/components/Button.js";
@@ -83,6 +89,10 @@ export function EntityMarkdownEditor<
     isDirty,
     tree,
     sidebarWidth,
+    sidebarMode,
+    isSidebarOpen,
+    setIsSidebarOpen,
+    toggleSidebarMode,
     handleEditorChange,
     handleRestoreDraft,
     handleDiscardDraft,
@@ -142,6 +152,41 @@ export function EntityMarkdownEditor<
       );
     };
   }, [clearDraft, entityType, novelId, setMarkdown, setSavedMarkdown, toast]);
+
+  // チャット画面から「Markdownで確認・編集」をクリックした際のプレビュー読み込みリスナー
+  useEffect(() => {
+    const handlePreviewApply = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        novelId: string;
+        entityType: string;
+        markdown: string;
+        appliedTitle?: string;
+      }>;
+      if (
+        !customEvent.detail ||
+        customEvent.detail.novelId !== novelId ||
+        customEvent.detail.entityType !== entityType
+      ) {
+        return;
+      }
+      const { markdown: newMarkdown, appliedTitle } = customEvent.detail;
+      setMarkdown(newMarkdown);
+      toast.success(
+        `チャットの提案内容（${appliedTitle || entityTitle}）をエディタに読み込みました。差分を確認・調整して保存してください。`
+      );
+    };
+
+    window.addEventListener(
+      "novel-creator:markdown-preview-apply",
+      handlePreviewApply
+    );
+    return () => {
+      window.removeEventListener(
+        "novel-creator:markdown-preview-apply",
+        handlePreviewApply
+      );
+    };
+  }, [entityTitle, entityType, novelId, setMarkdown, toast]);
 
   const handleOpenChat = useCallback(() => {
     if (selectedText.trim()) {
@@ -217,6 +262,30 @@ export function EntityMarkdownEditor<
     toast,
   ]);
 
+  const handleFormat = useCallback(() => {
+    let formatted = markdown;
+    if (entityType === "characters_markdown") {
+      formatted = formatCharactersMarkdown(markdown);
+    } else if (entityType === "settings_markdown") {
+      formatted = formatSettingsMarkdown(markdown);
+    } else if (
+      entityType === "foreshadowings_document" ||
+      entityType === "foreshadowings_markdown"
+    ) {
+      formatted = formatForeshadowingsMarkdown(markdown);
+    } else if (entityType === "story_outline_markdown") {
+      formatted = formatStoryOutlineMarkdown(markdown);
+    }
+
+    if (formatted === markdown) {
+      toast.success("マークダウンはすでに整形されています");
+      return;
+    }
+
+    setMarkdown(formatted);
+    toast.success("マークダウンを整形しました");
+  }, [entityType, markdown, setMarkdown, toast]);
+
   const handleSave = useCallback(async () => {
     try {
       const res = await saveMarkdown(markdown);
@@ -240,7 +309,7 @@ export function EntityMarkdownEditor<
 
   const isBusy = savingMarkdown || editingSection || editingDocument;
 
-  // Ctrl+S / Cmd+S ショートカットで保存
+  // Ctrl+S / Cmd+S ショートカットで保存、Shift+Alt+F で整形
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
@@ -248,11 +317,103 @@ export function EntityMarkdownEditor<
         if (isDirty && !isBusy) {
           void handleSave();
         }
+      } else if (e.shiftKey && e.altKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        if (!isBusy) {
+          handleFormat();
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSave, isBusy, isDirty]);
+  }, [handleFormat, handleSave, isBusy, isDirty]);
+
+  const [isHovered, setIsHovered] = useState(false);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsHovered(true);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+      setIsSidebarOpen(false);
+    }, 250);
+  }, [setIsSidebarOpen]);
+
+  const showOverlapSidebar =
+    sidebarMode === "overlap" && (isSidebarOpen || isHovered);
+
+  const renderTocContent = () => (
+    <>
+      <div className="mb-2 flex items-center justify-between border-border border-b px-1 pb-1.5 font-semibold text-muted-foreground text-xs">
+        <span
+          className="truncate font-bold text-foreground"
+          title={`目次 (カテゴリ / ${entityTitle})`}
+        >
+          目次
+        </span>
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={toggleSidebarMode}
+            className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition hover:bg-surface-raised hover:text-foreground"
+            title={
+              sidebarMode === "pinned"
+                ? "フロート表示にする（表示領域を節約）"
+                : "固定表示にする"
+            }
+            aria-label={sidebarMode === "pinned" ? "フロート表示" : "固定表示"}
+          >
+            {sidebarMode === "pinned" ? "🪟" : "📌"}
+          </button>
+        </div>
+      </div>
+      {tree.length === 0 ? (
+        <div className="p-2 text-muted-foreground italic">
+          {entityTitle}が見つかりません
+        </div>
+      ) : (
+        tree.map((cat) => (
+          <div key={cat.category} className="mb-2">
+            <div className="rounded bg-surface-raised px-2 py-1 font-bold text-foreground">
+              {cat.category}
+            </div>
+            <div className="mt-1 ml-2 space-y-0.5">
+              {cat.children.map((item) => {
+                const isActive =
+                  activeSection?.category === cat.category &&
+                  activeSection?.name === item.name;
+                return (
+                  <button
+                    key={item.name}
+                    type="button"
+                    onClick={() => handleTreeClick(item.headingLine)}
+                    className={`block w-full truncate rounded px-2 py-1 text-left transition-colors ${
+                      isActive
+                        ? "bg-primary font-semibold text-primary-foreground"
+                        : "text-foreground hover:bg-surface-raised"
+                    }`}
+                    title={item.name}
+                  >
+                    {item.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))
+      )}
+    </>
+  );
 
   if (loading) {
     return <Loading message={`${entityTitle}マークダウンを読み込み中...`} />;
@@ -289,6 +450,15 @@ export function EntityMarkdownEditor<
             title="保存 (Ctrl+S)"
           >
             保存
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={handleFormat}
+            disabled={isBusy}
+            title="マークダウンを整形 (Shift+Alt+F)"
+          >
+            🧹 整形
           </Button>
           <Button
             size="sm"
@@ -399,21 +569,15 @@ export function EntityMarkdownEditor<
           </div>
 
           {aiError && (
-            <div className="fade-in flex animate-in items-start justify-between gap-3 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-destructive text-xs duration-200">
-              <div className="flex min-w-0 items-start gap-2">
-                <span className="shrink-0 text-base leading-none">⚠️</span>
-                <div className="min-w-0 space-y-1">
-                  <div className="font-bold">AI編集エラーが発生しました</div>
-                  <p className="whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed opacity-95">
-                    {aiError}
-                  </p>
-                </div>
-              </div>
+            <div
+              role="alert"
+              className="flex items-center justify-between rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-destructive text-xs"
+            >
+              <span>{aiError}</span>
               <button
                 type="button"
                 onClick={() => setAiError(null)}
-                className="shrink-0 cursor-pointer rounded p-1 text-destructive/70 transition hover:bg-destructive/10 hover:text-destructive"
-                title="エラー表示を閉じる"
+                className="cursor-pointer font-bold hover:underline"
               >
                 ✕
               </button>
@@ -436,56 +600,56 @@ export function EntityMarkdownEditor<
       </div>
 
       <div className="relative flex flex-1 overflow-hidden">
-        <aside
-          style={{ width: `${sidebarWidth}px` }}
-          className="shrink-0 overflow-y-auto border-border border-r bg-surface p-2 text-xs"
-        >
-          <div className="mb-1 px-2 py-1 font-semibold text-muted-foreground">
-            目次 (カテゴリ / {entityTitle})
-          </div>
-          {tree.length === 0 ? (
-            <div className="p-2 text-muted-foreground italic">
-              {entityTitle}が見つかりません
-            </div>
-          ) : (
-            tree.map((cat) => (
-              <div key={cat.category} className="mb-2">
-                <div className="rounded bg-surface-raised px-2 py-1 font-bold text-foreground">
-                  {cat.category}
-                </div>
-                <div className="mt-1 ml-2 space-y-0.5">
-                  {cat.children.map((item) => {
-                    const isActive =
-                      activeSection?.category === cat.category &&
-                      activeSection?.name === item.name;
-                    return (
-                      <button
-                        key={item.name}
-                        type="button"
-                        onClick={() => handleTreeClick(item.headingLine)}
-                        className={`block w-full truncate rounded px-2 py-1 text-left transition-colors ${
-                          isActive
-                            ? "bg-primary font-semibold text-primary-foreground"
-                            : "text-foreground hover:bg-surface-raised"
-                        }`}
-                        title={item.name}
-                      >
-                        {item.name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ))
-          )}
-        </aside>
+        {/* 固定（ピン留め）モード時のサイドバー */}
+        {sidebarMode === "pinned" && (
+          <>
+            <aside
+              style={{ width: `${sidebarWidth}px` }}
+              className="shrink-0 overflow-y-auto border-border border-r bg-surface p-2 text-xs"
+            >
+              {renderTocContent()}
+            </aside>
 
-        {/* リサイザブルスプリッターバー */}
-        <div
-          onMouseDown={handleSplitterMouseDown}
-          className="z-10 -ml-0.5 w-1.5 shrink-0 cursor-col-resize select-none bg-border transition-colors hover:w-2 hover:bg-primary/50"
-          title="ドラッグして幅を調整"
-        />
+            {/* リサイザブルスプリッターバー */}
+            <div
+              onMouseDown={handleSplitterMouseDown}
+              className="z-10 -ml-0.5 w-1.5 shrink-0 cursor-col-resize select-none bg-border transition-colors hover:w-2 hover:bg-primary/50"
+              title="ドラッグして幅を調整"
+            />
+          </>
+        )}
+
+        {/* オーバーラップ（フロート）モード時の縮小ストリップ */}
+        {sidebarMode === "overlap" && (
+          <div
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onClick={() => setIsSidebarOpen((prev) => !prev)}
+            className="group z-10 flex w-7 shrink-0 cursor-pointer flex-col items-center border-border border-r bg-surface/80 py-3 text-muted-foreground transition hover:bg-surface-raised hover:text-foreground"
+            title="マウスホバーで目次を展開"
+          >
+            <span className="text-xs">📑</span>
+            <span className="mt-2 font-medium text-[10px] tracking-widest opacity-70 [writing-mode:vertical-rl] group-hover:opacity-100">
+              目次
+            </span>
+          </div>
+        )}
+
+        {/* オーバーラップ（フロート）モード時の展開サイドバー */}
+        {showOverlapSidebar && (
+          <div
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            className="absolute top-0 bottom-0 left-7 z-30 flex shadow-2xl"
+          >
+            <aside
+              style={{ width: `${sidebarWidth}px` }}
+              className="slide-in-from-left flex animate-in flex-col overflow-y-auto border-border border-r bg-surface/98 p-2 text-xs backdrop-blur-md duration-150"
+            >
+              {renderTocContent()}
+            </aside>
+          </div>
+        )}
 
         <main className="relative flex-1 overflow-hidden">
           <MonacoEditor

@@ -12,7 +12,7 @@ export function Card({ children, className = "", onClick }: CardProps) {
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
-      className={`rounded-xl border border-border bg-surface p-5 shadow-sm transition ${
+      className={`rounded-xl border border-border bg-surface p-4 shadow-sm transition ${
         onClick ? "cursor-pointer hover:border-primary hover:shadow-md" : ""
       } ${className}`}
     >
@@ -29,10 +29,12 @@ interface CardHeaderProps {
 
 export function CardHeader({ title, subtitle, action }: CardHeaderProps) {
   return (
-    <div className="mb-4 flex items-start justify-between gap-4">
-      <div>
-        <h3 className="font-semibold text-foreground text-lg">{title}</h3>
-        {subtitle && <p className="mt-1 text-muted text-sm">{subtitle}</p>}
+    <div className="mb-3 flex items-start justify-between gap-2">
+      <div className="min-w-0 flex-1">
+        <h3 className="break-words font-semibold text-base text-foreground leading-snug">
+          {title}
+        </h3>
+        {subtitle && <p className="mt-0.5 text-muted text-xs">{subtitle}</p>}
       </div>
       {action && <div className="shrink-0">{action}</div>}
     </div>

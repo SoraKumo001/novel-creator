@@ -4,7 +4,14 @@ import {
   type CategoryTreeNode,
   flattenCategoryTree,
 } from "@novel-creator/shared";
-import { type ReactNode, useCallback, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/Button.js";
 import { Card, CardHeader } from "@/components/Card.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
@@ -70,10 +77,67 @@ export function EntityListTab<
   const [viewMode, setViewMode] = useState<"cards" | "markdown">("cards");
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(256);
+  const [sidebarMode, setSidebarMode] = useState<"pinned" | "overlap">(() => {
+    const saved = localStorage.getItem(
+      `novel-creator:sidebar-mode:${config.idPrefix}`
+    );
+    return saved === "overlap" ? "overlap" : "pinned";
+  });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [sortOption, setSortOption] = useState<EntitySortOption>(() => {
     const saved = localStorage.getItem(`novel-creator:sort:${config.idPrefix}`);
     return (saved as EntitySortOption) || "category-asc-name-asc";
   });
+
+  const toggleSidebarMode = () => {
+    const next = sidebarMode === "pinned" ? "overlap" : "pinned";
+    setSidebarMode(next);
+    localStorage.setItem(`novel-creator:sidebar-mode:${config.idPrefix}`, next);
+    if (next === "overlap") {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  const [isHovered, setIsHovered] = useState(false);
+  const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsHovered(true);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsHovered(false);
+      setIsSidebarOpen(false);
+    }, 250);
+  }, []);
+
+  const showOverlapSidebar =
+    sidebarMode === "overlap" && (isSidebarOpen || isHovered);
+
+  // チャット等からMarkdown編集画面へ遷移要求があった場合にviewModeをmarkdownに切り替える
+  useEffect(() => {
+    const handleSwitch = () => {
+      setViewMode("markdown");
+    };
+    window.addEventListener(
+      "novel-creator:markdown-preview-apply",
+      handleSwitch
+    );
+    return () => {
+      window.removeEventListener(
+        "novel-creator:markdown-preview-apply",
+        handleSwitch
+      );
+    };
+  }, []);
 
   const handleSortChange = (newSort: EntitySortOption) => {
     setSortOption(newSort);
@@ -92,17 +156,24 @@ export function EntityListTab<
     [categoryTree]
   );
 
+  const sidebarWidthRef = useRef(sidebarWidth);
+  sidebarWidthRef.current = sidebarWidth;
+
   const handleSplitterMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     isDraggingRef.current = true;
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
 
+    const startX = e.clientX;
+    const startWidth = sidebarWidthRef.current;
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!isDraggingRef.current) {
         return;
       }
-      const newWidth = Math.max(160, Math.min(500, moveEvent.clientX));
+      const delta = moveEvent.clientX - startX;
+      const newWidth = Math.max(160, Math.min(500, startWidth + delta));
       setSidebarWidth(newWidth);
     };
 
@@ -209,40 +280,125 @@ export function EntityListTab<
           {config.renderMarkdownEditor(novelId)}
         </div>
       ) : (
-        <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface">
-          {/* 左サイドバー: 目次 (カテゴリ / 人物) */}
-          <aside
-            style={{ width: `${sidebarWidth}px` }}
-            className="shrink-0 overflow-y-auto border-border border-r bg-surface p-2 text-xs"
-          >
-            <div className="mb-1 px-2 py-1 font-semibold text-muted-foreground">
-              {config.sidebarLabel}
-            </div>
-            {entities.length === 0 ? (
-              <div className="p-2 text-muted-foreground italic">
-                {config.sidebarEmpty}
-              </div>
-            ) : (
-              categoryTree.map((node) => (
-                <SidebarTreeNode
-                  key={node.fullPath}
-                  node={node}
-                  idPrefix={idPrefix}
-                  onScrollTo={scrollToElement}
-                />
-              ))
-            )}
-          </aside>
+        <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-surface">
+          {/* 左サイドバー (固定モード) */}
+          {sidebarMode === "pinned" && (
+            <>
+              <aside
+                style={{ width: `${sidebarWidth}px` }}
+                className="shrink-0 overflow-y-auto border-border border-r bg-surface p-2 text-xs"
+              >
+                <div className="mb-2 flex items-center justify-between border-border border-b px-1 pb-1.5 font-semibold text-muted-foreground">
+                  <span
+                    className="truncate font-bold text-foreground"
+                    title={config.sidebarLabel}
+                  >
+                    目次
+                  </span>
+                  <button
+                    type="button"
+                    onClick={toggleSidebarMode}
+                    className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition hover:bg-surface-raised hover:text-foreground"
+                    title="フロート表示にする（表示領域を節約）"
+                    aria-label="フロート表示"
+                  >
+                    🪟
+                  </button>
+                </div>
+                {entities.length === 0 ? (
+                  <div className="p-2 text-muted-foreground italic">
+                    {config.sidebarEmpty}
+                  </div>
+                ) : (
+                  categoryTree.map((node) => (
+                    <SidebarTreeNode
+                      key={node.fullPath}
+                      node={node}
+                      idPrefix={idPrefix}
+                      onScrollTo={scrollToElement}
+                    />
+                  ))
+                )}
+              </aside>
 
-          {/* リサイザブルスプリッター */}
-          <div
-            onMouseDown={handleSplitterMouseDown}
-            className="z-10 -ml-0.5 w-1.5 shrink-0 cursor-col-resize select-none bg-border transition-colors hover:w-2 hover:bg-primary/50"
-            title="ドラッグして幅を調整"
-          />
+              {/* リサイザブルスプリッター */}
+              <div
+                onMouseDown={handleSplitterMouseDown}
+                className="z-10 -ml-0.5 w-1.5 shrink-0 cursor-col-resize select-none bg-border transition-colors hover:w-2 hover:bg-primary/50"
+                title="ドラッグして幅を調整"
+              />
+            </>
+          )}
+
+          {/* 左サイドバー (オーバーラップモード - 縮小ストリップ) */}
+          {sidebarMode === "overlap" && (
+            <div
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+              onClick={() => setIsSidebarOpen((prev) => !prev)}
+              className="group z-10 flex w-7 shrink-0 cursor-pointer flex-col items-center border-border border-r bg-surface/80 py-3 text-muted-foreground transition hover:bg-surface-raised hover:text-foreground"
+              title="マウスホバーで目次を展開"
+            >
+              <span className="text-xs">📑</span>
+              <span className="mt-2 font-medium text-[10px] tracking-widest opacity-70 [writing-mode:vertical-rl] group-hover:opacity-100">
+                目次
+              </span>
+            </div>
+          )}
+
+          {/* 左サイドバー (オーバーラップモード - 展開パネル) */}
+          {showOverlapSidebar && (
+            <div
+              onMouseEnter={handleMouseEnter}
+              onMouseLeave={handleMouseLeave}
+              className="absolute top-0 bottom-0 left-7 z-30 flex shadow-2xl"
+            >
+              <aside
+                style={{ width: `${sidebarWidth}px` }}
+                className="slide-in-from-left flex animate-in flex-col overflow-y-auto border-border border-r bg-surface/98 p-2 text-xs backdrop-blur-md duration-150"
+              >
+                <div className="mb-2 flex items-center justify-between border-border border-b px-1 pb-1.5 font-semibold text-muted-foreground">
+                  <span
+                    className="truncate font-bold text-foreground"
+                    title={config.sidebarLabel}
+                  >
+                    目次
+                  </span>
+                  <div className="flex shrink-0 items-center gap-0.5">
+                    <button
+                      type="button"
+                      onClick={toggleSidebarMode}
+                      className="flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground transition hover:bg-surface-raised hover:text-foreground"
+                      title="固定表示にする"
+                      aria-label="固定表示"
+                    >
+                      📌
+                    </button>
+                  </div>
+                </div>
+                {entities.length === 0 ? (
+                  <div className="p-2 text-muted-foreground italic">
+                    {config.sidebarEmpty}
+                  </div>
+                ) : (
+                  categoryTree.map((node) => (
+                    <SidebarTreeNode
+                      key={node.fullPath}
+                      node={node}
+                      idPrefix={idPrefix}
+                      onScrollTo={(id) => {
+                        scrollToElement(id);
+                        setIsSidebarOpen(false);
+                      }}
+                    />
+                  ))
+                )}
+              </aside>
+            </div>
+          )}
 
           {/* 右メイン領域: カードグリッド */}
-          <main className="min-h-0 flex-1 space-y-8 overflow-y-auto p-4">
+          <main className="@container min-h-0 flex-1 space-y-8 overflow-y-auto p-4">
             {loading && <Loading message={config.loadingMessage} />}
             {!loading && entities.length === 0 && (
               <EmptyState
@@ -285,7 +441,7 @@ export function EntityListTab<
                       {section.items.length}件
                     </span>
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-4 [grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr))]">
                     {section.items.map((entity) => (
                       <div
                         key={entity.id}
@@ -293,7 +449,7 @@ export function EntityListTab<
                         className="scroll-mt-4"
                       >
                         <Card
-                          className={`flex ${config.cardHeight} flex-col justify-between overflow-hidden`}
+                          className={`flex min-h-[14rem] ${config.cardHeight} flex-col justify-between overflow-hidden`}
                         >
                           <div className="flex min-h-0 flex-1 flex-col">
                             <div className="shrink-0">

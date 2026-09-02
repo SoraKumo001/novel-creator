@@ -5,6 +5,7 @@
 import {
   buildMarkdownCategoryTree,
   findSectionByLine,
+  formatMarkdownDocument,
   type MarkdownCategoryNode,
   scanMarkdownSections,
 } from "./markdownCore.js";
@@ -335,4 +336,11 @@ export function applyStoryOutlineSectionUpdate(
     mode,
     updatedMarkdown,
   };
+}
+
+/**
+ * ストーリー構想マークダウンの空行や改行・見出し・リスト構造を正規化して整形（フォーマット）したマークダウンを返す。
+ */
+export function formatStoryOutlineMarkdown(markdown: string): string {
+  return formatMarkdownDocument(markdown);
 }

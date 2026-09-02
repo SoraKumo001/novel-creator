@@ -39,6 +39,7 @@ export interface UseMarkdownEntityEditorReturn<
   hasDraft: boolean;
   instruction: string;
   isDirty: boolean;
+  isSidebarOpen: boolean;
   loading: boolean;
   markdown: string;
   message: string | null;
@@ -49,11 +50,16 @@ export interface UseMarkdownEntityEditorReturn<
   setEditScope: (scope: "section" | "document") => void;
   setError: (err: string | null) => void;
   setInstruction: (ins: string) => void;
+  setIsSidebarOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setMarkdown: (value: string) => void;
   setMessage: (msg: string | null) => void;
   setSavedMarkdown: (value: string) => void;
+  setSidebarMode: (mode: "pinned" | "overlap") => void;
   setSidebarWidth: (width: number) => void;
+  sidebarMode: "pinned" | "overlap";
   sidebarWidth: number;
+  toggleSidebar: () => void;
+  toggleSidebarMode: () => void;
   tree: TTree;
 }
 
@@ -86,6 +92,39 @@ export function useMarkdownEntityEditor<
     const saved = localStorage.getItem(`${storageKey}:sidebar-width`);
     return saved ? Number.parseInt(saved, 10) : 256;
   });
+  const [sidebarMode, setSidebarModeState] = useState<"pinned" | "overlap">(
+    () => {
+      const saved = localStorage.getItem(`${storageKey}:sidebar-mode`);
+      return saved === "overlap" ? "overlap" : "pinned";
+    }
+  );
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
+    const saved = localStorage.getItem(`${storageKey}:sidebar-open`);
+    return saved !== null ? saved === "true" : true;
+  });
+
+  const setSidebarMode = useCallback(
+    (mode: "pinned" | "overlap") => {
+      setSidebarModeState(mode);
+      localStorage.setItem(`${storageKey}:sidebar-mode`, mode);
+      if (mode === "overlap") {
+        setIsSidebarOpen(false);
+      }
+    },
+    [storageKey]
+  );
+
+  const toggleSidebarMode = useCallback(() => {
+    setSidebarMode(sidebarMode === "pinned" ? "overlap" : "pinned");
+  }, [setSidebarMode, sidebarMode]);
+
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen((prev) => {
+      const next = !prev;
+      localStorage.setItem(`${storageKey}:sidebar-open`, String(next));
+      return next;
+    });
+  }, [storageKey]);
 
   const handleSelectionChange = useCallback((text: string) => {
     setSelectedText(text.trim());
@@ -237,6 +276,9 @@ export function useMarkdownEntityEditor<
     [updateActiveSection]
   );
 
+  const sidebarWidthRef = useRef(sidebarWidth);
+  sidebarWidthRef.current = sidebarWidth;
+
   const handleSplitterMouseDown = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
@@ -244,11 +286,15 @@ export function useMarkdownEntityEditor<
       document.body.style.cursor = "col-resize";
       document.body.style.userSelect = "none";
 
+      const startX = e.clientX;
+      const startWidth = sidebarWidthRef.current;
+
       const handleMouseMove = (moveEvent: MouseEvent) => {
         if (!isDraggingRef.current) {
           return;
         }
-        const newWidth = Math.max(160, Math.min(600, moveEvent.clientX));
+        const delta = moveEvent.clientX - startX;
+        const newWidth = Math.max(160, Math.min(600, startWidth + delta));
         setSidebarWidth(newWidth);
       };
 
@@ -294,6 +340,12 @@ export function useMarkdownEntityEditor<
     tree,
     sidebarWidth,
     setSidebarWidth,
+    sidebarMode,
+    setSidebarMode,
+    isSidebarOpen,
+    setIsSidebarOpen,
+    toggleSidebar,
+    toggleSidebarMode,
     handleEditorChange,
     handleRestoreDraft,
     handleDiscardDraft,

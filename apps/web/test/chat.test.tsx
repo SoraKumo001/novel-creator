@@ -62,6 +62,8 @@ function uiMessageStreamBody(
 }
 
 beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
   mockFetch.mockReset();
   globalThis.fetch = mockFetch as unknown as typeof fetch;
   mockFetch.mockImplementation(async () => jsonResponse([]));

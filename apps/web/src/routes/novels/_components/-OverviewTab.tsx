@@ -257,6 +257,39 @@ export function OverviewTab({
         </Card>
       </div>
 
+      {/* 基本情報 */}
+      <Card>
+        <CardHeader
+          title="基本情報"
+          action={
+            <Button variant="secondary" onClick={infoEditModal.open}>
+              編集
+            </Button>
+          }
+        />
+        <dl className="space-y-3 text-sm">
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">タイトル</dt>
+            <dd className="font-medium text-slate-900 dark:text-slate-100">
+              {novel.title}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-slate-500 dark:text-slate-400">説明</dt>
+            <dd className="text-slate-700 dark:text-slate-300">
+              {novel.description ? (
+                <MarkdownText
+                  content={novel.description}
+                  className="text-slate-700 dark:text-slate-300"
+                />
+              ) : (
+                "未設定"
+              )}
+            </dd>
+          </div>
+        </dl>
+      </Card>
+
       {/* 高度な創作・分析AIスイート */}
       <Card className="space-y-4">
         <CardHeader
@@ -326,70 +359,6 @@ export function OverviewTab({
         </div>
       </Card>
 
-      {/* ストーリー構想 & あらすじ・結末相談 */}
-      <Card className="space-y-3">
-        <CardHeader
-          title="🗺️ ストーリー構想・あらすじ・結末（共創ワークスペース）"
-          action={
-            <Button
-              variant="secondary"
-              onClick={() =>
-                navigate({
-                  to: "/novels/$novelId",
-                  params: { novelId: novel.id },
-                  search: { tab: "plot" },
-                })
-              }
-            >
-              {novel.storyOutline?.trim()
-                ? "構想・相談を開く"
-                : "構想・相談を始める"}
-            </Button>
-          }
-        />
-        {novel.storyOutline?.trim() ? (
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 font-semibold text-primary text-xs" />
-              <span className="text-muted-foreground text-xs">
-                AIチャット相談・セクション推敲・章立て展開と連動中
-              </span>
-            </div>
-            <div className="max-h-48 overflow-y-auto rounded-lg border border-border bg-surface-raised p-3 text-xs">
-              <MarkdownText
-                content={novel.storyOutline}
-                className="line-clamp-6"
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col justify-between gap-3 rounded-lg border border-border border-dashed bg-surface-raised p-4 sm:flex-row sm:items-center">
-            <div className="space-y-1 text-xs">
-              <div className="font-bold text-foreground">
-                ストーリー構想・あらすじが未作成です
-              </div>
-              <p className="text-muted-foreground">
-                全体のあらすじ、序盤・中盤の展開、今後の展開候補、結末などをMarkdownで自由に記述しながら、AIと相談・反復推敲を重ねて骨格を固めることができます。
-              </p>
-            </div>
-            <Button
-              variant="primary"
-              size="sm"
-              className="shrink-0"
-              onClick={() =>
-                navigate({
-                  to: "/novels/$novelId",
-                  params: { novelId: novel.id },
-                  search: { tab: "plot" },
-                })
-              }
-            >
-              構想・相談を始める
-            </Button>
-          </div>
-        )}
-      </Card>
-
       {/* 執筆スタイル・文体ガイドライン */}
       <Card className="space-y-3">
         <CardHeader
@@ -437,39 +406,6 @@ export function OverviewTab({
             </Button>
           </div>
         )}
-      </Card>
-
-      {/* 基本情報 */}
-      <Card>
-        <CardHeader
-          title="基本情報"
-          action={
-            <Button variant="secondary" onClick={infoEditModal.open}>
-              編集
-            </Button>
-          }
-        />
-        <dl className="space-y-3 text-sm">
-          <div>
-            <dt className="text-slate-500 dark:text-slate-400">タイトル</dt>
-            <dd className="font-medium text-slate-900 dark:text-slate-100">
-              {novel.title}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-slate-500 dark:text-slate-400">説明</dt>
-            <dd className="text-slate-700 dark:text-slate-300">
-              {novel.description ? (
-                <MarkdownText
-                  content={novel.description}
-                  className="text-slate-700 dark:text-slate-300"
-                />
-              ) : (
-                "未設定"
-              )}
-            </dd>
-          </div>
-        </dl>
       </Card>
 
       <div className="flex justify-end">

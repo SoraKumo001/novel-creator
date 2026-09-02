@@ -1,5 +1,10 @@
-import { applyStoryOutlineSectionUpdate } from "@novel-creator/shared";
+import {
+  applyCharactersToMarkdown,
+  applySettingsToMarkdown,
+  applyStoryOutlineSectionUpdate,
+} from "@novel-creator/shared";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useContext, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { ChatUIContext } from "@/context/ChatContext.js";
@@ -11,9 +16,12 @@ import {
   createForeshadowing,
   createSetting,
   createTimeline,
+  fetchCharactersMarkdown,
+  fetchSettingsMarkdown,
   fetchStoryOutline,
   saveStoryOutline,
 } from "@/lib/services/index.js";
+import { ProposalDiffModal } from "./ProposalDiffModal.js";
 
 export interface ProposalPayload {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,11 +47,21 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const chatUI = useContext(ChatUIContext);
+  const navigate = useNavigate();
 
   const [status, setStatus] = useState<"pending" | "applied" | "dismissed">(
     "pending"
   );
   const [isApplying, setIsApplying] = useState(false);
+  const [diffModalOpen, setDiffModalOpen] = useState(false);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [diffData, setDiffData] = useState<{
+    entityType: string;
+    originalMarkdown: string;
+    targetTab: string;
+    title: string;
+    updatedMarkdown: string;
+  } | null>(null);
 
   const { proposalType, data, summary } = proposal;
 
@@ -222,6 +240,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
         queryKey: novelKeys.detail(targetNovelId),
       });
       setStatus("applied");
+      setDiffModalOpen(false);
       toast.success(`${cleanSummary}を小説データに反映しました`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "反映に失敗しました";
@@ -231,33 +250,160 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
     }
   };
 
-  if (status === "dismissed") {
-    return (
-      <div className="my-2 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-1.5 text-slate-400 text-xs dark:border-slate-800 dark:bg-slate-900/40">
-        ✕ 提案をスキップしました（{cleanSummary}）
-      </div>
-    );
-  }
+  const canShowDiff =
+    proposalType === "story_outline" ||
+    proposalType === "character" ||
+    proposalType === "setting" ||
+    (proposalType === "bulk" &&
+      ((Array.isArray(data.characters) && data.characters.length > 0) ||
+        (Array.isArray(data.settings) && data.settings.length > 0)));
 
-  if (status === "applied") {
-    return (
-      <div className="my-2 flex items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50/80 px-3 py-2 font-medium text-emerald-800 text-xs dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 20 20"
-          fill="currentColor"
-          className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-        >
-          <path
-            fillRule="evenodd"
-            d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
-            clipRule="evenodd"
-          />
-        </svg>
-        <span>✔ 小説データに反映完了: {cleanSummary}</span>
-      </div>
-    );
-  }
+  const handleOpenDiff = async () => {
+    if (!targetNovelId) {
+      toast.error(
+        "反映対象の小説が未選択です。上部の「対象」セレクターから小説を選択してください。"
+      );
+      return;
+    }
+    setDiffLoading(true);
+    try {
+      if (proposalType === "story_outline") {
+        const currentOutline = await fetchStoryOutline(targetNovelId).catch(
+          () => ""
+        );
+        const sectionName = safeSectionName;
+        const content = data.content || "";
+        const mode = data.mode || "replace";
+        const { updatedMarkdown } = applyStoryOutlineSectionUpdate(
+          currentOutline,
+          sectionName,
+          content,
+          mode
+        );
+        setDiffData({
+          title: `ストーリー構想「${safeSectionName}」`,
+          targetTab: "outline",
+          entityType: "story_outline_markdown",
+          originalMarkdown: currentOutline,
+          updatedMarkdown,
+        });
+        setDiffModalOpen(true);
+      } else if (proposalType === "character") {
+        const res = await fetchCharactersMarkdown(targetNovelId).catch(() => ({
+          markdown: "",
+        }));
+        const currentMd = res.markdown ?? "";
+        const updatedMd = applyCharactersToMarkdown(currentMd, [
+          {
+            name: data.name,
+            category: data.category,
+            description: data.description,
+            traits: data.traits,
+          },
+        ]);
+        setDiffData({
+          title: `登場人物「${data.name}」`,
+          targetTab: "characters",
+          entityType: "characters_markdown",
+          originalMarkdown: currentMd,
+          updatedMarkdown: updatedMd,
+        });
+        setDiffModalOpen(true);
+      } else if (proposalType === "setting") {
+        const res = await fetchSettingsMarkdown(targetNovelId).catch(() => ({
+          markdown: "",
+        }));
+        const currentMd = res.markdown ?? "";
+        const updatedMd = applySettingsToMarkdown(currentMd, [
+          {
+            name: data.name,
+            category: data.category,
+            description: data.description,
+          },
+        ]);
+        setDiffData({
+          title: `世界観・設定「${data.name}」`,
+          targetTab: "settings",
+          entityType: "settings_markdown",
+          originalMarkdown: currentMd,
+          updatedMarkdown: updatedMd,
+        });
+        setDiffModalOpen(true);
+      } else if (proposalType === "bulk") {
+        if (Array.isArray(data.characters) && data.characters.length > 0) {
+          const res = await fetchCharactersMarkdown(targetNovelId).catch(
+            () => ({ markdown: "" })
+          );
+          const currentMd = res.markdown ?? "";
+          const updatedMd = applyCharactersToMarkdown(
+            currentMd,
+            data.characters
+          );
+          setDiffData({
+            title: `登場人物（一括 ${data.characters.length}名）`,
+            targetTab: "characters",
+            entityType: "characters_markdown",
+            originalMarkdown: currentMd,
+            updatedMarkdown: updatedMd,
+          });
+          setDiffModalOpen(true);
+        } else if (Array.isArray(data.settings) && data.settings.length > 0) {
+          const res = await fetchSettingsMarkdown(targetNovelId).catch(() => ({
+            markdown: "",
+          }));
+          const currentMd = res.markdown ?? "";
+          const updatedMd = applySettingsToMarkdown(currentMd, data.settings);
+          setDiffData({
+            title: `世界観・設定（一括 ${data.settings.length}件）`,
+            targetTab: "settings",
+            entityType: "settings_markdown",
+            originalMarkdown: currentMd,
+            updatedMarkdown: updatedMd,
+          });
+          setDiffModalOpen(true);
+        }
+      }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "差分データの取得に失敗しました"
+      );
+    } finally {
+      setDiffLoading(false);
+    }
+  };
+
+  const handleOpenInEditor = () => {
+    if (!diffData || !targetNovelId) {
+      return;
+    }
+    setDiffModalOpen(false);
+
+    // 該当タブに遷移
+    navigate({
+      to: "/novels/$novelId",
+      params: { novelId: targetNovelId },
+      search: { tab: diffData.targetTab as any },
+    });
+
+    // 遷移後のエディタに提案適用後Markdownを渡すイベントを発火
+    setTimeout(() => {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(
+          new CustomEvent("novel-creator:markdown-preview-apply", {
+            detail: {
+              novelId: targetNovelId,
+              entityType: diffData.entityType,
+              markdown: diffData.updatedMarkdown,
+              appliedTitle: diffData.title,
+            },
+          })
+        );
+      }
+    }, 150);
+  };
+
+  const isApplied = status === "applied";
+  const isDismissed = status === "dismissed";
 
   const typeBadges: Record<string, { label: string; bg: string }> = {
     bulk: {
@@ -295,13 +441,21 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
     bg: "bg-slate-100 text-slate-800",
   };
 
+  const cardBorderClass = isApplied
+    ? "border-emerald-300 bg-linear-to-br from-emerald-50/90 to-teal-50/40 dark:border-emerald-800/80 dark:from-emerald-950/30 dark:to-teal-950/20"
+    : isDismissed
+      ? "border-slate-200 bg-slate-50/60 opacity-60 dark:border-slate-800 dark:bg-slate-900/30"
+      : "border-indigo-200 bg-linear-to-br from-indigo-50/90 to-purple-50/40 dark:border-indigo-900/60 dark:from-indigo-950/30 dark:to-purple-950/20";
+
   return (
-    <div className="my-3 overflow-hidden rounded-xl border border-indigo-200 bg-linear-to-br from-indigo-50/90 to-purple-50/40 p-3 shadow-xs dark:border-indigo-900/60 dark:from-indigo-950/30 dark:to-purple-950/20">
+    <div
+      className={`my-3 overflow-hidden rounded-xl border p-3 shadow-xs transition ${cardBorderClass}`}
+    >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-sm">💡</span>
+          <span className="text-sm">{isApplied ? "✔" : "💡"}</span>
           <span className="font-bold text-slate-800 text-xs dark:text-slate-200">
-            設定反映の提案
+            {isApplied ? "小説データに反映完了" : "設定反映の提案"}
           </span>
           <span
             className={`rounded-md px-1.5 py-0.5 font-semibold text-[10px] ${badge.bg}`}
@@ -310,14 +464,47 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           </span>
         </div>
 
-        <span className="font-medium text-[11px] text-indigo-700 dark:text-indigo-400">
-          ワンクリックで登録可能
-        </span>
+        {isApplied ? (
+          <span className="flex items-center gap-1 font-semibold text-[11px] text-emerald-700 dark:text-emerald-400">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="h-3.5 w-3.5"
+            >
+              <path
+                fillRule="evenodd"
+                d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span>反映済み</span>
+          </span>
+        ) : isDismissed ? (
+          <span className="font-medium text-[11px] text-slate-400">
+            スキップ済み
+          </span>
+        ) : (
+          <span className="font-medium text-[11px] text-indigo-700 dark:text-indigo-400">
+            ワンクリックで登録可能
+          </span>
+        )}
       </div>
 
-      <div className="mt-2.5 rounded-lg border border-indigo-100 bg-white/90 p-2.5 text-slate-700 text-xs shadow-2xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300">
+      <div className="mt-2.5 rounded-lg border border-indigo-100/70 bg-white/90 p-2.5 text-slate-700 text-xs shadow-2xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300">
         {proposalType === "bulk" && (
           <div className="space-y-2">
+            {(!Array.isArray(data.characters) ||
+              data.characters.length === 0) &&
+              (!Array.isArray(data.settings) || data.settings.length === 0) &&
+              (!Array.isArray(data.foreshadowings) ||
+                data.foreshadowings.length === 0) &&
+              (!Array.isArray(data.timelines) ||
+                data.timelines.length === 0) && (
+                <div className="py-1 text-slate-500 text-xs">
+                  （登録対象の項目はありません）
+                </div>
+              )}
             {Array.isArray(data.characters) && data.characters.length > 0 && (
               <div>
                 <div className="font-bold text-[11px] text-indigo-700 dark:text-indigo-400">
@@ -536,30 +723,86 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
         )}
       </div>
 
-      <div className="mt-2.5 flex items-center justify-end gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          onClick={() => setStatus("dismissed")}
-          disabled={isApplying}
-        >
-          破棄
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="primary"
-          onClick={handleApply}
-          disabled={
-            isApplying ||
-            !targetNovelId ||
-            (proposalType === "story_outline" && !data.content?.trim())
-          }
-        >
-          {isApplying ? "反映中..." : "✔ 小説に反映する"}
-        </Button>
+      <div className="mt-2.5 flex items-center justify-between gap-2">
+        {isApplied ? (
+          <div className="flex items-center gap-1.5 font-medium text-emerald-800 text-xs dark:text-emerald-300">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400"
+            >
+              <path
+                fillRule="evenodd"
+                d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <span>✔ 小説データに反映完了: {cleanSummary}</span>
+          </div>
+        ) : isDismissed ? (
+          <div className="text-slate-400 text-xs">
+            ✕ 提案をスキップしました（{cleanSummary}）
+          </div>
+        ) : (
+          <>
+            <div className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+              {cleanSummary}
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              {canShowDiff && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={handleOpenDiff}
+                  disabled={isApplying || diffLoading}
+                  isLoading={diffLoading}
+                >
+                  🔍 差分を確認
+                </Button>
+              )}
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={() => setStatus("dismissed")}
+                disabled={isApplying || diffLoading}
+              >
+                破棄
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="primary"
+                onClick={handleApply}
+                disabled={
+                  isApplying ||
+                  diffLoading ||
+                  !targetNovelId ||
+                  (proposalType === "story_outline" && !data.content?.trim())
+                }
+              >
+                {isApplying ? "反映中..." : "✔ 小説に反映する"}
+              </Button>
+            </div>
+          </>
+        )}
       </div>
+
+      {diffData && (
+        <ProposalDiffModal
+          isOpen={diffModalOpen}
+          onClose={() => setDiffModalOpen(false)}
+          title={diffData.title}
+          proposalSummary={cleanSummary}
+          originalMarkdown={diffData.originalMarkdown}
+          updatedMarkdown={diffData.updatedMarkdown}
+          onApply={handleApply}
+          onOpenInEditor={handleOpenInEditor}
+          isApplying={isApplying}
+        />
+      )}
     </div>
   );
 }

@@ -5,6 +5,11 @@
  * マークダウン文書の共通走査・ツリー構築・差分計算を提供します。
  */
 
+import remarkGfm from "remark-gfm";
+import remarkParse from "remark-parse";
+import remarkStringify from "remark-stringify";
+import { unified } from "unified";
+
 /** カテゴリツリーのノード定義 */
 export interface MarkdownCategoryNode {
   category: string;
@@ -280,4 +285,37 @@ export function trimAndJoinLines(lines: string[]): string {
     cloned.shift();
   }
   return cloned.join("\n");
+}
+
+const remarkFormatter = unified()
+  .use(remarkParse)
+  .use(remarkGfm)
+  .use(remarkStringify, {
+    bullet: "-",
+    emphasis: "*",
+    fences: true,
+    listItemIndent: "one",
+    resourceLink: true,
+    rule: "-",
+    strong: "*",
+  });
+
+/**
+ * マークダウンパーサー（AST）を用いて改行・空行・見出し・リスト構造を適切に正規化・整形する。
+ */
+export function formatMarkdownDocument(markdown: string): string {
+  if (!markdown || !markdown.trim()) {
+    return "";
+  }
+
+  // プレ処理: #とテキストの間にスペースがない見出し（例: ##見出し）を補正
+  const preprocessed = markdown.replace(/^(\s*#{1,6})([^\s#])/gm, "$1 $2");
+
+  try {
+    const file = remarkFormatter.processSync(preprocessed);
+    return String(file);
+  } catch {
+    // パースに失敗した場合は安全にトリム＋改行で返す
+    return `${markdown.trim()}\n`;
+  }
 }

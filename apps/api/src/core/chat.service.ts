@@ -481,6 +481,18 @@ export class ChatDomainService {
           .map((p) => (p as { text?: string }).text ?? "")
           .join("");
         try {
+          const hasMeaningfulContent =
+            fullText.trim() !== "" ||
+            (responseMessage.parts &&
+              responseMessage.parts.length > 0 &&
+              responseMessage.parts.some(
+                (p) => p.type !== "text" || (p.text && p.text.trim().length > 0)
+              ));
+
+          if (!hasMeaningfulContent) {
+            return;
+          }
+
           // 思考プロセス（reasoning）やツール呼び出しパーツ（tool-*）を含めた全 parts を保存
           const savedParts =
             responseMessage.parts && responseMessage.parts.length > 0

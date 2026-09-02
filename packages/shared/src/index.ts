@@ -17,9 +17,11 @@ export type {
   ParsedCharacterSection,
 } from "./charactersMarkdown.js";
 export {
+  applyCharactersToMarkdown,
   buildCharacterTree,
   diffCharacters,
   findCharacterAtLine,
+  formatCharactersMarkdown,
   getCharacterSections,
   parseCharactersMarkdown,
   serializeCharactersToMarkdown,
@@ -45,6 +47,7 @@ export {
   type ForeshadowingSectionRange,
   type ForeshadowingsDiff,
   findForeshadowingSectionByLine,
+  formatForeshadowingsMarkdown,
   type ParsedForeshadowingSection,
   parseForeshadowingsMarkdown,
   scanForeshadowingSectionRanges,
@@ -59,6 +62,7 @@ export {
   buildMarkdownCategoryTree,
   calculateEntityDiff,
   findSectionByLine,
+  formatMarkdownDocument,
   scanMarkdownSections,
   trimAndJoinLines,
   writeMarkdownEntitySections,
@@ -72,9 +76,11 @@ export type {
   SettingsDiff,
 } from "./settingsMarkdown.js";
 export {
+  applySettingsToMarkdown,
   buildSettingTree,
   diffSettings,
   findSectionAtLine,
+  formatSettingsMarkdown,
   getMarkdownSections,
   parseSettingsMarkdown,
   serializeSettingsToMarkdown,
@@ -83,6 +89,7 @@ export {
   applyStoryOutlineSectionUpdate,
   buildStoryOutlineCategoryTree,
   findStoryOutlineSectionByLine,
+  formatStoryOutlineMarkdown,
   STORY_OUTLINE_TEMPLATES,
   type StoryOutlineCategoryNode,
   type StoryOutlineSectionRange,

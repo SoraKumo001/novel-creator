@@ -11,6 +11,7 @@ import {
   buildMarkdownCategoryTree,
   calculateEntityDiff,
   findSectionByLine,
+  formatMarkdownDocument,
   type MarkdownCategoryNode,
   scanMarkdownSections,
   trimAndJoinLines,
@@ -172,4 +173,41 @@ export function diffSettings(
       name: p.name,
     })
   );
+}
+
+/**
+ * 現在の設定マークダウンに対し、新しい設定リストを追加または更新したマークダウンを生成する。
+ */
+export function applySettingsToMarkdown(
+  currentMarkdown: string,
+  newSettings: {
+    category?: string | null;
+    name: string;
+    description?: string | null;
+  }[]
+): string {
+  const existing = parseSettingsMarkdown(currentMarkdown);
+  const map = new Map<string, ParsedSettingSection>(
+    existing.map((s) => [s.name, s])
+  );
+  for (const ns of newSettings) {
+    const prev = map.get(ns.name);
+    map.set(ns.name, {
+      category: ns.category || prev?.category || "世界観",
+      name: ns.name,
+      description: ns.description ?? prev?.description ?? "",
+    });
+  }
+  return serializeSettingsToMarkdown(Array.from(map.values()));
+}
+
+/**
+ * 設定マークダウンをパースし、正規化・ソートして改行や空行を適切に整形（フォーマット）したマークダウンを返す。
+ */
+export function formatSettingsMarkdown(markdown: string): string {
+  const parsed = parseSettingsMarkdown(markdown);
+  if (parsed.length === 0) {
+    return formatMarkdownDocument(markdown);
+  }
+  return formatMarkdownDocument(serializeSettingsToMarkdown(parsed));
 }

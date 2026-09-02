@@ -16,7 +16,7 @@ interface ThemeContextValue {
   toggleTheme: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextValue | null>(null);
+export const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 const THEME_STORAGE_KEY = "novel-creator:theme";
 
@@ -40,32 +40,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       : "system";
   });
 
-  const [systemTheme, setSystemTheme] = useState<"light" | "dark">(
-    getSystemTheme
-  );
+  const [resolvedTheme, setResolvedTheme] = useState<"light" | "dark">(() => {
+    if (theme === "system") {
+      return getSystemTheme();
+    }
+    return theme;
+  });
 
-  // OS のカラーテーマ変更を検知
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = (e: MediaQueryListEvent) => {
-      setSystemTheme(e.matches ? "dark" : "light");
-    };
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
-
-  const resolvedTheme: "light" | "dark" =
-    theme === "system" ? systemTheme : theme;
-
-  // DOM の <html> クラスに .dark を適用
   useEffect(() => {
     const root = document.documentElement;
-    if (resolvedTheme === "dark") {
-      root.classList.add("dark");
-    } else {
-      root.classList.remove("dark");
+    if (theme === "system") {
+      const systemTheme = getSystemTheme();
+      setResolvedTheme(systemTheme);
+      root.classList.toggle("dark", systemTheme === "dark");
+
+      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const handler = (e: MediaQueryListEvent) => {
+        const nextTheme = e.matches ? "dark" : "light";
+        setResolvedTheme(nextTheme);
+        root.classList.toggle("dark", nextTheme === "dark");
+      };
+      mediaQuery.addEventListener("change", handler);
+      return () => mediaQuery.removeEventListener("change", handler);
     }
-  }, [resolvedTheme]);
+    setResolvedTheme(theme);
+    root.classList.toggle("dark", theme === "dark");
+  }, [theme]);
 
   const setTheme = useCallback((newTheme: ThemeMode) => {
     setThemeState(newTheme);
@@ -88,7 +88,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext);
   if (!context) {
-    throw new Error("useTheme must be used within a ThemeProvider");
+    return {
+      theme: "system",
+      resolvedTheme: "light",
+      setTheme: () => {},
+      toggleTheme: () => {},
+    };
   }
   return context;
 }

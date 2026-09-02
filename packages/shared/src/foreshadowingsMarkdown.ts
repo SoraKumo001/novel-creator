@@ -12,6 +12,7 @@ import {
   buildMarkdownCategoryTree,
   calculateEntityDiff,
   findSectionByLine,
+  formatMarkdownDocument,
   type MarkdownCategoryNode,
   scanMarkdownSections,
   writeMarkdownEntitySections,
@@ -359,4 +360,15 @@ export function diffForeshadowings(
     toDelete: diffResult.toDelete,
     toUpdate: diffResult.toUpdate,
   };
+}
+
+/**
+ * 伏線マークダウンをパースし、正規化・ソートして改行や空行を適切に整形（フォーマット）したマークダウンを返す。
+ */
+export function formatForeshadowingsMarkdown(markdown: string): string {
+  const parsed = parseForeshadowingsMarkdown(markdown);
+  if (parsed.length === 0) {
+    return formatMarkdownDocument(markdown);
+  }
+  return formatMarkdownDocument(serializeForeshadowingsToMarkdown(parsed));
 }

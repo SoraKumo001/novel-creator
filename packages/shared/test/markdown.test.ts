@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyCharactersToMarkdown,
   buildCharacterTree,
   buildSettingTree,
   diffCharacters,
   diffSettings,
   findCharacterAtLine,
   findSectionAtLine,
+  formatCharactersMarkdown,
+  formatSettingsMarkdown,
+  formatStoryOutlineMarkdown,
   parseCharactersMarkdown,
   parseSettingsMarkdown,
   serializeCharactersToMarkdown,
@@ -252,5 +256,93 @@ describe("charactersMarkdown", () => {
     expect(diff.toUpdate[0].id).toBe("1");
     expect(diff.toUpdate[0].traits).toEqual(["勇敢", "冷静"]);
     expect(diff.toDelete).toHaveLength(0);
+  });
+
+  describe("applyCharactersToMarkdown", () => {
+    it("既存マークダウンに新しい人物を追加・更新できること", () => {
+      const currentMd =
+        "# 主人公\n\n## アレン\n\n熱血な騎士。\n\n### 特徴\n\n- 勇敢";
+      const updatedMd = applyCharactersToMarkdown(currentMd, [
+        {
+          category: "仲間",
+          name: "ルーク",
+          description: "冷静な魔法使い。",
+          traits: ["博識"],
+        },
+      ]);
+
+      expect(updatedMd).toContain("## アレン");
+      expect(updatedMd).toContain("## ルーク");
+      expect(updatedMd).toContain("冷静な魔法使い。");
+      expect(updatedMd).toContain("- 博識");
+    });
+  });
+
+  describe("format functions", () => {
+    it("formatCharactersMarkdown で人物マークダウンがソート・整形されること", () => {
+      const messyMd =
+        "# 仲間\n\n## ベル\n\n盗賊。\n\n# 主人公\n\n## アレン\n\n騎士。\n\n";
+      const formatted = formatCharactersMarkdown(messyMd);
+      expect(formatted).toContain("# 主人公\n\n## アレン");
+      expect(formatted).toContain("# 仲間\n\n## ベル");
+    });
+
+    it("formatSettingsMarkdown で設定マークダウンが整形されること", () => {
+      const messyMd = "# 世界観\n\n\n\n## 魔法\n\n魔力。\n\n\n";
+      const formatted = formatSettingsMarkdown(messyMd);
+      expect(formatted).toContain("# 世界観\n\n## 魔法\n\n魔力。");
+    });
+
+    it("formatStoryOutlineMarkdown で連続空行が圧縮され、見出し前に適切な空行が挿入されること", () => {
+      const messyMd = [
+        "# 構想",
+        "あらすじの導入文です。",
+        "- 項目1",
+        "- 項目2",
+        "##結末",
+        "終わり。",
+      ].join("\n");
+      const formatted = formatStoryOutlineMarkdown(messyMd);
+      // 見出しの前に空行が入り、#とタイトルの間に空白が入ること
+      expect(formatted).toBe(
+        "# 構想\n\nあらすじの導入文です。\n\n- 項目1\n- 項目2\n\n## 結末\n\n終わり。\n"
+      );
+    });
+
+    it("ストーリー構想の複数行リスト項目と見出しが自然に整形されること", () => {
+      const outlineMd = [
+        "# 作品コンセプト & ログライン",
+        "- **ログライン（1行要約）**:",
+        "  行方不明の父を追い、魔境の根源の破壊に挑む物語。",
+        "- **テーマ**:",
+        "  過酷な環境を変えようとする挑戦。",
+        "",
+        "",
+        "",
+        "# 全体あらすじ",
+        "### 主人公の生い立ちと旅立ち",
+        "- 主人公が幼い頃、母親が病に倒れる。",
+        "- **裏側**: 父は家系が遺物の正体に気づく。",
+      ].join("\n");
+      const formatted = formatStoryOutlineMarkdown(outlineMd);
+      expect(formatted).toBe(
+        [
+          "# 作品コンセプト & ログライン",
+          "",
+          "- **ログライン（1行要約）**:",
+          "  行方不明の父を追い、魔境の根源の破壊に挑む物語。",
+          "- **テーマ**:",
+          "  過酷な環境を変えようとする挑戦。",
+          "",
+          "# 全体あらすじ",
+          "",
+          "### 主人公の生い立ちと旅立ち",
+          "",
+          "- 主人公が幼い頃、母親が病に倒れる。",
+          "- **裏側**: 父は家系が遺物の正体に気づく。",
+          "",
+        ].join("\n")
+      );
+    });
   });
 });

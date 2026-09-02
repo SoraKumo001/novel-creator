@@ -145,14 +145,23 @@ function extractTitle(message: UIMessage): string {
  * セッション一覧の取得自体は ChatContext 側の useQuery が行うため、
  * selectedNovelIdRef と refreshSessions を注入して連携する。
  */
+const ACTIVE_SESSION_STORAGE_KEY = "novel-creator:active-session";
+const CHAT_MESSAGES_CACHE_PREFIX = "novel-creator:chat-cache:";
+
 export function useChatStreaming({
   selectedNovelIdRef,
   refreshSessions,
 }: UseChatStreamingInput) {
   const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(
-    null
+    () => {
+      if (typeof window === "undefined") {
+        return null;
+      }
+      return localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
+    }
   );
   const currentSessionIdRef = useRef<string | null>(currentSessionId);
+  currentSessionIdRef.current = currentSessionId;
   const [selectedModelConfigId, setSelectedModelConfigId] = useState<
     string | null
   >(() => localStorage.getItem("novel-creator:chat-model") || null);
@@ -163,7 +172,7 @@ export function useChatStreaming({
 
   // sessionId を同期参照するための ref。
   // createSession 直後など state 反映前でも transport から最新値を読めるようにする。
-  const sessionIdRef = useRef<string | null>(null);
+  const sessionIdRef = useRef<string | null>(currentSessionId);
 
   // selectedNovelId は外部（ChatContext）から ref で注入されるため、
   // 最新値を毎レンダーで live な ref にコピーして stale closure を避ける。
@@ -180,6 +189,13 @@ export function useChatStreaming({
     currentSessionIdRef.current = id;
     sessionIdRef.current = id;
     setCurrentSessionIdState(id);
+    if (typeof window !== "undefined") {
+      if (id) {
+        localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, id);
+      } else {
+        localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
+      }
+    }
   }, []);
 
   const handleSetSelectedModelConfigId = useCallback((id: string | null) => {
@@ -280,6 +296,41 @@ export function useChatStreaming({
       void refreshSessions();
     },
   });
+
+  // マウント時に sessionStorage にキャッシュされたメッセージがあれば即座に初期表示
+  const cacheLoadedRef = useRef(false);
+  useEffect(() => {
+    if (cacheLoadedRef.current || !currentSessionId) {
+      return;
+    }
+    cacheLoadedRef.current = true;
+    try {
+      const cached = sessionStorage.getItem(
+        `${CHAT_MESSAGES_CACHE_PREFIX}${currentSessionId}`
+      );
+      if (cached) {
+        const parsed = JSON.parse(cached) as UIMessage[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setUiMessages(parsed);
+        }
+      }
+    } catch {}
+  }, [currentSessionId, setUiMessages]);
+
+  // メッセージ更新時にローカルキャッシュへ即時同期
+  useEffect(() => {
+    if (!currentSessionId || typeof window === "undefined") {
+      return;
+    }
+    if (uiMessages.length > 0) {
+      try {
+        sessionStorage.setItem(
+          `${CHAT_MESSAGES_CACHE_PREFIX}${currentSessionId}`,
+          JSON.stringify(uiMessages)
+        );
+      } catch {}
+    }
+  }, [currentSessionId, uiMessages]);
 
   // useChat の error 状態を既存の error 文字列 state に同期する
   useEffect(() => {
@@ -512,11 +563,17 @@ export function useChatStreaming({
 
   // 直前のメッセージを再試行する
   const retryLastMessage = useCallback(async () => {
-    if (!lastPromptRef.current || isStreaming) {
+    if (isStreaming) {
       return;
     }
-    await sendMessage(lastPromptRef.current);
-  }, [sendMessage, isStreaming]);
+    const lastUserPrompt =
+      lastPromptRef.current ??
+      [...messages].reverse().find((m) => m.role === "user")?.content;
+    if (!lastUserPrompt) {
+      return;
+    }
+    await sendMessage(lastUserPrompt);
+  }, [messages, sendMessage, isStreaming]);
 
   // エラー表示を消去する
   const clearError = useCallback(() => {

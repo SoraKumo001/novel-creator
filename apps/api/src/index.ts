@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { serve } from "@hono/node-server";
 import { parseEnv } from "@novel-creator/shared/env";
 import { config } from "dotenv";
@@ -5,8 +7,10 @@ import { config } from "dotenv";
 import { createApp } from "./app.js";
 import { createContext } from "./context.js";
 
-// ワークスペースルートの .env を明示的に読み込む
-config({ path: "../../.env" });
+// ワークスペースルートの .env を確実に読み込む
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+config({ path: path.resolve(currentDir, "../../../.env") });
+config(); // カレントディレクトリの .env もフォールバックで読み込む
 
 const env = parseEnv();
 console.log("[api] env loaded:", {

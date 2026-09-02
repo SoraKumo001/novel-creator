@@ -99,6 +99,8 @@ function deferredSessionsResponse(): Promise<Response> {
 }
 
 beforeEach(() => {
+  localStorage.clear();
+  sessionStorage.clear();
   uiRenderCount = 0;
   streamingRenderCount = 0;
   sessionsFetchCount = 0;

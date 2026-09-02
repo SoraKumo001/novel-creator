@@ -14,6 +14,8 @@ vi.mock("../src/lib/services/index.js", () => ({
   createForeshadowing: vi.fn(),
   createTimeline: vi.fn(),
   createChapter: vi.fn(),
+  fetchCharactersMarkdown: vi.fn(),
+  fetchSettingsMarkdown: vi.fn(),
   fetchStoryOutline: vi.fn(),
   saveStoryOutline: vi.fn(),
 }));
@@ -62,8 +64,10 @@ describe("ChatProposalCard", () => {
     it("ストーリー構想の提案内容（セクション名、理由、本文）が表示されること", () => {
       renderWithClient(<ChatProposalCard proposal={proposal} />);
 
-      expect(screen.getByText(/ストーリー構想/)).toBeInTheDocument();
-      expect(screen.getByText(/結（結末・エンディング）/)).toBeInTheDocument();
+      expect(screen.getAllByText(/ストーリー構想/).length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByText(/結（結末・エンディング）/).length
+      ).toBeGreaterThan(0);
       expect(screen.getByText(/ハッピーエンドへの変更/)).toBeInTheDocument();
       expect(
         screen.getByText(
@@ -114,7 +118,18 @@ describe("ChatProposalCard", () => {
         expect(mockToastSuccess).toHaveBeenCalledWith(
           expect.stringContaining("小説データに反映しました")
         );
+        expect(
+          screen.getAllByText(/小説データに反映完了/).length
+        ).toBeGreaterThan(0);
       });
+
+      // 反映後もどのセクションの提案だったかがカード上に残っていること
+      expect(
+        screen.getAllByText(/結（結末・エンディング）/).length
+      ).toBeGreaterThan(0);
+      expect(
+        screen.queryByRole("button", { name: /小説に反映する/ })
+      ).not.toBeInTheDocument();
 
       expect(eventListener).toHaveBeenCalledTimes(1);
       const customEvent = eventListener.mock.calls[0][0] as CustomEvent;
@@ -129,7 +144,7 @@ describe("ChatProposalCard", () => {
       );
     });
 
-    it("「破棄」をクリックするとスキップ状態になり非表示になること", () => {
+    it("「破棄」をクリックするとスキップ状態になり、反映ボタンが非表示になること", () => {
       renderWithClient(<ChatProposalCard proposal={proposal} />);
 
       const dismissButton = screen.getByRole("button", { name: /破棄/ });
@@ -155,6 +170,22 @@ describe("ChatProposalCard", () => {
       expect(screen.getByText(/反映する本文が空です/)).toBeInTheDocument();
       const applyBtn = screen.getByRole("button", { name: /小説に反映する/ });
       expect(applyBtn).toBeDisabled();
+    });
+
+    it("「差分を確認」ボタンをクリックすると既存マークダウンを取得して差分モーダルが開くこと", async () => {
+      vi.mocked(services.fetchStoryOutline).mockResolvedValue(
+        "# 原本マークダウン"
+      );
+
+      renderWithClient(<ChatProposalCard proposal={proposal} />);
+
+      const diffButton = screen.getByRole("button", { name: /差分を確認/ });
+      fireEvent.click(diffButton);
+
+      await waitFor(() => {
+        expect(services.fetchStoryOutline).toHaveBeenCalledWith(NOVEL_ID);
+        expect(screen.getByText(/差分プレビュー/)).toBeInTheDocument();
+      });
     });
   });
 
@@ -199,7 +230,7 @@ describe("ChatProposalCard", () => {
     it("一括登録の各エンティティプレビューが表示されること", () => {
       renderWithClient(<ChatProposalCard proposal={bulkProposal} />);
 
-      expect(screen.getByText(/一括登録/)).toBeInTheDocument();
+      expect(screen.getAllByText(/一括登録/).length).toBeGreaterThan(0);
       expect(screen.getByText("アレン")).toBeInTheDocument();
       expect(screen.getByText("帝国")).toBeInTheDocument();
       expect(screen.getByText("黒幕の正体")).toBeInTheDocument();
@@ -235,6 +266,9 @@ describe("ChatProposalCard", () => {
         expect(mockToastSuccess).toHaveBeenCalledWith(
           expect.stringContaining("小説データに反映しました")
         );
+        expect(
+          screen.getAllByText(/小説データに反映完了/).length
+        ).toBeGreaterThan(0);
       });
     });
   });

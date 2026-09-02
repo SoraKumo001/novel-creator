@@ -13,6 +13,7 @@ import {
   buildMarkdownCategoryTree,
   calculateEntityDiff,
   findSectionByLine,
+  formatMarkdownDocument,
   type MarkdownCategoryNode,
   scanMarkdownSections,
   trimAndJoinLines,
@@ -329,4 +330,45 @@ export function diffCharacters(
       traits: p.traits,
     })
   );
+}
+
+/**
+ * 現在の人物マークダウンに対し、新しい人物リストを追加または更新したマークダウンを生成する。
+ */
+export function applyCharactersToMarkdown(
+  currentMarkdown: string,
+  newCharacters: {
+    category?: string | null;
+    name: string;
+    description?: string | null;
+    traits?: string[] | null;
+    relationships?: string | null;
+  }[]
+): string {
+  const existing = parseCharactersMarkdown(currentMarkdown);
+  const map = new Map<string, ParsedCharacterSection>(
+    existing.map((c) => [c.name, c])
+  );
+  for (const nc of newCharacters) {
+    const prev = map.get(nc.name);
+    map.set(nc.name, {
+      category: nc.category || prev?.category || "未分類",
+      name: nc.name,
+      description: nc.description ?? prev?.description ?? "",
+      traits: nc.traits ?? prev?.traits ?? [],
+      relationships: nc.relationships ?? prev?.relationships ?? "",
+    });
+  }
+  return serializeCharactersToMarkdown(Array.from(map.values()));
+}
+
+/**
+ * 人物マークダウンをパースし、正規化・ソートして改行や空行を適切に整形（フォーマット）したマークダウンを返す。
+ */
+export function formatCharactersMarkdown(markdown: string): string {
+  const parsed = parseCharactersMarkdown(markdown);
+  if (parsed.length === 0) {
+    return formatMarkdownDocument(markdown);
+  }
+  return formatMarkdownDocument(serializeCharactersToMarkdown(parsed));
 }

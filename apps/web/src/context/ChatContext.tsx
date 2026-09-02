@@ -5,6 +5,7 @@ import {
   type ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -162,7 +163,26 @@ export const ChatStreamingContext =
 
 export function ChatProvider({ children }: { children: ReactNode }) {
   // --- 低頻度: 開閉・フォーカス・小説選択 ---
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpenState] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return localStorage.getItem("novel-creator:chat-open") === "true";
+  });
+
+  const setIsOpen = useCallback(
+    (open: boolean | ((prev: boolean) => boolean)) => {
+      setIsOpenState((prev) => {
+        const next = typeof open === "function" ? open(prev) : open;
+        if (typeof window !== "undefined") {
+          localStorage.setItem("novel-creator:chat-open", String(next));
+        }
+        return next;
+      });
+    },
+    []
+  );
+
   const [selectedNovelId, setSelectedNovelIdState] = useState<string | null>(
     null
   );
@@ -248,6 +268,18 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     },
     [setError, setMessages]
   );
+
+  // マウント時（リロード時）に保存されていたアクティブセッションのメッセージを最新化
+  const initialLoadedRef = useRef(false);
+  useEffect(() => {
+    if (initialLoadedRef.current) {
+      return;
+    }
+    initialLoadedRef.current = true;
+    if (currentSessionIdRef.current) {
+      void loadSessionMessages(currentSessionIdRef.current);
+    }
+  }, [loadSessionMessages]);
 
   // 新しい相談を開始（画面をクリアして新規作成待ち状態にする）。
   // 進行中のストリーミングは部分応答を破棄して中止する（abortStream と異なり
