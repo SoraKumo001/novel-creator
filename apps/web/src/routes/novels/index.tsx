@@ -57,7 +57,7 @@ function NovelsIndexPage() {
 
   return (
     <div className="max-w-6xl">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="font-bold text-3xl text-foreground tracking-tight">
             小説一覧
@@ -66,7 +66,11 @@ function NovelsIndexPage() {
             あなたの物語をここから始めましょう。
           </p>
         </div>
-        <Button onClick={() => setIsModalOpen(true)} leftIcon={<PlusIcon />}>
+        <Button
+          onClick={() => setIsModalOpen(true)}
+          leftIcon={<PlusIcon />}
+          className="shrink-0 whitespace-nowrap"
+        >
           新規作成
         </Button>
       </div>

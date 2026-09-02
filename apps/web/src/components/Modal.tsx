@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 
 interface ModalProps {
   children: ReactNode;
@@ -25,6 +25,8 @@ export function Modal({
   footer,
   size = "md",
 }: ModalProps) {
+  const isBackdropMouseDown = useRef(false);
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -42,10 +44,23 @@ export function Modal({
     return null;
   }
 
+  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    isBackdropMouseDown.current = e.target === e.currentTarget;
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isBackdropMouseDown.current && e.target === e.currentTarget) {
+      onClose();
+    }
+    isBackdropMouseDown.current = false;
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
-      onClick={onClose}
+      onMouseDown={handleBackdropMouseDown}
+      onClick={handleBackdropClick}
+      data-testid="modal-backdrop"
     >
       <div
         className={`flex max-h-[90vh] w-full flex-col ${sizeMap[size]} overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl`}
@@ -54,6 +69,7 @@ export function Modal({
         <div className="flex shrink-0 items-center justify-between border-border-subtle border-b px-6 py-4">
           <h2 className="font-semibold text-foreground text-lg">{title}</h2>
           <button
+            type="button"
             onClick={onClose}
             className="rounded p-1 text-muted transition hover:bg-surface-hover hover:text-foreground"
             aria-label="閉じる"

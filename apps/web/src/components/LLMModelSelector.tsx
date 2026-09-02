@@ -70,7 +70,7 @@ export function LLMModelSelector({
   if (configs.length === 0) {
     return (
       <div
-        className={`flex items-center gap-1 text-muted-foreground text-xs ${className}`}
+        className={`flex shrink-0 items-center gap-1 whitespace-nowrap text-muted-foreground text-xs ${className}`}
       >
         <span>🤖 デフォルトLLM (環境変数)</span>
       </div>
@@ -78,9 +78,9 @@ export function LLMModelSelector({
   }
 
   return (
-    <div className={`flex items-center gap-2 ${className}`}>
+    <div className={`flex shrink-0 items-center gap-2 ${className}`}>
       {label && (
-        <label className="font-medium text-foreground-secondary text-xs">
+        <label className="shrink-0 font-medium text-foreground-secondary text-xs">
           {label}
         </label>
       )}
@@ -90,7 +90,7 @@ export function LLMModelSelector({
           const val = e.target.value;
           onChange(val ? val : null);
         }}
-        className={`rounded-md border border-border bg-surface font-medium text-foreground transition focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary ${
+        className={`max-w-xs truncate rounded-md border border-border bg-surface font-medium text-foreground transition focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary ${
           isSmall ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-sm"
         }`}
       >

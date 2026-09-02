@@ -100,9 +100,13 @@ export function TimelineTab({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-bold text-foreground text-xl">タイムライン</h2>
-        <Button onClick={handleOpenCreate} leftIcon={<PlusIcon />}>
+        <Button
+          onClick={handleOpenCreate}
+          leftIcon={<PlusIcon />}
+          className="shrink-0 whitespace-nowrap"
+        >
           イベント追加
         </Button>
       </div>

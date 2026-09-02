@@ -1,6 +1,12 @@
 import type { NovelExportData } from "@novel-creator/shared";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { type ComponentType, useCallback, useEffect, useState } from "react";
+import {
+  type ComponentType,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/Button.js";
 import { ExportModal } from "@/components/ExportModal.js";
 import { Loading } from "@/components/Loading.js";
@@ -16,6 +22,7 @@ import { ForeshadowingTab } from "../_components/-ForeshadowingTab.js";
 import { OverviewTab } from "../_components/-OverviewTab.js";
 import { PlotTab } from "../_components/-PlotTab.js";
 import { SettingsTab } from "../_components/-SettingsTab.js";
+import { StoryOutlineTab } from "../_components/-StoryOutlineTab.js";
 import { TimelineTab } from "../_components/-TimelineTab.js";
 
 /**
@@ -26,12 +33,13 @@ import { TimelineTab } from "../_components/-TimelineTab.js";
  */
 const TAB_DEFS = [
   { id: "overview", label: "概要", icon: "📋", shortcut: "1" },
-  { id: "characters", label: "人物", icon: "👥", shortcut: "2" },
-  { id: "settings", label: "設定", icon: "🌍", shortcut: "3" },
-  { id: "foreshadowing", label: "伏線", icon: "🚩", shortcut: "4" },
-  { id: "timeline", label: "タイムライン", icon: "⏱️", shortcut: "5" },
-  { id: "plot", label: "プロット", icon: "🗺️", shortcut: "6" },
-  { id: "editor", label: "本文", icon: "✍️", shortcut: "7" },
+  { id: "outline", label: "構想", icon: "🗺️", shortcut: "2" },
+  { id: "characters", label: "人物", icon: "👥", shortcut: "3" },
+  { id: "settings", label: "設定", icon: "🌍", shortcut: "4" },
+  { id: "foreshadowing", label: "伏線", icon: "🚩", shortcut: "5" },
+  { id: "timeline", label: "タイムライン", icon: "⏱️", shortcut: "6" },
+  { id: "plot", label: "プロット", icon: "📑", shortcut: "7" },
+  { id: "editor", label: "本文", icon: "✍️", shortcut: "8" },
 ] as const;
 
 type TabId = (typeof TAB_DEFS)[number]["id"];
@@ -48,6 +56,7 @@ const TAB_CONTENT: Record<
   }>
 > = {
   overview: OverviewTab,
+  outline: StoryOutlineTab,
   characters: CharactersTab,
   settings: SettingsTab,
   foreshadowing: ForeshadowingTab,
@@ -83,9 +92,60 @@ function NovelDetailPage() {
   const { toggleChat } = useChatUI();
   const toast = useToast();
 
+  const tabListRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
   const [exportOpen, setExportOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [exportData, setExportData] = useState<NovelExportData | null>(null);
+
+  const checkTabScroll = useCallback(() => {
+    const el = tabListRef.current;
+    if (!el) {
+      return;
+    }
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 2);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 2);
+  }, []);
+
+  useEffect(() => {
+    checkTabScroll();
+    window.addEventListener("resize", checkTabScroll);
+    return () => window.removeEventListener("resize", checkTabScroll);
+  }, [checkTabScroll]);
+
+  // アクティブタブ切り替え時に可視領域へ自動スクロール
+  useEffect(() => {
+    const el = tabListRef.current;
+    if (!el) {
+      return;
+    }
+    const activeEl = el.querySelector(
+      `[data-tab-id="${activeTab}"]`
+    ) as HTMLElement | null;
+    if (activeEl) {
+      activeEl.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "nearest",
+      });
+    }
+    checkTabScroll();
+  }, [activeTab, checkTabScroll]);
+
+  const scrollTab = (direction: "left" | "right") => {
+    const el = tabListRef.current;
+    if (!el) {
+      return;
+    }
+    const amount = 200;
+    el.scrollBy({
+      left: direction === "left" ? -amount : amount,
+      behavior: "smooth",
+    });
+  };
 
   const handleOpenExport = useCallback(async () => {
     if (!novelId) {
@@ -103,7 +163,7 @@ function NovelDetailPage() {
     }
   }, [novelId, toast]);
 
-  // グローバルショートカット: Alt+1 ~ Alt+{TAB_DEFS.length}（現在 7）でタブ切り替え、Ctrl+J でチャット開閉
+  // グローバルショートカット: Alt+1 ~ Alt+{TAB_DEFS.length}（現在 8）でタブ切り替え、Ctrl+J でチャット開閉
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+J または Cmd+J でチャット開閉
@@ -172,13 +232,41 @@ function NovelDetailPage() {
             </div>
           </header>
 
-          <nav className="mb-4 shrink-0 border-border border-b">
-            <div className="flex gap-1 overflow-x-auto">
+          <nav className="relative mb-4 shrink-0 border-border border-b">
+            {/* 左スクロール矢印ボタン */}
+            {canScrollLeft && (
+              <button
+                type="button"
+                onClick={() => scrollTab("left")}
+                className="absolute top-0 bottom-0 left-0 z-10 flex cursor-pointer items-center bg-gradient-to-r from-surface via-surface/90 to-transparent pr-3 pl-1 text-muted-foreground transition hover:text-foreground"
+                aria-label="左へスクロール"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-4 w-4"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M11.78 5.22a.75.75 0 0 1 0 1.06L8.06 10l3.72 3.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            )}
+
+            <div
+              ref={tabListRef}
+              onScroll={checkTabScroll}
+              className="flex gap-1 overflow-x-auto scroll-smooth pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               {TAB_DEFS.map((t) => {
                 const isActive = activeTab === t.id;
                 return (
                   <button
                     key={t.id}
+                    data-tab-id={t.id}
                     onClick={() =>
                       navigate({
                         to: "/novels/$novelId",
@@ -186,7 +274,7 @@ function NovelDetailPage() {
                         search: { tab: t.id },
                       })
                     }
-                    className={`group flex cursor-pointer items-center gap-1.5 whitespace-nowrap border-b-2 px-3.5 py-2 font-medium text-sm transition ${
+                    className={`group flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 py-1.5 font-medium text-xs transition sm:px-3 sm:py-2 sm:text-sm ${
                       isActive
                         ? "border-primary bg-primary/5 font-bold text-primary"
                         : "border-transparent text-muted-foreground hover:border-border hover:bg-surface-hover hover:text-foreground"
@@ -195,13 +283,36 @@ function NovelDetailPage() {
                   >
                     <span>{t.icon}</span>
                     <span>{t.label}</span>
-                    <span className="hidden rounded px-1 text-[10px] text-muted-foreground opacity-60 group-hover:opacity-100 sm:inline-block">
+                    <span className="hidden rounded px-1 text-[10px] text-muted-foreground opacity-60 group-hover:opacity-100 xl:inline-block">
                       Alt+{t.shortcut}
                     </span>
                   </button>
                 );
               })}
             </div>
+
+            {/* 右スクロール矢印ボタン */}
+            {canScrollRight && (
+              <button
+                type="button"
+                onClick={() => scrollTab("right")}
+                className="absolute top-0 right-0 bottom-0 z-10 flex cursor-pointer items-center bg-gradient-to-l from-surface via-surface/90 to-transparent pr-1 pl-3 text-muted-foreground transition hover:text-foreground"
+                aria-label="右へスクロール"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  className="h-4 w-4"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M8.22 5.22a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.75.75 0 0 1-1.06-1.06L11.94 10 8.22 6.28a.75.75 0 0 1 0-1.06Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            )}
           </nav>
 
           <div className="min-h-0 flex-1 overflow-hidden">

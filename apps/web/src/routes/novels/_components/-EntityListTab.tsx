@@ -138,12 +138,12 @@ export function EntityListTab<
 
   return (
     <div className="flex h-full flex-col space-y-4">
-      <div className="flex shrink-0 items-center justify-between border-border border-b pb-3">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b pb-3">
         <h2 className="font-bold text-foreground text-xl">{config.title}</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           {viewMode === "cards" && (
             <>
-              <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+              <div className="flex shrink-0 items-center gap-1.5 text-muted-foreground text-xs">
                 <span>並び順:</span>
                 <Select
                   aria-label="並び順"
@@ -170,12 +170,16 @@ export function EntityListTab<
                 </Select>
               </div>
 
-              <Button onClick={config.onNew} leftIcon={<PlusIcon />}>
+              <Button
+                onClick={config.onNew}
+                leftIcon={<PlusIcon />}
+                className="shrink-0 whitespace-nowrap"
+              >
                 {config.newLabel}
               </Button>
             </>
           )}
-          <div className="flex rounded-lg border border-border bg-surface p-0.5">
+          <div className="flex shrink-0 rounded-lg border border-border bg-surface p-0.5">
             <button
               onClick={() => setViewMode("cards")}
               className={`rounded-md px-3 py-1.5 font-medium text-sm transition ${

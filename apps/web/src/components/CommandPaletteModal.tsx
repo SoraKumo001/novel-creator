@@ -62,6 +62,18 @@ export function CommandPaletteModal({
     const list: CommandItem[] = [];
 
     // アクション
+    list.push({
+      id: "action-outline",
+      category: "アクション",
+      icon: "🗺️",
+      title: "ストーリー構想・あらすじ相談",
+      subtitle: "起承転結や三幕構成のMarkdown構想",
+      onSelect: () => {
+        onClose();
+        onNavigateTab("outline");
+      },
+    });
+
     if (onOpenVerticalPreview) {
       list.push({
         id: "action-vertical",
@@ -273,12 +285,29 @@ export function CommandPaletteModal({
     }
   };
 
+  const isBackdropMouseDown = useRef(false);
+
+  const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    isBackdropMouseDown.current = e.target === e.currentTarget;
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isBackdropMouseDown.current && e.target === e.currentTarget) {
+      onClose();
+    }
+    isBackdropMouseDown.current = false;
+  };
+
   if (!isOpen) {
     return null;
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-20 backdrop-blur-xs sm:pt-28">
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-4 pt-20 backdrop-blur-xs sm:pt-28"
+      onMouseDown={handleBackdropMouseDown}
+      onClick={handleBackdropClick}
+    >
       <div
         className="fade-in zoom-in-95 flex max-h-[70vh] w-full max-w-xl animate-in flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl duration-150"
         onClick={(e) => e.stopPropagation()}
