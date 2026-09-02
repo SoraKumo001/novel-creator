@@ -78,7 +78,7 @@ export function createProposeTools(
     }),
     proposeCreateCharacter: scopedTool({
       description:
-        "新しい登場人物（キャラクター）の登録をユーザーに提案します。会話の中で新しい人物が考案されたり固まった場合に使用してください。",
+        "新しい登場人物（キャラクター）の登録、または既存の古い人物の削除を伴う設定更新・置換をユーザーに提案します。会話の中で新しい人物が考案されたり、既存人物の名前・設定の刷新が決まった場合に使用してください。",
       errorMessage: "キャラクター登録提案の生成に失敗しました。",
       parameters: z.object({
         category: z
@@ -96,6 +96,12 @@ export function createProposeTools(
           .string()
           .optional()
           .describe("対象の小説ID（省略時は現在の相談対象小説）"),
+        oldCharacterName: z
+          .string()
+          .optional()
+          .describe(
+            "置換・更新元の古い登場人物名。設定変更に伴い古い人物を削除したい場合に指定します。"
+          ),
         traits: z
           .array(z.string())
           .optional()
@@ -107,24 +113,40 @@ export function createProposeTools(
       resolve: ({ novelId }) => resolveNovelId(novelId),
       run: (
         targetId,
-        { name, category = "未分類", description, traits = [] }
-      ) => ({
-        data: {
-          category,
-          description,
+        {
           name,
-          traits,
-        },
-        novelId: targetId,
-        proposalType: "character",
-        summary: `登場人物「${name}」の設定登録提案`,
-        type: "proposal",
-      }),
+          category = "未分類",
+          description,
+          traits = [],
+          oldCharacterName,
+        }
+      ) => {
+        const hasReplace =
+          typeof oldCharacterName === "string" &&
+          oldCharacterName.trim().length > 0;
+        const replaceSummary = hasReplace
+          ? `（旧「${oldCharacterName.trim()}」を削除して置換）`
+          : "";
+
+        return {
+          data: {
+            category,
+            description,
+            name,
+            oldCharacterName: hasReplace ? oldCharacterName.trim() : null,
+            traits,
+          },
+          novelId: targetId,
+          proposalType: "character",
+          summary: `登場人物「${name}」の設定登録提案${replaceSummary}`,
+          type: "proposal",
+        };
+      },
     }),
 
     proposeCreateSetting: scopedTool({
       description:
-        "新しい世界観・設定（用語、地理、魔法体系、組織、アイテムなど）の登録をユーザーに提案します。会話の中で新しい設定が考案された場合に使用してください。",
+        "新しい世界観・設定（用語、地理、魔法体系、組織、アイテムなど）の登録、または既存の古い設定の削除を伴う更新・置換をユーザーに提案します。会話の中で新しい設定が考案されたり、既存設定の名称変更・全面差し替えが決まった場合に使用してください。",
       errorMessage: "設定登録提案の生成に失敗しました。",
       parameters: z.object({
         category: z
@@ -138,17 +160,89 @@ export function createProposeTools(
           .string()
           .optional()
           .describe("対象の小説ID（省略時は現在の相談対象小説）"),
+        oldSettingName: z
+          .string()
+          .optional()
+          .describe(
+            "置換・更新元の古い設定名。設定名変更や差し替えに伴い古い設定を削除したい場合に指定します。"
+          ),
       }),
       resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: (targetId, { name, category, description }) => ({
+      run: (targetId, { name, category, description, oldSettingName }) => {
+        const hasReplace =
+          typeof oldSettingName === "string" &&
+          oldSettingName.trim().length > 0;
+        const replaceSummary = hasReplace
+          ? `（旧「${oldSettingName.trim()}」を削除して置換）`
+          : "";
+
+        return {
+          data: {
+            category,
+            description,
+            name,
+            oldSettingName: hasReplace ? oldSettingName.trim() : null,
+          },
+          novelId: targetId,
+          proposalType: "setting",
+          summary: `世界観設定「${name}」(${category})の登録提案${replaceSummary}`,
+          type: "proposal",
+        };
+      },
+    }),
+
+    proposeDeleteSetting: scopedTool({
+      description:
+        "不要になった世界観・設定の削除をユーザーに提案します。会話の中で廃止・整理が決まった設定がある場合に使用してください。",
+      errorMessage: "設定削除提案の生成に失敗しました。",
+      parameters: z.object({
+        name: z.string().describe("削除する世界観・設定の名称"),
+        novelId: z
+          .string()
+          .optional()
+          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
+        reason: z
+          .string()
+          .optional()
+          .describe("この設定を削除する理由・背景の説明"),
+      }),
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      run: (targetId, { name, reason }) => ({
         data: {
-          category,
-          description,
           name,
+          reason: reason || null,
         },
         novelId: targetId,
-        proposalType: "setting",
-        summary: `世界観設定「${name}」(${category})の登録提案`,
+        proposalType: "delete_setting",
+        summary: `世界観設定「${name}」の削除提案${reason ? `（${reason}）` : ""}`,
+        type: "proposal",
+      }),
+    }),
+
+    proposeDeleteCharacter: scopedTool({
+      description:
+        "不要になった登場人物（キャラクター）の削除をユーザーに提案します。会話の中で廃止・退場が決まった人物がある場合に使用してください。",
+      errorMessage: "キャラクター削除提案の生成に失敗しました。",
+      parameters: z.object({
+        name: z.string().describe("削除する登場人物の名称"),
+        novelId: z
+          .string()
+          .optional()
+          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
+        reason: z
+          .string()
+          .optional()
+          .describe("この人物を削除する理由・背景の説明"),
+      }),
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      run: (targetId, { name, reason }) => ({
+        data: {
+          name,
+          reason: reason || null,
+        },
+        novelId: targetId,
+        proposalType: "delete_character",
+        summary: `登場人物「${name}」の削除提案${reason ? `（${reason}）` : ""}`,
         type: "proposal",
       }),
     }),
@@ -257,6 +351,16 @@ export function createProposeTools(
           .optional()
           .default([])
           .describe("提案する登場人物の配列"),
+        deleteCharacters: z
+          .array(z.string())
+          .optional()
+          .default([])
+          .describe("一括処理で同時に削除する古い登場人物名の配列"),
+        deleteSettings: z
+          .array(z.string())
+          .optional()
+          .default([])
+          .describe("一括処理で同時に削除する古い世界観・設定名の配列"),
         foreshadowings: z
           .array(
             z.object({
@@ -311,6 +415,8 @@ export function createProposeTools(
           settings = [],
           foreshadowings = [],
           timelines = [],
+          deleteSettings = [],
+          deleteCharacters = [],
           summary,
         }
       ) => {
@@ -335,18 +441,44 @@ export function createProposeTools(
           timestamp: t.timestamp || null,
         }));
 
-        const totalCount =
+        const totalAddCount =
           normalizedCharacters.length +
           normalizedSettings.length +
           normalizedForeshadowings.length +
           normalizedTimelines.length;
+        const totalDelCount = deleteSettings.length + deleteCharacters.length;
+
+        const parts: string[] = [];
+        if (normalizedCharacters.length > 0) {
+          parts.push(`人物${normalizedCharacters.length}件`);
+        }
+        if (normalizedSettings.length > 0) {
+          parts.push(`設定${normalizedSettings.length}件`);
+        }
+        if (normalizedForeshadowings.length > 0) {
+          parts.push(`伏線${normalizedForeshadowings.length}件`);
+        }
+        if (normalizedTimelines.length > 0) {
+          parts.push(`年表${normalizedTimelines.length}件`);
+        }
+        if (deleteSettings.length > 0) {
+          parts.push(`旧設定削除${deleteSettings.length}件`);
+        }
+        if (deleteCharacters.length > 0) {
+          parts.push(`旧人物削除${deleteCharacters.length}件`);
+        }
+
         const defaultSummary =
           summary ||
-          `設定の一括登録提案（合計${totalCount}件: 人物${normalizedCharacters.length}件、設定${normalizedSettings.length}件、伏線${normalizedForeshadowings.length}件、年表${normalizedTimelines.length}件）`;
+          `設定の一括登録提案（合計${totalAddCount + totalDelCount}件: ${parts.join("、")}）`;
 
         return {
           data: {
             characters: normalizedCharacters,
+            deleteCharacters: deleteCharacters.filter(
+              (n) => n.trim().length > 0
+            ),
+            deleteSettings: deleteSettings.filter((n) => n.trim().length > 0),
             foreshadowings: normalizedForeshadowings,
             settings: normalizedSettings,
             timelines: normalizedTimelines,

@@ -333,7 +333,7 @@ export function diffCharacters(
 }
 
 /**
- * 現在の人物マークダウンに対し、新しい人物リストを追加または更新したマークダウンを生成する。
+ * 現在の人物マークダウンに対し、新しい人物リストを追加または更新し、指定された古い人物を削除したマークダウンを生成する。
  */
 export function applyCharactersToMarkdown(
   currentMarkdown: string,
@@ -343,17 +343,25 @@ export function applyCharactersToMarkdown(
     description?: string | null;
     traits?: string[] | null;
     relationships?: string | null;
-  }[]
+  }[],
+  deleteNames?: string[]
 ): string {
   const existing = parseCharactersMarkdown(currentMarkdown);
-  const map = new Map<string, ParsedCharacterSection>(
-    existing.map((c) => [c.name, c])
+  const deleteSet = new Set(
+    (deleteNames ?? []).map((n) => n.trim()).filter((n) => n.length > 0)
   );
+  const map = new Map<string, ParsedCharacterSection>();
+  for (const c of existing) {
+    if (!deleteSet.has(c.name.trim())) {
+      map.set(c.name.trim(), c);
+    }
+  }
   for (const nc of newCharacters) {
-    const prev = map.get(nc.name);
-    map.set(nc.name, {
+    const trimmed = nc.name.trim();
+    const prev = map.get(trimmed);
+    map.set(trimmed, {
       category: nc.category || prev?.category || "未分類",
-      name: nc.name,
+      name: trimmed,
       description: nc.description ?? prev?.description ?? "",
       traits: nc.traits ?? prev?.traits ?? [],
       relationships: nc.relationships ?? prev?.relationships ?? "",

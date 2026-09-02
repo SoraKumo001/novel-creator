@@ -11,8 +11,6 @@ import type {
   Timeline,
 } from "@/lib/types.js";
 
-export type EntityAction = "create" | "overwrite" | "merge";
-
 export interface EditableCharacter extends ExtractedCharacterItem {
   _id: string;
   _selected: boolean;

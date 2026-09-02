@@ -4,6 +4,8 @@ import {
   createForeshadowing,
   createSetting,
   createTimeline,
+  deleteCharacter,
+  deleteSetting,
   updateChapter,
   updateCharacter,
   updateForeshadowing,
@@ -21,6 +23,7 @@ import type {
 /** エンティティごとの保存結果 */
 export interface SaveCounts {
   created: number;
+  deleted?: number;
   updated: number;
 }
 
@@ -35,13 +38,14 @@ export function appendNote(existingText: string, addition: string): string {
   return base ? `${base}\n\n【追記】\n${trimmed}` : trimmed;
 }
 
-/** 選択された人物を登録・更新する（overwrite / merge / create） */
+/** 選択された人物を登録・更新・置換する（overwrite / merge / replace / create） */
 export async function saveCharacters(
   targetNovelId: string,
   chars: EditableCharacter[]
 ): Promise<SaveCounts> {
   let created = 0;
   let updated = 0;
+  let deleted = 0;
 
   for (const char of chars) {
     const trimmedName = char.name.trim();
@@ -57,7 +61,23 @@ export async function saveCharacters(
           .map((t) => t.trim())
           .filter((t) => t.length > 0);
 
-    if (char.action === "overwrite" && char.matchedExisting) {
+    if (
+      char.action === "replace" &&
+      (char.replaceTargetId || char.matchedExisting?.id)
+    ) {
+      const deleteId = char.replaceTargetId || char.matchedExisting?.id;
+      if (deleteId) {
+        await deleteCharacter(deleteId);
+        deleted++;
+      }
+      await createCharacter(targetNovelId, {
+        name: trimmedName,
+        category: trimmedCategory,
+        description: trimmedDesc || undefined,
+        traits: traitsList.length > 0 ? traitsList : undefined,
+      });
+      created++;
+    } else if (char.action === "overwrite" && char.matchedExisting) {
       await updateCharacter(char.matchedExisting.id, {
         name: trimmedName,
         category: trimmedCategory,
@@ -92,23 +112,39 @@ export async function saveCharacters(
     }
   }
 
-  return { created, updated };
+  return { created, deleted, updated };
 }
 
-/** 選択された設定を登録・更新する（overwrite / merge / create） */
+/** 選択された設定を登録・更新・置換する（overwrite / merge / replace / create） */
 export async function saveSettings(
   targetNovelId: string,
   sets: EditableSetting[]
 ): Promise<SaveCounts> {
   let created = 0;
   let updated = 0;
+  let deleted = 0;
 
   for (const set of sets) {
     const trimmedName = set.name.trim();
     const trimmedCategory = set.category.trim() || "世界観";
     const trimmedDesc = set.description?.trim() || "";
 
-    if (set.action === "overwrite" && set.matchedExisting) {
+    if (
+      set.action === "replace" &&
+      (set.replaceTargetId || set.matchedExisting?.id)
+    ) {
+      const deleteId = set.replaceTargetId || set.matchedExisting?.id;
+      if (deleteId) {
+        await deleteSetting(deleteId);
+        deleted++;
+      }
+      await createSetting(targetNovelId, {
+        name: trimmedName,
+        category: trimmedCategory,
+        description: trimmedDesc || undefined,
+      });
+      created++;
+    } else if (set.action === "overwrite" && set.matchedExisting) {
       await updateSetting(set.matchedExisting.id, {
         name: trimmedName,
         category: trimmedCategory,
@@ -135,7 +171,7 @@ export async function saveSettings(
     }
   }
 
-  return { created, updated };
+  return { created, deleted, updated };
 }
 
 /** 選択された伏線を登録・更新する（overwrite / merge / create） */

@@ -9,12 +9,16 @@ import {
 import * as services from "../src/lib/services/index.js";
 
 vi.mock("../src/lib/services/index.js", () => ({
-  createCharacter: vi.fn(),
-  createSetting: vi.fn(),
-  createForeshadowing: vi.fn(),
-  createTimeline: vi.fn(),
   createChapter: vi.fn(),
+  createCharacter: vi.fn(),
+  createForeshadowing: vi.fn(),
+  createSetting: vi.fn(),
+  createTimeline: vi.fn(),
+  deleteCharacter: vi.fn(),
+  deleteSetting: vi.fn(),
+  fetchCharacters: vi.fn(),
   fetchCharactersMarkdown: vi.fn(),
+  fetchSettings: vi.fn(),
   fetchSettingsMarkdown: vi.fn(),
   fetchStoryOutline: vi.fn(),
   saveStoryOutline: vi.fn(),
@@ -269,6 +273,109 @@ describe("ChatProposalCard", () => {
         expect(
           screen.getAllByText(/小説データに反映完了/).length
         ).toBeGreaterThan(0);
+      });
+    });
+  });
+
+  describe("setting proposal with replacement", () => {
+    const replaceProposal: ProposalPayload = {
+      type: "proposal",
+      proposalType: "setting",
+      novelId: NOVEL_ID,
+      data: {
+        category: "世界観",
+        description: "新たな大国。",
+        name: "神聖ルミナス皇国",
+        oldSettingName: "ルミナス帝国",
+      },
+      summary:
+        "世界観設定「神聖ルミナス皇国」(世界観)の登録提案（旧「ルミナス帝国」を削除して置換）",
+    };
+
+    it("置換元の旧設定名が表示されること", () => {
+      renderWithClient(<ChatProposalCard proposal={replaceProposal} />);
+
+      expect(screen.getByText("神聖ルミナス皇国")).toBeInTheDocument();
+      expect(screen.getByText("ルミナス帝国")).toBeInTheDocument();
+      expect(screen.getByText(/削除対象の旧設定/)).toBeInTheDocument();
+    });
+
+    it("反映時に旧設定を削除してから新設定を作成すること", async () => {
+      vi.mocked(services.fetchSettings).mockResolvedValue([
+        {
+          id: "old-setting-id-1",
+          name: "ルミナス帝国",
+          category: "世界観",
+          description: "古い帝国",
+          novelId: NOVEL_ID,
+          metadata: {},
+          createdAt: null,
+          updatedAt: null,
+        },
+      ]);
+
+      renderWithClient(<ChatProposalCard proposal={replaceProposal} />);
+
+      const applyBtn = screen.getByRole("button", { name: /小説に反映する/ });
+      fireEvent.click(applyBtn);
+
+      await waitFor(() => {
+        expect(services.fetchSettings).toHaveBeenCalledWith(NOVEL_ID);
+        expect(services.deleteSetting).toHaveBeenCalledWith("old-setting-id-1");
+        expect(services.createSetting).toHaveBeenCalledWith(
+          NOVEL_ID,
+          expect.objectContaining({
+            name: "神聖ルミナス皇国",
+            category: "世界観",
+            description: "新たな大国。",
+          })
+        );
+      });
+    });
+  });
+
+  describe("delete_setting proposal", () => {
+    const deleteProposal: ProposalPayload = {
+      type: "proposal",
+      proposalType: "delete_setting",
+      novelId: NOVEL_ID,
+      data: {
+        name: "旧設定A",
+        reason: "世界観整理のため",
+      },
+      summary: "世界観設定「旧設定A」の削除提案（世界観整理のため）",
+    };
+
+    it("削除対象の設定名と理由が表示されること", () => {
+      renderWithClient(<ChatProposalCard proposal={deleteProposal} />);
+
+      expect(screen.getByText("旧設定A")).toBeInTheDocument();
+      expect(screen.getAllByText(/世界観整理のため/).length).toBeGreaterThan(0);
+      expect(screen.getByText(/設定削除の提案/)).toBeInTheDocument();
+    });
+
+    it("反映時に旧設定を削除すること", async () => {
+      vi.mocked(services.fetchSettings).mockResolvedValue([
+        {
+          id: "del-id-99",
+          name: "旧設定A",
+          category: "世界観",
+          description: "不要な設定",
+          novelId: NOVEL_ID,
+          metadata: {},
+          createdAt: null,
+          updatedAt: null,
+        },
+      ]);
+
+      renderWithClient(<ChatProposalCard proposal={deleteProposal} />);
+
+      const applyBtn = screen.getByRole("button", { name: /小説に反映する/ });
+      fireEvent.click(applyBtn);
+
+      await waitFor(() => {
+        expect(services.fetchSettings).toHaveBeenCalledWith(NOVEL_ID);
+        expect(services.deleteSetting).toHaveBeenCalledWith("del-id-99");
       });
     });
   });

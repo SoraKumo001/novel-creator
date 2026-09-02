@@ -176,7 +176,7 @@ export function diffSettings(
 }
 
 /**
- * 現在の設定マークダウンに対し、新しい設定リストを追加または更新したマークダウンを生成する。
+ * 現在の設定マークダウンに対し、新しい設定リストを追加または更新し、指定された古い設定を削除したマークダウンを生成する。
  */
 export function applySettingsToMarkdown(
   currentMarkdown: string,
@@ -184,17 +184,25 @@ export function applySettingsToMarkdown(
     category?: string | null;
     name: string;
     description?: string | null;
-  }[]
+  }[],
+  deleteNames?: string[]
 ): string {
   const existing = parseSettingsMarkdown(currentMarkdown);
-  const map = new Map<string, ParsedSettingSection>(
-    existing.map((s) => [s.name, s])
+  const deleteSet = new Set(
+    (deleteNames ?? []).map((n) => n.trim()).filter((n) => n.length > 0)
   );
+  const map = new Map<string, ParsedSettingSection>();
+  for (const s of existing) {
+    if (!deleteSet.has(s.name.trim())) {
+      map.set(s.name.trim(), s);
+    }
+  }
   for (const ns of newSettings) {
-    const prev = map.get(ns.name);
-    map.set(ns.name, {
+    const trimmed = ns.name.trim();
+    const prev = map.get(trimmed);
+    map.set(trimmed, {
       category: ns.category || prev?.category || "世界観",
-      name: ns.name,
+      name: trimmed,
       description: ns.description ?? prev?.description ?? "",
     });
   }

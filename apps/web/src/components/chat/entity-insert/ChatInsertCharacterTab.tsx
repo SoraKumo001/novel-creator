@@ -1,7 +1,9 @@
+import type { Character } from "@/lib/types.js";
 import type { EditableCharacter, EntityAction } from "./types.js";
 
 interface ChatInsertCharacterTabProps {
   characters: EditableCharacter[];
+  existingCharacters?: Character[];
   onRemove: (id: string) => void;
   onToggle: (id: string) => void;
   onUpdate: (
@@ -13,6 +15,7 @@ interface ChatInsertCharacterTabProps {
 
 export function ChatInsertCharacterTab({
   characters,
+  existingCharacters = [],
   onToggle,
   onRemove,
   onUpdate,
@@ -71,13 +74,65 @@ export function ChatInsertCharacterTab({
                     >
                       <option value="overwrite">上書き更新</option>
                       <option value="merge">追記マージ</option>
+                      <option value="replace">
+                        旧人物を削除して再作成（置換）
+                      </option>
                       <option value="create">新規追加（同名別件）</option>
                     </select>
                   </div>
                 </div>
               ) : (
-                <div className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 font-bold text-[10px] text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
-                  ✨ 新規追加
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/60 px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800/60">
+                  <div className="inline-flex items-center gap-1 rounded bg-emerald-50 px-2 py-0.5 font-bold text-[10px] text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    ✨{" "}
+                    {char.action === "replace"
+                      ? "置換（旧人物削除）"
+                      : "新規追加"}
+                  </div>
+                  {existingCharacters.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <label className="text-[11px] text-slate-600 dark:text-slate-300">
+                        反映方法:
+                      </label>
+                      <select
+                        value={char.action}
+                        onChange={(e) =>
+                          onUpdate(
+                            char._id,
+                            "action",
+                            e.target.value as EntityAction
+                          )
+                        }
+                        className="rounded border border-slate-300 bg-white px-2 py-0.5 text-slate-800 text-xs focus:outline-none dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+                      >
+                        <option value="create">新規追加</option>
+                        <option value="replace">
+                          既存の旧人物を削除して置換
+                        </option>
+                      </select>
+
+                      {char.action === "replace" && (
+                        <select
+                          value={char.replaceTargetId || ""}
+                          onChange={(e) =>
+                            onUpdate(
+                              char._id,
+                              "replaceTargetId",
+                              e.target.value
+                            )
+                          }
+                          className="rounded border border-rose-300 bg-rose-50/70 px-2 py-0.5 text-rose-800 text-xs focus:outline-none dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-300"
+                        >
+                          <option value="">-- 削除する旧人物を選択 --</option>
+                          {existingCharacters.map((ec) => (
+                            <option key={ec.id} value={ec.id}>
+                              🗑️ {ec.name} ({ec.category})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -15,10 +15,12 @@ function createDummyCtx(): ServiceContext {
 describe("proposeTools", () => {
   const NOVEL_ID = "novel-uuid-123";
 
-  it("createProposeTools は全 7 つの提案ツールを返す", () => {
+  it("createProposeTools は全 9 つの提案ツールを返す", () => {
     const tools = createProposeTools(createDummyCtx(), NOVEL_ID);
     expect(tools.proposeCreateCharacter).toBeDefined();
     expect(tools.proposeCreateSetting).toBeDefined();
+    expect(tools.proposeDeleteSetting).toBeDefined();
+    expect(tools.proposeDeleteCharacter).toBeDefined();
     expect(tools.proposeAddForeshadowing).toBeDefined();
     expect(tools.proposeAddTimelineEvent).toBeDefined();
     expect(tools.proposeUpdatePlot).toBeDefined();
@@ -26,12 +28,62 @@ describe("proposeTools", () => {
     expect(tools.proposeBulkCreate).toBeDefined();
   });
 
+  describe("proposeCreateSetting", () => {
+    it("oldSettingName を指定した場合に置換・削除情報を含む提案ペイロードを生成すること", async () => {
+      const tools = createProposeTools(createDummyCtx(), NOVEL_ID);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await (tools.proposeCreateSetting as any).execute({
+        category: "世界観",
+        description: "新たな皇国",
+        name: "神聖ルミナス皇国",
+        oldSettingName: "ルミナス帝国",
+      });
+
+      expect(res).toEqual({
+        data: {
+          category: "世界観",
+          description: "新たな皇国",
+          name: "神聖ルミナス皇国",
+          oldSettingName: "ルミナス帝国",
+        },
+        novelId: NOVEL_ID,
+        proposalType: "setting",
+        summary:
+          "世界観設定「神聖ルミナス皇国」(世界観)の登録提案（旧「ルミナス帝国」を削除して置換）",
+        type: "proposal",
+      });
+    });
+  });
+
+  describe("proposeDeleteSetting", () => {
+    it("設定削除の提案ペイロードを生成できること", async () => {
+      const tools = createProposeTools(createDummyCtx(), NOVEL_ID);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await (tools.proposeDeleteSetting as any).execute({
+        name: "旧帝国",
+        reason: "世界観再構築のため",
+      });
+
+      expect(res).toEqual({
+        data: {
+          name: "旧帝国",
+          reason: "世界観再構築のため",
+        },
+        novelId: NOVEL_ID,
+        proposalType: "delete_setting",
+        summary: "世界観設定「旧帝国」の削除提案（世界観再構築のため）",
+        type: "proposal",
+      });
+    });
+  });
+
   describe("proposeBulkCreate", () => {
-    it("複数の人物や設定を含む一括提案ペイロードを生成できること", async () => {
+    it("複数の人物や設定、および削除リストを含む一括提案ペイロードを生成できること", async () => {
       const tools = createProposeTools(createDummyCtx(), NOVEL_ID);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const res = await (tools.proposeBulkCreate as any).execute({
         characters: [{ name: "ルーク", description: "騎士" }],
+        deleteSettings: ["旧帝国"],
         settings: [
           { name: "王国", category: "世界観", description: "平和な国" },
         ],
@@ -47,6 +99,8 @@ describe("proposeTools", () => {
               traits: [],
             },
           ],
+          deleteCharacters: [],
+          deleteSettings: ["旧帝国"],
           foreshadowings: [],
           settings: [
             { category: "世界観", description: "平和な国", name: "王国" },
@@ -56,7 +110,7 @@ describe("proposeTools", () => {
         novelId: NOVEL_ID,
         proposalType: "bulk",
         summary:
-          "設定の一括登録提案（合計2件: 人物1件、設定1件、伏線0件、年表0件）",
+          "設定の一括登録提案（合計3件: 人物1件、設定1件、旧設定削除1件）",
         type: "proposal",
       });
     });

@@ -338,6 +338,7 @@ export function ChatInsertEntityModal({
         foreCounts.updated +
         timeCounts.updated +
         plotCounts.updated;
+      const deletedCount = (charCounts.deleted || 0) + (setCounts.deleted || 0);
 
       // キャッシュの無効化
       await Promise.all([
@@ -367,6 +368,9 @@ export function ChatInsertEntityModal({
       }
       if (updatedCount > 0) {
         parts.push(`更新・マージ: ${updatedCount}件`);
+      }
+      if (deletedCount > 0) {
+        parts.push(`旧データ削除: ${deletedCount}件`);
       }
 
       toast.success(`小説データに反映しました（${parts.join(", ")}）`);

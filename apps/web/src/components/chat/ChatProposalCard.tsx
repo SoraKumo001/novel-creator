@@ -2,6 +2,8 @@ import {
   applyCharactersToMarkdown,
   applySettingsToMarkdown,
   applyStoryOutlineSectionUpdate,
+  deleteCharactersFromMarkdown,
+  deleteSettingsFromMarkdown,
 } from "@novel-creator/shared";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
@@ -16,7 +18,11 @@ import {
   createForeshadowing,
   createSetting,
   createTimeline,
+  deleteCharacter,
+  deleteSetting,
+  fetchCharacters,
   fetchCharactersMarkdown,
+  fetchSettings,
   fetchSettingsMarkdown,
   fetchStoryOutline,
   saveStoryOutline,
@@ -31,6 +37,8 @@ export interface ProposalPayload {
     | "bulk"
     | "character"
     | "setting"
+    | "delete_setting"
+    | "delete_character"
     | "foreshadowing"
     | "timeline"
     | "plot"
@@ -109,6 +117,38 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           ? data.foreshadowings
           : [];
         const timelines = Array.isArray(data.timelines) ? data.timelines : [];
+        const deleteSettingsList: string[] = Array.isArray(data.deleteSettings)
+          ? data.deleteSettings
+          : [];
+        const deleteCharactersList: string[] = Array.isArray(
+          data.deleteCharacters
+        )
+          ? data.deleteCharacters
+          : [];
+
+        // 削除処理（古い設定）
+        if (deleteSettingsList.length > 0) {
+          const existingSettings = await fetchSettings(targetNovelId);
+          for (const delName of deleteSettingsList) {
+            const targets = existingSettings.filter((s) => s.name === delName);
+            for (const t of targets) {
+              await deleteSetting(t.id);
+            }
+          }
+        }
+
+        // 削除処理（古い人物）
+        if (deleteCharactersList.length > 0) {
+          const existingCharacters = await fetchCharacters(targetNovelId);
+          for (const delName of deleteCharactersList) {
+            const targets = existingCharacters.filter(
+              (c) => c.name === delName
+            );
+            for (const t of targets) {
+              await deleteCharacter(t.id);
+            }
+          }
+        }
 
         for (const c of characters) {
           await createCharacter(targetNovelId, {
@@ -139,12 +179,12 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           });
         }
 
-        if (characters.length > 0) {
+        if (characters.length > 0 || deleteCharactersList.length > 0) {
           await queryClient.invalidateQueries({
             queryKey: novelKeys.characters(targetNovelId),
           });
         }
-        if (settings.length > 0) {
+        if (settings.length > 0 || deleteSettingsList.length > 0) {
           await queryClient.invalidateQueries({
             queryKey: novelKeys.settings(targetNovelId),
           });
@@ -160,6 +200,15 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           });
         }
       } else if (proposalType === "character") {
+        if (data.oldCharacterName) {
+          const existingCharacters = await fetchCharacters(targetNovelId);
+          const targets = existingCharacters.filter(
+            (c) => c.name === data.oldCharacterName
+          );
+          for (const t of targets) {
+            await deleteCharacter(t.id);
+          }
+        }
         await createCharacter(targetNovelId, {
           name: data.name,
           category: data.category || "未分類",
@@ -170,6 +219,15 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           queryKey: novelKeys.characters(targetNovelId),
         });
       } else if (proposalType === "setting") {
+        if (data.oldSettingName) {
+          const existingSettings = await fetchSettings(targetNovelId);
+          const targets = existingSettings.filter(
+            (s) => s.name === data.oldSettingName
+          );
+          for (const t of targets) {
+            await deleteSetting(t.id);
+          }
+        }
         await createSetting(targetNovelId, {
           name: data.name,
           category: data.category || "世界観",
@@ -177,6 +235,24 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
         });
         await queryClient.invalidateQueries({
           queryKey: novelKeys.settings(targetNovelId),
+        });
+      } else if (proposalType === "delete_setting") {
+        const existingSettings = await fetchSettings(targetNovelId);
+        const targets = existingSettings.filter((s) => s.name === data.name);
+        for (const t of targets) {
+          await deleteSetting(t.id);
+        }
+        await queryClient.invalidateQueries({
+          queryKey: novelKeys.settings(targetNovelId),
+        });
+      } else if (proposalType === "delete_character") {
+        const existingCharacters = await fetchCharacters(targetNovelId);
+        const targets = existingCharacters.filter((c) => c.name === data.name);
+        for (const t of targets) {
+          await deleteCharacter(t.id);
+        }
+        await queryClient.invalidateQueries({
+          queryKey: novelKeys.characters(targetNovelId),
         });
       } else if (proposalType === "foreshadowing") {
         await createForeshadowing(targetNovelId, {
@@ -254,9 +330,15 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
     proposalType === "story_outline" ||
     proposalType === "character" ||
     proposalType === "setting" ||
+    proposalType === "delete_setting" ||
+    proposalType === "delete_character" ||
     (proposalType === "bulk" &&
       ((Array.isArray(data.characters) && data.characters.length > 0) ||
-        (Array.isArray(data.settings) && data.settings.length > 0)));
+        (Array.isArray(data.settings) && data.settings.length > 0) ||
+        (Array.isArray(data.deleteSettings) &&
+          data.deleteSettings.length > 0) ||
+        (Array.isArray(data.deleteCharacters) &&
+          data.deleteCharacters.length > 0)));
 
   const handleOpenDiff = async () => {
     if (!targetNovelId) {
@@ -293,16 +375,25 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           markdown: "",
         }));
         const currentMd = res.markdown ?? "";
-        const updatedMd = applyCharactersToMarkdown(currentMd, [
-          {
-            name: data.name,
-            category: data.category,
-            description: data.description,
-            traits: data.traits,
-          },
-        ]);
+        const deleteNames = data.oldCharacterName
+          ? [data.oldCharacterName]
+          : [];
+        const updatedMd = applyCharactersToMarkdown(
+          currentMd,
+          [
+            {
+              name: data.name,
+              category: data.category,
+              description: data.description,
+              traits: data.traits,
+            },
+          ],
+          deleteNames
+        );
         setDiffData({
-          title: `登場人物「${data.name}」`,
+          title: data.oldCharacterName
+            ? `登場人物「${data.name}」（旧「${data.oldCharacterName}」置換）`
+            : `登場人物「${data.name}」`,
           targetTab: "characters",
           entityType: "characters_markdown",
           originalMarkdown: currentMd,
@@ -314,47 +405,100 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           markdown: "",
         }));
         const currentMd = res.markdown ?? "";
-        const updatedMd = applySettingsToMarkdown(currentMd, [
-          {
-            name: data.name,
-            category: data.category,
-            description: data.description,
-          },
-        ]);
+        const deleteNames = data.oldSettingName ? [data.oldSettingName] : [];
+        const updatedMd = applySettingsToMarkdown(
+          currentMd,
+          [
+            {
+              name: data.name,
+              category: data.category,
+              description: data.description,
+            },
+          ],
+          deleteNames
+        );
         setDiffData({
-          title: `世界観・設定「${data.name}」`,
+          title: data.oldSettingName
+            ? `世界観・設定「${data.name}」（旧「${data.oldSettingName}」置換）`
+            : `世界観・設定「${data.name}」`,
           targetTab: "settings",
           entityType: "settings_markdown",
           originalMarkdown: currentMd,
           updatedMarkdown: updatedMd,
         });
         setDiffModalOpen(true);
+      } else if (proposalType === "delete_setting") {
+        const res = await fetchSettingsMarkdown(targetNovelId).catch(() => ({
+          markdown: "",
+        }));
+        const currentMd = res.markdown ?? "";
+        const updatedMd = deleteSettingsFromMarkdown(currentMd, [data.name]);
+        setDiffData({
+          title: `世界観・設定「${data.name}」（削除）`,
+          targetTab: "settings",
+          entityType: "settings_markdown",
+          originalMarkdown: currentMd,
+          updatedMarkdown: updatedMd,
+        });
+        setDiffModalOpen(true);
+      } else if (proposalType === "delete_character") {
+        const res = await fetchCharactersMarkdown(targetNovelId).catch(() => ({
+          markdown: "",
+        }));
+        const currentMd = res.markdown ?? "";
+        const updatedMd = deleteCharactersFromMarkdown(currentMd, [data.name]);
+        setDiffData({
+          title: `登場人物「${data.name}」（削除）`,
+          targetTab: "characters",
+          entityType: "characters_markdown",
+          originalMarkdown: currentMd,
+          updatedMarkdown: updatedMd,
+        });
+        setDiffModalOpen(true);
       } else if (proposalType === "bulk") {
-        if (Array.isArray(data.characters) && data.characters.length > 0) {
+        const delChars = Array.isArray(data.deleteCharacters)
+          ? data.deleteCharacters
+          : [];
+        const delSets = Array.isArray(data.deleteSettings)
+          ? data.deleteSettings
+          : [];
+        const hasChars =
+          (Array.isArray(data.characters) && data.characters.length > 0) ||
+          delChars.length > 0;
+        const hasSets =
+          (Array.isArray(data.settings) && data.settings.length > 0) ||
+          delSets.length > 0;
+
+        if (hasChars) {
           const res = await fetchCharactersMarkdown(targetNovelId).catch(
             () => ({ markdown: "" })
           );
           const currentMd = res.markdown ?? "";
           const updatedMd = applyCharactersToMarkdown(
             currentMd,
-            data.characters
+            Array.isArray(data.characters) ? data.characters : [],
+            delChars
           );
           setDiffData({
-            title: `登場人物（一括 ${data.characters.length}名）`,
+            title: `登場人物（一括 反映 ${data.characters?.length || 0}名 / 削除 ${delChars.length}名）`,
             targetTab: "characters",
             entityType: "characters_markdown",
             originalMarkdown: currentMd,
             updatedMarkdown: updatedMd,
           });
           setDiffModalOpen(true);
-        } else if (Array.isArray(data.settings) && data.settings.length > 0) {
+        } else if (hasSets) {
           const res = await fetchSettingsMarkdown(targetNovelId).catch(() => ({
             markdown: "",
           }));
           const currentMd = res.markdown ?? "";
-          const updatedMd = applySettingsToMarkdown(currentMd, data.settings);
+          const updatedMd = applySettingsToMarkdown(
+            currentMd,
+            Array.isArray(data.settings) ? data.settings : [],
+            delSets
+          );
           setDiffData({
-            title: `世界観・設定（一括 ${data.settings.length}件）`,
+            title: `世界観・設定（一括 反映 ${data.settings?.length || 0}件 / 削除 ${delSets.length}件）`,
             targetTab: "settings",
             entityType: "settings_markdown",
             originalMarkdown: currentMd,
@@ -418,6 +562,14 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
       label: "🌍 世界観・設定",
       bg: "bg-teal-100 text-teal-800 dark:bg-teal-950/60 dark:text-teal-300",
     },
+    delete_setting: {
+      label: "🗑️ 設定削除",
+      bg: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
+    },
+    delete_character: {
+      label: "🗑️ 人物削除",
+      bg: "bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300",
+    },
     foreshadowing: {
       label: "🔍 伏線",
       bg: "bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300",
@@ -441,11 +593,16 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
     bg: "bg-slate-100 text-slate-800",
   };
 
+  const isDeleteOnly =
+    proposalType === "delete_setting" || proposalType === "delete_character";
+
   const cardBorderClass = isApplied
     ? "border-emerald-300 bg-linear-to-br from-emerald-50/90 to-teal-50/40 dark:border-emerald-800/80 dark:from-emerald-950/30 dark:to-teal-950/20"
     : isDismissed
       ? "border-slate-200 bg-slate-50/60 opacity-60 dark:border-slate-800 dark:bg-slate-900/30"
-      : "border-indigo-200 bg-linear-to-br from-indigo-50/90 to-purple-50/40 dark:border-indigo-900/60 dark:from-indigo-950/30 dark:to-purple-950/20";
+      : isDeleteOnly
+        ? "border-rose-200 bg-linear-to-br from-rose-50/90 to-amber-50/40 dark:border-rose-900/60 dark:from-rose-950/30 dark:to-amber-950/20"
+        : "border-indigo-200 bg-linear-to-br from-indigo-50/90 to-purple-50/40 dark:border-indigo-900/60 dark:from-indigo-950/30 dark:to-purple-950/20";
 
   return (
     <div
@@ -453,9 +610,15 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-sm">{isApplied ? "✔" : "💡"}</span>
+          <span className="text-sm">
+            {isApplied ? "✔" : isDeleteOnly ? "🗑️" : "💡"}
+          </span>
           <span className="font-bold text-slate-800 text-xs dark:text-slate-200">
-            {isApplied ? "小説データに反映完了" : "設定反映の提案"}
+            {isApplied
+              ? "小説データに反映完了"
+              : isDeleteOnly
+                ? "設定削除の提案"
+                : "設定反映の提案"}
           </span>
           <span
             className={`rounded-md px-1.5 py-0.5 font-semibold text-[10px] ${badge.bg}`}
@@ -485,8 +648,14 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
             スキップ済み
           </span>
         ) : (
-          <span className="font-medium text-[11px] text-indigo-700 dark:text-indigo-400">
-            ワンクリックで登録可能
+          <span
+            className={`font-medium text-[11px] ${
+              isDeleteOnly
+                ? "text-rose-700 dark:text-rose-400"
+                : "text-indigo-700 dark:text-indigo-400"
+            }`}
+          >
+            {isDeleteOnly ? "ワンクリックで削除実行" : "ワンクリックで登録可能"}
           </span>
         )}
       </div>
@@ -499,10 +668,49 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
               (!Array.isArray(data.settings) || data.settings.length === 0) &&
               (!Array.isArray(data.foreshadowings) ||
                 data.foreshadowings.length === 0) &&
-              (!Array.isArray(data.timelines) ||
-                data.timelines.length === 0) && (
+              (!Array.isArray(data.timelines) || data.timelines.length === 0) &&
+              (!Array.isArray(data.deleteSettings) ||
+                data.deleteSettings.length === 0) &&
+              (!Array.isArray(data.deleteCharacters) ||
+                data.deleteCharacters.length === 0) && (
                 <div className="py-1 text-slate-500 text-xs">
-                  （登録対象の項目はありません）
+                  （登録・削除対象の項目はありません）
+                </div>
+              )}
+            {Array.isArray(data.deleteSettings) &&
+              data.deleteSettings.length > 0 && (
+                <div className="rounded border border-rose-200 bg-rose-50/60 p-2 text-xs dark:border-rose-900/40 dark:bg-rose-950/20">
+                  <div className="font-bold text-[11px] text-rose-700 dark:text-rose-400">
+                    🗑️ 削除対象の世界観・設定 ({data.deleteSettings.length}件)
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {data.deleteSettings.map((name: string, i: number) => (
+                      <span
+                        key={i}
+                        className="rounded bg-rose-100 px-1.5 py-0.5 font-medium text-[10px] text-rose-800 line-through dark:bg-rose-900/60 dark:text-rose-300"
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            {Array.isArray(data.deleteCharacters) &&
+              data.deleteCharacters.length > 0 && (
+                <div className="rounded border border-rose-200 bg-rose-50/60 p-2 text-xs dark:border-rose-900/40 dark:bg-rose-950/20">
+                  <div className="font-bold text-[11px] text-rose-700 dark:text-rose-400">
+                    🗑️ 削除対象の登場人物 ({data.deleteCharacters.length}名)
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {data.deleteCharacters.map((name: string, i: number) => (
+                      <span
+                        key={i}
+                        className="rounded bg-rose-100 px-1.5 py-0.5 font-medium text-[10px] text-rose-800 line-through dark:bg-rose-900/60 dark:text-rose-300"
+                      >
+                        {name}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               )}
             {Array.isArray(data.characters) && data.characters.length > 0 && (
@@ -603,6 +811,15 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
         )}
         {proposalType === "character" && (
           <div className="space-y-1">
+            {data.oldCharacterName && (
+              <div className="rounded border border-rose-200 bg-rose-50/80 px-2 py-1 text-[11px] text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                🗑️ 削除対象の旧人物:{" "}
+                <span className="font-bold line-through">
+                  {data.oldCharacterName}
+                </span>{" "}
+                （反映時に自動削除されます）
+              </div>
+            )}
             <div className="font-bold text-slate-900 dark:text-slate-100">
               {data.name}{" "}
               <span className="font-normal text-[11px] text-slate-500">
@@ -629,6 +846,15 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
 
         {proposalType === "setting" && (
           <div className="space-y-1">
+            {data.oldSettingName && (
+              <div className="rounded border border-rose-200 bg-rose-50/80 px-2 py-1 text-[11px] text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+                🗑️ 削除対象の旧設定:{" "}
+                <span className="font-bold line-through">
+                  {data.oldSettingName}
+                </span>{" "}
+                （反映時に自動削除されます）
+              </div>
+            )}
             <div className="font-bold text-slate-900 dark:text-slate-100">
               {data.name}{" "}
               <span className="font-normal text-[11px] text-slate-500">
@@ -638,6 +864,44 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
             <p className="line-clamp-3 whitespace-pre-wrap text-[11px] text-slate-600 dark:text-slate-400">
               {data.description}
             </p>
+          </div>
+        )}
+
+        {proposalType === "delete_setting" && (
+          <div className="space-y-1">
+            <div className="rounded border border-rose-200 bg-rose-50/80 p-2 text-rose-800 text-xs dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+              <div className="font-bold">
+                🗑️ 削除する設定: <span className="underline">{data.name}</span>
+              </div>
+              {data.reason && (
+                <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-400">
+                  理由: {data.reason}
+                </div>
+              )}
+              <div className="mt-1 text-[10px] text-rose-600 dark:text-rose-400">
+                ※
+                反映すると小説データおよび設定マークダウンから完全に削除されます
+              </div>
+            </div>
+          </div>
+        )}
+
+        {proposalType === "delete_character" && (
+          <div className="space-y-1">
+            <div className="rounded border border-rose-200 bg-rose-50/80 p-2 text-rose-800 text-xs dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300">
+              <div className="font-bold">
+                🗑️ 削除する人物: <span className="underline">{data.name}</span>
+              </div>
+              {data.reason && (
+                <div className="mt-1 text-[11px] text-slate-600 dark:text-slate-400">
+                  理由: {data.reason}
+                </div>
+              )}
+              <div className="mt-1 text-[10px] text-rose-600 dark:text-rose-400">
+                ※
+                反映すると小説データおよび登場人物マークダウンから完全に削除されます
+              </div>
+            </div>
           </div>
         )}
 
