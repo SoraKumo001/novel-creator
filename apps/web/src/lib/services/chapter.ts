@@ -162,3 +162,29 @@ export async function createSection(
     updatedAt: row.updatedAt ?? null,
   };
 }
+
+export async function fetchPlotMarkdown(
+  novelId: string
+): Promise<{ markdown: string }> {
+  const res = await apiClient.novels[":id"].chapters.markdown.$get({
+    param: { id: novelId },
+  });
+  if (!res.ok) {
+    throw await parseResponseError(res, "プロットマークダウンの取得");
+  }
+  return res.json();
+}
+
+export async function savePlotMarkdown(
+  novelId: string,
+  markdown: string
+): Promise<{ created: number; deleted: number; updated: number }> {
+  const res = await apiClient.novels[":id"].chapters.markdown.$post({
+    param: { id: novelId },
+    json: { markdown },
+  });
+  if (!res.ok) {
+    throw await parseResponseError(res, "プロットマークダウンの保存");
+  }
+  return res.json();
+}

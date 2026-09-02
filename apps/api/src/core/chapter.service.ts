@@ -1,4 +1,9 @@
 import { chapters, sections } from "@novel-creator/db";
+import {
+  diffPlot,
+  parsePlotMarkdown,
+  serializePlotToMarkdown,
+} from "@novel-creator/shared";
 import { asc, eq } from "drizzle-orm";
 import {
   NotFoundError,
@@ -28,6 +33,100 @@ export class ChapterDomainService {
       ...ch,
       sections: sectionRows.filter((s) => s.chapterId === ch.id),
     }));
+  }
+
+  async getMarkdown(novelId: string) {
+    const chaptersWithSections = await this.listChaptersWithSections(novelId);
+    return serializePlotToMarkdown(chaptersWithSections);
+  }
+
+  async saveMarkdown(novelId: string, markdown: string) {
+    const existingChapters = await this.listChaptersWithSections(novelId);
+    const parsed = parsePlotMarkdown(markdown);
+    const diff = diffPlot(existingChapters, parsed);
+
+    let createdChaptersCount = 0;
+    let updatedChaptersCount = 0;
+    let deletedChaptersCount = 0;
+
+    await this.ctx.db.transaction(async (tx) => {
+      // 1. 新規章・節の作成
+      for (const ch of diff.chaptersToCreate) {
+        const [createdCh] = await tx
+          .insert(chapters)
+          .values({
+            novelId,
+            order: ch.order,
+            summary: ch.summary || null,
+            title: ch.title,
+          })
+          .returning();
+        createdChaptersCount++;
+
+        for (const sec of ch.sections) {
+          await tx.insert(sections).values({
+            chapterId: createdCh.id,
+            order: sec.order,
+            summary: sec.summary || null,
+            title: sec.title || null,
+          });
+        }
+      }
+
+      // 2. 既存章の更新
+      for (const ch of diff.chaptersToUpdate) {
+        await tx
+          .update(chapters)
+          .set({
+            order: ch.order,
+            summary: ch.summary || null,
+            title: ch.title,
+            updatedAt: new Date(),
+          })
+          .where(eq(chapters.id, ch.id));
+        updatedChaptersCount++;
+      }
+
+      // 3. 既存章への新規節追加
+      for (const sec of diff.sectionsToCreate) {
+        await tx.insert(sections).values({
+          chapterId: sec.chapterId,
+          order: sec.order,
+          summary: sec.summary || null,
+          title: sec.title || null,
+        });
+      }
+
+      // 4. 既存節の更新
+      for (const sec of diff.sectionsToUpdate) {
+        await tx
+          .update(sections)
+          .set({
+            order: sec.order,
+            summary: sec.summary || null,
+            title: sec.title || null,
+            updatedAt: new Date(),
+          })
+          .where(eq(sections.id, sec.id));
+      }
+
+      // 5. 削除対象の節
+      for (const secId of diff.sectionsToDelete) {
+        await tx.delete(sections).where(eq(sections.id, secId));
+      }
+
+      // 6. 削除対象の章
+      for (const chId of diff.chaptersToDelete) {
+        await tx.delete(chapters).where(eq(chapters.id, chId));
+        deletedChaptersCount++;
+      }
+    });
+
+    return {
+      createdCount: createdChaptersCount,
+      deletedCount: deletedChaptersCount,
+      updatedCount: updatedChaptersCount,
+    };
   }
 
   async getChapterWithSections(id: string) {

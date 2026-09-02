@@ -363,6 +363,62 @@ export function diffForeshadowings(
 }
 
 /**
+ * 現在の伏線マークダウンに対し、新しい伏線リストを追加または更新し、指定された古い伏線を削除したマークダウンを生成する。
+ */
+export function applyForeshadowingsToMarkdown(
+  currentMarkdown: string,
+  newItems: {
+    category?: string | null;
+    title: string;
+    description?: string | null;
+    status?: ForeshadowingStatus | null;
+    placedSectionId?: string | null;
+    resolvedSectionId?: string | null;
+  }[],
+  deleteTitles?: string[]
+): string {
+  const existing = parseForeshadowingsMarkdown(currentMarkdown);
+  const deleteSet = new Set(
+    (deleteTitles ?? []).map((t) => t.trim()).filter((t) => t.length > 0)
+  );
+  const map = new Map<string, ParsedForeshadowingSection>();
+  for (const f of existing) {
+    if (!deleteSet.has(f.title.trim())) {
+      map.set(f.title.trim(), f);
+    }
+  }
+  for (const item of newItems) {
+    const trimmedTitle = item.title.trim();
+    const prev = map.get(trimmedTitle);
+    map.set(trimmedTitle, {
+      category: item.category || prev?.category || "未分類",
+      title: trimmedTitle,
+      description: item.description ?? prev?.description ?? "",
+      status: item.status || prev?.status || "unresolved",
+      placedSectionId:
+        item.placedSectionId !== undefined
+          ? item.placedSectionId
+          : (prev?.placedSectionId ?? null),
+      resolvedSectionId:
+        item.resolvedSectionId !== undefined
+          ? item.resolvedSectionId
+          : (prev?.resolvedSectionId ?? null),
+    });
+  }
+  return serializeForeshadowingsToMarkdown(Array.from(map.values()));
+}
+
+/**
+ * 現在の伏線マークダウンから、指定された伏線タイトルを削除したマークダウンを生成する。
+ */
+export function deleteForeshadowingsFromMarkdown(
+  currentMarkdown: string,
+  deleteTitles: string[]
+): string {
+  return applyForeshadowingsToMarkdown(currentMarkdown, [], deleteTitles);
+}
+
+/**
  * 伏線マークダウンをパースし、正規化・ソートして改行や空行を適切に整形（フォーマット）したマークダウンを返す。
  */
 export function formatForeshadowingsMarkdown(markdown: string): string {

@@ -11,6 +11,7 @@ import { useNovel } from "@/hooks/useNovel.js";
 import { useTimelines } from "@/hooks/useTimelines.js";
 import type { Chapter, Section, Timeline } from "@/lib/types.js";
 import { IconButton, PencilIcon, PlusIcon, TrashIcon } from "./-Icons.js";
+import { TimelinesMarkdownEditor } from "./-TimelinesMarkdownEditor.js";
 
 export function TimelineTab({
   novel,
@@ -25,11 +26,15 @@ export function TimelineTab({
     createTimeline,
     updateTimeline,
     deleteTimeline,
+    fetchTimelinesMarkdown,
+    saveTimelinesMarkdown,
+    savingMarkdown,
     creating,
     updating,
     deleting,
   } = useTimelines(novel.id);
 
+  const [viewMode, setViewMode] = useState<"cards" | "markdown">("cards");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTimeline, setEditingTimeline] = useState<Timeline | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -101,97 +106,136 @@ export function TimelineTab({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-bold text-foreground text-xl">タイムライン</h2>
-        <Button
-          onClick={handleOpenCreate}
-          leftIcon={<PlusIcon />}
-          className="shrink-0 whitespace-nowrap"
-        >
-          イベント追加
-        </Button>
+        <div className="flex items-center gap-3">
+          <h2 className="font-bold text-foreground text-xl">タイムライン</h2>
+          <div className="flex rounded-lg border border-border bg-surface-raised p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setViewMode("cards")}
+              className={`rounded-md px-2.5 py-1 font-medium transition ${
+                viewMode === "cards"
+                  ? "bg-surface text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              一覧
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("markdown")}
+              className={`rounded-md px-2.5 py-1 font-medium transition ${
+                viewMode === "markdown"
+                  ? "bg-surface text-foreground shadow-xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              マークダウン
+            </button>
+          </div>
+        </div>
+        {viewMode === "cards" && (
+          <Button
+            onClick={handleOpenCreate}
+            leftIcon={<PlusIcon />}
+            className="shrink-0 whitespace-nowrap"
+          >
+            イベント追加
+          </Button>
+        )}
       </div>
 
-      {loading && <Loading message="タイムラインを読み込み中..." />}
-
-      {!loading && timelines.length === 0 && (
-        <EmptyState
-          title="イベントがありません"
-          description="物語の流れを時系列で整理しましょう。"
+      {viewMode === "markdown" ? (
+        <TimelinesMarkdownEditor
+          novelId={novel.id}
+          fetchTimelinesMarkdown={fetchTimelinesMarkdown}
+          saveTimelinesMarkdown={saveTimelinesMarkdown}
+          savingMarkdown={savingMarkdown}
         />
-      )}
+      ) : (
+        <>
+          {loading && <Loading message="タイムラインを読み込み中..." />}
 
-      {!loading && timelines.length > 0 && (
-        <div className="relative space-y-0 pl-4">
-          <div className="absolute top-0 bottom-0 left-7 w-px bg-border" />
-          {timelines.map((timeline) => {
-            const sectionLabel = timeline.sectionId
-              ? sectionTitleMap.get(timeline.sectionId)
-              : null;
-            return (
-              <div
-                key={timeline.id}
-                className="relative flex items-start gap-4 py-3"
-              >
-                <div className="z-10 mt-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-surface" />
-                <div className="flex-1 rounded-xl border border-border bg-surface p-4 shadow-sm transition hover:border-border-hover">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-semibold text-primary text-xs">
-                          {timeline.timestamp || `順序 ${timeline.order}`}
-                        </span>
-                        {sectionLabel && (
-                          <span className="inline-flex items-center rounded-md border border-border bg-surface-raised px-2 py-0.5 text-muted-foreground text-xs">
-                            📖 {sectionLabel}
-                          </span>
-                        )}
+          {!loading && timelines.length === 0 && (
+            <EmptyState
+              title="イベントがありません"
+              description="物語の流れを時系列で整理しましょう。"
+            />
+          )}
+
+          {!loading && timelines.length > 0 && (
+            <div className="relative space-y-0 pl-4">
+              <div className="absolute top-0 bottom-0 left-7 w-px bg-border" />
+              {timelines.map((timeline) => {
+                const sectionLabel = timeline.sectionId
+                  ? sectionTitleMap.get(timeline.sectionId)
+                  : null;
+                return (
+                  <div
+                    key={timeline.id}
+                    className="relative flex items-start gap-4 py-3"
+                  >
+                    <div className="z-10 mt-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-surface" />
+                    <div className="flex-1 rounded-xl border border-border bg-surface p-4 shadow-sm transition hover:border-border-hover">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold text-primary text-xs">
+                              {timeline.timestamp || `順序 ${timeline.order}`}
+                            </span>
+                            {sectionLabel && (
+                              <span className="inline-flex items-center rounded-md border border-border bg-surface-raised px-2 py-0.5 text-muted-foreground text-xs">
+                                📖 {sectionLabel}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-1.5 whitespace-pre-wrap font-medium text-foreground text-sm leading-relaxed">
+                            {timeline.event}
+                          </div>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <IconButton
+                            label="編集"
+                            onClick={() => handleOpenEdit(timeline)}
+                            icon={<PencilIcon />}
+                          />
+                          <IconButton
+                            label="削除"
+                            onClick={() => setDeletingId(timeline.id)}
+                            icon={<TrashIcon />}
+                          />
+                        </div>
                       </div>
-                      <div className="mt-1.5 whitespace-pre-wrap font-medium text-foreground text-sm leading-relaxed">
-                        {timeline.event}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <IconButton
-                        label="編集"
-                        onClick={() => handleOpenEdit(timeline)}
-                        icon={<PencilIcon />}
-                      />
-                      <IconButton
-                        label="削除"
-                        onClick={() => setDeletingId(timeline.id)}
-                        icon={<TrashIcon />}
-                      />
                     </div>
                   </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
+          )}
+
+          <TimelineFormModal
+            isOpen={isFormOpen}
+            defaultValues={editingTimeline}
+            onClose={() => {
+              setIsFormOpen(false);
+              setEditingTimeline(null);
+            }}
+            onSubmit={handleFormSubmit}
+            isLoading={creating || updating}
+            chapters={chaptersWithSections}
+            novelSections={allSections}
+          />
+
+          <ConfirmDialog
+            isOpen={!!deletingId}
+            onClose={() => setDeletingId(null)}
+            onConfirm={handleDelete}
+            title="イベントを削除しますか？"
+            message="この操作は元に戻せません。"
+            confirmLabel="削除"
+            isLoading={deleting}
+          />
+        </>
       )}
-
-      <TimelineFormModal
-        isOpen={isFormOpen}
-        defaultValues={editingTimeline}
-        onClose={() => {
-          setIsFormOpen(false);
-          setEditingTimeline(null);
-        }}
-        onSubmit={handleFormSubmit}
-        isLoading={creating || updating}
-        chapters={chaptersWithSections}
-        novelSections={allSections}
-      />
-
-      <ConfirmDialog
-        isOpen={!!deletingId}
-        onClose={() => setDeletingId(null)}
-        onConfirm={handleDelete}
-        title="イベントを削除しますか？"
-        message="この操作は元に戻せません。"
-        confirmLabel="削除"
-        isLoading={deleting}
-      />
     </div>
   );
 }

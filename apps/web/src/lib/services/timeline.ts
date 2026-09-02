@@ -87,3 +87,29 @@ export async function deleteTimeline(id: string): Promise<void> {
     throw await parseResponseError(res, "タイムラインの削除");
   }
 }
+
+export async function fetchTimelinesMarkdown(
+  novelId: string
+): Promise<{ markdown: string }> {
+  const res = await apiClient.novels[":id"].timelines.markdown.$get({
+    param: { id: novelId },
+  });
+  if (!res.ok) {
+    throw await parseResponseError(res, "年表マークダウンの取得");
+  }
+  return res.json();
+}
+
+export async function saveTimelinesMarkdown(
+  novelId: string,
+  markdown: string
+): Promise<{ created: number; deleted: number; updated: number }> {
+  const res = await apiClient.novels[":id"].timelines.markdown.$post({
+    param: { id: novelId },
+    json: { markdown },
+  });
+  if (!res.ok) {
+    throw await parseResponseError(res, "年表マークダウンの保存");
+  }
+  return res.json();
+}

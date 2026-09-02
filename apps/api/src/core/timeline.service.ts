@@ -1,4 +1,9 @@
 import { timelines } from "@novel-creator/db";
+import {
+  diffTimelines,
+  parseTimelinesMarkdown,
+  serializeTimelinesToMarkdown,
+} from "@novel-creator/shared";
 import { eq } from "drizzle-orm";
 import { assertFound, type ServiceContext, ValidationError } from "./types.js";
 
@@ -11,6 +16,51 @@ export class TimelineDomainService {
       .from(timelines)
       .where(eq(timelines.novelId, novelId))
       .orderBy(timelines.order);
+  }
+
+  async getMarkdown(novelId: string) {
+    const rows = await this.listTimelines(novelId);
+    return serializeTimelinesToMarkdown(rows);
+  }
+
+  async saveMarkdown(novelId: string, markdown: string) {
+    const existing = await this.listTimelines(novelId);
+    const parsed = parseTimelinesMarkdown(markdown);
+    const diff = diffTimelines(existing, parsed);
+
+    await this.ctx.db.transaction(async (tx) => {
+      for (const item of diff.toCreate) {
+        await tx.insert(timelines).values({
+          event: item.event,
+          novelId,
+          order: item.order,
+          sectionId: item.sectionId ?? null,
+          timestamp: item.timestamp ?? null,
+        });
+      }
+
+      for (const u of diff.toUpdate) {
+        await tx
+          .update(timelines)
+          .set({
+            event: u.event,
+            order: u.order,
+            sectionId: u.sectionId ?? null,
+            timestamp: u.timestamp ?? null,
+          })
+          .where(eq(timelines.id, u.id));
+      }
+
+      for (const id of diff.toDelete) {
+        await tx.delete(timelines).where(eq(timelines.id, id));
+      }
+    });
+
+    return {
+      createdCount: diff.toCreate.length,
+      deletedCount: diff.toDelete.length,
+      updatedCount: diff.toUpdate.length,
+    };
   }
 
   async getNextTimelineOrder(novelId: string): Promise<number> {

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { toErrorMessage } from "@/lib/errors.js";
 import { novelKeys } from "@/lib/queryKeys.js";
 import {
@@ -7,6 +8,8 @@ import {
   deleteChapter,
   deleteSection,
   fetchChapters,
+  fetchPlotMarkdown,
+  savePlotMarkdown,
   updateChapter,
   updateSection,
 } from "@/lib/services/index.js";
@@ -32,8 +35,13 @@ interface UseChaptersReturn {
   deleteSection: (id: string) => Promise<void>;
   deleting: boolean;
   error: string | null;
+  fetchPlotMarkdown: () => Promise<string>;
   loading: boolean;
   refetch: () => Promise<void>;
+  savePlotMarkdown: (
+    markdown: string
+  ) => Promise<{ created: number; deleted: number; updated: number }>;
+  savingMarkdown: boolean;
   updateChapter: (id: string, input: UpdateChapterInput) => Promise<Chapter>;
   updateSection: (id: string, input: UpdateSectionInput) => Promise<Section>;
   updating: boolean;
@@ -97,6 +105,17 @@ export function useChapters(novelId: string): UseChaptersReturn {
       queryClient.invalidateQueries({ queryKey: novelKeys.chapters(novelId) }),
   });
 
+  const saveMarkdownMutation = useMutation({
+    mutationFn: (markdown: string) => savePlotMarkdown(novelId, markdown),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: novelKeys.chapters(novelId) }),
+  });
+
+  const handleFetchMarkdown = useCallback(async () => {
+    const res = await fetchPlotMarkdown(novelId);
+    return res.markdown;
+  }, [novelId]);
+
   return {
     chapters,
     loading,
@@ -123,5 +142,8 @@ export function useChapters(novelId: string): UseChaptersReturn {
       updateSectionMutation.isPending ||
       deleteSectionMutation.isPending,
     deleting: deleteMutation.isPending,
+    fetchPlotMarkdown: handleFetchMarkdown,
+    savePlotMarkdown: saveMarkdownMutation.mutateAsync,
+    savingMarkdown: saveMarkdownMutation.isPending,
   };
 }

@@ -11,11 +11,15 @@ import type {
   Timeline,
 } from "@/lib/types.js";
 
+export type EntityAction = "create" | "overwrite" | "merge" | "replace";
+
 export interface EditableCharacter extends ExtractedCharacterItem {
   _id: string;
   _selected: boolean;
   action: EntityAction;
   matchedExisting?: Character;
+  replaceTargetId?: string;
+  replaceTargetName?: string;
   traitsString: string;
 }
 
@@ -24,12 +28,15 @@ export interface EditableSetting extends ExtractedSettingItem {
   _selected: boolean;
   action: EntityAction;
   matchedExisting?: Setting;
+  replaceTargetId?: string;
+  replaceTargetName?: string;
 }
 
 export interface EditableForeshadowing extends ExtractedChatForeshadowingItem {
   _id: string;
   _selected: boolean;
   action: EntityAction;
+  category?: string;
   matchedExisting?: Foreshadowing;
 }
 

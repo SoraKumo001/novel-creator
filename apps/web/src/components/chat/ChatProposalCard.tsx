@@ -1,7 +1,10 @@
 import {
   applyCharactersToMarkdown,
+  applyForeshadowingsToMarkdown,
+  applyPlotToMarkdown,
   applySettingsToMarkdown,
   applyStoryOutlineSectionUpdate,
+  applyTimelinesToMarkdown,
   deleteCharactersFromMarkdown,
   deleteSettingsFromMarkdown,
 } from "@novel-creator/shared";
@@ -13,19 +16,18 @@ import { ChatUIContext } from "@/context/ChatContext.js";
 import { useToast } from "@/hooks/useToast.js";
 import { novelKeys } from "@/lib/queryKeys.js";
 import {
-  createChapter,
-  createCharacter,
-  createForeshadowing,
-  createSetting,
-  createTimeline,
-  deleteCharacter,
-  deleteSetting,
-  fetchCharacters,
   fetchCharactersMarkdown,
-  fetchSettings,
+  fetchForeshadowingsMarkdown,
+  fetchPlotMarkdown,
   fetchSettingsMarkdown,
   fetchStoryOutline,
+  fetchTimelinesMarkdown,
+  saveCharactersMarkdown,
+  saveForeshadowingsMarkdown,
+  savePlotMarkdown,
+  saveSettingsMarkdown,
   saveStoryOutline,
+  saveTimelinesMarkdown,
 } from "@/lib/services/index.js";
 import { ProposalDiffModal } from "./ProposalDiffModal.js";
 
@@ -126,156 +128,309 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           ? data.deleteCharacters
           : [];
 
-        // 削除処理（古い設定）
-        if (deleteSettingsList.length > 0) {
-          const existingSettings = await fetchSettings(targetNovelId);
-          for (const delName of deleteSettingsList) {
-            const targets = existingSettings.filter((s) => s.name === delName);
-            for (const t of targets) {
-              await deleteSetting(t.id);
-            }
-          }
-        }
-
-        // 削除処理（古い人物）
-        if (deleteCharactersList.length > 0) {
-          const existingCharacters = await fetchCharacters(targetNovelId);
-          for (const delName of deleteCharactersList) {
-            const targets = existingCharacters.filter(
-              (c) => c.name === delName
-            );
-            for (const t of targets) {
-              await deleteCharacter(t.id);
-            }
-          }
-        }
-
-        for (const c of characters) {
-          await createCharacter(targetNovelId, {
-            name: c.name,
-            category: c.category || "未分類",
-            description: c.description,
-            traits: c.traits || [],
-          });
-        }
-        for (const s of settings) {
-          await createSetting(targetNovelId, {
-            name: s.name,
-            category: s.category || "世界観",
-            description: s.description,
-          });
-        }
-        for (const f of foreshadowings) {
-          await createForeshadowing(targetNovelId, {
-            title: f.title,
-            description: f.description,
-            status: f.status || "unresolved",
-          });
-        }
-        for (const t of timelines) {
-          await createTimeline(targetNovelId, {
-            event: t.event,
-            timestamp: t.timestamp,
-          });
-        }
-
+        // 人物マークダウンの反映
         if (characters.length > 0 || deleteCharactersList.length > 0) {
+          const res = await fetchCharactersMarkdown(targetNovelId).catch(
+            () => ({ markdown: "" })
+          );
+          const currentMd = res.markdown ?? "";
+          const updatedMd = applyCharactersToMarkdown(
+            currentMd,
+            characters,
+            deleteCharactersList
+          );
+          await saveCharactersMarkdown(targetNovelId, updatedMd);
+
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("novel-creator:characters-updated", {
+                detail: {
+                  novelId: targetNovelId,
+                  markdown: updatedMd,
+                  appliedTitle: "一括登録（人物）",
+                },
+              })
+            );
+          }
           await queryClient.invalidateQueries({
             queryKey: novelKeys.characters(targetNovelId),
           });
         }
+
+        // 設定マークダウンの反映
         if (settings.length > 0 || deleteSettingsList.length > 0) {
+          const res = await fetchSettingsMarkdown(targetNovelId).catch(() => ({
+            markdown: "",
+          }));
+          const currentMd = res.markdown ?? "";
+          const updatedMd = applySettingsToMarkdown(
+            currentMd,
+            settings,
+            deleteSettingsList
+          );
+          await saveSettingsMarkdown(targetNovelId, updatedMd);
+
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("novel-creator:settings-updated", {
+                detail: {
+                  novelId: targetNovelId,
+                  markdown: updatedMd,
+                  appliedTitle: "一括登録（設定）",
+                },
+              })
+            );
+          }
           await queryClient.invalidateQueries({
             queryKey: novelKeys.settings(targetNovelId),
           });
         }
+
+        // 伏線マークダウンの反映
         if (foreshadowings.length > 0) {
+          const currentMd = await fetchForeshadowingsMarkdown(
+            targetNovelId
+          ).catch(() => "");
+          const updatedMd = applyForeshadowingsToMarkdown(
+            currentMd,
+            foreshadowings
+          );
+          await saveForeshadowingsMarkdown(targetNovelId, updatedMd);
+
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("novel-creator:foreshadowings-updated", {
+                detail: {
+                  novelId: targetNovelId,
+                  markdown: updatedMd,
+                  appliedTitle: "一括登録（伏線）",
+                },
+              })
+            );
+          }
           await queryClient.invalidateQueries({
             queryKey: novelKeys.foreshadowings(targetNovelId),
           });
         }
+
+        // 年表マークダウンの反映
         if (timelines.length > 0) {
+          const res = await fetchTimelinesMarkdown(targetNovelId).catch(() => ({
+            markdown: "",
+          }));
+          const currentMd = res.markdown ?? "";
+          const updatedMd = applyTimelinesToMarkdown(currentMd, timelines);
+          await saveTimelinesMarkdown(targetNovelId, updatedMd);
+
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(
+              new CustomEvent("novel-creator:timelines-updated", {
+                detail: {
+                  novelId: targetNovelId,
+                  markdown: updatedMd,
+                  appliedTitle: "一括登録（年表）",
+                },
+              })
+            );
+          }
           await queryClient.invalidateQueries({
             queryKey: novelKeys.timelines(targetNovelId),
           });
         }
       } else if (proposalType === "character") {
-        if (data.oldCharacterName) {
-          const existingCharacters = await fetchCharacters(targetNovelId);
-          const targets = existingCharacters.filter(
-            (c) => c.name === data.oldCharacterName
+        const res = await fetchCharactersMarkdown(targetNovelId).catch(() => ({
+          markdown: "",
+        }));
+        const currentMd = res.markdown ?? "";
+        const deleteNames = data.oldCharacterName
+          ? [data.oldCharacterName]
+          : [];
+        const updatedMd = applyCharactersToMarkdown(
+          currentMd,
+          [
+            {
+              name: data.name,
+              category: data.category,
+              description: data.description,
+              traits: data.traits,
+            },
+          ],
+          deleteNames
+        );
+        await saveCharactersMarkdown(targetNovelId, updatedMd);
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("novel-creator:characters-updated", {
+              detail: {
+                novelId: targetNovelId,
+                markdown: updatedMd,
+                appliedTitle: data.name,
+              },
+            })
           );
-          for (const t of targets) {
-            await deleteCharacter(t.id);
-          }
         }
-        await createCharacter(targetNovelId, {
-          name: data.name,
-          category: data.category || "未分類",
-          description: data.description,
-          traits: data.traits || [],
-        });
         await queryClient.invalidateQueries({
           queryKey: novelKeys.characters(targetNovelId),
         });
       } else if (proposalType === "setting") {
-        if (data.oldSettingName) {
-          const existingSettings = await fetchSettings(targetNovelId);
-          const targets = existingSettings.filter(
-            (s) => s.name === data.oldSettingName
+        const res = await fetchSettingsMarkdown(targetNovelId).catch(() => ({
+          markdown: "",
+        }));
+        const currentMd = res.markdown ?? "";
+        const deleteNames = data.oldSettingName ? [data.oldSettingName] : [];
+        const updatedMd = applySettingsToMarkdown(
+          currentMd,
+          [
+            {
+              name: data.name,
+              category: data.category,
+              description: data.description,
+            },
+          ],
+          deleteNames
+        );
+        await saveSettingsMarkdown(targetNovelId, updatedMd);
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("novel-creator:settings-updated", {
+              detail: {
+                novelId: targetNovelId,
+                markdown: updatedMd,
+                appliedTitle: data.name,
+              },
+            })
           );
-          for (const t of targets) {
-            await deleteSetting(t.id);
-          }
         }
-        await createSetting(targetNovelId, {
-          name: data.name,
-          category: data.category || "世界観",
-          description: data.description,
-        });
         await queryClient.invalidateQueries({
           queryKey: novelKeys.settings(targetNovelId),
         });
       } else if (proposalType === "delete_setting") {
-        const existingSettings = await fetchSettings(targetNovelId);
-        const targets = existingSettings.filter((s) => s.name === data.name);
-        for (const t of targets) {
-          await deleteSetting(t.id);
+        const res = await fetchSettingsMarkdown(targetNovelId).catch(() => ({
+          markdown: "",
+        }));
+        const currentMd = res.markdown ?? "";
+        const updatedMd = deleteSettingsFromMarkdown(currentMd, [data.name]);
+        await saveSettingsMarkdown(targetNovelId, updatedMd);
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("novel-creator:settings-updated", {
+              detail: {
+                novelId: targetNovelId,
+                markdown: updatedMd,
+                appliedTitle: data.name,
+              },
+            })
+          );
         }
         await queryClient.invalidateQueries({
           queryKey: novelKeys.settings(targetNovelId),
         });
       } else if (proposalType === "delete_character") {
-        const existingCharacters = await fetchCharacters(targetNovelId);
-        const targets = existingCharacters.filter((c) => c.name === data.name);
-        for (const t of targets) {
-          await deleteCharacter(t.id);
+        const res = await fetchCharactersMarkdown(targetNovelId).catch(() => ({
+          markdown: "",
+        }));
+        const currentMd = res.markdown ?? "";
+        const updatedMd = deleteCharactersFromMarkdown(currentMd, [data.name]);
+        await saveCharactersMarkdown(targetNovelId, updatedMd);
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("novel-creator:characters-updated", {
+              detail: {
+                novelId: targetNovelId,
+                markdown: updatedMd,
+                appliedTitle: data.name,
+              },
+            })
+          );
         }
         await queryClient.invalidateQueries({
           queryKey: novelKeys.characters(targetNovelId),
         });
       } else if (proposalType === "foreshadowing") {
-        await createForeshadowing(targetNovelId, {
-          title: data.title,
-          description: data.description,
-          status: data.status || "unresolved",
-        });
+        const currentMd = await fetchForeshadowingsMarkdown(
+          targetNovelId
+        ).catch(() => "");
+        const updatedMd = applyForeshadowingsToMarkdown(currentMd, [
+          {
+            title: data.title,
+            description: data.description,
+            status: data.status || "unresolved",
+            category: data.category,
+          },
+        ]);
+        await saveForeshadowingsMarkdown(targetNovelId, updatedMd);
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("novel-creator:foreshadowings-updated", {
+              detail: {
+                novelId: targetNovelId,
+                markdown: updatedMd,
+                appliedTitle: data.title,
+              },
+            })
+          );
+        }
         await queryClient.invalidateQueries({
           queryKey: novelKeys.foreshadowings(targetNovelId),
         });
       } else if (proposalType === "timeline") {
-        await createTimeline(targetNovelId, {
-          event: data.event,
-          timestamp: data.timestamp,
-        });
+        const res = await fetchTimelinesMarkdown(targetNovelId).catch(() => ({
+          markdown: "",
+        }));
+        const currentMd = res.markdown ?? "";
+        const updatedMd = applyTimelinesToMarkdown(currentMd, [
+          {
+            event: data.event,
+            timestamp: data.timestamp,
+            order: data.order,
+          },
+        ]);
+        await saveTimelinesMarkdown(targetNovelId, updatedMd);
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("novel-creator:timelines-updated", {
+              detail: {
+                novelId: targetNovelId,
+                markdown: updatedMd,
+                appliedTitle: data.event,
+              },
+            })
+          );
+        }
         await queryClient.invalidateQueries({
           queryKey: novelKeys.timelines(targetNovelId),
         });
       } else if (proposalType === "plot") {
-        await createChapter(targetNovelId, {
-          title: data.chapterTitle || data.title,
-          summary: data.summary,
-        });
+        const res = await fetchPlotMarkdown(targetNovelId).catch(() => ({
+          markdown: "",
+        }));
+        const currentMd = res.markdown ?? "";
+        const chapterTitle = data.chapterTitle || data.title;
+        const updatedMd = applyPlotToMarkdown(currentMd, [
+          {
+            title: chapterTitle,
+            summary: data.summary,
+          },
+        ]);
+        await savePlotMarkdown(targetNovelId, updatedMd);
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("novel-creator:plot-updated", {
+              detail: {
+                novelId: targetNovelId,
+                markdown: updatedMd,
+                appliedTitle: chapterTitle,
+              },
+            })
+          );
+        }
         await queryClient.invalidateQueries({
           queryKey: novelKeys.chapters(targetNovelId),
         });
@@ -332,9 +487,15 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
     proposalType === "setting" ||
     proposalType === "delete_setting" ||
     proposalType === "delete_character" ||
+    proposalType === "foreshadowing" ||
+    proposalType === "timeline" ||
+    proposalType === "plot" ||
     (proposalType === "bulk" &&
       ((Array.isArray(data.characters) && data.characters.length > 0) ||
         (Array.isArray(data.settings) && data.settings.length > 0) ||
+        (Array.isArray(data.foreshadowings) &&
+          data.foreshadowings.length > 0) ||
+        (Array.isArray(data.timelines) && data.timelines.length > 0) ||
         (Array.isArray(data.deleteSettings) &&
           data.deleteSettings.length > 0) ||
         (Array.isArray(data.deleteCharacters) &&
@@ -451,6 +612,66 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           title: `登場人物「${data.name}」（削除）`,
           targetTab: "characters",
           entityType: "characters_markdown",
+          originalMarkdown: currentMd,
+          updatedMarkdown: updatedMd,
+        });
+        setDiffModalOpen(true);
+      } else if (proposalType === "foreshadowing") {
+        const currentMd = await fetchForeshadowingsMarkdown(
+          targetNovelId
+        ).catch(() => "");
+        const updatedMd = applyForeshadowingsToMarkdown(currentMd, [
+          {
+            title: data.title,
+            description: data.description,
+            status: data.status || "unresolved",
+            category: data.category,
+          },
+        ]);
+        setDiffData({
+          title: `伏線「${data.title}」`,
+          targetTab: "foreshadowings",
+          entityType: "foreshadowings_markdown",
+          originalMarkdown: currentMd,
+          updatedMarkdown: updatedMd,
+        });
+        setDiffModalOpen(true);
+      } else if (proposalType === "timeline") {
+        const res = await fetchTimelinesMarkdown(targetNovelId).catch(() => ({
+          markdown: "",
+        }));
+        const currentMd = res.markdown ?? "";
+        const updatedMd = applyTimelinesToMarkdown(currentMd, [
+          {
+            event: data.event,
+            timestamp: data.timestamp,
+            order: data.order,
+          },
+        ]);
+        setDiffData({
+          title: `年表「${data.event}」`,
+          targetTab: "timeline",
+          entityType: "timelines_markdown",
+          originalMarkdown: currentMd,
+          updatedMarkdown: updatedMd,
+        });
+        setDiffModalOpen(true);
+      } else if (proposalType === "plot") {
+        const res = await fetchPlotMarkdown(targetNovelId).catch(() => ({
+          markdown: "",
+        }));
+        const currentMd = res.markdown ?? "";
+        const chapterTitle = data.chapterTitle || data.title;
+        const updatedMd = applyPlotToMarkdown(currentMd, [
+          {
+            title: chapterTitle,
+            summary: data.summary,
+          },
+        ]);
+        setDiffData({
+          title: `プロット「${chapterTitle}」`,
+          targetTab: "plot",
+          entityType: "plot_markdown",
           originalMarkdown: currentMd,
           updatedMarkdown: updatedMd,
         });

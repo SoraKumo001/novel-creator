@@ -25,7 +25,9 @@ export interface EntityMarkdownEditorProps<
     | "settings_markdown"
     | "foreshadowings_document"
     | "foreshadowings_markdown"
-    | "story_outline_markdown";
+    | "story_outline_markdown"
+    | "timelines_markdown"
+    | "plot_markdown";
   extraToolbarActions?: React.ReactNode;
   fetchMarkdown: () => Promise<string>;
   findSectionAtLine: (markdown: string, lineNumber: number) => TSection | null;
@@ -88,42 +90,60 @@ export function EntityMarkdownEditor<
   const [historyOpen, setHistoryOpen] = useState(false);
   const toast = useToast();
 
-  // チャット画面でストーリー構想が更新された際のリアルタイム同期リスナー
+  // チャット画面で提案が更新・反映された際のリアルタイム同期リスナー
   useEffect(() => {
-    if (entityType !== "story_outline_markdown") {
+    const eventNameMap: Record<string, string> = {
+      characters_markdown: "novel-creator:characters-updated",
+      settings_markdown: "novel-creator:settings-updated",
+      foreshadowings_document: "novel-creator:foreshadowings-updated",
+      foreshadowings_markdown: "novel-creator:foreshadowings-updated",
+      story_outline_markdown: "novel-creator:story-outline-updated",
+      timelines_markdown: "novel-creator:timelines-updated",
+      plot_markdown: "novel-creator:plot-updated",
+    };
+
+    const targetEventName = eventNameMap[entityType];
+    if (!targetEventName) {
       return;
     }
 
     const handleExternalUpdate = (event: Event) => {
       const customEvent = event as CustomEvent<{
-        novelId: string;
-        markdown: string;
         appliedSection?: string;
+        appliedTitle?: string;
+        markdown: string;
+        novelId: string;
       }>;
       if (!customEvent.detail || customEvent.detail.novelId !== novelId) {
         return;
       }
 
-      const { markdown: newMarkdown, appliedSection } = customEvent.detail;
+      const {
+        markdown: newMarkdown,
+        appliedSection,
+        appliedTitle,
+      } = customEvent.detail;
       setMarkdown(newMarkdown);
       setSavedMarkdown(newMarkdown);
       clearDraft();
       toast.success(
-        `チャットからの提案（${appliedSection || "ストーリー構想"}）をエディタに同期しました`
+        `チャットからの提案（${appliedSection || appliedTitle || entityTitle}）をエディタに同期しました`
       );
     };
 
-    window.addEventListener(
-      "novel-creator:story-outline-updated",
-      handleExternalUpdate
-    );
+    window.addEventListener(targetEventName, handleExternalUpdate);
     return () => {
-      window.removeEventListener(
-        "novel-creator:story-outline-updated",
-        handleExternalUpdate
-      );
+      window.removeEventListener(targetEventName, handleExternalUpdate);
     };
-  }, [clearDraft, entityType, novelId, setMarkdown, setSavedMarkdown, toast]);
+  }, [
+    clearDraft,
+    entityTitle,
+    entityType,
+    novelId,
+    setMarkdown,
+    setSavedMarkdown,
+    toast,
+  ]);
 
   // チャット画面から「Markdownで確認・編集」をクリックした際のプレビュー読み込みリスナー
   useEffect(() => {

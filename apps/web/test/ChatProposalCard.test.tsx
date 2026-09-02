@@ -9,17 +9,16 @@ import {
 import * as services from "../src/lib/services/index.js";
 
 vi.mock("../src/lib/services/index.js", () => ({
-  createChapter: vi.fn(),
-  createCharacter: vi.fn(),
-  createForeshadowing: vi.fn(),
-  createSetting: vi.fn(),
-  createTimeline: vi.fn(),
-  deleteCharacter: vi.fn(),
-  deleteSetting: vi.fn(),
-  fetchCharacters: vi.fn(),
   fetchCharactersMarkdown: vi.fn(),
-  fetchSettings: vi.fn(),
+  saveCharactersMarkdown: vi.fn(),
   fetchSettingsMarkdown: vi.fn(),
+  saveSettingsMarkdown: vi.fn(),
+  fetchForeshadowingsMarkdown: vi.fn(),
+  saveForeshadowingsMarkdown: vi.fn(),
+  fetchTimelinesMarkdown: vi.fn(),
+  saveTimelinesMarkdown: vi.fn(),
+  fetchPlotMarkdown: vi.fn(),
+  savePlotMarkdown: vi.fn(),
   fetchStoryOutline: vi.fn(),
   saveStoryOutline: vi.fn(),
 }));
@@ -244,28 +243,59 @@ describe("ChatProposalCard", () => {
       ).toBeInTheDocument();
     });
 
-    it("一括反映をクリックすると全サービスAPIが呼び出されること", async () => {
+    it("一括反映をクリックすると各マークダウン保存APIが呼び出されること", async () => {
+      vi.mocked(services.fetchCharactersMarkdown).mockResolvedValue({
+        markdown: "",
+      });
+      vi.mocked(services.saveCharactersMarkdown).mockResolvedValue({
+        created: 1,
+        updated: 0,
+        deleted: 0,
+      });
+      vi.mocked(services.fetchSettingsMarkdown).mockResolvedValue({
+        markdown: "",
+      });
+      vi.mocked(services.saveSettingsMarkdown).mockResolvedValue({
+        created: 1,
+        updated: 0,
+        deleted: 0,
+      });
+      vi.mocked(services.fetchForeshadowingsMarkdown).mockResolvedValue("");
+      vi.mocked(services.saveForeshadowingsMarkdown).mockResolvedValue({
+        created: 1,
+        updated: 0,
+        deleted: 0,
+      });
+      vi.mocked(services.fetchTimelinesMarkdown).mockResolvedValue({
+        markdown: "",
+      });
+      vi.mocked(services.saveTimelinesMarkdown).mockResolvedValue({
+        created: 1,
+        updated: 0,
+        deleted: 0,
+      });
+
       renderWithClient(<ChatProposalCard proposal={bulkProposal} />);
 
       const applyBtn = screen.getByRole("button", { name: /小説に反映する/ });
       fireEvent.click(applyBtn);
 
       await waitFor(() => {
-        expect(services.createCharacter).toHaveBeenCalledWith(
+        expect(services.saveCharactersMarkdown).toHaveBeenCalledWith(
           NOVEL_ID,
-          expect.objectContaining({ name: "アレン" })
+          expect.stringContaining("アレン")
         );
-        expect(services.createSetting).toHaveBeenCalledWith(
+        expect(services.saveSettingsMarkdown).toHaveBeenCalledWith(
           NOVEL_ID,
-          expect.objectContaining({ name: "帝国" })
+          expect.stringContaining("帝国")
         );
-        expect(services.createForeshadowing).toHaveBeenCalledWith(
+        expect(services.saveForeshadowingsMarkdown).toHaveBeenCalledWith(
           NOVEL_ID,
-          expect.objectContaining({ title: "黒幕の正体" })
+          expect.stringContaining("黒幕の正体")
         );
-        expect(services.createTimeline).toHaveBeenCalledWith(
+        expect(services.saveTimelinesMarkdown).toHaveBeenCalledWith(
           NOVEL_ID,
-          expect.objectContaining({ event: "王都陥落" })
+          expect.stringContaining("王都陥落")
         );
         expect(mockToastSuccess).toHaveBeenCalledWith(
           expect.stringContaining("小説データに反映しました")
@@ -300,19 +330,15 @@ describe("ChatProposalCard", () => {
       expect(screen.getByText(/削除対象の旧設定/)).toBeInTheDocument();
     });
 
-    it("反映時に旧設定を削除してから新設定を作成すること", async () => {
-      vi.mocked(services.fetchSettings).mockResolvedValue([
-        {
-          id: "old-setting-id-1",
-          name: "ルミナス帝国",
-          category: "世界観",
-          description: "古い帝国",
-          novelId: NOVEL_ID,
-          metadata: {},
-          createdAt: null,
-          updatedAt: null,
-        },
-      ]);
+    it("反映時に旧設定を削除して新設定をマークダウン保存すること", async () => {
+      vi.mocked(services.fetchSettingsMarkdown).mockResolvedValue({
+        markdown: "# 世界観\n\n## ルミナス帝国\n\n古い帝国\n",
+      });
+      vi.mocked(services.saveSettingsMarkdown).mockResolvedValue({
+        created: 1,
+        updated: 0,
+        deleted: 1,
+      });
 
       renderWithClient(<ChatProposalCard proposal={replaceProposal} />);
 
@@ -320,15 +346,10 @@ describe("ChatProposalCard", () => {
       fireEvent.click(applyBtn);
 
       await waitFor(() => {
-        expect(services.fetchSettings).toHaveBeenCalledWith(NOVEL_ID);
-        expect(services.deleteSetting).toHaveBeenCalledWith("old-setting-id-1");
-        expect(services.createSetting).toHaveBeenCalledWith(
+        expect(services.fetchSettingsMarkdown).toHaveBeenCalledWith(NOVEL_ID);
+        expect(services.saveSettingsMarkdown).toHaveBeenCalledWith(
           NOVEL_ID,
-          expect.objectContaining({
-            name: "神聖ルミナス皇国",
-            category: "世界観",
-            description: "新たな大国。",
-          })
+          expect.stringContaining("神聖ルミナス皇国")
         );
       });
     });
@@ -354,19 +375,15 @@ describe("ChatProposalCard", () => {
       expect(screen.getByText(/設定削除の提案/)).toBeInTheDocument();
     });
 
-    it("反映時に旧設定を削除すること", async () => {
-      vi.mocked(services.fetchSettings).mockResolvedValue([
-        {
-          id: "del-id-99",
-          name: "旧設定A",
-          category: "世界観",
-          description: "不要な設定",
-          novelId: NOVEL_ID,
-          metadata: {},
-          createdAt: null,
-          updatedAt: null,
-        },
-      ]);
+    it("反映時に旧設定を削除マークダウン保存すること", async () => {
+      vi.mocked(services.fetchSettingsMarkdown).mockResolvedValue({
+        markdown: "# 世界観\n\n## 旧設定A\n\n不要な設定\n",
+      });
+      vi.mocked(services.saveSettingsMarkdown).mockResolvedValue({
+        created: 0,
+        updated: 0,
+        deleted: 1,
+      });
 
       renderWithClient(<ChatProposalCard proposal={deleteProposal} />);
 
@@ -374,8 +391,11 @@ describe("ChatProposalCard", () => {
       fireEvent.click(applyBtn);
 
       await waitFor(() => {
-        expect(services.fetchSettings).toHaveBeenCalledWith(NOVEL_ID);
-        expect(services.deleteSetting).toHaveBeenCalledWith("del-id-99");
+        expect(services.fetchSettingsMarkdown).toHaveBeenCalledWith(NOVEL_ID);
+        expect(services.saveSettingsMarkdown).toHaveBeenCalledWith(
+          NOVEL_ID,
+          expect.not.stringContaining("旧設定A")
+        );
       });
     });
   });

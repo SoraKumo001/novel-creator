@@ -210,6 +210,16 @@ export function applySettingsToMarkdown(
 }
 
 /**
+ * 現在の設定マークダウンから、指定された設定名を削除したマークダウンを生成する。
+ */
+export function deleteSettingsFromMarkdown(
+  currentMarkdown: string,
+  deleteNames: string[]
+): string {
+  return applySettingsToMarkdown(currentMarkdown, [], deleteNames);
+}
+
+/**
  * 設定マークダウンをパースし、正規化・ソートして改行や空行を適切に整形（フォーマット）したマークダウンを返す。
  */
 export function formatSettingsMarkdown(markdown: string): string {

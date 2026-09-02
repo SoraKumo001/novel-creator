@@ -371,6 +371,16 @@ export function applyCharactersToMarkdown(
 }
 
 /**
+ * 現在の人物マークダウンから、指定された人物名を削除したマークダウンを生成する。
+ */
+export function deleteCharactersFromMarkdown(
+  currentMarkdown: string,
+  deleteNames: string[]
+): string {
+  return applyCharactersToMarkdown(currentMarkdown, [], deleteNames);
+}
+
+/**
  * 人物マークダウンをパースし、正規化・ソートして改行や空行を適切に整形（フォーマット）したマークダウンを返す。
  */
 export function formatCharactersMarkdown(markdown: string): string {

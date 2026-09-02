@@ -76,8 +76,11 @@ export function StoryOutlineMarkdownEditor({
     }
     setGeneratingPlot(true);
     try {
-      const plot = await generatePlotFromStoryOutline(novelId, currentMarkdown);
+      const plot = await generatePlotFromStoryOutline(novelId, {
+        storyOutline: currentMarkdown,
+      });
       setPlotPreview(plot);
+
       setSelectedPlotIndices(new Set(plot.chapters.map((_, index) => index)));
     } catch (e) {
       toast.error(toErrorMessage(e));

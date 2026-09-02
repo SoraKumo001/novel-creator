@@ -19,6 +19,7 @@ export type {
 export {
   applyCharactersToMarkdown,
   buildCharacterTree,
+  deleteCharactersFromMarkdown,
   diffCharacters,
   findCharacterAtLine,
   formatCharactersMarkdown,
@@ -41,7 +42,9 @@ export {
   type NovelExportSection,
 } from "./exportFormatter.js";
 export {
+  applyForeshadowingsToMarkdown,
   buildForeshadowingCategoryTree,
+  deleteForeshadowingsFromMarkdown,
   diffForeshadowings,
   type ForeshadowingCategoryNode,
   type ForeshadowingSectionRange,
@@ -67,6 +70,22 @@ export {
   trimAndJoinLines,
   writeMarkdownEntitySections,
 } from "./markdownCore.js";
+export {
+  applyPlotToMarkdown,
+  buildPlotCategoryTree,
+  deletePlotFromMarkdown,
+  diffPlot,
+  findPlotSectionByLine,
+  formatPlotMarkdown,
+  type ParsedPlotChapterItem,
+  type ParsedPlotSectionItem,
+  type PlotCategoryNode,
+  type PlotDiff,
+  type PlotSectionRange,
+  parsePlotMarkdown,
+  scanPlotSectionRanges,
+  serializePlotToMarkdown,
+} from "./plotMarkdown.js";
 export { parseRubyToHtml, stripRuby } from "./ruby.js";
 export * from "./schemas/entities.js";
 export type {
@@ -78,6 +97,7 @@ export type {
 export {
   applySettingsToMarkdown,
   buildSettingTree,
+  deleteSettingsFromMarkdown,
   diffSettings,
   findSectionAtLine,
   formatSettingsMarkdown,
@@ -103,3 +123,18 @@ export {
   type StyleGuideSnippet,
   type StyleGuideTemplate,
 } from "./styleGuideTemplates.js";
+export {
+  applyTimelinesToMarkdown,
+  buildTimelineCategoryTree,
+  deleteTimelinesFromMarkdown,
+  diffTimelines,
+  findTimelineSectionByLine,
+  formatTimelinesMarkdown,
+  type ParsedTimelineSection,
+  parseTimelinesMarkdown,
+  scanTimelineSectionRanges,
+  serializeTimelinesToMarkdown,
+  type TimelineCategoryNode,
+  type TimelineSectionRange,
+  type TimelinesDiff,
+} from "./timelinesMarkdown.js";

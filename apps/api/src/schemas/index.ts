@@ -246,7 +246,17 @@ export const editSettingSectionSchema = z.object({
 
 // ---- 人物マークダウン一括保存 ----
 export const saveCharactersMarkdownSchema = z.object({
-  markdown: z.string().min(1),
+  markdown: z.string(),
+});
+
+// ---- 年表マークダウン一括保存 ----
+export const saveTimelinesMarkdownSchema = z.object({
+  markdown: z.string(),
+});
+
+// ---- プロットマークダウン一括保存 ----
+export const savePlotMarkdownSchema = z.object({
+  markdown: z.string(),
 });
 
 // ---- 人物セクションLLM編集 ----

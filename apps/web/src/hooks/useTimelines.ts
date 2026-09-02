@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { toErrorMessage } from "@/lib/errors.js";
 import { novelKeys } from "@/lib/queryKeys.js";
 import {
   createTimeline,
   deleteTimeline,
   fetchTimelines,
+  fetchTimelinesMarkdown,
+  saveTimelinesMarkdown,
   updateTimeline,
 } from "@/lib/services/index.js";
 import type {
@@ -19,8 +22,13 @@ interface UseTimelinesReturn {
   deleteTimeline: (id: string) => Promise<void>;
   deleting: boolean;
   error: string | null;
+  fetchTimelinesMarkdown: () => Promise<string>;
   loading: boolean;
   refetch: () => Promise<void>;
+  saveTimelinesMarkdown: (
+    markdown: string
+  ) => Promise<{ created: number; deleted: number; updated: number }>;
+  savingMarkdown: boolean;
   timelines: Timeline[];
   updateTimeline: (id: string, input: UpdateTimelineInput) => Promise<Timeline>;
   updating: boolean;
@@ -59,6 +67,17 @@ export function useTimelines(novelId: string): UseTimelinesReturn {
       queryClient.invalidateQueries({ queryKey: novelKeys.timelines(novelId) }),
   });
 
+  const saveMarkdownMutation = useMutation({
+    mutationFn: (markdown: string) => saveTimelinesMarkdown(novelId, markdown),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: novelKeys.timelines(novelId) }),
+  });
+
+  const handleFetchMarkdown = useCallback(async () => {
+    const res = await fetchTimelinesMarkdown(novelId);
+    return res.markdown;
+  }, [novelId]);
+
   return {
     timelines,
     loading,
@@ -72,5 +91,8 @@ export function useTimelines(novelId: string): UseTimelinesReturn {
     creating: createMutation.isPending,
     updating: updateMutation.isPending,
     deleting: deleteMutation.isPending,
+    fetchTimelinesMarkdown: handleFetchMarkdown,
+    saveTimelinesMarkdown: saveMarkdownMutation.mutateAsync,
+    savingMarkdown: saveMarkdownMutation.isPending,
   };
 }

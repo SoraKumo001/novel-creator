@@ -126,6 +126,8 @@ export async function getForeshadowingsMarkdown(
   return data.markdown;
 }
 
+export const fetchForeshadowingsMarkdown = getForeshadowingsMarkdown;
+
 export async function saveForeshadowingsMarkdown(
   novelId: string,
   markdown: string
