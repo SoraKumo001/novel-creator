@@ -80,7 +80,9 @@ export function StreamingStatus({
           <div className="max-w-[88%] rounded-2xl rounded-bl-xs border border-primary/30 bg-surface-raised px-4 py-2.5 text-foreground text-sm shadow-xs">
             {/* 思考プロセス & ツール呼び出しはテキスト生成前でもリアルタイムに表示 */}
             <ToolActivity parts={streamingParts} isStreaming={true} />
-            {streamingContent && <MarkdownText content={streamingContent} />}
+            {streamingContent && (
+              <MarkdownText content={streamingContent} disableMermaid={true} />
+            )}
           </div>
         </>
       ) : (

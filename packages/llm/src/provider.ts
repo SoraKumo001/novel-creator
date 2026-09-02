@@ -67,7 +67,11 @@ function resolveEnvValue(
   field: "apiKey" | "baseURL"
 ): string | undefined {
   if (kind === "embedding" && env.EMBEDDING_PROVIDER === provider) {
-    return field === "apiKey" ? env.EMBEDDING_API_KEY : env.EMBEDDING_BASE_URL;
+    const embVal =
+      field === "apiKey" ? env.EMBEDDING_API_KEY : env.EMBEDDING_BASE_URL;
+    if (embVal !== undefined) {
+      return embVal;
+    }
   }
   if (env.LLM_PROVIDER === provider) {
     return field === "apiKey" ? env.LLM_API_KEY : env.LLM_BASE_URL;
@@ -258,14 +262,12 @@ export function createLLMProvider(env: Env): LanguageModel {
 /**
  * AI SDK の EmbeddingModel インスタンスを返す。
  *
- * baseURL は EMBEDDING_BASE_URL を優先し、未設定の場合は LLM_BASE_URL にフォールバックする
- * （createEmbeddingModelFromConfig の config パスと対称な挙動）。
- * EMBEDDING_BASE_URL を明示設定している場合の挙動は変わらない。
+ * プロバイダが一致する場合のみ LLM_* の設定へフォールバックする。
  */
 export function createEmbeddingProvider(env: Env): EmbeddingModel {
   const provider = env.EMBEDDING_PROVIDER ?? env.LLM_PROVIDER;
-  const apiKey = env.EMBEDDING_API_KEY ?? env.LLM_API_KEY;
-  const baseURL = env.EMBEDDING_BASE_URL ?? env.LLM_BASE_URL;
+  const apiKey = resolveEnvValue(env, "embedding", provider, "apiKey");
+  const baseURL = resolveEnvValue(env, "embedding", provider, "baseURL");
 
   return createEmbeddingModel(
     provider,

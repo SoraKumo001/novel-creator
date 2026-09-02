@@ -1,7 +1,8 @@
 import { applyStoryOutlineSectionUpdate } from "@novel-creator/shared";
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Button } from "@/components/Button.js";
+import { ChatUIContext } from "@/context/ChatContext.js";
 import { useToast } from "@/hooks/useToast.js";
 import { novelKeys } from "@/lib/queryKeys.js";
 import {
@@ -19,6 +20,7 @@ export interface ProposalPayload {
   data: Record<string, any>;
   novelId: string;
   proposalType:
+    | "bulk"
     | "character"
     | "setting"
     | "foreshadowing"
@@ -36,64 +38,158 @@ interface ChatProposalCardProps {
 export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const chatUI = useContext(ChatUIContext);
 
   const [status, setStatus] = useState<"pending" | "applied" | "dismissed">(
     "pending"
   );
   const [isApplying, setIsApplying] = useState(false);
 
-  const { proposalType, novelId, data, summary } = proposal;
+  const { proposalType, data, summary } = proposal;
+
+  const rawNovelId = proposal.novelId;
+  const targetNovelId =
+    typeof rawNovelId === "string" &&
+    rawNovelId.trim() &&
+    rawNovelId !== "undefined" &&
+    rawNovelId !== "null"
+      ? rawNovelId.trim()
+      : chatUI?.selectedNovelId?.trim() || "";
+
+  const rawSectionName = data.sectionName;
+  const safeSectionName =
+    typeof rawSectionName === "string" &&
+    rawSectionName.trim() &&
+    rawSectionName !== "undefined"
+      ? rawSectionName.trim()
+      : data.mode === "full_document"
+        ? "ドキュメント全体"
+        : "全体あらすじ";
+
+  const cleanSummary =
+    summary && !summary.includes("undefined")
+      ? summary
+      : proposalType === "story_outline"
+        ? `ストーリー構想「${safeSectionName}」の更新提案${data.reason ? `（${data.reason}）` : ""}`
+        : summary || "設定登録提案";
 
   const handleApply = async () => {
+    if (!targetNovelId) {
+      toast.error(
+        "反映対象の小説が未選択です。上部の「対象」セレクターから小説を選択してください。"
+      );
+      return;
+    }
     setIsApplying(true);
     try {
-      if (proposalType === "character") {
-        await createCharacter(novelId, {
+      if (proposalType === "bulk") {
+        const characters = Array.isArray(data.characters)
+          ? data.characters
+          : [];
+        const settings = Array.isArray(data.settings) ? data.settings : [];
+        const foreshadowings = Array.isArray(data.foreshadowings)
+          ? data.foreshadowings
+          : [];
+        const timelines = Array.isArray(data.timelines) ? data.timelines : [];
+
+        for (const c of characters) {
+          await createCharacter(targetNovelId, {
+            name: c.name,
+            category: c.category || "未分類",
+            description: c.description,
+            traits: c.traits || [],
+          });
+        }
+        for (const s of settings) {
+          await createSetting(targetNovelId, {
+            name: s.name,
+            category: s.category || "世界観",
+            description: s.description,
+          });
+        }
+        for (const f of foreshadowings) {
+          await createForeshadowing(targetNovelId, {
+            title: f.title,
+            description: f.description,
+            status: f.status || "unresolved",
+          });
+        }
+        for (const t of timelines) {
+          await createTimeline(targetNovelId, {
+            event: t.event,
+            timestamp: t.timestamp,
+          });
+        }
+
+        if (characters.length > 0) {
+          await queryClient.invalidateQueries({
+            queryKey: novelKeys.characters(targetNovelId),
+          });
+        }
+        if (settings.length > 0) {
+          await queryClient.invalidateQueries({
+            queryKey: novelKeys.settings(targetNovelId),
+          });
+        }
+        if (foreshadowings.length > 0) {
+          await queryClient.invalidateQueries({
+            queryKey: novelKeys.foreshadowings(targetNovelId),
+          });
+        }
+        if (timelines.length > 0) {
+          await queryClient.invalidateQueries({
+            queryKey: novelKeys.timelines(targetNovelId),
+          });
+        }
+      } else if (proposalType === "character") {
+        await createCharacter(targetNovelId, {
           name: data.name,
           category: data.category || "未分類",
           description: data.description,
           traits: data.traits || [],
         });
         await queryClient.invalidateQueries({
-          queryKey: novelKeys.characters(novelId),
+          queryKey: novelKeys.characters(targetNovelId),
         });
       } else if (proposalType === "setting") {
-        await createSetting(novelId, {
+        await createSetting(targetNovelId, {
           name: data.name,
           category: data.category || "世界観",
           description: data.description,
         });
         await queryClient.invalidateQueries({
-          queryKey: novelKeys.settings(novelId),
+          queryKey: novelKeys.settings(targetNovelId),
         });
       } else if (proposalType === "foreshadowing") {
-        await createForeshadowing(novelId, {
+        await createForeshadowing(targetNovelId, {
           title: data.title,
           description: data.description,
           status: data.status || "unresolved",
         });
         await queryClient.invalidateQueries({
-          queryKey: novelKeys.foreshadowings(novelId),
+          queryKey: novelKeys.foreshadowings(targetNovelId),
         });
       } else if (proposalType === "timeline") {
-        await createTimeline(novelId, {
+        await createTimeline(targetNovelId, {
           event: data.event,
           timestamp: data.timestamp,
         });
         await queryClient.invalidateQueries({
-          queryKey: novelKeys.timelines(novelId),
+          queryKey: novelKeys.timelines(targetNovelId),
         });
       } else if (proposalType === "plot") {
-        await createChapter(novelId, {
+        await createChapter(targetNovelId, {
           title: data.chapterTitle || data.title,
           summary: data.summary,
         });
         await queryClient.invalidateQueries({
-          queryKey: novelKeys.chapters(novelId),
+          queryKey: novelKeys.chapters(targetNovelId),
         });
       } else if (proposalType === "story_outline") {
-        const currentOutline = await fetchStoryOutline(novelId).catch(() => "");
-        const sectionName = data.sectionName || "全体あらすじ";
+        const currentOutline = await fetchStoryOutline(targetNovelId).catch(
+          () => ""
+        );
+        const sectionName = safeSectionName;
         const content = data.content || "";
         const mode = data.mode || "replace";
 
@@ -105,14 +201,14 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
             mode
           );
 
-        await saveStoryOutline(novelId, updatedMarkdown);
+        await saveStoryOutline(targetNovelId, updatedMarkdown);
 
         // 開いているストーリー構想エディタ（Monaco Editor）へ即時反映イベントを発火
         if (typeof window !== "undefined") {
           window.dispatchEvent(
             new CustomEvent("novel-creator:story-outline-updated", {
               detail: {
-                novelId,
+                novelId: targetNovelId,
                 markdown: updatedMarkdown,
                 appliedSection,
                 mode,
@@ -123,10 +219,10 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
       }
 
       await queryClient.invalidateQueries({
-        queryKey: novelKeys.detail(novelId),
+        queryKey: novelKeys.detail(targetNovelId),
       });
       setStatus("applied");
-      toast.success(`${summary}を小説データに反映しました`);
+      toast.success(`${cleanSummary}を小説データに反映しました`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "反映に失敗しました";
       toast.error(msg);
@@ -138,7 +234,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
   if (status === "dismissed") {
     return (
       <div className="my-2 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-1.5 text-slate-400 text-xs dark:border-slate-800 dark:bg-slate-900/40">
-        ✕ 提案をスキップしました（{summary}）
+        ✕ 提案をスキップしました（{cleanSummary}）
       </div>
     );
   }
@@ -158,12 +254,16 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
             clipRule="evenodd"
           />
         </svg>
-        <span>✔ 小説データに反映完了: {summary}</span>
+        <span>✔ 小説データに反映完了: {cleanSummary}</span>
       </div>
     );
   }
 
   const typeBadges: Record<string, { label: string; bg: string }> = {
+    bulk: {
+      label: "📦 一括登録",
+      bg: "bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300",
+    },
     character: {
       label: "👤 登場人物",
       bg: "bg-indigo-100 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300",
@@ -216,6 +316,104 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
       </div>
 
       <div className="mt-2.5 rounded-lg border border-indigo-100 bg-white/90 p-2.5 text-slate-700 text-xs shadow-2xs dark:border-slate-800 dark:bg-slate-900/80 dark:text-slate-300">
+        {proposalType === "bulk" && (
+          <div className="space-y-2">
+            {Array.isArray(data.characters) && data.characters.length > 0 && (
+              <div>
+                <div className="font-bold text-[11px] text-indigo-700 dark:text-indigo-400">
+                  👤 登場人物 ({data.characters.length}名)
+                </div>
+                <div className="mt-1 space-y-1 border-indigo-200 border-l-2 pl-1.5 dark:border-indigo-800">
+                  {data.characters.map((c: any, i: number) => (
+                    <div key={i} className="text-[11px]">
+                      <span className="font-semibold text-slate-900 dark:text-slate-100">
+                        {c.name}
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        {" "}
+                        ({c.category || "未分類"})
+                      </span>
+                      {c.description && (
+                        <p className="line-clamp-1 text-[10px] text-slate-600 dark:text-slate-400">
+                          {c.description}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {Array.isArray(data.settings) && data.settings.length > 0 && (
+              <div>
+                <div className="font-bold text-[11px] text-teal-700 dark:text-teal-400">
+                  🌍 世界観・設定 ({data.settings.length}件)
+                </div>
+                <div className="mt-1 space-y-1 border-teal-200 border-l-2 pl-1.5 dark:border-teal-800">
+                  {data.settings.map((s: any, i: number) => (
+                    <div key={i} className="text-[11px]">
+                      <span className="font-semibold text-slate-900 dark:text-slate-100">
+                        {s.name}
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        {" "}
+                        ({s.category})
+                      </span>
+                      {s.description && (
+                        <p className="line-clamp-1 text-[10px] text-slate-600 dark:text-slate-400">
+                          {s.description}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {Array.isArray(data.foreshadowings) &&
+              data.foreshadowings.length > 0 && (
+                <div>
+                  <div className="font-bold text-[11px] text-amber-700 dark:text-amber-400">
+                    🔍 伏線 ({data.foreshadowings.length}件)
+                  </div>
+                  <div className="mt-1 space-y-1 border-amber-200 border-l-2 pl-1.5 dark:border-amber-800">
+                    {data.foreshadowings.map((f: any, i: number) => (
+                      <div key={i} className="text-[11px]">
+                        <span className="font-semibold text-slate-900 dark:text-slate-100">
+                          {f.title}
+                        </span>
+                        {f.description && (
+                          <p className="line-clamp-1 text-[10px] text-slate-600 dark:text-slate-400">
+                            {f.description}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            {Array.isArray(data.timelines) && data.timelines.length > 0 && (
+              <div>
+                <div className="font-bold text-[11px] text-blue-700 dark:text-blue-400">
+                  ⏳ 年表イベント ({data.timelines.length}件)
+                </div>
+                <div className="mt-1 space-y-1 border-blue-200 border-l-2 pl-1.5 dark:border-blue-800">
+                  {data.timelines.map((t: any, i: number) => (
+                    <div key={i} className="text-[11px]">
+                      <span className="font-semibold text-slate-900 dark:text-slate-100">
+                        {t.event}
+                      </span>
+                      {t.timestamp && (
+                        <span className="text-[10px] text-slate-500">
+                          {" "}
+                          ({t.timestamp})
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         {proposalType === "character" && (
           <div className="space-y-1">
             <div className="font-bold text-slate-900 dark:text-slate-100">
@@ -298,7 +496,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-1.5">
               <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100">
-                <span>📝 {data.sectionName || "全体あらすじ"}</span>
+                <span>📝 {safeSectionName}</span>
                 {data.mode && data.mode !== "replace" && (
                   <span className="rounded bg-amber-100 px-1.5 py-0.2 font-medium text-[10px] text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                     {data.mode === "append"
@@ -318,9 +516,22 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
                 </span>
               )}
             </div>
-            <div className="max-h-36 overflow-y-auto whitespace-pre-wrap rounded border border-slate-100 bg-slate-50/90 p-2 font-mono text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
-              {data.content}
-            </div>
+            {data.content?.trim() ? (
+              <div className="max-h-36 overflow-y-auto whitespace-pre-wrap rounded border border-slate-100 bg-slate-50/90 p-2 font-mono text-[11px] text-slate-700 dark:border-slate-800 dark:bg-slate-950/60 dark:text-slate-300">
+                {data.content}
+              </div>
+            ) : (
+              <div className="rounded border border-amber-200 bg-amber-50/80 p-2 text-[11px] text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+                ⚠️
+                反映する本文が空です。AIに「具体的な構想本文も含めて再提案して」とお伝えください。
+              </div>
+            )}
+          </div>
+        )}
+        {!targetNovelId && (
+          <div className="rounded border border-amber-200 bg-amber-50/80 p-2 text-[11px] text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+            ⚠️
+            反映先の小説が選択されていません。チャット上部の「対象」から小説を選択してください。
           </div>
         )}
       </div>
@@ -340,7 +551,11 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           size="sm"
           variant="primary"
           onClick={handleApply}
-          disabled={isApplying}
+          disabled={
+            isApplying ||
+            !targetNovelId ||
+            (proposalType === "story_outline" && !data.content?.trim())
+          }
         >
           {isApplying ? "反映中..." : "✔ 小説に反映する"}
         </Button>

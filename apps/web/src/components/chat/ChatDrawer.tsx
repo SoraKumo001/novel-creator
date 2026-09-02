@@ -1,9 +1,17 @@
-import { type KeyboardEvent, useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  memo,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/Button.js";
 import { LLMModelSelector } from "@/components/LLMModelSelector.js";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import {
   type ChatFocusContext,
+  type ChatMessage,
   QUICK_PROMPTS,
   type QuickPrompt,
   useChatStreamingState,
@@ -34,6 +42,67 @@ export function buildChatPrefill(focus: ChatFocusContext): string {
   }
   return `${header}\n\n--- 現在の内容 ---\n${summary}\n--- ここまで ---\n\n`;
 }
+
+interface ChatMessageItemProps {
+  copiedId: string | null;
+  message: ChatMessage;
+  onCopy: (content: string, id: string) => void;
+  onInsertEntity: (content: string) => void;
+}
+
+const ChatMessageItem = memo(function ChatMessageItem({
+  message: m,
+  copiedId,
+  onCopy,
+  onInsertEntity,
+}: ChatMessageItemProps) {
+  const isUser = m.role === "user";
+  return (
+    <div className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}>
+      <div className="mb-1 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
+        <span>{isUser ? "あなた" : "AIパートナー"}</span>
+      </div>
+      <div
+        className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm shadow-xs ${
+          isUser
+            ? "rounded-br-xs bg-primary text-primary-foreground"
+            : "rounded-bl-xs border border-border bg-surface-raised text-foreground"
+        }`}
+      >
+        {isUser ? (
+          <div className="whitespace-pre-wrap">{m.content}</div>
+        ) : (
+          <>
+            {/* AI のツール呼び出し活動 & 思考プロセス（v7 パーツから抽出。無ければ非表示） */}
+            <ToolActivity parts={m.parts} isStreaming={false} />
+            {m.content && <MarkdownText content={m.content} />}
+          </>
+        )}
+      </div>
+
+      {/* アシスタントメッセージのアクションバー */}
+      {!isUser && (
+        <div className="mt-1 flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => onCopy(m.content, m.id)}
+            className="cursor-pointer hover:text-foreground"
+          >
+            {copiedId === m.id ? "✓ コピー完了" : "📋 コピー"}
+          </button>
+          <span>•</span>
+          <button
+            type="button"
+            onClick={() => onInsertEntity(m.content)}
+            className="cursor-pointer font-medium hover:text-primary"
+          >
+            📥 設定・人物へ取り込む
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
 
 export function ChatDrawer() {
   // 低頻度: 開閉・フォーカス・セッション選択などの操作系
@@ -94,8 +163,10 @@ export function ChatDrawer() {
     null
   );
 
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const isUserScrolledUpRef = useRef(false);
+  const scrollRafRef = useRef<number | null>(null);
 
   const handleWidthChange = (width: DrawerWidth) => {
     setDrawerWidth(width);
@@ -107,17 +178,55 @@ export function ChatDrawer() {
     localStorage.setItem("novel-creator:chat-layout-mode", mode);
   };
 
-  // メッセージやストリーミング更新時に最下部にスクロール
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const handleMessagesScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const isAtBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 60;
+    isUserScrolledUpRef.current = !isAtBottom;
   };
 
+  // チャットオープン時や履歴切り替え時の初期スクロール & フォーカス
   useEffect(() => {
     if (isOpen && !showHistoryView) {
-      scrollToBottom();
+      isUserScrolledUpRef.current = false;
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop =
+          messagesContainerRef.current.scrollHeight;
+      }
       textareaRef.current?.focus();
     }
-  }, [isOpen, messages, streamingContent, showHistoryView]);
+  }, [isOpen, showHistoryView]);
+
+  // 新規メッセージ追加時のスクロール
+  useEffect(() => {
+    if (isOpen && !showHistoryView && !isUserScrolledUpRef.current) {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTop =
+          messagesContainerRef.current.scrollHeight;
+      }
+    }
+  }, [messages.length, isOpen, showHistoryView]);
+
+  // ストリーミング中の自動スクロール追従（requestAnimationFrameでスロットル & 非ブロッキング）
+  useEffect(() => {
+    if (!isStreaming || isUserScrolledUpRef.current) {
+      return;
+    }
+    if (scrollRafRef.current == null) {
+      scrollRafRef.current = requestAnimationFrame(() => {
+        if (messagesContainerRef.current && !isUserScrolledUpRef.current) {
+          messagesContainerRef.current.scrollTop =
+            messagesContainerRef.current.scrollHeight;
+        }
+        scrollRafRef.current = null;
+      });
+    }
+    return () => {
+      if (scrollRafRef.current != null) {
+        cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = null;
+      }
+    };
+  }, [streamingContent, streamingParts, isStreaming]);
 
   // エディタからの「AIと相談」フォーカスが未消費なら入力欄にプリフィルする。
   // 既存入力は上書きせず末尾へ追記し、消費後はクリアして二重プリフィルを防ぐ。
@@ -163,16 +272,23 @@ export function ChatDrawer() {
     await sendMessage(qp.prompt);
   };
 
-  const handleCopy = async (content: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(content);
-      setCopiedId(id);
-      toast.success("クリップボードにコピーしました");
-      setTimeout(() => setCopiedId(null), 2000);
-    } catch {
-      toast.error("コピーに失敗しました");
-    }
-  };
+  const handleCopy = useCallback(
+    async (content: string, id: string) => {
+      try {
+        await navigator.clipboard.writeText(content);
+        setCopiedId(id);
+        toast.success("クリップボードにコピーしました");
+        setTimeout(() => setCopiedId(null), 2000);
+      } catch {
+        toast.error("コピーに失敗しました");
+      }
+    },
+    [toast]
+  );
+
+  const handleInsertEntity = useCallback((content: string) => {
+    setInsertModalSource(content);
+  }, []);
 
   const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
@@ -480,7 +596,11 @@ export function ChatDrawer() {
       ) : (
         /* メッセージチャットビュー */
         <>
-          <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          <div
+            ref={messagesContainerRef}
+            onScroll={handleMessagesScroll}
+            className="flex-1 space-y-4 overflow-y-auto p-4"
+          >
             {messages.length === 0 && !streamingContent && (
               <div className="space-y-4 py-6">
                 <div className="text-center">
@@ -520,57 +640,15 @@ export function ChatDrawer() {
               </div>
             )}
 
-            {messages.map((m) => {
-              const isUser = m.role === "user";
-              return (
-                <div
-                  key={m.id}
-                  className={`flex flex-col ${isUser ? "items-end" : "items-start"}`}
-                >
-                  <div className="mb-1 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground">
-                    <span>{isUser ? "あなた" : "AIパートナー"}</span>
-                  </div>
-                  <div
-                    className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm shadow-xs ${
-                      isUser
-                        ? "rounded-br-xs bg-primary text-primary-foreground"
-                        : "rounded-bl-xs border border-border bg-surface-raised text-foreground"
-                    }`}
-                  >
-                    {isUser ? (
-                      <div className="whitespace-pre-wrap">{m.content}</div>
-                    ) : (
-                      <>
-                        {/* AI のツール呼び出し活動 & 思考プロセス（v7 パーツから抽出。無ければ非表示） */}
-                        <ToolActivity parts={m.parts} isStreaming={false} />
-                        {m.content && <MarkdownText content={m.content} />}
-                      </>
-                    )}
-                  </div>
-
-                  {/* アシスタントメッセージのアクションバー */}
-                  {!isUser && (
-                    <div className="mt-1 flex items-center gap-2 px-1 text-[11px] text-muted-foreground">
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(m.content, m.id)}
-                        className="hover:text-foreground"
-                      >
-                        {copiedId === m.id ? "✓ コピー完了" : "📋 コピー"}
-                      </button>
-                      <span>•</span>
-                      <button
-                        type="button"
-                        onClick={() => setInsertModalSource(m.content)}
-                        className="font-medium hover:text-primary"
-                      >
-                        📥 設定・人物へ取り込む
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {messages.map((m) => (
+              <ChatMessageItem
+                key={m.id}
+                message={m}
+                copiedId={copiedId}
+                onCopy={handleCopy}
+                onInsertEntity={handleInsertEntity}
+              />
+            ))}
 
             {/* ストリーミング中のリアルタイム表示 */}
             {isStreaming && (
@@ -639,8 +717,6 @@ export function ChatDrawer() {
                 )}
               </div>
             )}
-
-            <div ref={messagesEndRef} />
           </div>
 
           {/* 入力フォーム */}

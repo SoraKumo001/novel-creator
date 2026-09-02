@@ -8,12 +8,15 @@ interface MarkdownTextProps {
   /** 折り返し表示用のコンパクトスタイル。LLM 出力の小さなボックス内表示向け。 */
   compact?: boolean;
   content: string;
+  /** ストリーミング中など未確定テキスト時に Mermaid レンダリングを抑止するフラグ */
+  disableMermaid?: boolean;
 }
 
 export function MarkdownText({
   content,
   className,
   compact,
+  disableMermaid,
 }: MarkdownTextProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const html = useMemo(() => {
@@ -22,13 +25,22 @@ export function MarkdownText({
   }, [content]);
 
   useEffect(() => {
+    if (disableMermaid) {
+      return;
+    }
+
     const el = containerRef.current;
     if (!el) {
       return;
     }
 
+    const mermaidBlocks = el.querySelectorAll("pre > code.language-mermaid");
+    if (mermaidBlocks.length === 0) {
+      return;
+    }
+
     // marked が出力した ```mermaid コードブロックをプレースホルダに差し替え
-    el.querySelectorAll("pre > code.language-mermaid").forEach((codeEl) => {
+    mermaidBlocks.forEach((codeEl) => {
       const pre = codeEl.parentElement;
       if (!pre) {
         return;
@@ -44,7 +56,7 @@ export function MarkdownText({
       void renderMermaid(el);
     });
     return () => window.cancelAnimationFrame(handle);
-  }, [html]);
+  }, [html, disableMermaid]);
 
   return (
     <div

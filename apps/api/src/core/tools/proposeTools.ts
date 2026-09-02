@@ -180,18 +180,24 @@ export function createProposeTools(
 
     proposeUpdateStoryOutline: scopedTool({
       description:
-        "ストーリー構想（全体のあらすじ、起承転結、序盤・中盤・結末、今後の展開候補、構想メモなど）のマークダウンの追加・更新・ブラッシュアップをユーザーに提案します。あらすじの整理や展開・結末のアイデアが固まった際に積極的に使用してください。",
+        "ストーリー構想（全体のあらすじ、起承転結、序盤・中盤・結末、今後の展開候補、構想メモなど）のマークダウンの追加・更新・ブラッシュアップをユーザーに提案します。反映したい具体的な文章・マークダウン本文を必ず content 引数に完全に含めて呼び出してください。全体を一括更新する場合は mode: 'full_document'、特定セクションを更新する場合はそのセクション名を指定します。",
       errorMessage: "ストーリー構想更新提案の生成に失敗しました。",
       parameters: z.object({
         content: z
           .string()
-          .describe("反映するマークダウン形式の本文（箇条書きや文章）"),
+          .min(
+            1,
+            "反映する本文（content）は必須です。反映したい具体的なマークダウンテキストを必ず格納してください。"
+          )
+          .describe(
+            "反映するマークダウン形式の本文（箇条書きや文章、またはドキュメント全体の完全なテキスト）。空にしてはいけません。"
+          ),
         mode: z
           .enum(["replace", "append", "prepend", "full_document"])
           .optional()
           .default("replace")
           .describe(
-            "反映モード（replace: セクション全体を置換, append: 末尾に追記, prepend: 先頭に挿入, full_document: マークダウン全体を置換）"
+            "反映モード（replace: 指定セクション全体を置換, append: 末尾に追記, prepend: 先頭に挿入, full_document: ドキュメント全体を一括置換）"
           ),
         novelId: z
           .string()
@@ -203,23 +209,154 @@ export function createProposeTools(
           .describe("この更新を提案する理由・変更ポイントの要約"),
         sectionName: z
           .string()
+          .optional()
           .describe(
-            '反映先セクション名または見出し名（例: "全体あらすじ", "結（結末・エンディング）", "起（序盤・導入）", "承（中盤・展開）", "転（転換点・クライマックス）", "今後の展開候補 & 分岐アイデア", "作品コンセプト & ログライン", "ドキュメント全体" など）'
+            '反映先セクション名または見出し名（例: "全体あらすじ", "結（結末・エンディング）", "起（序盤・導入）", "承（中盤・展開）", "転（転換点・クライマックス）", "今後の展開候補 & 分岐アイデア", "作品コンセプト & ログライン", "ドキュメント全体" など。省略時は自動判定）'
           ),
       }),
       resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: (targetId, { sectionName, content, mode = "replace", reason }) => ({
-        data: {
-          content,
-          mode,
-          reason: reason || null,
-          sectionName,
-        },
-        novelId: targetId,
-        proposalType: "story_outline",
-        summary: `ストーリー構想「${sectionName}」の更新提案${reason ? `（${reason}）` : ""}`,
-        type: "proposal",
+      run: (targetId, { sectionName, content, mode = "replace", reason }) => {
+        const resolvedSection =
+          typeof sectionName === "string" &&
+          sectionName.trim() &&
+          sectionName !== "undefined"
+            ? sectionName.trim()
+            : mode === "full_document"
+              ? "ドキュメント全体"
+              : "全体あらすじ";
+
+        return {
+          data: {
+            content,
+            mode,
+            reason: reason || null,
+            sectionName: resolvedSection,
+          },
+          novelId: targetId,
+          proposalType: "story_outline",
+          summary: `ストーリー構想「${resolvedSection}」の更新提案${reason ? `（${reason}）` : ""}`,
+          type: "proposal",
+        };
+      },
+    }),
+
+    proposeBulkCreate: scopedTool({
+      description:
+        "複数の登場人物、世界観設定、伏線、年表イベントなどをまとめて一括でユーザーに登録提案します。会話の中で複数のキャラクターや設定が同時に考案された場合は、個別にツールを何度も呼ぶのではなく、必ずこの一括提案ツールを1回だけ呼び出してください。",
+      errorMessage: "一括登録提案の生成に失敗しました。",
+      parameters: z.object({
+        characters: z
+          .array(
+            z.object({
+              category: z.string().optional().default("未分類"),
+              description: z.string().describe("外見、性格、背景などの説明"),
+              name: z.string().describe("キャラクター名"),
+              traits: z.array(z.string()).optional().default([]),
+            })
+          )
+          .optional()
+          .default([])
+          .describe("提案する登場人物の配列"),
+        foreshadowings: z
+          .array(
+            z.object({
+              description: z.string().describe("伏線の詳細"),
+              status: z
+                .enum(["unresolved", "resolved", "abandoned"])
+                .optional()
+                .default("unresolved"),
+              title: z.string().describe("伏線タイトル"),
+            })
+          )
+          .optional()
+          .default([])
+          .describe("提案する伏線の配列"),
+        novelId: z
+          .string()
+          .optional()
+          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
+        settings: z
+          .array(
+            z.object({
+              category: z.string().describe("カテゴリ（世界観、地理等）"),
+              description: z.string().describe("設定詳細"),
+              name: z.string().describe("設定名"),
+            })
+          )
+          .optional()
+          .default([])
+          .describe("提案する世界観・設定の配列"),
+        summary: z
+          .string()
+          .optional()
+          .describe(
+            "提案全体の簡単な要約（例: メインキャラ3名と世界観設定の追加）"
+          ),
+        timelines: z
+          .array(
+            z.object({
+              event: z.string().describe("出来事"),
+              timestamp: z.string().optional().describe("時期・日時"),
+            })
+          )
+          .optional()
+          .default([])
+          .describe("提案する年表イベントの配列"),
       }),
+      resolve: ({ novelId }) => resolveNovelId(novelId),
+      run: (
+        targetId,
+        {
+          characters = [],
+          settings = [],
+          foreshadowings = [],
+          timelines = [],
+          summary,
+        }
+      ) => {
+        const normalizedCharacters = characters.map((c) => ({
+          category: c.category || "未分類",
+          description: c.description,
+          name: c.name,
+          traits: c.traits || [],
+        }));
+        const normalizedSettings = settings.map((s) => ({
+          category: s.category || "世界観",
+          description: s.description,
+          name: s.name,
+        }));
+        const normalizedForeshadowings = foreshadowings.map((f) => ({
+          description: f.description || "",
+          status: f.status || "unresolved",
+          title: f.title,
+        }));
+        const normalizedTimelines = timelines.map((t) => ({
+          event: t.event,
+          timestamp: t.timestamp || null,
+        }));
+
+        const totalCount =
+          normalizedCharacters.length +
+          normalizedSettings.length +
+          normalizedForeshadowings.length +
+          normalizedTimelines.length;
+        const defaultSummary =
+          summary ||
+          `設定の一括登録提案（合計${totalCount}件: 人物${normalizedCharacters.length}件、設定${normalizedSettings.length}件、伏線${normalizedForeshadowings.length}件、年表${normalizedTimelines.length}件）`;
+
+        return {
+          data: {
+            characters: normalizedCharacters,
+            foreshadowings: normalizedForeshadowings,
+            settings: normalizedSettings,
+            timelines: normalizedTimelines,
+          },
+          novelId: targetId,
+          proposalType: "bulk",
+          summary: defaultSummary,
+          type: "proposal",
+        };
+      },
     }),
   };
 }

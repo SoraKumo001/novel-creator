@@ -15,7 +15,7 @@ function createDummyCtx(): ServiceContext {
 describe("proposeTools", () => {
   const NOVEL_ID = "novel-uuid-123";
 
-  it("createProposeTools は全 6 つの提案ツールを返す", () => {
+  it("createProposeTools は全 7 つの提案ツールを返す", () => {
     const tools = createProposeTools(createDummyCtx(), NOVEL_ID);
     expect(tools.proposeCreateCharacter).toBeDefined();
     expect(tools.proposeCreateSetting).toBeDefined();
@@ -23,6 +23,43 @@ describe("proposeTools", () => {
     expect(tools.proposeAddTimelineEvent).toBeDefined();
     expect(tools.proposeUpdatePlot).toBeDefined();
     expect(tools.proposeUpdateStoryOutline).toBeDefined();
+    expect(tools.proposeBulkCreate).toBeDefined();
+  });
+
+  describe("proposeBulkCreate", () => {
+    it("複数の人物や設定を含む一括提案ペイロードを生成できること", async () => {
+      const tools = createProposeTools(createDummyCtx(), NOVEL_ID);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const res = await (tools.proposeBulkCreate as any).execute({
+        characters: [{ name: "ルーク", description: "騎士" }],
+        settings: [
+          { name: "王国", category: "世界観", description: "平和な国" },
+        ],
+      });
+
+      expect(res).toEqual({
+        data: {
+          characters: [
+            {
+              category: "未分類",
+              description: "騎士",
+              name: "ルーク",
+              traits: [],
+            },
+          ],
+          foreshadowings: [],
+          settings: [
+            { category: "世界観", description: "平和な国", name: "王国" },
+          ],
+          timelines: [],
+        },
+        novelId: NOVEL_ID,
+        proposalType: "bulk",
+        summary:
+          "設定の一括登録提案（合計2件: 人物1件、設定1件、伏線0件、年表0件）",
+        type: "proposal",
+      });
+    });
   });
 
   describe("proposeUpdateStoryOutline", () => {

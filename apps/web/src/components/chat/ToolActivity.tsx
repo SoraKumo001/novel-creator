@@ -20,6 +20,7 @@ const TOOL_LABELS: Record<string, string> = {
   proposeAddTimelineEvent: "年表追加提案",
   proposeUpdatePlot: "プロット更新提案",
   proposeUpdateStoryOutline: "ストーリー構想更新提案",
+  proposeBulkCreate: "一括設定登録提案",
 };
 
 /** ツール呼び出しの表示用アイコン */
@@ -39,6 +40,7 @@ const TOOL_ICONS: Record<string, string> = {
   proposeAddTimelineEvent: "💡",
   proposeUpdatePlot: "💡",
   proposeUpdateStoryOutline: "💡",
+  proposeBulkCreate: "💡",
 };
 
 /** AI SDK v7 のツールパーツ（静的 tool-<name> / 動的 dynamic-tool の両方） */
@@ -148,6 +150,15 @@ function formatArgsSummary(toolName: string, input: unknown): string | null {
   const args = input as Record<string, unknown>;
   if (Object.keys(args).length === 0) {
     return null;
+  }
+  if (toolName === "proposeBulkCreate") {
+    const chars = Array.isArray(args.characters) ? args.characters.length : 0;
+    const sets = Array.isArray(args.settings) ? args.settings.length : 0;
+    const fores = Array.isArray(args.foreshadowings)
+      ? args.foreshadowings.length
+      : 0;
+    const times = Array.isArray(args.timelines) ? args.timelines.length : 0;
+    return `合計 ${chars + sets + fores + times} 件 (人物:${chars}, 設定:${sets}, 伏線:${fores}, 年表:${times})`;
   }
   if (args.name) {
     return `名前: ${String(args.name)}`;

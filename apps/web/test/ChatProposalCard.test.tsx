@@ -140,5 +140,102 @@ describe("ChatProposalCard", () => {
         screen.queryByRole("button", { name: /小説に反映する/ })
       ).not.toBeInTheDocument();
     });
+
+    it("content が空の場合は警告が表示され、反映ボタンが無効化されること", () => {
+      const emptyProposal: ProposalPayload = {
+        ...proposal,
+        data: {
+          ...proposal.data,
+          content: "",
+        },
+      };
+
+      renderWithClient(<ChatProposalCard proposal={emptyProposal} />);
+
+      expect(screen.getByText(/反映する本文が空です/)).toBeInTheDocument();
+      const applyBtn = screen.getByRole("button", { name: /小説に反映する/ });
+      expect(applyBtn).toBeDisabled();
+    });
+  });
+
+  describe("bulk proposal", () => {
+    const bulkProposal: ProposalPayload = {
+      type: "proposal",
+      proposalType: "bulk",
+      novelId: NOVEL_ID,
+      data: {
+        characters: [
+          {
+            name: "アレン",
+            category: "主人公",
+            description: "熱血な少年",
+            traits: ["勇敢"],
+          },
+        ],
+        settings: [
+          {
+            name: "帝国",
+            category: "世界観",
+            description: "巨大な軍事国家",
+          },
+        ],
+        foreshadowings: [
+          {
+            title: "黒幕の正体",
+            description: "実は王太子",
+            status: "unresolved",
+          },
+        ],
+        timelines: [
+          {
+            event: "王都陥落",
+            timestamp: "10年前",
+          },
+        ],
+      },
+      summary: "設定の一括登録提案（合計4件）",
+    };
+
+    it("一括登録の各エンティティプレビューが表示されること", () => {
+      renderWithClient(<ChatProposalCard proposal={bulkProposal} />);
+
+      expect(screen.getByText(/一括登録/)).toBeInTheDocument();
+      expect(screen.getByText("アレン")).toBeInTheDocument();
+      expect(screen.getByText("帝国")).toBeInTheDocument();
+      expect(screen.getByText("黒幕の正体")).toBeInTheDocument();
+      expect(screen.getByText("王都陥落")).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /小説に反映する/ })
+      ).toBeInTheDocument();
+    });
+
+    it("一括反映をクリックすると全サービスAPIが呼び出されること", async () => {
+      renderWithClient(<ChatProposalCard proposal={bulkProposal} />);
+
+      const applyBtn = screen.getByRole("button", { name: /小説に反映する/ });
+      fireEvent.click(applyBtn);
+
+      await waitFor(() => {
+        expect(services.createCharacter).toHaveBeenCalledWith(
+          NOVEL_ID,
+          expect.objectContaining({ name: "アレン" })
+        );
+        expect(services.createSetting).toHaveBeenCalledWith(
+          NOVEL_ID,
+          expect.objectContaining({ name: "帝国" })
+        );
+        expect(services.createForeshadowing).toHaveBeenCalledWith(
+          NOVEL_ID,
+          expect.objectContaining({ title: "黒幕の正体" })
+        );
+        expect(services.createTimeline).toHaveBeenCalledWith(
+          NOVEL_ID,
+          expect.objectContaining({ event: "王都陥落" })
+        );
+        expect(mockToastSuccess).toHaveBeenCalledWith(
+          expect.stringContaining("小説データに反映しました")
+        );
+      });
+    });
   });
 });

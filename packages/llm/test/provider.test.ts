@@ -285,7 +285,7 @@ describe("createEmbeddingProvider", () => {
     });
   });
 
-  it("EMBEDDING_BASE_URL が未設定の場合は LLM_BASE_URL にフォールバックすること", async () => {
+  it("EMBEDDING_BASE_URL が未設定でプロバイダが一致する場合は LLM_BASE_URL にフォールバックすること", async () => {
     const { createOpenAI } = await importMockedOpenAI();
     createEmbeddingProvider({
       EMBEDDING_API_KEY: "emb-key",
@@ -300,6 +300,24 @@ describe("createEmbeddingProvider", () => {
     expect(vi.mocked(createOpenAI)).toHaveBeenCalledWith({
       apiKey: "emb-key",
       baseURL: "https://llm.example.com/v1",
+    });
+  });
+
+  it("EMBEDDING_PROVIDER が LLM_PROVIDER と異なる場合は LLM_* へフォールバックしないこと", async () => {
+    const { createGoogleGenerativeAI } = await import("@ai-sdk/google");
+    createEmbeddingProvider({
+      EMBEDDING_API_KEY: "google-key",
+      EMBEDDING_MODEL: "gemini-embedding-2",
+      EMBEDDING_PROVIDER: "google",
+      LLM_API_KEY: "llm-key",
+      LLM_BASE_URL: "https://llm.example.com/v1",
+      LLM_MODEL: "llm-model",
+      LLM_PROVIDER: "openai",
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any);
+    expect(vi.mocked(createGoogleGenerativeAI)).toHaveBeenCalledWith({
+      apiKey: "google-key",
+      baseURL: undefined,
     });
   });
 });

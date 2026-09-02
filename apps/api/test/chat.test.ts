@@ -393,6 +393,7 @@ describe("Chat API", () => {
       "getTimelines",
       "proposeAddForeshadowing",
       "proposeAddTimelineEvent",
+      "proposeBulkCreate",
       "proposeCreateCharacter",
       "proposeCreateSetting",
       "proposeUpdatePlot",
