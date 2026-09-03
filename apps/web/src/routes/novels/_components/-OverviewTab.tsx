@@ -1,17 +1,19 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useAnalysis } from "@/hooks/useAnalysis.js";
+import { useAnalysisRunner } from "@/hooks/useAnalysisRunner.js";
 import { useChapters } from "@/hooks/useChapters.js";
 import {
   useHistoryViewState,
   useModalResultState,
   useModalState,
 } from "@/hooks/useModalResultState.js";
-import { useNovel } from "@/hooks/useNovel.js";
+import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
+import { useStyleGuideModal } from "@/hooks/useStyleGuideModal.js";
+import { useTargetWords } from "@/hooks/useTargetWords.js";
 import { REQUIRED_TITLE_MESSAGE } from "@/lib/constants.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import type {
-  AnalysisHistoryEntry,
   CharacterVoiceCheckResult,
   MultiPersonaReviewResult,
   StoryArcResult,
@@ -20,12 +22,14 @@ import { OverviewView } from "./-OverviewView.js";
 
 export function OverviewTab({
   novel,
+  novelMutations,
   onRefresh,
 }: {
   novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;
+  novelMutations: NovelMutations;
   onRefresh: () => Promise<void>;
 }) {
-  const { updateNovel, updating, deleteNovel, deleting } = useNovel(novel.id);
+  const { updateNovel, updating, deleteNovel, deleting } = novelMutations;
   const { chapters } = useChapters(novel.id);
   const {
     running,
@@ -40,7 +44,19 @@ export function OverviewTab({
   const infoEditModal = useModalState();
   const deleteConfirmModal = useModalState();
   const heatmapModal = useModalState();
-  const styleGuideModal = useModalState();
+
+  const { styleGuideModal, handleSaveStyleGuide } = useStyleGuideModal({
+    novelId: novel.id,
+    updateNovel,
+    onRefresh,
+  });
+
+  const {
+    targetWords: targetWordCount,
+    isEditingTarget,
+    handleEditTarget,
+    handleSaveTargetWords,
+  } = useTargetWords(`novel-creator:target-words-total:${novel.id}`);
 
   const arcModal = useModalResultState<StoryArcResult>();
   const arcHistory = useHistoryViewState();
@@ -49,116 +65,33 @@ export function OverviewTab({
   const personaModal = useModalResultState<MultiPersonaReviewResult>();
   const personaHistory = useHistoryViewState();
 
+  const arcRunner = useAnalysisRunner<StoryArcResult>({
+    run: () => runStoryArc(novel.id),
+    modal: arcModal,
+    history: arcHistory,
+    analysisType: "story-arc",
+  });
+  const voiceRunner = useAnalysisRunner<CharacterVoiceCheckResult>({
+    run: () => runVoiceCheck(novel.id, {}),
+    modal: voiceModal,
+    history: voiceHistory,
+    analysisType: "check-voice",
+  });
+  const personaRunner = useAnalysisRunner<MultiPersonaReviewResult>({
+    run: () => runPersonaReview(novel.id, {}),
+    modal: personaModal,
+    history: personaHistory,
+    analysisType: "persona-review",
+  });
+
   const [title, setTitle] = useState(novel.title);
   const [description, setDescription] = useState(novel.description ?? "");
   const [formError, setFormError] = useState<string | null>(null);
-
-  const handleSaveStyleGuide = async (newStyleGuide: string) => {
-    await updateNovel(novel.id, { styleGuide: newStyleGuide });
-    await onRefresh();
-  };
-
-  const [targetWordCount, setTargetWordCount] = useState<number>(() => {
-    const saved = localStorage.getItem(
-      `novel-creator:target-words-total:${novel.id}`
-    );
-    return saved ? Number.parseInt(saved, 10) : 100_000;
-  });
-  const [isEditingTarget, setIsEditingTarget] = useState(false);
 
   const totalSections = useMemo(
     () => chapters.reduce((acc, ch) => acc + ch.sections.length, 0),
     [chapters]
   );
-
-  const handleRunStoryArc = async () => {
-    arcModal.open();
-    arcModal.setResult(null);
-    arcModal.setError(null);
-    arcHistory.resetHistoryView();
-    try {
-      const res = await runStoryArc(novel.id);
-      arcModal.setResult(res);
-      arcHistory.bumpHistoryKey();
-    } catch (e) {
-      if ((e as Error)?.name === "AbortError") {
-        return;
-      }
-      arcModal.setError(toErrorMessage(e));
-    }
-  };
-
-  const handleRunVoiceCheck = async () => {
-    voiceModal.open();
-    voiceModal.setResult(null);
-    voiceModal.setError(null);
-    voiceHistory.resetHistoryView();
-    try {
-      const res = await runVoiceCheck(novel.id, {});
-      voiceModal.setResult(res);
-      voiceHistory.bumpHistoryKey();
-    } catch (e) {
-      if ((e as Error)?.name === "AbortError") {
-        return;
-      }
-      voiceModal.setError(toErrorMessage(e));
-    }
-  };
-
-  const handleRunPersonaReview = async () => {
-    personaModal.open();
-    personaModal.setResult(null);
-    personaModal.setError(null);
-    personaHistory.resetHistoryView();
-    try {
-      const res = await runPersonaReview(novel.id, {});
-      personaModal.setResult(res);
-      personaHistory.bumpHistoryKey();
-    } catch (e) {
-      if ((e as Error)?.name === "AbortError") {
-        return;
-      }
-      personaModal.setError(toErrorMessage(e));
-    }
-  };
-
-  const handleSelectArcHistory = (entry: AnalysisHistoryEntry) => {
-    if (entry.analysisType !== "story-arc") {
-      return;
-    }
-    arcModal.setResult(entry.result as StoryArcResult);
-    arcModal.setError(null);
-    arcHistory.showHistory(entry.createdAt);
-  };
-  const handleSelectVoiceHistory = (entry: AnalysisHistoryEntry) => {
-    if (entry.analysisType !== "check-voice") {
-      return;
-    }
-    voiceModal.setResult(entry.result as CharacterVoiceCheckResult);
-    voiceModal.setError(null);
-    voiceHistory.showHistory(entry.createdAt);
-  };
-  const handleSelectPersonaHistory = (entry: AnalysisHistoryEntry) => {
-    if (entry.analysisType !== "persona-review") {
-      return;
-    }
-    personaModal.setResult(entry.result as MultiPersonaReviewResult);
-    personaModal.setError(null);
-    personaHistory.showHistory(entry.createdAt);
-  };
-
-  const handleSaveTargetWords = (val: number) => {
-    const clamped = Math.max(
-      1000,
-      Math.min(1_000_000, Number.isNaN(val) ? 100_000 : val)
-    );
-    setTargetWordCount(clamped);
-    localStorage.setItem(
-      `novel-creator:target-words-total:${novel.id}`,
-      String(clamped)
-    );
-    setIsEditingTarget(false);
-  };
 
   async function handleDelete() {
     try {
@@ -225,7 +158,7 @@ export function OverviewTab({
           key: personaHistory.historyKey,
         },
       }}
-      onEditTarget={() => setIsEditingTarget(true)}
+      onEditTarget={handleEditTarget}
       onSaveTargetWords={handleSaveTargetWords}
       onOpenInfoEdit={infoEditModal.open}
       onTitleChange={setTitle}
@@ -234,12 +167,12 @@ export function OverviewTab({
       onDelete={() => void handleDelete()}
       onOpenStyleGuide={styleGuideModal.open}
       onSaveStyleGuide={handleSaveStyleGuide}
-      onRunStoryArc={() => void handleRunStoryArc()}
-      onRunVoiceCheck={() => void handleRunVoiceCheck()}
-      onRunPersonaReview={() => void handleRunPersonaReview()}
-      onSelectArcHistory={handleSelectArcHistory}
-      onSelectVoiceHistory={handleSelectVoiceHistory}
-      onSelectPersonaHistory={handleSelectPersonaHistory}
+      onRunStoryArc={() => void arcRunner.handleRun()}
+      onRunVoiceCheck={() => void voiceRunner.handleRun()}
+      onRunPersonaReview={() => void personaRunner.handleRun()}
+      onSelectArcHistory={arcRunner.handleSelectHistory}
+      onSelectVoiceHistory={voiceRunner.handleSelectHistory}
+      onSelectPersonaHistory={personaRunner.handleSelectHistory}
       onCancelAnalysis={cancelAnalysis}
     />
   );

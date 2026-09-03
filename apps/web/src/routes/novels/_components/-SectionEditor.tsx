@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useChatUI } from "@/context/ChatContext.js";
 import { useAnalysis } from "@/hooks/useAnalysis.js";
+import { useAnalysisRunner } from "@/hooks/useAnalysisRunner.js";
 import { useContent } from "@/hooks/useContent.js";
 import { useGenerate } from "@/hooks/useGenerate.js";
 import {
@@ -8,12 +9,13 @@ import {
   useModalResultState,
   useModalState,
 } from "@/hooks/useModalResultState.js";
-import { useNovel } from "@/hooks/useNovel.js";
+import type { NovelMutations } from "@/hooks/useNovel.js";
+import { useStyleGuideModal } from "@/hooks/useStyleGuideModal.js";
+import { useTargetWords } from "@/hooks/useTargetWords.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import { countWords } from "@/lib/sse.js";
 import type {
-  AnalysisHistoryEntry,
   CharacterVoiceCheckResult,
   ExtractResult,
   MultiPersonaReviewResult,
@@ -27,6 +29,8 @@ import { useSectionProofread } from "./-useSectionProofread.js";
 interface SectionEditorProps {
   isZenMode: boolean;
   novelId: string;
+  novelMutations: NovelMutations;
+  novelStyleGuide?: string | null;
   onRefresh: () => Promise<void>;
   onToggleZenMode: () => void;
   onUpdateTitle: (newTitle: string) => Promise<void>;
@@ -36,6 +40,8 @@ interface SectionEditorProps {
 export function SectionEditor({
   novelId,
   section,
+  novelMutations,
+  novelStyleGuide,
   onRefresh,
   onUpdateTitle,
   isZenMode,
@@ -62,19 +68,19 @@ export function SectionEditor({
     runPersonaReview,
     cancel: cancelAnalysis,
   } = useAnalysis();
-  const { novel, updateNovel, updating: updatingNovel } = useNovel(novelId);
 
   const [localBody, setLocalBody] = useState("");
   const [savedBody, setSavedBody] = useState("");
   const [wordCount, setWordCount] = useState(0);
-  const [targetWords, setTargetWords] = useState(() => {
-    const saved = localStorage.getItem(
-      `novel-creator:target-words:${section.id}`
-    );
-    return saved ? Number.parseInt(saved, 10) : 2000;
-  });
+  const { targetWords, handleSaveTargetWords } = useTargetWords(
+    `novel-creator:target-words:${section.id}`
+  );
 
-  const styleGuideModal = useModalState();
+  const { styleGuideModal, handleSaveStyleGuide } = useStyleGuideModal({
+    novelId,
+    updateNovel: novelMutations.updateNovel,
+    onRefresh,
+  });
   const extractResultModal = useModalResultState<ExtractResult>();
   const historyModal = useModalState();
   const verticalPreviewModal = useModalState();
@@ -84,11 +90,6 @@ export function SectionEditor({
   const personaReviewModal = useModalResultState<MultiPersonaReviewResult>();
   const personaHistory = useHistoryViewState();
   const customPromptManagerModal = useModalState();
-
-  const handleSaveStyleGuide = async (newGuide: string) => {
-    await updateNovel(novelId, { styleGuide: newGuide });
-    await onRefresh();
-  };
 
   const toast = useToast();
 
@@ -153,18 +154,6 @@ export function SectionEditor({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleSave]);
 
-  const handleTargetWordsChange = (val: number) => {
-    const clamped = Math.max(
-      100,
-      Math.min(50_000, Number.isNaN(val) ? 2000 : val)
-    );
-    setTargetWords(clamped);
-    localStorage.setItem(
-      `novel-creator:target-words:${section.id}`,
-      String(clamped)
-    );
-  };
-
   const handleModelChange = (id: string | null) => {
     setSelectedModelConfigId(id);
     if (id) {
@@ -201,28 +190,34 @@ export function SectionEditor({
   const handleOpenProofread = proofread.handleOpenProofread;
   const handleCancelProofread = proofread.handleCancelProofread;
 
+  const voiceRunner = useAnalysisRunner<CharacterVoiceCheckResult>({
+    run: () =>
+      runVoiceCheck(novelId, {
+        body: localBody,
+        modelConfigId: selectedModelConfigId,
+      }),
+    modal: voiceCheckerModal,
+    history: voiceHistory,
+    analysisType: "check-voice",
+  });
+  const personaRunner = useAnalysisRunner<MultiPersonaReviewResult>({
+    run: () =>
+      runPersonaReview(novelId, {
+        sectionId: section.id,
+        body: localBody,
+        modelConfigId: selectedModelConfigId,
+      }),
+    modal: personaReviewModal,
+    history: personaHistory,
+    analysisType: "persona-review",
+  });
+
   const handleOpenVoiceChecker = async () => {
     if (!localBody.trim()) {
       toast.error("チェックする本文がありません");
       return;
     }
-    voiceCheckerModal.open();
-    voiceCheckerModal.setResult(null);
-    voiceCheckerModal.setError(null);
-    voiceHistory.resetHistoryView();
-    try {
-      const res = await runVoiceCheck(novelId, {
-        body: localBody,
-        modelConfigId: selectedModelConfigId,
-      });
-      voiceCheckerModal.setResult(res);
-      voiceHistory.bumpHistoryKey();
-    } catch (e) {
-      if ((e as Error)?.name === "AbortError") {
-        return;
-      }
-      voiceCheckerModal.setError(toErrorMessage(e));
-    }
+    await voiceRunner.handleRun();
   };
 
   const handleOpenPersonaReview = async () => {
@@ -230,41 +225,7 @@ export function SectionEditor({
       toast.error("レビュー対象の本文がありません");
       return;
     }
-    personaReviewModal.open();
-    personaReviewModal.setResult(null);
-    personaReviewModal.setError(null);
-    personaHistory.resetHistoryView();
-    try {
-      const res = await runPersonaReview(novelId, {
-        sectionId: section.id,
-        body: localBody,
-        modelConfigId: selectedModelConfigId,
-      });
-      personaReviewModal.setResult(res);
-      personaHistory.bumpHistoryKey();
-    } catch (e) {
-      if ((e as Error)?.name === "AbortError") {
-        return;
-      }
-      personaReviewModal.setError(toErrorMessage(e));
-    }
-  };
-
-  const handleSelectVoiceHistory = (entry: AnalysisHistoryEntry) => {
-    if (entry.analysisType !== "check-voice") {
-      return;
-    }
-    voiceCheckerModal.setResult(entry.result as CharacterVoiceCheckResult);
-    voiceCheckerModal.setError(null);
-    voiceHistory.showHistory(entry.createdAt);
-  };
-  const handleSelectPersonaHistory = (entry: AnalysisHistoryEntry) => {
-    if (entry.analysisType !== "persona-review") {
-      return;
-    }
-    personaReviewModal.setResult(entry.result as MultiPersonaReviewResult);
-    personaReviewModal.setError(null);
-    personaHistory.showHistory(entry.createdAt);
+    await personaRunner.handleRun();
   };
 
   const { openChat } = useChatUI();
@@ -312,8 +273,8 @@ export function SectionEditor({
     <SectionEditorView
       section={section}
       novelId={novelId}
-      novelStyleGuide={novel?.styleGuide}
-      updatingNovel={updatingNovel}
+      novelStyleGuide={novelStyleGuide}
+      updatingNovel={novelMutations.updating}
       isZenMode={isZenMode}
       localBody={localBody}
       loading={loading}
@@ -353,7 +314,7 @@ export function SectionEditor({
       onSave={() => void handleSave()}
       onUpdateTitle={onUpdateTitle}
       onToggleZenMode={onToggleZenMode}
-      onTargetWordsChange={handleTargetWordsChange}
+      onTargetWordsChange={handleSaveTargetWords}
       onModelChange={handleModelChange}
       onGenerate={() => void handleGenerate()}
       onExtract={() => void handleExtract()}
@@ -379,8 +340,8 @@ export function SectionEditor({
         toast.success("推敲後の文章を本文に反映しました");
       }}
       onSaveStyleGuide={handleSaveStyleGuide}
-      onSelectVoiceHistory={handleSelectVoiceHistory}
-      onSelectPersonaHistory={handleSelectPersonaHistory}
+      onSelectVoiceHistory={voiceRunner.handleSelectHistory}
+      onSelectPersonaHistory={personaRunner.handleSelectHistory}
       onHistoryRestore={(restored) => {
         setLocalBody(restored);
         setSavedBody(restored);

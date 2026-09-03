@@ -1,4 +1,4 @@
-import type { useNovel } from "@/hooks/useNovel.js";
+import type { NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import { StoryOutlineMarkdownEditor } from "./-StoryOutlineMarkdownEditor.js";
 
 export function StoryOutlineTab({
@@ -6,6 +6,7 @@ export function StoryOutlineTab({
   onRefresh,
 }: {
   novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;
+  novelMutations?: NovelMutations;
   onRefresh: () => Promise<void>;
 }) {
   return (

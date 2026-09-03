@@ -9,11 +9,11 @@ import { Input } from "@/components/Input.js";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import { Modal } from "@/components/Modal.js";
 import { MultiPersonaReviewModal } from "@/components/MultiPersonaReviewModal.js";
+import { ReadingTime } from "@/components/ReadingTime.js";
 import { StatCard } from "@/components/StatCard.js";
 import { StoryArcChartModal } from "@/components/StoryArcChartModal.js";
 import { StyleGuideModal } from "@/components/StyleGuideModal.js";
 import { Textarea } from "@/components/Textarea.js";
-import { formatReadingMinutes } from "@/lib/format.js";
 import type {
   AnalysisHistoryEntry,
   AnalysisProgress,
@@ -23,6 +23,7 @@ import type {
   NovelDetail,
   StoryArcResult,
 } from "@/lib/types.js";
+import { OVERVIEW_ANALYSIS_ACTIONS } from "./-analysisActions.js";
 
 export interface OverviewModalBundle {
   arc: {
@@ -94,6 +95,12 @@ export interface OverviewViewProps {
 
 export function OverviewView(props: OverviewViewProps) {
   const { novel, modals } = props;
+  const overviewActionHandlers: Record<string, () => void> = {
+    "story-arc": props.onRunStoryArc,
+    "voice-check": props.onRunVoiceCheck,
+    "persona-review": props.onRunPersonaReview,
+    heatmap: modals.heatmap.open,
+  };
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
@@ -134,9 +141,7 @@ export function OverviewView(props: OverviewViewProps) {
               </button>
             )
           }
-          footer={
-            <>読了目安: 約 {formatReadingMinutes(props.targetWordCount)} 分</>
-          }
+          footer={<ReadingTime chars={props.targetWordCount} />}
         />
       </div>
 
@@ -182,30 +187,15 @@ export function OverviewView(props: OverviewViewProps) {
           }
         />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <ActionCardButton
-            icon="📈"
-            title="感情アーク & テンション"
-            description="全章節の盛り上がり度・緊張感の起伏をグラフで可視化・診断"
-            onClick={props.onRunStoryArc}
-          />
-          <ActionCardButton
-            icon="🎭"
-            title="キャラクター口調チェッカー"
-            description="一人称・二人称・語尾のブレやキャラ崩壊を一括検出"
-            onClick={props.onRunVoiceCheck}
-          />
-          <ActionCardButton
-            icon="👥"
-            title="模擬読者・編集部レビュー"
-            description="商業編集者や考察派ファン等4名のペルソナが作品を査読"
-            onClick={props.onRunPersonaReview}
-          />
-          <ActionCardButton
-            icon="📊"
-            title="人物出現頻度ヒートマップ"
-            description="誰がどの章に出ているかをマトリックス表示し出番偏りを防止"
-            onClick={modals.heatmap.open}
-          />
+          {OVERVIEW_ANALYSIS_ACTIONS.map((action) => (
+            <ActionCardButton
+              key={action.id}
+              icon={action.icon}
+              title={action.label}
+              description={action.description}
+              onClick={overviewActionHandlers[action.id]}
+            />
+          ))}
         </div>
       </Card>
 

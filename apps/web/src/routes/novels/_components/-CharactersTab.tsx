@@ -2,7 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import { Tag } from "@/components/Tag.js";
 import { useCharacters } from "@/hooks/useCharacters.js";
-import { useNovel } from "@/hooks/useNovel.js";
+import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import type { Character } from "@/lib/types.js";
 import { EntityListTab } from "./-EntityListTab.js";
 import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
@@ -12,6 +12,7 @@ export function CharactersTab({
   onRefresh,
 }: {
   novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;
+  novelMutations?: NovelMutations;
   onRefresh: () => Promise<void>;
 }) {
   const {

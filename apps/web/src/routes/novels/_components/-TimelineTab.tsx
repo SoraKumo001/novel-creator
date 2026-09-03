@@ -15,7 +15,7 @@ import { Select } from "@/components/Select.js";
 import { TabHeader } from "@/components/TabHeader.js";
 import { Textarea } from "@/components/Textarea.js";
 import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
-import { useNovel } from "@/hooks/useNovel.js";
+import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import { useTimelines } from "@/hooks/useTimelines.js";
 import type { Chapter, Section, Timeline } from "@/lib/types.js";
 import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
@@ -25,6 +25,7 @@ export function TimelineTab({
   onRefresh,
 }: {
   novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;
+  novelMutations?: NovelMutations;
   onRefresh: () => Promise<void>;
 }) {
   const {

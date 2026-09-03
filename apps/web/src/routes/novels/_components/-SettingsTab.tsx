@@ -1,6 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { MarkdownText } from "@/components/MarkdownText.js";
-import { useNovel } from "@/hooks/useNovel.js";
+import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import { useSettings } from "@/hooks/useSettings.js";
 import type { Setting } from "@/lib/types.js";
 import { EntityListTab } from "./-EntityListTab.js";
@@ -11,6 +11,7 @@ export function SettingsTab({
   onRefresh,
 }: {
   novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;
+  novelMutations?: NovelMutations;
   onRefresh: () => Promise<void>;
 }) {
   const {

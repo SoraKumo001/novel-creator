@@ -8,7 +8,7 @@ import {
 } from "@/lib/services/index.js";
 import type { Novel, NovelDetail, UpdateNovelInput } from "@/lib/types.js";
 
-interface UseNovelReturn {
+export interface UseNovelReturn {
   deleteNovel: (id: string) => Promise<void>;
   deleting: boolean;
   error: string | null;
@@ -18,6 +18,12 @@ interface UseNovelReturn {
   updateNovel: (id: string, input: UpdateNovelInput) => Promise<Novel>;
   updating: boolean;
 }
+
+/** ルートから各タブへprops配布する小説ミューテーション群。 */
+export type NovelMutations = Pick<
+  UseNovelReturn,
+  "updateNovel" | "updating" | "deleteNovel" | "deleting"
+>;
 
 export function useNovel(novelId: string): UseNovelReturn {
   const queryClient = useQueryClient();

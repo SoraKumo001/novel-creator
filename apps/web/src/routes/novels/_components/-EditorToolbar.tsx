@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { PencilIcon, SparklesIcon } from "@/components/Icons.js";
 import { LLMModelSelector } from "@/components/LLMModelSelector.js";
-import { formatReadingMinutes } from "@/lib/format.js";
+import { ReadingTime } from "@/components/ReadingTime.js";
 import type { Section } from "@/lib/types.js";
+import { EDITOR_AI_MENU_ACTIONS } from "./-analysisActions.js";
 
 interface EditorToolbarProps {
   canExtract: boolean;
@@ -107,13 +108,20 @@ export function EditorToolbar({
     await onUpdateTitle(titleInput.trim());
   };
 
-  // 読了目安時間（約400文字/分）
-  const readingMinutes = formatReadingMinutes(wordCount);
   // 進捗率
   const progressPercent = Math.min(
     100,
     Math.round((wordCount / targetWords) * 100)
   );
+
+  // AI推敲メニューのハンドラ（表示条件は呼び出し側＝propsの有無で決まる）
+  const aiMenuHandlers: Record<string, (() => void) | undefined> = {
+    proofread: onOpenProofread,
+    "voice-check": onOpenVoiceChecker,
+    "persona-review": onOpenPersonaReview,
+    chat: onOpenChat,
+    "custom-prompts": onOpenCustomPrompts,
+  };
 
   return (
     <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b bg-surface px-5 py-2.5">
@@ -232,7 +240,7 @@ export function EditorToolbar({
               )}
             </div>
             <span>•</span>
-            <span>読了目安: 約 {readingMinutes} 分</span>
+            <ReadingTime chars={wordCount} />
           </div>
         </div>
       </div>
@@ -255,120 +263,56 @@ export function EditorToolbar({
           {aiMenuOpen && (
             <div className="fade-in zoom-in-95 absolute right-0 z-30 mt-1 w-56 animate-in divide-y divide-border/40 rounded-xl border border-border bg-surface py-1.5 shadow-xl duration-100">
               <div className="py-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAiMenuOpen(false);
-                    onOpenProofread();
-                  }}
-                  className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
-                >
-                  <span className="text-base">✨</span>
-                  <div>
-                    <div className="font-semibold">本文校正・推敲</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      誤字・文体・視点ブレを点検
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAiMenuOpen(false);
-                    onOpenVoiceChecker();
-                  }}
-                  className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
-                >
-                  <span className="text-base">🎭</span>
-                  <div>
-                    <div className="font-semibold">口調・一貫性チェック</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      人物設定とセリフのズレを検出
-                    </div>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAiMenuOpen(false);
-                    onOpenPersonaReview();
-                  }}
-                  className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
-                >
-                  <span className="text-base">👥</span>
-                  <div>
-                    <div className="font-semibold">4ペルソナ模擬査読</div>
-                    <div className="text-[10px] text-muted-foreground">
-                      編集者・読者・評論家レビュー
-                    </div>
-                  </div>
-                </button>
-
-                {onOpenChat && (
+                {EDITOR_AI_MENU_ACTIONS.filter(
+                  (action) =>
+                    action.id !== "extract" &&
+                    aiMenuHandlers[action.id] !== undefined
+                ).map((action) => (
                   <button
+                    key={action.id}
                     type="button"
                     onClick={() => {
                       setAiMenuOpen(false);
-                      onOpenChat();
+                      aiMenuHandlers[action.id]?.();
                     }}
                     className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
                   >
-                    <span className="text-base">💬</span>
+                    <span className="text-base">{action.icon}</span>
                     <div>
-                      <div className="font-semibold">
-                        チャットで相談・壁打ち
-                      </div>
+                      <div className="font-semibold">{action.label}</div>
                       <div className="text-[10px] text-muted-foreground">
-                        この話の展開や設定をAIと相談
+                        {action.description}
                       </div>
                     </div>
                   </button>
-                )}
-
-                {onOpenCustomPrompts && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAiMenuOpen(false);
-                      onOpenCustomPrompts();
-                    }}
-                    className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
-                  >
-                    <span className="text-base">🪄</span>
-                    <div>
-                      <div className="font-semibold">
-                        カスタムプロンプト管理
-                      </div>
-                      <div className="text-[10px] text-muted-foreground">
-                        推敲・生成プロンプトの作成・編集
-                      </div>
-                    </div>
-                  </button>
-                )}
+                ))}
               </div>
 
               <div className="py-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAiMenuOpen(false);
-                    onExtract();
-                  }}
-                  disabled={!canExtract || extracting}
-                  className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised disabled:opacity-50"
-                >
-                  <span className="text-base">⚡</span>
-                  <div>
-                    <div className="font-semibold">
-                      {extracting ? "抽出中..." : "整合性更新（設定抽出）"}
+                {EDITOR_AI_MENU_ACTIONS.filter(
+                  (action) => action.id === "extract"
+                ).map((action) => (
+                  <button
+                    key={action.id}
+                    type="button"
+                    onClick={() => {
+                      setAiMenuOpen(false);
+                      onExtract();
+                    }}
+                    disabled={!canExtract || extracting}
+                    className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised disabled:opacity-50"
+                  >
+                    <span className="text-base">{action.icon}</span>
+                    <div>
+                      <div className="font-semibold">
+                        {extracting ? "抽出中..." : action.label}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground">
+                        {action.description}
+                      </div>
                     </div>
-                    <div className="text-[10px] text-muted-foreground">
-                      本文から新設定・年表を抽出
-                    </div>
-                  </div>
-                </button>
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -444,18 +388,6 @@ export function EditorToolbar({
             </div>
           )}
         </div>
-
-        {/* 📝 執筆ガイドボタン */}
-        {onOpenStyleGuide && (
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={onOpenStyleGuide}
-            title="視点・文体・執筆ガイドラインを確認・編集"
-          >
-            📝 執筆ガイド
-          </Button>
-        )}
 
         {/* 📑 参考資料ペイン開閉トグル */}
         {onToggleReferencePanel && (

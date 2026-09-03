@@ -6,7 +6,7 @@ import { TabHeader } from "@/components/TabHeader.js";
 import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
 import { useChapters } from "@/hooks/useChapters.js";
 import { useGenerate } from "@/hooks/useGenerate.js";
-import { useNovel } from "@/hooks/useNovel.js";
+import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import type { Chapter, Section } from "@/lib/types.js";
@@ -19,6 +19,7 @@ export function PlotTab({
   onRefresh,
 }: {
   novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;
+  novelMutations?: NovelMutations;
   onRefresh: () => Promise<void>;
 }) {
   const toast = useToast();

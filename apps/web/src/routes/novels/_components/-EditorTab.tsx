@@ -2,16 +2,18 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { PlusIcon } from "@/components/Icons.js";
 import { useChapters } from "@/hooks/useChapters.js";
-import { useNovel } from "@/hooks/useNovel.js";
+import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import type { Section } from "@/lib/types.js";
 import { SectionEditor } from "./-SectionEditor.js";
 import { SectionSidebar } from "./-SectionSidebar.js";
 
 export function EditorTab({
   novel,
+  novelMutations,
   onRefresh,
 }: {
   novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;
+  novelMutations: NovelMutations;
   onRefresh: () => Promise<void>;
 }) {
   const { chapters, createSection, updateSection, creating } = useChapters(
@@ -295,6 +297,8 @@ export function EditorTab({
             key={editorKey}
             novelId={novel.id}
             section={selectedSection}
+            novelMutations={novelMutations}
+            novelStyleGuide={novel.styleGuide}
             onRefresh={onRefresh}
             onUpdateTitle={(newTitle) =>
               handleUpdateSectionTitle(selectedSection, newTitle)

@@ -12,7 +12,7 @@ import { ExportModal } from "@/components/ExportModal.js";
 import { KeyboardShortcutsModal } from "@/components/KeyboardShortcutsModal.js";
 import { Loading } from "@/components/Loading.js";
 import { useChatUI } from "@/context/ChatContext.js";
-import { useNovel } from "@/hooks/useNovel.js";
+import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import { fetchNovelExportData } from "@/lib/services/index.js";
@@ -49,6 +49,7 @@ const TAB_CONTENT: Record<
   TabId,
   ComponentType<{
     novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;
+    novelMutations: NovelMutations;
     onRefresh: () => Promise<void>;
   }>
 > = {
@@ -71,7 +72,22 @@ export const Route = createLazyFileRoute("/novels/$novelId/")({
 
 export function NovelDetailPage() {
   const { novelId } = Route.useParams();
-  const { novel, loading, error, refetch } = useNovel(novelId);
+  const {
+    novel,
+    loading,
+    error,
+    refetch,
+    updateNovel,
+    updating,
+    deleteNovel,
+    deleting,
+  } = useNovel(novelId);
+  const novelMutations: NovelMutations = {
+    updateNovel,
+    updating,
+    deleteNovel,
+    deleting,
+  };
   const { tab } = Route.useSearch();
   const activeTab: TabId = tab ?? "overview";
   const navigate = useNavigate();
@@ -306,10 +322,18 @@ export function NovelDetailPage() {
           <div className="min-h-0 flex-1 overflow-hidden">
             {isScrollable ? (
               <div className="h-full overflow-y-auto pr-1">
-                <ActiveTabContent novel={novel} onRefresh={refetch} />
+                <ActiveTabContent
+                  novel={novel}
+                  novelMutations={novelMutations}
+                  onRefresh={refetch}
+                />
               </div>
             ) : (
-              <ActiveTabContent novel={novel} onRefresh={refetch} />
+              <ActiveTabContent
+                novel={novel}
+                novelMutations={novelMutations}
+                onRefresh={refetch}
+              />
             )}
           </div>
         </>
