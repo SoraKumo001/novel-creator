@@ -329,9 +329,9 @@ export function EntityMarkdownEditor<
               <div
                 className="cursor-pointer truncate px-2 py-1 font-semibold text-muted-foreground text-xs hover:text-foreground"
                 onClick={() => handleTreeClick(cat.headingLine)}
-                title={`# ${cat.category}`}
+                title={cat.category}
               >
-                # {cat.category}
+                {cat.category}
               </div>
               <div className="ml-2 space-y-0.5 border-border border-l pl-2">
                 {cat.children.map((item) => (
@@ -344,9 +344,9 @@ export function EntityMarkdownEditor<
                         : "text-foreground hover:bg-surface-hover"
                     }`}
                     onClick={() => handleTreeClick(item.headingLine)}
-                    title={`## ${item.name}`}
+                    title={item.name}
                   >
-                    ## {item.name}
+                    {item.name}
                   </div>
                 ))}
               </div>
