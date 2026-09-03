@@ -151,7 +151,7 @@ describe("useChatStreaming", () => {
     });
   });
 
-  it("メッセージキャッシュ保存の失敗がログ出力され error として公開されること", async () => {
+  it("メッセージキャッシュ保存の失敗が error として公開されること", async () => {
     const fetchMock = vi.fn().mockResolvedValue(successStream());
     globalThis.fetch = fetchMock as unknown as typeof fetch;
     // jsdom では sessionStorage インスタンスへの spy が効かないため、
@@ -165,10 +165,8 @@ describe("useChatStreaming", () => {
         }
         return originalSetItem.call(this, key, value);
       });
-    const consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => {});
-
+    // AGENTS.md の console 残存禁止方針により、失敗は error state 経路でのみ通知する
+    // （console.error には出力しない）。
     const { result } = renderHook(() =>
       useChatStreaming({
         refreshSessions: vi.fn(),
@@ -183,7 +181,6 @@ describe("useChatStreaming", () => {
     await waitFor(() => {
       expect(result.current.error).toBe("QuotaExceededError");
     });
-    expect(consoleErrorSpy).toHaveBeenCalled();
     expect(setItemSpy).toHaveBeenCalled();
   });
 });

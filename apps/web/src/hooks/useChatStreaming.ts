@@ -1,5 +1,5 @@
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage } from "ai";
+import type { UIMessage } from "ai";
 import {
   type RefObject,
   useCallback,
@@ -9,77 +9,29 @@ import {
   useState,
 } from "react";
 import { toErrorMessage } from "@/lib/errors.js";
+import { updateChatSession } from "@/lib/services/index.js";
 import {
-  createChatSession,
-  deleteChatSession,
-  updateChatSession,
-} from "@/lib/services/index.js";
-import type { ChatSession } from "@/lib/types.js";
+  type ChatMessage,
+  extractTitle,
+  hasToolPart,
+  textOf,
+} from "./chatStreamingTypes.js";
+import {
+  chatCacheKey,
+  loadCachedMessages,
+  useChatTransport,
+} from "./chatTransport.js";
+import { useChatActions } from "./useChatActions.js";
+import { useChatProgress } from "./useChatProgress.js";
 
-export interface ChatMessage {
-  content: string;
-  createdAt: number;
-  id: string;
-  /**
-   * UI Message の生 parts（v7）。ツールパーツ（tool-<name>）表示などに使用。
-   * text パーツの連結結果が content に入るが、ツールパーツは content には含まれない。
-   */
-  parts: UIMessage["parts"];
-  role: "user" | "assistant";
-}
-
-/** バックエンド（SSE data-progress パーツ）から届く一時的な進捗ペイロード */
-export type ChatProgressPhase = "start" | "step-start" | "step-finish" | "done";
-
-export interface ChatProgress {
-  finishReason?: string;
-  /** 想定される総ステップ数 */
-  maxSteps: number;
-  phase: ChatProgressPhase;
-  /** 1-based。先頭ステップ前は 0 */
-  step: number;
-}
-
-/** フックが公開する進捗状態（開始時刻を記録したもの）。isStreaming 中のみ非 null になる */
-export interface StreamingProgress {
-  maxSteps: number;
-  phase: ChatProgressPhase;
-  /** 経過時間の基準時刻（EPOCH ms）。最初の data-progress 到着 or status が submitted になった時点 */
-  startedAt: number;
-  step: number;
-}
-
-const PROGRESS_PHASES: ReadonlyArray<ChatProgressPhase> = [
-  "start",
-  "step-start",
-  "step-finish",
-  "done",
-];
-
-/** 未知の値（data-progress の data フィールド）を ChatProgress に絞り込む */
-function toChatProgress(value: unknown): ChatProgress | null {
-  if (!value || typeof value !== "object") {
-    return null;
-  }
-  const v = value as Record<string, unknown>;
-  const phase = v.phase;
-  if (
-    typeof phase !== "string" ||
-    !PROGRESS_PHASES.includes(phase as ChatProgressPhase)
-  ) {
-    return null;
-  }
-  if (typeof v.step !== "number" || typeof v.maxSteps !== "number") {
-    return null;
-  }
-  return {
-    phase: phase as ChatProgressPhase,
-    step: v.step,
-    maxSteps: v.maxSteps,
-    finishReason:
-      typeof v.finishReason === "string" ? v.finishReason : undefined,
-  };
-}
+// 互換のための再エクスポート（既存の import パスを維持する）
+export type {
+  ChatMessage,
+  ChatProgress,
+  ChatProgressPhase,
+  StreamingProgress,
+} from "./chatStreamingTypes.js";
+export { rowToUIMessage } from "./chatStreamingTypes.js";
 
 /** チャットのストリーミング状態機械に必要なセッション層の入力 */
 export interface UseChatStreamingInput {
@@ -89,65 +41,19 @@ export interface UseChatStreamingInput {
   selectedNovelIdRef: RefObject<string | null>;
 }
 
-/** UI Message からテキストパーツのみを連結して取り出す */
-function textOf(message: UIMessage): string {
-  return message.parts
-    .filter((p): p is Extract<typeof p, { type: "text" }> => p.type === "text")
-    .map((p) => p.text)
-    .join("");
-}
-
-/** ツールパーツ（tool-<name> / dynamic-tool）が含まれるか */
-function hasToolPart(parts: UIMessage["parts"]): boolean {
-  return parts.some((p) => {
-    const t = (p as { type?: string }).type;
-    return (
-      typeof t === "string" && (t.startsWith("tool-") || t === "dynamic-tool")
-    );
-  });
-}
-
-/**
- * セッション詳細（DB行）を UI Message に変換して useChat へ seed する。
- * parts があればそれをそのまま使い、無ければ text パーツを合成する。
- * サーバーはリクエストの最後のユーザーメッセージのみを採用し履歴は DB から
- * 構築するため、ここでは id/role/parts を正しく設定する。
- */
-export function rowToUIMessage(row: {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  parts?: unknown[] | null;
-}): UIMessage {
-  const parts: UIMessage["parts"] =
-    Array.isArray(row.parts) && row.parts.length > 0
-      ? (row.parts as UIMessage["parts"])
-      : [{ type: "text", text: row.content, state: "done" }];
-  return {
-    id: row.id,
-    role: row.role,
-    parts,
-  };
-}
-
-/** 応答メッセージからタイトル案（〜30文字）を生成する */
-function extractTitle(message: UIMessage): string {
-  const text = textOf(message).trim();
-  return text.replace(/\s+/g, " ").slice(0, 30);
-}
-
 /**
  * チャットのメッセージ・ストリーミング状態機械を担うフック。
  * AI SDK（@ai-sdk/react の useChat + DefaultChatTransport）を使って
  * '/api/chat' への送信と UI Message Stream の受信を行う。
  *
- * セッションの自動作成・削除・送信・中断・全消去の各処理と、
- * currentSessionId の状態をここで一元管理する。
+ * 単一 source of truth: メッセージ一覧・ストリーミング状態・進捗・
+ * セッション選択はすべてここで一元管理する。ChatContext はこのフックへ
+ * 委譲するのみで派生値の再計算や重複 state を持たない。
+ *
  * セッション一覧の取得自体は ChatContext 側の useQuery が行うため、
  * selectedNovelIdRef と refreshSessions を注入して連携する。
  */
 const ACTIVE_SESSION_STORAGE_KEY = "novel-creator:active-session";
-const CHAT_MESSAGES_CACHE_PREFIX = "novel-creator:chat-cache:";
 
 export function useChatStreaming({
   selectedNovelIdRef,
@@ -209,57 +115,21 @@ export function useChatStreaming({
     }
   }, []);
 
-  // 進捗状態（バックエンドの data-progress パーツ由来）。
-  // 経過時間の開始時刻は「最初の data-progress 到着」または「status が submitted になった
-  // 時点」のどちらか早い方で確定する。進行中のストリームが変わっても開始時刻を維持するため
-  // ref で保持し、isStreaming の終了時にリセットする。
-  const [progress, setProgress] = useState<StreamingProgress | null>(null);
-  const progressStartedAtRef = useRef<number | null>(null);
+  // 進捗状態（バックエンドの data-progress パーツ由来）は useChatProgress に委譲する
+  const {
+    progress,
+    setProgress,
+    resetProgress,
+    ensureProgressStarted,
+    handleProgressData,
+  } = useChatProgress();
 
-  const ensureProgressStarted = useCallback((): number => {
-    if (progressStartedAtRef.current === null) {
-      progressStartedAtRef.current = Date.now();
-    }
-    return progressStartedAtRef.current;
-  }, []);
-
-  // data-progress パーツ（transient SSE data）を受信して進捗状態を更新する。
-  // このコールバックは useChat の onData に渡され、ストリーム中の一時データパーツを観測できる。
-  const handleProgressData = useCallback(
-    (dataPart: { type: string; data: unknown }) => {
-      if (dataPart.type !== "data-progress") {
-        return;
-      }
-      const payload = toChatProgress(dataPart.data);
-      if (!payload) {
-        return;
-      }
-      setProgress({
-        phase: payload.phase,
-        step: payload.step,
-        maxSteps: payload.maxSteps,
-        startedAt: ensureProgressStarted(),
-      });
-    },
-    [ensureProgressStarted]
-  );
-
-  // 送信時に毎回 sessionId / novelId / modelConfigId を ref 経由で最新値を埋め込む。
-  const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: "/api/chat",
-        prepareSendMessagesRequest: ({ messages }) => ({
-          body: {
-            sessionId: sessionIdRef.current,
-            novelId: selectedNovelIdLiveRef.current,
-            messages,
-            modelConfigId: selectedModelConfigIdRef.current,
-          },
-        }),
-      }),
-    []
-  );
+  // 送信時に毎回 sessionId / novelId / modelConfigId を ref 経由で最新値を埋め込む
+  const transport = useChatTransport({
+    sessionIdRef,
+    selectedNovelIdLiveRef,
+    selectedModelConfigIdRef,
+  });
 
   const {
     messages: uiMessages,
@@ -293,11 +163,7 @@ export function useChatStreaming({
           // タイトル）へ影響するため、既存のエラー経路（error state）で通知する。
           void updateChatSession(currentSessionIdRef.current, {
             title,
-          }).catch((err) => {
-            console.error(
-              "チャットセッションのタイトル保存に失敗しました",
-              toErrorMessage(err)
-            );
+          }).catch((err: unknown) => {
             setError(toErrorMessage(err));
           });
         }
@@ -313,23 +179,9 @@ export function useChatStreaming({
       return;
     }
     cacheLoadedRef.current = true;
-    try {
-      const cached = sessionStorage.getItem(
-        `${CHAT_MESSAGES_CACHE_PREFIX}${currentSessionId}`
-      );
-      if (cached) {
-        const parsed = JSON.parse(cached) as UIMessage[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setUiMessages(parsed);
-        }
-      }
-    } catch (err) {
-      // キャッシュ復元はベストエフォート（失敗時はサーバー再取得にフォールバックする）ため、
-      // ユーザーへエラーを出さずログに残す。
-      console.error(
-        "チャットメッセージキャッシュの復元に失敗しました",
-        toErrorMessage(err)
-      );
+    const cached = loadCachedMessages(currentSessionId);
+    if (cached) {
+      setUiMessages(cached);
     }
   }, [currentSessionId, setUiMessages]);
 
@@ -341,16 +193,12 @@ export function useChatStreaming({
     if (uiMessages.length > 0) {
       try {
         sessionStorage.setItem(
-          `${CHAT_MESSAGES_CACHE_PREFIX}${currentSessionId}`,
+          chatCacheKey(currentSessionId),
           JSON.stringify(uiMessages)
         );
-      } catch (err) {
+      } catch (err: unknown) {
         // メッセージのローカル永続化（リロード後の復元用）の失敗は、ストリーム終了後に
         // 表示履歴が残らない状態へ直結するため、既存のエラー経路で通知する。
-        console.error(
-          "チャットメッセージキャッシュの保存に失敗しました",
-          toErrorMessage(err)
-        );
         setError(toErrorMessage(err));
       }
     }
@@ -389,10 +237,9 @@ export function useChatStreaming({
             }
       );
     } else {
-      progressStartedAtRef.current = null;
-      setProgress(null);
+      resetProgress();
     }
-  }, [isStreaming, ensureProgressStarted]);
+  }, [isStreaming, ensureProgressStarted, setProgress, resetProgress]);
 
   // 画面に表示する確定済みメッセージ。
   // ストリーミング中は最後のアシスタント応答（進行中）を丸ごと除外し、
@@ -453,156 +300,30 @@ export function useChatStreaming({
     return last.parts;
   }, [uiMessages, isStreaming]);
 
-  // 新規セッション作成
-  const createSession = useCallback(
-    async (
-      novelId?: string | null,
-      initialTitle?: string
-    ): Promise<ChatSession | null> => {
-      const targetNovelId =
-        novelId !== undefined ? novelId : selectedNovelIdLiveRef.current;
-      try {
-        const created = await createChatSession({
-          novelId: targetNovelId || undefined,
-          title: initialTitle || "新しい相談",
-        });
-        setCurrentSessionId(created.id);
-        setUiMessages([]);
-        setError(null);
-        // セッション一覧を再取得して新規セッションを反映する
-        await refreshSessions();
-        return created;
-      } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : "セッションの作成に失敗しました";
-        setError(msg);
-        return null;
-      }
-    },
-    [refreshSessions, setCurrentSessionId, setUiMessages]
-  );
-
-  // セッション削除
-  const deleteSession = useCallback(
-    async (sessionId: string) => {
-      try {
-        await deleteChatSession(sessionId);
-        await refreshSessions();
-        if (currentSessionIdRef.current === sessionId) {
-          setCurrentSessionId(null);
-          setUiMessages([]);
-        }
-      } catch (err) {
-        const msg =
-          err instanceof Error ? err.message : "セッションの削除に失敗しました";
-        setError(msg);
-      }
-    },
-    [refreshSessions, setCurrentSessionId, setUiMessages]
-  );
-
-  // ストリーミング中断（部分応答をメッセージとして確定する）
-  const abortStream = useCallback(async () => {
-    await stop();
-    // 部分応答（streaming の text パーツ）を done に確定して画面に残す
-    setUiMessages((prev) =>
-      prev.map((m, idx) => {
-        if (idx !== prev.length - 1 || m.role !== "assistant") {
-          return m;
-        }
-        const hasStreaming = m.parts.some(
-          (p) => p.type === "text" && p.state === "streaming"
-        );
-        if (!hasStreaming) {
-          return m;
-        }
-        return {
-          ...m,
-          parts: m.parts.map((p) =>
-            p.type === "text" && p.state === "streaming"
-              ? { ...p, state: "done" }
-              : p
-          ),
-        };
-      })
-    );
-  }, [setUiMessages, stop]);
-
-  // ストリーミング中断（部分応答を破棄する）。
-  // abortStream() と異なり部分応答を done 化しないため、state==='streaming' の
-  // text パーツを持つメッセージは messages から除外され続け、画面上から消える
-  // （= 破棄される）。セッション切り替えや新規チャット開始のように、
-  // 直後にメッセージ一覧を差し替える呼び出し側向けの中断手段。
-  const abortStreamDiscard = useCallback(async () => {
-    await stop();
-  }, [stop]);
-
-  // メッセージ全消去（紐づくセッションごと削除する）
-  const clearMessages = useCallback(() => {
-    void abortStream();
-    if (currentSessionIdRef.current) {
-      void deleteSession(currentSessionIdRef.current);
-    } else {
-      setUiMessages([]);
-      setError(null);
-    }
-  }, [abortStream, deleteSession, setUiMessages]);
-
-  // 送信した最後のプロンプトを再試行用に記憶する
-  const lastPromptRef = useRef<string | null>(null);
-
-  // メッセージ送信（セッション自動作成 → AI SDK ストリーミング）
-  const sendMessage = useCallback(
-    async (content: string) => {
-      const text = content.trim();
-      if (!text || isStreaming) {
-        return;
-      }
-
-      lastPromptRef.current = text;
-      setError(null);
-
-      let activeSessionId = currentSessionIdRef.current;
-
-      // まだセッションがない場合は新規セッションを作成
-      if (!activeSessionId) {
-        const titleProposal =
-          text.slice(0, 30).trim().replace(/\n+/g, " ") || "新しい相談";
-        const newSession = await createSession(
-          selectedNovelIdLiveRef.current,
-          titleProposal
-        );
-        if (!newSession) {
-          return;
-        }
-        activeSessionId = newSession.id;
-        autoCreatedSessionRef.current = activeSessionId;
-      }
-
-      // AI SDK がユーザーメッセージを追加して送信する
-      await chatSendMessage({ text });
-    },
-    [createSession, chatSendMessage, isStreaming]
-  );
-
-  // 直前のメッセージを再試行する
-  const retryLastMessage = useCallback(async () => {
-    if (isStreaming) {
-      return;
-    }
-    const lastUserPrompt =
-      lastPromptRef.current ??
-      [...messages].reverse().find((m) => m.role === "user")?.content;
-    if (!lastUserPrompt) {
-      return;
-    }
-    await sendMessage(lastUserPrompt);
-  }, [messages, sendMessage, isStreaming]);
-
-  // エラー表示を消去する
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
+  // セッション操作・送信・中断・再試行は useChatActions に委譲する（単一 source の一部）
+  const {
+    createSession,
+    deleteSession,
+    sendMessage,
+    abortStream,
+    abortStreamDiscard,
+    clearMessages,
+    retryLastMessage,
+    clearError,
+    lastPromptRef,
+  } = useChatActions({
+    autoCreatedSessionRef,
+    chatSendMessage,
+    currentSessionIdRef,
+    isStreaming,
+    messages,
+    refreshSessions,
+    selectedNovelIdLiveRef,
+    setCurrentSessionId,
+    setError,
+    setUiMessages,
+    stop,
+  });
 
   // 戻り値は ChatProvider から2つの context value に分配されるため
   // メモ化してフィールド単位の同一性を保証する
@@ -635,18 +356,15 @@ export function useChatStreaming({
     [
       currentSessionId,
       setCurrentSessionId,
-      currentSessionIdRef,
       selectedModelConfigId,
       handleSetSelectedModelConfigId,
       messages,
       setUiMessages,
       isStreaming,
-      isStreamingRef,
       streamingContent,
       streamingParts,
       progress,
       error,
-      setError,
       clearError,
       lastPromptRef.current,
       retryLastMessage,

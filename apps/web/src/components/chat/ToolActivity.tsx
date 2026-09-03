@@ -1,141 +1,28 @@
-import type { DynamicToolUIPart, ToolUIPart, UITools } from "ai";
-import { getToolName } from "ai";
 import { useState } from "react";
 import { ChatProposalCard, type ProposalPayload } from "./ChatProposalCard.js";
+import { extractReasoning, ReasoningActivity } from "./ReasoningActivity.js";
+import {
+  extractToolInvocations,
+  formatArgsSummary,
+  formatResultSummary,
+  type ToolInvocationItem,
+  toolIcon,
+  toolLabel,
+  toPreviewJson,
+} from "./toolParts.js";
 
-/** ツールの日本語表示名マップ */
-const TOOL_LABELS: Record<string, string> = {
-  getNovelInfo: "小説情報",
-  getStoryOutline: "ストーリー構想取得",
-  getCharacters: "人物取得",
-  getSettings: "設定取得",
-  getPlotAndChapters: "プロット・章構成取得",
-  getSectionContent: "本文取得",
-  getForeshadowings: "伏線取得",
-  getTimelines: "時系列取得",
-  searchNovelKnowledge: "知識検索",
-  proposeCreateCharacter: "人物登録提案",
-  proposeCreateSetting: "設定登録提案",
-  proposeAddForeshadowing: "伏線登録提案",
-  proposeAddTimelineEvent: "年表追加提案",
-  proposeUpdatePlot: "プロット更新提案",
-  proposeUpdateStoryOutline: "ストーリー構想更新提案",
-  proposeBulkCreate: "一括設定登録提案",
-};
-
-/** ツール呼び出しの表示用アイコン */
-const TOOL_ICONS: Record<string, string> = {
-  getNovelInfo: "📖",
-  getStoryOutline: "📑",
-  getCharacters: "🎭",
-  getSettings: "🌍",
-  getPlotAndChapters: "📑",
-  getSectionContent: "📝",
-  getForeshadowings: "🔍",
-  getTimelines: "⏳",
-  searchNovelKnowledge: "🧠",
-  proposeCreateCharacter: "💡",
-  proposeCreateSetting: "💡",
-  proposeAddForeshadowing: "💡",
-  proposeAddTimelineEvent: "💡",
-  proposeUpdatePlot: "💡",
-  proposeUpdateStoryOutline: "💡",
-  proposeBulkCreate: "💡",
-};
-
-/** AI SDK v7 のツールパーツ（静的 tool-<name> / 動的 dynamic-tool の両方） */
-type AnyToolUIPart = ToolUIPart<UITools> | DynamicToolUIPart;
-
-/** v7 ツールパーツの state */
-export type ToolPartState = AnyToolUIPart["state"];
-
-export interface ToolInvocationItem {
-  /** state が 'output-error' のときのエラーテキスト */
-  errorText?: string;
-  /** state が 'output-available' のとき true */
-  hasOutput: boolean;
-  /** ツール引数（input）。state に応じて未定義のことがある */
-  input?: unknown;
-  /** 実行結果（output）。state が 'output-available' のときのみ */
-  output?: unknown;
-  state: ToolPartState;
-  toolCallId: string;
-  /** v7 ツール名（type の 'tool-' サフィックス / dynamic-tool の toolName） */
-  toolName: string;
-}
-
-/**
- * 構造チェックでパーツがツールパーツかどうかを判定する。
- * `tool-xxx`（動的 ID サフィックス付き含む）と `dynamic-tool` の両方を拾う。
- */
-function isToolPartLike(part: unknown): part is AnyToolUIPart {
-  if (!part || typeof part !== "object") {
-    return false;
-  }
-  const p = part as { type?: unknown; toolCallId?: unknown };
-  if (typeof p.toolCallId !== "string" || p.toolCallId.length === 0) {
-    return false;
-  }
-  return (
-    typeof p.type === "string" &&
-    (p.type.startsWith("tool-") || p.type === "dynamic-tool")
-  );
-}
-
-/**
- * ツールパーツからツール名を取得する。
- * ai パッケージの getToolName ヘルパーを使用し、失敗時は構造的にフォールバックする。
- */
-function resolveToolName(part: AnyToolUIPart): string {
-  try {
-    return getToolName(part as Parameters<typeof getToolName>[0]);
-  } catch {
-    const p = part as { type: string; toolName?: string };
-    if (p.type === "dynamic-tool") {
-      return p.toolName ?? "unknown";
-    }
-    return p.type.slice("tool-".length);
-  }
-}
-
-/**
- * UIMessage の parts 配列からツール呼び出し一覧を抽出する（純関数）。
- * AI SDK v7 のパーツ形式（type が 'tool-<name>' / 'dynamic-tool'）に対応。
- */
-export function extractToolInvocations(
-  parts?: unknown[] | null
-): ToolInvocationItem[] {
-  if (!Array.isArray(parts) || parts.length === 0) {
-    return [];
-  }
-
-  const items: ToolInvocationItem[] = [];
-
-  for (const part of parts) {
-    if (!isToolPartLike(part)) {
-      continue;
-    }
-
-    const state = part.state as ToolPartState;
-    items.push({
-      toolCallId: part.toolCallId,
-      toolName: resolveToolName(part),
-      state,
-      hasOutput: state === "output-available",
-      input: "input" in part ? part.input : undefined,
-      output:
-        state === "output-available"
-          ? (part as { output?: unknown }).output
-          : undefined,
-      errorText:
-        state === "output-error"
-          ? String((part as { errorText?: unknown }).errorText ?? "")
-          : undefined,
-    });
-  }
-
-  return items;
-}
+export {
+  extractReasoning,
+  ReasoningActivity,
+  type ReasoningItem,
+} from "./ReasoningActivity.js";
+// 互換のための再エクスポート（既存の import パスを維持する）
+export {
+  extractToolInvocations,
+  type ToolInvocationItem,
+  toolLabel,
+} from "./toolParts.js";
+export type { ProposalPayload };
 
 /**
  * UIMessage の parts 配列から提案ペイロード一覧を抽出する（純関数）。
@@ -156,89 +43,6 @@ export function extractProposalPayloads(
     }
   }
   return proposals;
-}
-
-/** ツール名の日本語表示ラベルを返す（未知のツール名はそのまま） */
-export function toolLabel(toolName: string): string {
-  return TOOL_LABELS[toolName] ?? toolName;
-}
-
-/** ツール引数の表示用サマリー文字列を生成する */
-function formatArgsSummary(toolName: string, input: unknown): string | null {
-  if (!input || typeof input !== "object") {
-    return null;
-  }
-  const args = input as Record<string, unknown>;
-  if (Object.keys(args).length === 0) {
-    return null;
-  }
-  if (toolName === "proposeBulkCreate") {
-    const chars = Array.isArray(args.characters) ? args.characters.length : 0;
-    const sets = Array.isArray(args.settings) ? args.settings.length : 0;
-    const fores = Array.isArray(args.foreshadowings)
-      ? args.foreshadowings.length
-      : 0;
-    const times = Array.isArray(args.timelines) ? args.timelines.length : 0;
-    return `合計 ${chars + sets + fores + times} 件 (人物:${chars}, 設定:${sets}, 伏線:${fores}, 年表:${times})`;
-  }
-  if (args.name) {
-    return `名前: ${String(args.name)}`;
-  }
-  if (toolName === "searchNovelKnowledge" && args.query) {
-    return `クエリ: "${String(args.query)}"`;
-  }
-  if (args.sectionId) {
-    return `節ID: ${String(args.sectionId).slice(0, 8)}...`;
-  }
-  if (args.category) {
-    return `カテゴリ: ${String(args.category)}`;
-  }
-  return null;
-}
-
-/** ツール結果の表示用サマリー文字列を生成する */
-function formatResultSummary(output: unknown): string | null {
-  if (output === undefined || output === null) {
-    return null;
-  }
-  if (typeof output === "object") {
-    const res = output as Record<string, unknown>;
-    if (res.error) {
-      return String(res.error);
-    }
-    if (typeof res.count === "number") {
-      return `${res.count} 件取得`;
-    }
-    if (typeof res.chapterCount === "number") {
-      return `${res.chapterCount} 章の構成を取得`;
-    }
-    if (res.title) {
-      return `「${String(res.title)}」を取得`;
-    }
-    if (Array.isArray(res.characters) && res.characters.length > 0) {
-      return `${res.characters.length} 件のキャラクターを取得`;
-    }
-    if (Array.isArray(res.settings) && res.settings.length > 0) {
-      return `${res.settings.length} 件の設定を取得`;
-    }
-  }
-  return "完了";
-}
-
-/** JSON プレビュー用の文字列化（長い場合は切り詰める） */
-const PREVIEW_LIMIT = 2000;
-
-function toPreviewJson(value: unknown): string {
-  let json: string;
-  try {
-    json = JSON.stringify(value, null, 2) ?? String(value);
-  } catch {
-    json = String(value);
-  }
-  if (json.length > PREVIEW_LIMIT) {
-    return `${json.slice(0, PREVIEW_LIMIT)}\n… (残り ${(json.length - PREVIEW_LIMIT).toLocaleString()} 文字)`;
-  }
-  return json;
 }
 
 /** state ごとのステータス表示 */
@@ -304,137 +108,6 @@ function StatusBadge({ item }: { item: ToolInvocationItem }) {
   }
 }
 
-export interface ReasoningItem {
-  state?: "streaming" | "done";
-  text: string;
-}
-
-/**
- * UIMessage の parts 配列から思考プロセス（reasoning）を抽出する（純関数）。
- * AI SDK v7 の parts: { type: 'reasoning', text: string, state?: 'streaming' | 'done' } に対応。
- */
-export function extractReasoning(
-  parts?: unknown[] | null
-): ReasoningItem | null {
-  if (!Array.isArray(parts) || parts.length === 0) {
-    return null;
-  }
-
-  const reasoningParts = parts.filter(
-    (
-      p
-    ): p is { type: "reasoning"; text: string; state?: "streaming" | "done" } =>
-      Boolean(
-        p &&
-          typeof p === "object" &&
-          (p as { type?: unknown }).type === "reasoning" &&
-          typeof (p as { text?: unknown }).text === "string"
-      )
-  );
-
-  if (reasoningParts.length === 0) {
-    return null;
-  }
-
-  const text = reasoningParts.map((p) => p.text || "").join("");
-  if (!text.trim()) {
-    return null;
-  }
-
-  const isStreaming = reasoningParts.some((p) => p.state === "streaming");
-  return {
-    text,
-    state: isStreaming ? "streaming" : "done",
-  };
-}
-
-/**
- * 思考プロセス（Reasoning）の表示用コンポーネント。
- * ストリーミング中は自動展開でリアルタイムに思考内容を表示し、完了時は折りたたみトグル可能。
- */
-export function ReasoningActivity({
-  reasoning,
-  defaultExpanded,
-}: {
-  reasoning: ReasoningItem | null;
-  defaultExpanded?: boolean;
-}) {
-  const isStreaming = reasoning?.state === "streaming";
-  const [isOpen, setIsOpen] = useState<boolean>(
-    () => defaultExpanded ?? isStreaming
-  );
-
-  if (!reasoning || !reasoning.text.trim()) {
-    return null;
-  }
-
-  // ストリーミング中は常に開く（ユーザーが手動で閉じない限り）
-  const expanded = isStreaming || isOpen;
-
-  return (
-    <div className="mb-2 w-full overflow-hidden rounded-xl border border-indigo-200/70 bg-indigo-50/50 text-[12px] shadow-xs backdrop-blur transition dark:border-indigo-900/50 dark:bg-indigo-950/30">
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="flex w-full cursor-pointer items-center justify-between gap-2 px-3 py-2 text-left text-indigo-950 transition hover:bg-indigo-100/50 dark:text-indigo-200 dark:hover:bg-indigo-900/30"
-      >
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          <span
-            className={`shrink-0 text-sm ${isStreaming ? "animate-pulse" : ""}`}
-          >
-            🧠
-          </span>
-          <span className="truncate font-semibold">
-            {isStreaming ? "AIパートナーが思考中..." : "思考プロセス"}
-          </span>
-          {!isStreaming && (
-            <span className="text-[10px] text-muted-foreground">
-              ({reasoning.text.length.toLocaleString()}文字)
-            </span>
-          )}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1.5 text-[11px]">
-          {isStreaming ? (
-            <span className="flex items-center gap-1 font-medium text-indigo-600 dark:text-indigo-400">
-              <span className="inline-block h-1.5 w-1.5 animate-ping rounded-full bg-indigo-500" />
-              <span>推論中...</span>
-            </span>
-          ) : (
-            <span className="text-[10px] text-muted-foreground">
-              {expanded ? "閉じる" : "表示"}
-            </span>
-          )}
-
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${
-              expanded ? "rotate-180" : ""
-            }`}
-          >
-            <path
-              fillRule="evenodd"
-              d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="max-h-60 overflow-y-auto whitespace-pre-wrap border-indigo-200/50 border-t bg-background/60 p-3 font-mono text-[11px] text-foreground/90 leading-relaxed dark:border-indigo-900/40">
-          {reasoning.text}
-          {isStreaming && (
-            <span className="ml-0.5 inline-block h-3.5 w-1.5 animate-pulse bg-indigo-500 align-middle" />
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export interface ToolActivityProps {
   /** ストリーミング実行中かどうか */
   isStreaming?: boolean;
@@ -472,7 +145,7 @@ export function ToolActivity({
         <div className="space-y-1.5">
           {invocations.map((inv) => {
             const label = toolLabel(inv.toolName);
-            const icon = TOOL_ICONS[inv.toolName] ?? "⚙️";
+            const icon = toolIcon(inv.toolName);
             const isExpanded = expandedId === inv.toolCallId;
             const argsSummary = formatArgsSummary(inv.toolName, inv.input);
             const hasInput = inv.input !== undefined && inv.input !== null;
