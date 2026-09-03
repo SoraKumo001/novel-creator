@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
+  extractProposalPayloads,
   extractReasoning,
   extractToolInvocations,
   ToolActivity,
@@ -335,5 +336,39 @@ describe("extractReasoning & ReasoningActivity", () => {
     expect(screen.getByText("AIパートナーが思考中...")).toBeInTheDocument();
     expect(screen.getByText("推論中...")).toBeInTheDocument();
     expect(screen.getByText("リアルタイムに推論中...")).toBeInTheDocument();
+  });
+
+  describe("extractProposalPayloads & showProposalCards", () => {
+    const proposalPart = {
+      type: "tool-proposeCreateCharacter",
+      toolCallId: "prop-1",
+      state: "output-available",
+      input: { name: "ルカ" },
+      output: {
+        type: "proposal",
+        proposalType: "character",
+        data: { name: "ルカ", category: "主人公" },
+        summary: "登場人物「ルカ」の登録提案",
+      },
+    };
+
+    it("extractProposalPayloads で proposal を抽出できること", () => {
+      const parts = [{ type: "text", text: "提案します" }, proposalPart];
+      const proposals = extractProposalPayloads(parts);
+      expect(proposals).toHaveLength(1);
+      expect(proposals[0].proposalType).toBe("character");
+    });
+
+    it("showProposalCards={false} のとき、インラインの提案カードを描画しないこと", () => {
+      const parts = [proposalPart];
+      render(<ToolActivity parts={parts} showProposalCards={false} />);
+
+      // ツールログのヘッダーは描画される
+      expect(screen.getByText("人物登録提案")).toBeInTheDocument();
+      // インラインの提案カード（反映ボタンなど）は描画されない
+      expect(
+        screen.queryByRole("button", { name: /小説に反映する/ })
+      ).not.toBeInTheDocument();
+    });
   });
 });

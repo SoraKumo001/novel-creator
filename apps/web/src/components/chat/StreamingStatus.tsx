@@ -2,7 +2,8 @@ import type { UIMessage } from "ai";
 import { useEffect, useState } from "react";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import type { StreamingProgress } from "@/hooks/useChatStreaming.js";
-import { ToolActivity } from "./ToolActivity.js";
+import { ChatProposalCard } from "./ChatProposalCard.js";
+import { extractProposalPayloads, ToolActivity } from "./ToolActivity.js";
 
 interface StreamingStatusProps {
   /** バックエンド（data-progress パーツ）由来の進捗。isStreaming 中のみ非 null */
@@ -78,11 +79,21 @@ export function StreamingStatus({
             </span>
           </div>
           <div className="max-w-[88%] rounded-2xl rounded-bl-xs border border-primary/30 bg-surface-raised px-4 py-2.5 text-foreground text-sm shadow-xs">
-            {/* 思考プロセス & ツール呼び出しはテキスト生成前でもリアルタイムに表示 */}
-            <ToolActivity parts={streamingParts} isStreaming={true} />
+            {/* 思考プロセス & ツール呼び出しはテキスト生成前でもリアルタイムに表示（提案カードは下部に配置） */}
+            <ToolActivity
+              parts={streamingParts}
+              isStreaming={true}
+              showProposalCards={false}
+            />
             {streamingContent && (
               <MarkdownText content={streamingContent} disableMermaid={true} />
             )}
+            {/* 作成された登録用の提案カード（ストリーミング完了時等に解説テキストの直下に表示） */}
+            {extractProposalPayloads(streamingParts).map((proposal, idx) => (
+              <div key={idx} className="mt-2.5">
+                <ChatProposalCard proposal={proposal} />
+              </div>
+            ))}
           </div>
         </>
       ) : (

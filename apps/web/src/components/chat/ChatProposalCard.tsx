@@ -1127,7 +1127,29 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
                   <div className="font-bold text-[11px] text-amber-700 dark:text-amber-400">
                     🔍 伏線 ({data.foreshadowings.length}件)
                   </div>
-                  <div className="mt-1 space-y-1 border-amber-200 border-l-2 pl-1.5 dark:border-amber-800"></div>
+                  <div className="mt-1 space-y-1 border-amber-200 border-l-2 pl-1.5 dark:border-amber-800">
+                    {data.foreshadowings.map((f: any, i: number) => {
+                      const displayTitle =
+                        f.title ||
+                        f.name ||
+                        (f.description
+                          ? f.description.slice(0, 24) +
+                            (f.description.length > 24 ? "..." : "")
+                          : "（伏線）");
+                      return (
+                        <div key={i} className="text-[11px]">
+                          <span className="font-semibold text-slate-900 dark:text-slate-100">
+                            {displayTitle}
+                          </span>
+                          {f.description && f.title && (
+                            <p className="line-clamp-1 text-[10px] text-slate-600 dark:text-slate-400">
+                              {f.description}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             {Array.isArray(data.timelines) && data.timelines.length > 0 && (

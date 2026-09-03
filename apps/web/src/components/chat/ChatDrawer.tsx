@@ -20,10 +20,10 @@ import {
 import { useNovels } from "@/hooks/useNovels.js";
 import { usePinnedSessions } from "@/hooks/usePinnedSessions.js";
 import { useToast } from "@/hooks/useToast.js";
-import { ChatInsertEntityModal } from "./ChatInsertEntityModal.js";
+import { ChatProposalCard } from "./ChatProposalCard.js";
 import { ChatSessionList } from "./ChatSessionList.js";
 import { StreamingStatus } from "./StreamingStatus.js";
-import { ToolActivity } from "./ToolActivity.js";
+import { extractProposalPayloads, ToolActivity } from "./ToolActivity.js";
 
 type DrawerWidth = "normal" | "wide" | "full";
 type ChatLayoutMode = "overlay" | "docked";
@@ -66,18 +66,24 @@ export function buildChatPromptWithFocus(
   return `【参照コンテキスト: ${focus.title}】\n--- 現在の内容 ---\n${summary}\n--- ここまで ---\n\n${trimmed}`;
 }
 
+/** 相談実行時にメッセージ末尾へ付与する不可視コンテキストブロックを生成する（互換用・純関数） */
+export function buildContextAppendedPrompt(
+  userPrompt: string,
+  focus: ChatFocusContext
+): string {
+  return buildChatPromptWithFocus(userPrompt, focus);
+}
+
 interface ChatMessageItemProps {
   copiedId: string | null;
   message: ChatMessage;
   onCopy: (content: string, id: string) => void;
-  onInsertEntity: (content: string) => void;
 }
 
 const ChatMessageItem = memo(function ChatMessageItem({
   message: m,
   copiedId,
   onCopy,
-  onInsertEntity,
 }: ChatMessageItemProps) {
   const isUser = m.role === "user";
   return (
@@ -96,9 +102,19 @@ const ChatMessageItem = memo(function ChatMessageItem({
           <div className="whitespace-pre-wrap">{m.content}</div>
         ) : (
           <>
-            {/* AI のツール呼び出し活動 & 思考プロセス（v7 パーツから抽出。無ければ非表示） */}
-            <ToolActivity parts={m.parts} isStreaming={false} />
+            {/* AI のツール呼び出し活動 & 思考プロセス（提案カードは下部に配置） */}
+            <ToolActivity
+              parts={m.parts}
+              isStreaming={false}
+              showProposalCards={false}
+            />
             {m.content && <MarkdownText content={m.content} />}
+            {/* 作成された登録用の提案カード（解説テキストの直下） */}
+            {extractProposalPayloads(m.parts).map((proposal, idx) => (
+              <div key={idx} className="mt-2.5">
+                <ChatProposalCard proposal={proposal} />
+              </div>
+            ))}
           </>
         )}
       </div>
@@ -112,14 +128,6 @@ const ChatMessageItem = memo(function ChatMessageItem({
             className="cursor-pointer hover:text-foreground"
           >
             {copiedId === m.id ? "✓ コピー完了" : "📋 コピー"}
-          </button>
-          <span>•</span>
-          <button
-            type="button"
-            onClick={() => onInsertEntity(m.content)}
-            className="cursor-pointer font-medium hover:text-primary"
-          >
-            📥 設定・人物へ取り込む
           </button>
         </div>
       )}
@@ -182,9 +190,6 @@ export function ChatDrawer() {
   const [input, setInput] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showHistoryView, setShowHistoryView] = useState(false);
-  const [insertModalSource, setInsertModalSource] = useState<string | null>(
-    null
-  );
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -304,10 +309,6 @@ export function ChatDrawer() {
     },
     [toast]
   );
-
-  const handleInsertEntity = useCallback((content: string) => {
-    setInsertModalSource(content);
-  }, []);
 
   const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
@@ -668,7 +669,6 @@ export function ChatDrawer() {
                 message={m}
                 copiedId={copiedId}
                 onCopy={handleCopy}
-                onInsertEntity={handleInsertEntity}
               />
             ))}
 
@@ -809,17 +809,6 @@ export function ChatDrawer() {
             </div>
           </div>
         </>
-      )}
-
-      {/* 設定・人物取り込みモーダル */}
-      {insertModalSource && (
-        <ChatInsertEntityModal
-          isOpen={!!insertModalSource}
-          onClose={() => setInsertModalSource(null)}
-          sourceText={insertModalSource}
-          defaultNovelId={selectedNovelId}
-          novels={novels}
-        />
       )}
     </aside>
   );

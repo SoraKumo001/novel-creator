@@ -137,6 +137,27 @@ export function extractToolInvocations(
   return items;
 }
 
+/**
+ * UIMessage の parts 配列から提案ペイロード一覧を抽出する（純関数）。
+ */
+export function extractProposalPayloads(
+  parts?: unknown[] | null
+): ProposalPayload[] {
+  const invocations = extractToolInvocations(parts);
+  const proposals: ProposalPayload[] = [];
+  for (const inv of invocations) {
+    if (
+      inv.hasOutput &&
+      typeof inv.output === "object" &&
+      inv.output !== null &&
+      (inv.output as { type?: string }).type === "proposal"
+    ) {
+      proposals.push(inv.output as ProposalPayload);
+    }
+  }
+  return proposals;
+}
+
 /** ツール名の日本語表示ラベルを返す（未知のツール名はそのまま） */
 export function toolLabel(toolName: string): string {
   return TOOL_LABELS[toolName] ?? toolName;
@@ -414,14 +435,20 @@ export function ReasoningActivity({
   );
 }
 
-interface ToolActivityProps {
+export interface ToolActivityProps {
   /** ストリーミング実行中かどうか */
   isStreaming?: boolean;
   /** UIMessage の parts 配列（tool パーツおよび reasoning パーツを抽出して表示する） */
   parts?: unknown[] | null;
+  /** 提案カード（ChatProposalCard）をインライン表示するかどうか。デフォルト true。 */
+  showProposalCards?: boolean;
 }
 
-export function ToolActivity({ parts, isStreaming }: ToolActivityProps) {
+export function ToolActivity({
+  parts,
+  isStreaming,
+  showProposalCards = true,
+}: ToolActivityProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const invocations = extractToolInvocations(parts);
   const reasoning = extractReasoning(parts);
@@ -552,7 +579,8 @@ export function ToolActivity({ parts, isStreaming }: ToolActivityProps) {
                 )}
 
                 {/* 提案ツール（Propose Tools）の承認カード（アコーディオンの開閉によらず常時表示） */}
-                {inv.hasOutput &&
+                {showProposalCards &&
+                  inv.hasOutput &&
                   typeof inv.output === "object" &&
                   inv.output !== null &&
                   (inv.output as { type?: string }).type === "proposal" && (
