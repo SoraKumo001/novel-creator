@@ -5,6 +5,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { EmptyState } from "@/components/EmptyState.js";
 import { LLMModelSelector } from "@/components/LLMModelSelector.js";
 import { Loading } from "@/components/Loading.js";
+import { TabHeader } from "@/components/TabHeader.js";
 import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
 import { useChapters } from "@/hooks/useChapters.js";
 
@@ -312,13 +313,11 @@ export function PlotTab({
 
   return (
     <div className="flex h-full flex-col space-y-4">
-      {/* ツールバー */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b pb-3">
-        <div className="flex items-center gap-3">
-          <h2 className="font-bold text-foreground text-xl">
-            章立て・プロット
-          </h2>
-          {viewMode === "structure" && chapters.length > 0 && (
+      <TabHeader
+        title="章立て・プロット"
+        leftExtra={
+          viewMode === "structure" &&
+          chapters.length > 0 && (
             <button
               onClick={toggleExpandAll}
               className="cursor-pointer text-muted-foreground text-xs transition hover:text-foreground"
@@ -327,11 +326,10 @@ export function PlotTab({
                 ? "すべて折りたたむ"
                 : "すべて展開"}
             </button>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          {viewMode === "structure" && (
+          )
+        }
+        rightControls={
+          viewMode === "structure" && (
             <>
               <LLMModelSelector
                 value={selectedModelConfigId}
@@ -355,7 +353,9 @@ export function PlotTab({
                 章を追加
               </Button>
             </>
-          )}
+          )
+        }
+        viewModeSwitch={
           <ViewModeSwitch
             value={viewMode}
             onChange={setViewMode}
@@ -364,8 +364,8 @@ export function PlotTab({
               { label: "マークダウン", value: "markdown" },
             ]}
           />
-        </div>
-      </div>
+        }
+      />
 
       {viewMode === "markdown" ? (
         <div className="min-h-0 flex-1">

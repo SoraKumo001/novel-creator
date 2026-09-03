@@ -7,6 +7,7 @@ import type {
 } from "@/lib/types.js";
 import { AnalysisHistoryPanel } from "./AnalysisHistoryPanel.js";
 import { AnalysisProgressPanel } from "./AnalysisProgressPanel.js";
+import { Badge, type BadgeVariant } from "./Badge.js";
 import { Button } from "./Button.js";
 import { HistoryViewBanner } from "./HistoryViewBanner.js";
 import { Modal } from "./Modal.js";
@@ -28,26 +29,29 @@ interface CharacterVoiceCheckerModalProps {
   viewedAt?: string | null;
 }
 
-const ISSUE_TYPE_LABELS: Record<string, { label: string; color: string }> = {
+const ISSUE_TYPE_LABELS: Record<
+  string,
+  { label: string; variant: BadgeVariant }
+> = {
   firstPerson: {
     label: "一人称の矛盾",
-    color: "bg-rose-500/10 text-rose-600 border-rose-500/30",
+    variant: "rose",
   },
   secondPerson: {
     label: "二人称の矛盾",
-    color: "bg-orange-500/10 text-orange-600 border-orange-500/30",
+    variant: "orange",
   },
   speechPattern: {
     label: "口調・語尾のズレ",
-    color: "bg-amber-500/10 text-amber-600 border-amber-500/30",
+    variant: "amber",
   },
   toneShift: {
     label: "感情・トーン急変",
-    color: "bg-purple-500/10 text-purple-600 border-purple-500/30",
+    variant: "purple",
   },
   outOfCharacter: {
     label: "キャラブレ・不自然",
-    color: "bg-red-500/10 text-red-600 border-red-500/30",
+    variant: "rose",
   },
 };
 
@@ -178,7 +182,7 @@ function ResultBody({
           result.issues.map((issue, idx) => {
             const typeConfig = ISSUE_TYPE_LABELS[issue.issueType] ?? {
               label: issue.issueType,
-              color: "bg-slate-500/10 text-slate-600 border-slate-500/30",
+              variant: "slate" as const,
             };
 
             return (
@@ -191,11 +195,9 @@ function ResultBody({
                     <span className="font-bold text-foreground text-sm">
                       👤 {issue.characterName}
                     </span>
-                    <span
-                      className={`rounded-full border px-2 py-0.5 font-semibold text-[10px] ${typeConfig.color}`}
-                    >
+                    <Badge variant={typeConfig.variant} size="sm">
                       {typeConfig.label}
-                    </span>
+                    </Badge>
                   </div>
 
                   {onApplyFix && (

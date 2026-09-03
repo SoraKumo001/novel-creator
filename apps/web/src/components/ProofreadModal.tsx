@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import type { ProofreadResult } from "@/lib/types.js";
 import { AIProgressIndicator } from "./AIProgressIndicator.js";
+import { Badge, type BadgeVariant } from "./Badge.js";
 import { Button } from "./Button.js";
 import { Modal } from "./Modal.js";
 
@@ -14,46 +15,13 @@ interface ProofreadModalProps {
   result: ProofreadResult | null;
 }
 
-const TYPE_CONFIG: Record<
-  string,
-  { label: string; bg: string; text: string; border: string }
-> = {
-  viewpoint: {
-    label: "視点ブレ",
-    bg: "bg-rose-500/10",
-    text: "text-rose-600 dark:text-rose-400",
-    border: "border-rose-500/30",
-  },
-  typo: {
-    label: "誤字・表記揺れ",
-    bg: "bg-amber-500/10",
-    text: "text-amber-600 dark:text-amber-400",
-    border: "border-amber-500/30",
-  },
-  grammar: {
-    label: "文法・助詞",
-    bg: "bg-orange-500/10",
-    text: "text-orange-600 dark:text-orange-400",
-    border: "border-orange-500/30",
-  },
-  pacing: {
-    label: "リズム・テンポ",
-    bg: "bg-blue-500/10",
-    text: "text-blue-600 dark:text-blue-400",
-    border: "border-blue-500/30",
-  },
-  consistency: {
-    label: "設定整合性",
-    bg: "bg-purple-500/10",
-    text: "text-purple-600 dark:text-purple-400",
-    border: "border-purple-500/30",
-  },
-  other: {
-    label: "その他",
-    bg: "bg-slate-500/10",
-    text: "text-slate-600 dark:text-slate-400",
-    border: "border-slate-500/30",
-  },
+const TYPE_CONFIG: Record<string, { label: string; variant: BadgeVariant }> = {
+  viewpoint: { label: "視点ブレ", variant: "rose" },
+  typo: { label: "誤字・表記揺れ", variant: "amber" },
+  grammar: { label: "文法・助詞", variant: "orange" },
+  pacing: { label: "リズム・テンポ", variant: "blue" },
+  consistency: { label: "設定整合性", variant: "purple" },
+  other: { label: "その他", variant: "slate" },
 };
 
 export function ProofreadModal({
@@ -205,11 +173,9 @@ export function ProofreadModal({
                     className="space-y-2 rounded-lg border border-border bg-surface p-3 text-xs"
                   >
                     <div className="flex items-center justify-between">
-                      <span
-                        className={`rounded-full border px-2 py-0.5 font-semibold text-[10px] ${config.bg} ${config.text} ${config.border}`}
-                      >
+                      <Badge variant={config.variant} size="sm">
                         {config.label}
-                      </span>
+                      </Badge>
                     </div>
 
                     <div className="space-y-1">

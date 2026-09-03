@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { EmptyState } from "@/components/EmptyState.js";
+import { FormModal } from "@/components/FormModal.js";
 import { Input } from "@/components/Input.js";
 import { Loading } from "@/components/Loading.js";
-import { Modal } from "@/components/Modal.js";
 import { Select } from "@/components/Select.js";
+
+import { TabHeader } from "@/components/TabHeader.js";
 import { Textarea } from "@/components/Textarea.js";
 import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
+
 import { useNovel } from "@/hooks/useNovel.js";
 import { useTimelines } from "@/hooks/useTimelines.js";
 import type { Chapter, Section, Timeline } from "@/lib/types.js";
@@ -106,10 +109,10 @@ export function TimelineTab({
 
   return (
     <div className="flex h-full flex-col space-y-4">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b pb-3">
-        <h2 className="font-bold text-foreground text-xl">タイムライン</h2>
-        <div className="flex flex-wrap items-center gap-3">
-          {viewMode === "cards" && (
+      <TabHeader
+        title="タイムライン"
+        rightControls={
+          viewMode === "cards" && (
             <Button
               onClick={handleOpenCreate}
               leftIcon={<PlusIcon />}
@@ -117,7 +120,9 @@ export function TimelineTab({
             >
               イベント追加
             </Button>
-          )}
+          )
+        }
+        viewModeSwitch={
           <ViewModeSwitch
             value={viewMode}
             onChange={setViewMode}
@@ -126,8 +131,8 @@ export function TimelineTab({
               { label: "マークダウン", value: "markdown" },
             ]}
           />
-        </div>
-      </div>
+        }
+      />
 
       {viewMode === "markdown" ? (
         <div className="min-h-0 flex-1">
@@ -289,75 +294,66 @@ function TimelineFormModal({
   }
 
   return (
-    <Modal
+    <FormModal
       isOpen={isOpen}
       onClose={onClose}
       title={isEdit ? "イベントを編集" : "イベントを追加"}
       size="md"
-      footer={
-        <>
-          <Button variant="secondary" onClick={onClose} disabled={isLoading}>
-            キャンセル
-          </Button>
-          <Button onClick={handleSubmit} isLoading={isLoading}>
-            {isEdit ? "更新" : "追加"}
-          </Button>
-        </>
-      }
+      isLoading={isLoading}
+      onSubmit={handleSubmit}
+      submitLabel={isEdit ? "更新" : "追加"}
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <Textarea
-          label="イベント内容"
-          value={event}
-          onChange={(e) => setEvent(e.target.value)}
-          rows={3}
-          placeholder="例: 王都の市場で黒ずくめの男と接触する。"
+      <Textarea
+        label="イベント内容"
+        value={event}
+        onChange={(e) => setEvent(e.target.value)}
+        rows={3}
+        placeholder="例: 王都の市場で黒ずくめの男と接触する。"
+      />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <Input
+          label="順序"
+          type="number"
+          value={order}
+          onChange={(e) => setOrder(Number(e.target.value))}
         />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input
-            label="順序"
-            type="number"
-            value={order}
-            onChange={(e) => setOrder(Number(e.target.value))}
-          />
-          <Input
-            label="タイムスタンプ"
-            value={timestamp}
-            onChange={(e) => setTimestamp(e.target.value)}
-            placeholder="例: 第一章冒頭, 3日目の朝..."
-          />
+        <Input
+          label="タイムスタンプ"
+          value={timestamp}
+          onChange={(e) => setTimestamp(e.target.value)}
+          placeholder="例: 第一章冒頭, 3日目の朝..."
+        />
+      </div>
+      {novelSections.length > 0 && (
+        <div>
+          <label className="mb-1.5 block font-medium text-foreground-secondary text-sm">
+            紐づける節 (任意)
+          </label>
+          <Select
+            value={sectionId}
+            onChange={(e) => setSectionId(e.target.value)}
+            className="w-full px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+          >
+            <option value="">なし</option>
+            {chapters && chapters.length > 0
+              ? chapters.map((ch) => (
+                  <optgroup key={ch.id} label={ch.title}>
+                    {(ch.sections ?? []).map((sec) => (
+                      <option key={sec.id} value={sec.id}>
+                        {sec.title || `節 ${sec.order}`}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))
+              : novelSections.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.title || `節 ${s.order}`}
+                  </option>
+                ))}
+          </Select>
         </div>
-        {novelSections.length > 0 && (
-          <div>
-            <label className="mb-1.5 block font-medium text-foreground-secondary text-sm">
-              紐づける節 (任意)
-            </label>
-            <Select
-              value={sectionId}
-              onChange={(e) => setSectionId(e.target.value)}
-              className="w-full px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-            >
-              <option value="">なし</option>
-              {chapters && chapters.length > 0
-                ? chapters.map((ch) => (
-                    <optgroup key={ch.id} label={ch.title}>
-                      {(ch.sections ?? []).map((sec) => (
-                        <option key={sec.id} value={sec.id}>
-                          {sec.title || `節 ${sec.order}`}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))
-                : novelSections.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.title || `節 ${s.order}`}
-                    </option>
-                  ))}
-            </Select>
-          </div>
-        )}
-        {error && <p className="text-rose-500 text-sm">{error}</p>}
-      </form>
-    </Modal>
+      )}
+      {error && <p className="text-rose-500 text-sm">{error}</p>}
+    </FormModal>
   );
 }

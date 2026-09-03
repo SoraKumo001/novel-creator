@@ -1,10 +1,5 @@
-import {
-  buildSettingTree,
-  findSectionAtLine,
-  type SettingSectionRange,
-} from "@novel-creator/shared";
 import type { SaveSettingsMarkdownResult } from "@/lib/types.js";
-import { EntityMarkdownEditor } from "./-EntityMarkdownEditor.js";
+import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
 
 interface SettingsMarkdownEditorProps {
   fetchSettingsMarkdown: () => Promise<string>;
@@ -22,15 +17,11 @@ export function SettingsMarkdownEditor({
   savingMarkdown,
 }: SettingsMarkdownEditorProps) {
   return (
-    <EntityMarkdownEditor<SettingSectionRange>
+    <PresetEntityMarkdownEditor
+      preset="settings"
       novelId={novelId}
-      entityTitle="設定"
-      entityType="settings_markdown"
-      storageKey={`novel-creator:draft:settings:${novelId}`}
       fetchMarkdown={fetchSettingsMarkdown}
       saveMarkdown={saveSettingsMarkdown}
-      buildTree={buildSettingTree}
-      findSectionAtLine={findSectionAtLine}
       savingMarkdown={savingMarkdown}
     />
   );

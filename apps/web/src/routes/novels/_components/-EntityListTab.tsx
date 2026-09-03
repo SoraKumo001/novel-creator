@@ -18,6 +18,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { EmptyState } from "@/components/EmptyState.js";
 import { Loading } from "@/components/Loading.js";
 import { Select } from "@/components/Select.js";
+import { TabHeader } from "@/components/TabHeader.js";
 import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
 import { IconButton, PencilIcon, PlusIcon, TrashIcon } from "./-Icons.js";
 
@@ -210,10 +211,10 @@ export function EntityListTab<
 
   return (
     <div className="flex h-full flex-col space-y-4">
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b pb-3">
-        <h2 className="font-bold text-foreground text-xl">{config.title}</h2>
-        <div className="flex flex-wrap items-center gap-3">
-          {viewMode === "cards" && (
+      <TabHeader
+        title={config.title}
+        rightControls={
+          viewMode === "cards" && (
             <>
               <div className="flex shrink-0 items-center gap-1.5 text-muted-foreground text-xs">
                 <span>並び順:</span>
@@ -250,7 +251,9 @@ export function EntityListTab<
                 {config.newLabel}
               </Button>
             </>
-          )}
+          )
+        }
+        viewModeSwitch={
           <ViewModeSwitch
             value={viewMode}
             onChange={setViewMode}
@@ -259,8 +262,8 @@ export function EntityListTab<
               { label: "マークダウン", value: "markdown" },
             ]}
           />
-        </div>
-      </div>
+        }
+      />
 
       {viewMode === "markdown" ? (
         <div className="min-h-0 flex-1">

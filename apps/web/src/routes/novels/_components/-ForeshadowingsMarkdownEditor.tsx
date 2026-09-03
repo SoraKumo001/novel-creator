@@ -1,9 +1,4 @@
-import {
-  buildForeshadowingCategoryTree,
-  type ForeshadowingSectionRange,
-  findForeshadowingSectionByLine,
-} from "@novel-creator/shared";
-import { EntityMarkdownEditor } from "./-EntityMarkdownEditor.js";
+import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
 
 interface ForeshadowingsMarkdownEditorProps {
   fetchForeshadowingsMarkdown: () => Promise<string>;
@@ -21,23 +16,11 @@ export function ForeshadowingsMarkdownEditor({
   savingMarkdown,
 }: ForeshadowingsMarkdownEditorProps) {
   return (
-    <EntityMarkdownEditor<ForeshadowingSectionRange>
+    <PresetEntityMarkdownEditor
+      preset="foreshadowings"
       novelId={novelId}
-      entityTitle="伏線"
-      entityType="foreshadowings_document"
-      storageKey={`novel-creator:draft:foreshadowings:${novelId}`}
       fetchMarkdown={fetchForeshadowingsMarkdown}
-      saveMarkdown={async (md) => {
-        const res = await saveForeshadowingsMarkdown(md);
-        return {
-          created: res.created,
-          updated: res.updated,
-          deleted: res.deleted,
-          duplicateCount: 0,
-        };
-      }}
-      buildTree={buildForeshadowingCategoryTree}
-      findSectionAtLine={findForeshadowingSectionByLine}
+      saveMarkdown={saveForeshadowingsMarkdown}
       savingMarkdown={savingMarkdown}
     />
   );

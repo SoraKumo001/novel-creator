@@ -1,16 +1,11 @@
-import {
-  buildPlotCategoryTree,
-  findPlotSectionByLine,
-  type PlotSectionRange,
-} from "@novel-creator/shared";
-import { EntityMarkdownEditor } from "./-EntityMarkdownEditor.js";
+import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
 
 interface PlotMarkdownEditorProps {
   fetchPlotMarkdown: () => Promise<string>;
   novelId: string;
   savePlotMarkdown: (
     markdown: string
-  ) => Promise<{ created: number; deleted: number; updated: number }>;
+  ) => Promise<{ created?: number; updated?: number; deleted?: number }>;
   savingMarkdown: boolean;
 }
 
@@ -21,15 +16,11 @@ export function PlotMarkdownEditor({
   savingMarkdown,
 }: PlotMarkdownEditorProps) {
   return (
-    <EntityMarkdownEditor<PlotSectionRange>
+    <PresetEntityMarkdownEditor
+      preset="plot"
       novelId={novelId}
-      entityTitle="プロット"
-      entityType="plot_markdown"
-      storageKey={`novel-creator:draft:plot:${novelId}`}
       fetchMarkdown={fetchPlotMarkdown}
       saveMarkdown={savePlotMarkdown}
-      buildTree={buildPlotCategoryTree}
-      findSectionAtLine={findPlotSectionByLine}
       savingMarkdown={savingMarkdown}
     />
   );

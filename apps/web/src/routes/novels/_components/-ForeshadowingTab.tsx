@@ -1,5 +1,6 @@
 import { useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
+import { Badge, type BadgeVariant } from "@/components/Badge.js";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import { useChapters } from "@/hooks/useChapters.js";
 import { useForeshadowings } from "@/hooks/useForeshadowings.js";
@@ -20,27 +21,21 @@ export type ForeshadowingEntity = Foreshadowing & {
 
 const STATUS_CONFIG: Record<
   ForeshadowingStatus,
-  { label: string; bg: string; text: string; border: string; icon: string }
+  { label: string; variant: BadgeVariant; icon: string }
 > = {
   unresolved: {
     label: "未回収",
-    bg: "bg-amber-500/10",
-    text: "text-amber-600 dark:text-amber-400",
-    border: "border-amber-500/30",
+    variant: "amber",
     icon: "⏳",
   },
   resolved: {
     label: "回収済",
-    bg: "bg-emerald-500/10",
-    text: "text-emerald-600 dark:text-emerald-400",
-    border: "border-emerald-500/30",
+    variant: "emerald",
     icon: "✅",
   },
   abandoned: {
     label: "保留・破棄",
-    bg: "bg-muted/10",
-    text: "text-muted-foreground",
-    border: "border-border",
+    variant: "muted",
     icon: "🚫",
   },
 };
@@ -132,11 +127,12 @@ export function ForeshadowingTab({ novel, onRefresh }: ForeshadowingTabProps) {
                     e.stopPropagation();
                     void handleToggleStatus(item);
                   }}
-                  className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-semibold text-xs transition hover:opacity-80 ${cfg.bg} ${cfg.text} ${cfg.border}`}
+                  className="cursor-pointer transition hover:opacity-80"
                   title="クリックしてステータスを変更"
                 >
-                  <span>{cfg.icon}</span>
-                  <span>{cfg.label}</span>
+                  <Badge variant={cfg.variant} icon={cfg.icon}>
+                    {cfg.label}
+                  </Badge>
                 </button>
               </div>
 

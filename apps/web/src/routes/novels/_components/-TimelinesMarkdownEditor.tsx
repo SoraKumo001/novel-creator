@@ -1,16 +1,11 @@
-import {
-  buildTimelineCategoryTree,
-  findTimelineSectionByLine,
-  type TimelineSectionRange,
-} from "@novel-creator/shared";
-import { EntityMarkdownEditor } from "./-EntityMarkdownEditor.js";
+import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
 
 interface TimelinesMarkdownEditorProps {
   fetchTimelinesMarkdown: () => Promise<string>;
   novelId: string;
   saveTimelinesMarkdown: (
     markdown: string
-  ) => Promise<{ created: number; deleted: number; updated: number }>;
+  ) => Promise<{ created?: number; updated?: number; deleted?: number }>;
   savingMarkdown: boolean;
 }
 
@@ -21,15 +16,11 @@ export function TimelinesMarkdownEditor({
   savingMarkdown,
 }: TimelinesMarkdownEditorProps) {
   return (
-    <EntityMarkdownEditor<TimelineSectionRange>
+    <PresetEntityMarkdownEditor
+      preset="timelines"
       novelId={novelId}
-      entityTitle="年表"
-      entityType="timelines_markdown"
-      storageKey={`novel-creator:draft:timelines:${novelId}`}
       fetchMarkdown={fetchTimelinesMarkdown}
       saveMarkdown={saveTimelinesMarkdown}
-      buildTree={buildTimelineCategoryTree}
-      findSectionAtLine={findTimelineSectionByLine}
       savingMarkdown={savingMarkdown}
     />
   );
