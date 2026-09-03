@@ -1,5 +1,5 @@
-import { DiffEditor } from "@monaco-editor/react";
-import { useMemo, useState } from "react";
+import type { DiffEditorProps } from "@monaco-editor/react";
+import { type ComponentType, lazy, Suspense, useMemo, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { Loading } from "@/components/Loading.js";
@@ -7,6 +7,11 @@ import { Modal } from "@/components/Modal.js";
 import { useHistories } from "@/hooks/useHistories.js";
 import { useTheme } from "@/hooks/useTheme.js";
 import type { HistoryItem } from "@/lib/services/index.js";
+
+// @monaco-editor/react は差分表示時にだけ読み込む（初期バンドルから除外する）
+const DiffEditor = lazy<ComponentType<DiffEditorProps>>(() =>
+  import("@monaco-editor/react").then((m) => ({ default: m.DiffEditor }))
+);
 
 interface HistoryDiffModalProps {
   currentContent: string;
@@ -210,26 +215,34 @@ export function HistoryDiffModal({
             {/* 右カラム: Monaco DiffEditor (flex-1) */}
             <div className="relative h-full min-w-0 flex-1 overflow-hidden rounded-lg border border-border bg-surface shadow-inner">
               {activeHistory ? (
-                <DiffEditor
-                  key={`${renderSideBySide ? "side" : "inline"}-${activeHistory.id}`}
-                  height="100%"
-                  original={originalText}
-                  modified={currentContent}
-                  language="markdown"
-                  theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
-                  options={{
-                    renderSideBySide,
-                    useInlineViewWhenSpaceIsLimited: false,
-                    renderSideBySideInlineBreakpoint: 0,
-                    readOnly: true,
-                    minimap: { enabled: false },
-                    fontSize: 13,
-                    lineNumbers: "on",
-                    wordWrap: "on",
-                    smoothScrolling: true,
-                    padding: { top: 12, bottom: 12 },
-                  }}
-                />
+                <Suspense
+                  fallback={
+                    <div className="flex h-full w-full items-center justify-center">
+                      <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  }
+                >
+                  <DiffEditor
+                    key={`${renderSideBySide ? "side" : "inline"}-${activeHistory.id}`}
+                    height="100%"
+                    original={originalText}
+                    modified={currentContent}
+                    language="markdown"
+                    theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
+                    options={{
+                      renderSideBySide,
+                      useInlineViewWhenSpaceIsLimited: false,
+                      renderSideBySideInlineBreakpoint: 0,
+                      readOnly: true,
+                      minimap: { enabled: false },
+                      fontSize: 13,
+                      lineNumbers: "on",
+                      wordWrap: "on",
+                      smoothScrolling: true,
+                      padding: { top: 12, bottom: 12 },
+                    }}
+                  />
+                </Suspense>
               ) : (
                 <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
                   左側から比較したい履歴を選択してください

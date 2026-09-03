@@ -1,8 +1,20 @@
-import { DiffEditor, type DiffOnMount } from "@monaco-editor/react";
-import { useCallback, useContext, useState } from "react";
+import type { DiffEditorProps, DiffOnMount } from "@monaco-editor/react";
+import {
+  type ComponentType,
+  lazy,
+  Suspense,
+  useCallback,
+  useContext,
+  useState,
+} from "react";
 import { Button } from "@/components/Button.js";
 import { Modal } from "@/components/Modal.js";
 import { ThemeContext } from "@/context/ThemeContext.js";
+
+// @monaco-editor/react は差分表示時にだけ読み込む（初期バンドルから除外する）
+const DiffEditor = lazy<ComponentType<DiffEditorProps>>(() =>
+  import("@monaco-editor/react").then((m) => ({ default: m.DiffEditor }))
+);
 
 export interface DiffTabItem {
   count?: number;
@@ -182,30 +194,38 @@ export function ProposalDiffModal({
 
         {/* Monaco DiffEditor */}
         <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border bg-background shadow-xs">
-          <DiffEditor
-            key={`${renderSideBySide ? "side" : "inline"}-${activeItem?.id ?? "single"}-${isOpen ? "open" : "closed"}`}
-            height="100%"
-            language="markdown"
-            theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
-            original={currentOriginal}
-            modified={currentUpdated}
-            onMount={handleDiffMount}
-            options={{
-              readOnly: true,
-              renderSideBySide,
-              minimap: { enabled: false },
-              scrollBeyondLastLine: false,
-              wordWrap: "on",
-              diffWordWrap: "on",
-              wrappingStrategy: "advanced",
-              automaticLayout: true,
-              fontSize: 13,
-              lineNumbersMinChars: 3,
-              padding: { top: 8, bottom: 8 },
-              originalEditable: false,
-              useInlineViewWhenSpaceIsLimited: false,
-            }}
-          />
+          <Suspense
+            fallback={
+              <div className="flex h-full w-full items-center justify-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            }
+          >
+            <DiffEditor
+              key={`${renderSideBySide ? "side" : "inline"}-${activeItem?.id ?? "single"}-${isOpen ? "open" : "closed"}`}
+              height="100%"
+              language="markdown"
+              theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
+              original={currentOriginal}
+              modified={currentUpdated}
+              onMount={handleDiffMount}
+              options={{
+                readOnly: true,
+                renderSideBySide,
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                wordWrap: "on",
+                diffWordWrap: "on",
+                wrappingStrategy: "advanced",
+                automaticLayout: true,
+                fontSize: 13,
+                lineNumbersMinChars: 3,
+                padding: { top: 8, bottom: 8 },
+                originalEditable: false,
+                useInlineViewWhenSpaceIsLimited: false,
+              }}
+            />
+          </Suspense>
         </div>
       </div>
     </Modal>

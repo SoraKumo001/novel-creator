@@ -221,3 +221,21 @@ export interface VectorRecord {
 2. **`VectorizeStore` (Cloudflare Vectorize)**
    - Cloudflare のグローバル分散 Vector DB。
    - `id`, `values` (ベクトル), `metadata` (JSON) で格納し、`vectorize.query()` による類似度検索を実行。
+
+---
+
+## 4. DB運用 (スキーマ変更フロー)
+
+スキーマ変更の適用は **マイグレーション (`db:migrate`) を正** とする。
+
+- **`db:migrate`** が、すべての環境（ローカル開発・CI・本番）で唯一の正規の適用方法。
+  新規環境の初期構築（`db:setup`）を含め、`packages/db/drizzle/` 配下のマイグレーションファイルを順に適用してスキーマを構築する。
+- **`db:push`**（Drizzle Kit push）は破棄可能なローカル試作専用。スキーマを DB に直接反映するため、マイグレーション履歴 (`drizzle.__drizzle_migrations`) と実 DB の状態に**ドリフト（不一致）**を生む。
+  **マイグレーション済みの DB に対して `db:push` を実行してはならない**（例: 後から `db:migrate` を実行すると `relation "xxx_idx" already exists` で失敗する）。
+- スキーマ変更の標準フロー: `db:generate` でマイグレーションファイルを生成 → `db:migrate` で適用。
+
+### 既知の不整合（要見直し）
+
+現在の `db:setup` は `docker compose up -d && pnpm --filter @novel-creator/db db:push` であり、**`db:push` を使用している**。
+これは上記方針（`db:migrate` を正とする）と矛盾するため、今後 `db:setup` をマイグレーションベースへ変更することを検討する。
+（本決定の時点ではスクリプトの挙動は変更せず、方針の統一は本ドキュメントのみで行う。）
