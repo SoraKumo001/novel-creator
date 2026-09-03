@@ -122,17 +122,20 @@ export async function upsertEntityEmbedding(
 
 | ツール名                      | 引数 (Zod Schema)                             | 役割と戻り値                                                          |
 | :---------------------------- | :-------------------------------------------- | :-------------------------------------------------------------------- |
-| **`proposeCreateCharacter`**  | `name`, `category?`, `description`, `traits?` | 新規登場人物の登録をチャット上で提案（承認カードを表示）              |
-| **`proposeCreateSetting`**    | `name`, `category`, `description`             | 新規世界観・設定の登録をチャット上で提案（承認カードを表示）          |
-| **`proposeAddForeshadowing`** | `title`, `description`, `status?`             | 新規伏線の登録をチャット上で提案（承認カードを表示）                  |
-| **`proposeAddTimelineEvent`** | `event`, `timestamp?`                         | 年表への出来事追加をチャット上で提案（承認カードを表示）              |
-| **`proposeUpdatePlot`**       | `chapterTitle`, `summary`                     | 章プロット・あらすじの作成/更新をチャット上で提案（承認カードを表示） |
+| **`proposeCreateCharacter`**      | `name`, `category?`, `description`, `traits?`         | 新規登場人物の登録をチャット上で提案（承認カードを表示）              |
+| **`proposeCreateSetting`**        | `name`, `category`, `description`                     | 新規世界観・設定の登録をチャット上で提案（承認カードを表示）          |
+| **`proposeAddForeshadowing`**     | `title`, `description`, `status?`                     | 新規伏線の登録をチャット上で提案（承認カードを表示）                  |
+| **`proposeAddTimelineEvent`**     | `event`, `timestamp?`                                 | 年表への出来事追加をチャット上で提案（承認カードを表示）              |
+| **`proposeUpdatePlot`**           | `chapterTitle`, `summary`                             | 章プロット・あらすじの作成/更新をチャット上で提案（承認カードを表示） |
+| **`proposeUpdateStoryOutline`**   | `sectionName`, `content`, `mode?`                     | 起承転結などのストーリー全体構想の更新を提案（承認カードを表示）      |
+| **`proposeBulkCreate`**           | `characters?`, `settings?`, `foreshadowings?`, ...     | 複数カテゴリ（人物・設定・伏線・年表）の一括登録を提案（承認カードを表示） |
 
 ### 3.3 ツール呼び出しとクライアント連携
 
 - **自律的探索**: LLM はユーザーの質問（例:「第2章の伏線と主人公の関係性は？」）に応じて、`getForeshadowings` や `getCharacters`、`getPlotAndChapters` を連鎖的に呼び出して文脈を把握します。
-- **提案とインライン承認 (`ChatProposalCard`)**: LLM が `propose〜` ツールを呼ぶと、即時書き込みは行わず提案ペイロードを返します。クライアント側ではインライン承認カードが描画され、作家がワンクリックで小説データへ登録できます。
-- **UI 表示 (`ToolActivity`)**: AI SDK UI の Data Stream 経由でツール呼び出し（`tool-call`）と実行結果（`tool-result`）がクライアントにリアルタイム配信され、チャット画面上にカードとして展開されます。
+- **提案とインライン承認 (`ChatProposalCard`)**: LLM が `propose〜` ツールを呼ぶと、即時書き込みは行わず提案ペイロードを返します。クライアント側では**AIの解説テキスト本文の直下（メッセージ最下部）**に提案カードが描画され、作家がスクロールの手間なくワンクリックで小説データへ登録できます。
+- **Monaco DiffEditor による差分確認 (`ProposalDiffModal`)**: 反映前に変更前後の Markdown 全文差分を左右並列／行内統合で比較可能。一括登録提案（`proposeBulkCreate`）時は全カテゴリ（人物・設定・伏線・年表）をタブ切り替えで精査できます。
+- **UI 表示 (`ToolActivity`)**: AI SDK UI の Data Stream 経由でツール呼び出し（`tool-call`）と実行結果（`tool-result`）がクライアントにリアルタイム配信され、チャット上部にコンパクトな折りたたみカードとして展開されます。
 
 ---
 

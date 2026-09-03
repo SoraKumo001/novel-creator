@@ -717,7 +717,7 @@ export function ChatDrawer() {
                     ✕
                   </button>
                 </div>
-                <div className="max-h-36 overflow-y-auto whitespace-pre-wrap break-words rounded border border-destructive/20 bg-background/60 p-2 font-mono text-[11px] text-foreground/90">
+                <div className="wrap-break-word max-h-36 overflow-y-auto whitespace-pre-wrap rounded border border-destructive/20 bg-background/60 p-2 font-mono text-[11px] text-foreground/90">
                   {error}
                 </div>
                 {lastPrompt && (

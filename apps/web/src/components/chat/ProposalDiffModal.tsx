@@ -118,7 +118,7 @@ export function ProposalDiffModal({
         </div>
       }
     >
-      <div className="flex h-[75vh] max-h-[820px] min-h-[440px] w-full flex-col space-y-3">
+      <div className="flex h-[75vh] max-h-205 min-h-110 w-full flex-col space-y-3">
         {/* 上部コントロールバー */}
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2.5 border-border border-b pb-2.5 text-xs">
           <div className="flex flex-wrap items-center gap-3">

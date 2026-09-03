@@ -1327,7 +1327,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
               </div>
               {data.reason && (
                 <span
-                  className="max-w-[160px] truncate text-[10px] text-slate-500"
+                  className="max-w-40 truncate text-[10px] text-slate-500"
                   title={data.reason}
                 >
                   {data.reason}
