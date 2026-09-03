@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/Input.js";
 import { useChatUI } from "@/context/ChatContext.js";
 import { useCharacters } from "@/hooks/useCharacters.js";
@@ -136,7 +136,7 @@ export function CharacterEditor({
     }
   }
 
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
     setError(null);
     if (!name.trim()) {
       toast.error("名前は必須です");
@@ -168,7 +168,19 @@ export function CharacterEditor({
     } catch (e) {
       toast.error(toErrorMessage(e));
     }
-  }
+  }, [
+    category,
+    characterId,
+    createCharacter,
+    description,
+    isEdit,
+    name,
+    navigate,
+    novelId,
+    toast,
+    traitsText,
+    updateCharacter,
+  ]);
 
   // Ctrl+S / Cmd+S ショートカットで保存
   useEffect(() => {
@@ -182,17 +194,7 @@ export function CharacterEditor({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    category,
-    characterId,
-    creating,
-    description,
-    isEdit,
-    name,
-    novelId,
-    traitsText,
-    updating,
-  ]);
+  }, [creating, handleSave, name, updating]);
 
   async function handleDeleteInstruction() {
     const targetId = deleteConfirm.payload;

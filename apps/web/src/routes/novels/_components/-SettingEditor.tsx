@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/Input.js";
 import { useChatUI } from "@/context/ChatContext.js";
 import { useLlmInstructions } from "@/hooks/useLlmInstructions.js";
@@ -113,7 +113,7 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
     }
   }
 
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
     setError(null);
     if (!category.trim() || !name.trim()) {
       toast.error("カテゴリーと名前は必須です");
@@ -140,7 +140,18 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
     } catch (e) {
       toast.error(toErrorMessage(e));
     }
-  }
+  }, [
+    category,
+    createSetting,
+    description,
+    isEdit,
+    name,
+    navigate,
+    novelId,
+    settingId,
+    toast,
+    updateSetting,
+  ]);
 
   // Ctrl+S / Cmd+S ショートカットで保存（頁遷移なし）
   useEffect(() => {

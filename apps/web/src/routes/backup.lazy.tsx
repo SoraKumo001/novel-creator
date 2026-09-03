@@ -12,8 +12,19 @@ import { useNovels } from "@/hooks/useNovels.js";
 import { useRestoreNovel } from "@/hooks/useRestore.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
-import { streamReindex } from "@/lib/services/vector.js";
-import type { BackupData, ReindexProgressEvent } from "@/lib/types.js";
+import type { BackupData } from "@/lib/types.js";
+import {
+  buildCounts,
+  DownloadIcon,
+  downloadBackupFile,
+  formatBackupDate,
+  PreviewRow,
+  parseBackupFile,
+  RestoreIcon,
+  UploadIcon,
+  useReindexFlow,
+  WarningIcon,
+} from "./-backupParts.js";
 
 export const Route = createLazyFileRoute("/backup")({
   component: BackupPage,
@@ -31,13 +42,7 @@ export function BackupPage() {
   const [parsed, setParsed] = useState<BackupData | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  // インデックス再構築モーダルステート（設定ページと同じフロー）
-  const [reindexModalOpen, setReindexModalOpen] = useState(false);
-  const [reindexProgress, setReindexProgress] =
-    useState<ReindexProgressEvent | null>(null);
-  const [reindexRunning, setReindexRunning] = useState(false);
-  const [reindexDone, setReindexDone] = useState(false);
-  const [reindexError, setReindexError] = useState<string | null>(null);
+  const reindex = useReindexFlow(defaultEmbeddingConfig?.id);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleExport() {
@@ -47,19 +52,7 @@ export function BackupPage() {
     try {
       const res = await exportNovel(selectedNovelId);
       const data = (await res.json()) as BackupData;
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: "application/json",
-      });
-      const url = URL.createObjectURL(blob);
-      const date = new Date().toISOString().slice(0, 10);
-      const filename = `novel-backup-${selectedNovelId}-${date}.json`;
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      downloadBackupFile(data, selectedNovelId);
       toast.success("バックアップを作成しました");
     } catch (e) {
       toast.error(toErrorMessage(e));
@@ -83,14 +76,8 @@ export function BackupPage() {
     if (!f) {
       return;
     }
-
     try {
-      const text = await f.text();
-      const parsed = JSON.parse(text) as unknown;
-      if (!isBackupData(parsed)) {
-        throw new Error("バックアップファイルの形式が正しくありません");
-      }
-      setParsed(parsed);
+      setParsed(await parseBackupFile(f));
     } catch (e) {
       setParseError(toErrorMessage(e));
     }
@@ -112,46 +99,6 @@ export function BackupPage() {
     }
   }
 
-  function handleOpenReindexModal() {
-    setReindexProgress(null);
-    setReindexDone(false);
-    setReindexError(null);
-    setReindexModalOpen(true);
-  }
-
-  async function handleStartReindex() {
-    setReindexRunning(true);
-    setReindexDone(false);
-    setReindexError(null);
-    setReindexProgress({
-      current: 0,
-      total: 0,
-      percent: 0,
-      stage: "再構築を開始しています...",
-    });
-
-    try {
-      await streamReindex({
-        embeddingConfigId: defaultEmbeddingConfig?.id,
-        onProgress: (p) => setReindexProgress(p),
-        onDone: () => {
-          setReindexRunning(false);
-          setReindexDone(true);
-          toast.success("インデックス再構築が完了しました");
-        },
-        onError: (err) => {
-          setReindexRunning(false);
-          setReindexError(err);
-          toast.error(`再構築エラー: ${err}`);
-        },
-      });
-    } catch (e) {
-      setReindexRunning(false);
-      setReindexError(toErrorMessage(e));
-      toast.error(toErrorMessage(e));
-    }
-  }
-
   const counts = parsed ? buildCounts(parsed) : null;
   const restoreTitle = parsed?.meta?.novelTitle ?? "選択中の小説";
 
@@ -167,27 +114,22 @@ export function BackupPage() {
       </div>
 
       <div className="space-y-6">
-        {/* エクスポート */}
         <Card>
           <CardHeader
             title="バックアップ（エクスポート）"
             subtitle="小説単位でデータをJSONファイルに保存します"
           />
-
           {loadingNovels && <Loading message="読み込み中..." />}
-
           {!loadingNovels && novelsError && (
             <div className="rounded-lg border border-danger-border bg-danger-subtle p-4 text-danger-subtle-fg text-sm">
               {novelsError}
             </div>
           )}
-
           {!loadingNovels && !novelsError && novels.length === 0 && (
             <div className="rounded-lg border border-border bg-surface-muted p-4 text-foreground-secondary text-sm">
               小説がまだありません。新規作成してからバックアップしてください。
             </div>
           )}
-
           {!loadingNovels && !novelsError && novels.length > 0 && (
             <div className="space-y-4">
               <div>
@@ -211,7 +153,6 @@ export function BackupPage() {
                   ))}
                 </Select>
               </div>
-
               <Button
                 onClick={handleExport}
                 isLoading={exporting}
@@ -224,13 +165,11 @@ export function BackupPage() {
           )}
         </Card>
 
-        {/* インポート */}
         <Card>
           <CardHeader
             title="リストア（インポート）"
             subtitle="バックアップファイルからデータを復元します"
           />
-
           <div className="mb-5 rounded-lg border border-warning-border bg-warning-subtle p-4 text-sm text-warning-subtle-fg">
             <div className="flex items-start gap-2.5">
               <WarningIcon className="mt-0.5 h-5 w-5 shrink-0" />
@@ -239,19 +178,17 @@ export function BackupPage() {
               </p>
             </div>
           </div>
-
           <div className="space-y-4">
             <div>
               <Button
-                onClick={handleOpenReindexModal}
-                disabled={reindexRunning}
-                isLoading={reindexRunning}
+                onClick={reindex.openModal}
+                disabled={reindex.running}
+                isLoading={reindex.running}
                 leftIcon={<span>⚡</span>}
               >
                 ベクトルデータを再生成する
               </Button>
             </div>
-
             <div>
               <label
                 htmlFor="backup-file"
@@ -306,7 +243,6 @@ export function BackupPage() {
                 <p className="mt-1.5 text-rose-500 text-xs">{parseError}</p>
               )}
             </div>
-
             {parsed && counts && (
               <div className="rounded-lg border border-border bg-primary-subtle p-4">
                 <h4 className="mb-2 font-semibold text-primary-subtle-fg text-sm">
@@ -316,7 +252,7 @@ export function BackupPage() {
                   <PreviewRow label="タイトル" value={parsed.meta.novelTitle} />
                   <PreviewRow
                     label="エクスポート日"
-                    value={formatDate(parsed.meta.exportedAt)}
+                    value={formatBackupDate(parsed.meta.exportedAt)}
                   />
                   {Object.entries(counts).map(([label, value]) => (
                     <PreviewRow
@@ -328,7 +264,6 @@ export function BackupPage() {
                 </div>
               </div>
             )}
-
             <Button
               variant="danger"
               onClick={() => setConfirmOpen(true)}
@@ -354,160 +289,18 @@ export function BackupPage() {
       />
 
       <ReindexProgressModal
-        isOpen={reindexModalOpen}
-        onClose={() => setReindexModalOpen(false)}
-        progress={reindexProgress}
-        isRunning={reindexRunning}
-        isDone={reindexDone}
-        error={reindexError}
-        onStart={handleStartReindex}
+        isOpen={reindex.modalOpen}
+        onClose={() => reindex.setModalOpen(false)}
+        progress={reindex.progress}
+        isRunning={reindex.running}
+        isDone={reindex.done}
+        error={reindex.error}
+        onStart={reindex.start}
         targetModelName={
           defaultEmbeddingConfig?.name ?? "デフォルト埋め込みモデル"
         }
         dimensions={defaultEmbeddingConfig?.dimensions}
       />
     </div>
-  );
-}
-
-function isBackupData(value: unknown): value is BackupData {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-  const v = value as Record<string, unknown>;
-  if (!v.meta || typeof v.meta !== "object") {
-    return false;
-  }
-  const meta = v.meta as Record<string, unknown>;
-  if (typeof meta.novelId !== "string" || typeof meta.novelTitle !== "string") {
-    return false;
-  }
-  if (!v.rdb || typeof v.rdb !== "object" || Array.isArray(v.rdb)) {
-    return false;
-  }
-  return true;
-}
-
-function buildCounts(data: BackupData): Record<string, number> {
-  const labels: Record<string, string> = {
-    novels: "小説",
-    chapters: "章",
-    sections: "節",
-    contents: "本文",
-    characters: "人物",
-    settings: "設定",
-    timelines: "タイムライン",
-    llmInstructions: "LLM指示",
-  };
-
-  const result: Record<string, number> = {};
-  for (const [key, rows] of Object.entries(data.rdb)) {
-    if (Array.isArray(rows)) {
-      const label = labels[key] ?? key;
-      result[label] = rows.length;
-    }
-  }
-  return result;
-}
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) {
-    return "未設定";
-  }
-  try {
-    return new Date(value).toLocaleDateString("ja-JP", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return value;
-  }
-}
-
-function PreviewRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <span className="text-muted">{label}</span>
-      <span className="font-medium text-foreground">{value}</span>
-    </div>
-  );
-}
-
-function DownloadIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-      className="h-4 w-4"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-      />
-    </svg>
-  );
-}
-
-function UploadIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-      className={className ?? "h-5 w-5"}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-      />
-    </svg>
-  );
-}
-
-function RestoreIcon() {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-      className="h-4 w-4"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.5 16.556 18.375 12 18.375s-8.25-1.875-8.25-4.375v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
-      />
-    </svg>
-  );
-}
-
-function WarningIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      fill="none"
-      viewBox="0 0 24 24"
-      strokeWidth={1.5}
-      stroke="currentColor"
-      className={className ?? "h-5 w-5"}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-      />
-    </svg>
   );
 }

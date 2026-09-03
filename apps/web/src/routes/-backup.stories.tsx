@@ -125,7 +125,7 @@ const meta = {
     (Story) => {
       const queryClient = makeQueryClient();
       const restore = installFetchMock();
-      useEffect(() => restore, []);
+      useEffect(() => restore, [restore]);
       return (
         <QueryClientProvider client={queryClient}>
           <ToastProvider>

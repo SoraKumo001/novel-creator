@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/Input.js";
 import { Select } from "@/components/Select.js";
 import { useChatUI } from "@/context/ChatContext.js";
@@ -125,7 +125,7 @@ export function ForeshadowingEditor({
     }
   }
 
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
     setError(null);
     if (!title.trim() || !category.trim()) {
       toast.error("カテゴリーとタイトルは必須です");
@@ -154,7 +154,21 @@ export function ForeshadowingEditor({
     } catch (e) {
       toast.error(toErrorMessage(e));
     }
-  }
+  }, [
+    category,
+    createForeshadowing,
+    description,
+    foreshadowingId,
+    isEdit,
+    navigate,
+    novelId,
+    placedSectionId,
+    resolvedSectionId,
+    status,
+    title,
+    toast,
+    updateForeshadowing,
+  ]);
 
   // Ctrl+S / Cmd+S ショートカットで保存
   useEffect(() => {

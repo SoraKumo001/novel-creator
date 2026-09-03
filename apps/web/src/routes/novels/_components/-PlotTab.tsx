@@ -1,24 +1,18 @@
 import { useEffect, useState } from "react";
-import { AIProgressIndicator } from "@/components/AIProgressIndicator.js";
 import { Button } from "@/components/Button.js";
-import { ConfirmDialog } from "@/components/ConfirmDialog.js";
-import { EmptyState } from "@/components/EmptyState.js";
 import { LLMModelSelector } from "@/components/LLMModelSelector.js";
-import { Loading } from "@/components/Loading.js";
 import { TabHeader } from "@/components/TabHeader.js";
 import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
 import { useChapters } from "@/hooks/useChapters.js";
-
 import { useGenerate } from "@/hooks/useGenerate.js";
 import { useNovel } from "@/hooks/useNovel.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import type { Chapter, Section } from "@/lib/types.js";
-import { ChapterSectionFormModal } from "./-ChapterSectionFormModal.js";
-import { ChapterTreeItem } from "./-ChapterTreeItem.js";
 import { PlusIcon, SparklesIcon } from "./-Icons.js";
 import { PlotMarkdownEditor } from "./-PlotMarkdownEditor.js";
-import { PlotPreviewPanel } from "./-PlotPreviewPanel.js";
+import { swapChapterOrder, swapSectionOrder } from "./-PlotMoveUtils.js";
+import { PlotStructureView } from "./-PlotStructureView.js";
 
 export function PlotTab({
   novel,
@@ -28,7 +22,6 @@ export function PlotTab({
   onRefresh: () => Promise<void>;
 }) {
   const toast = useToast();
-
   const {
     chapters,
     loading,
@@ -63,7 +56,6 @@ export function PlotTab({
   const [expandedChapterIds, setExpandedChapterIds] = useState<Set<string>>(
     new Set()
   );
-
   const [chapterForm, setChapterForm] = useState<Chapter | null>(null);
   const [sectionForm, setSectionForm] = useState<{
     chapterId: string;
@@ -73,7 +65,6 @@ export function PlotTab({
     type: "chapter" | "section";
     id: string;
   } | null>(null);
-
   const [plotPreview, setPlotPreview] = useState(generatedPlot);
   const [selectedPlotIndices, setSelectedPlotIndices] = useState<Set<number>>(
     new Set()
@@ -242,34 +233,13 @@ export function PlotTab({
     chapterId: string,
     direction: "up" | "down"
   ) {
-    const sorted = [...chapters].sort((a, b) => a.order - b.order);
-    const index = sorted.findIndex((c) => c.id === chapterId);
-    if (index === -1) {
-      return;
-    }
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= sorted.length) {
-      return;
-    }
-
-    const current = sorted[index];
-    const target = sorted[targetIndex];
-
-    const currentOrder = current.order;
-    const targetOrder = target.order;
-
-    await updateChapter(current.id, {
-      title: current.title,
-      order: targetOrder,
-      summary: current.summary ?? "",
-    });
-    await updateChapter(target.id, {
-      title: target.title,
-      order: currentOrder,
-      summary: target.summary ?? "",
-    });
-
-    await onRefresh();
+    await swapChapterOrder(
+      chapters,
+      chapterId,
+      direction,
+      updateChapter,
+      onRefresh
+    );
   }
 
   async function handleMoveSection(
@@ -277,38 +247,14 @@ export function PlotTab({
     sectionId: string,
     direction: "up" | "down"
   ) {
-    const chapter = chapters.find((c) => c.id === chapterId);
-    if (!chapter) {
-      return;
-    }
-    const sorted = [...chapter.sections].sort((a, b) => a.order - b.order);
-    const index = sorted.findIndex((s) => s.id === sectionId);
-    if (index === -1) {
-      return;
-    }
-    const targetIndex = direction === "up" ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= sorted.length) {
-      return;
-    }
-
-    const current = sorted[index];
-    const target = sorted[targetIndex];
-
-    const currentOrder = current.order;
-    const targetOrder = target.order;
-
-    await updateSection(current.id, {
-      title: current.title ?? "",
-      order: targetOrder,
-      summary: current.summary ?? "",
-    });
-    await updateSection(target.id, {
-      title: target.title ?? "",
-      order: currentOrder,
-      summary: target.summary ?? "",
-    });
-
-    await onRefresh();
+    await swapSectionOrder(
+      chapters,
+      chapterId,
+      sectionId,
+      direction,
+      updateSection,
+      onRefresh
+    );
   }
 
   return (
@@ -377,141 +323,68 @@ export function PlotTab({
           />
         </div>
       ) : (
-        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
-          {generatingPlot && (
-            <div className="fade-in animate-in rounded-xl border border-primary/40 bg-surface-raised p-5 shadow-md duration-200">
-              <AIProgressIndicator
-                stage="AIが小説設定・登場人物を参照してプロット構成を立案中..."
-                description="物語の起承転結や伏線・キャラクター設定を考慮し、全章の構成案を生成しています"
-                startedAt={generateStartedAt ?? Date.now()}
-                onCancel={cancelGeneration}
-                cancelLabel="生成を中止"
-                variant="panel"
-              />
-            </div>
-          )}
-
-          {plotPreview && (
-            <PlotPreviewPanel
-              plotPreview={plotPreview}
-              selectedPlotIndices={selectedPlotIndices}
-              onToggleAll={(checked) => {
-                if (checked) {
-                  setSelectedPlotIndices(
-                    new Set(plotPreview.chapters.map((_, i) => i))
-                  );
-                } else {
-                  setSelectedPlotIndices(new Set());
-                }
-              }}
-              onToggleIndex={(index) => {
-                setSelectedPlotIndices((prev) => {
-                  const next = new Set(prev);
-                  if (next.has(index)) {
-                    next.delete(index);
-                  } else {
-                    next.add(index);
-                  }
-                  return next;
-                });
-              }}
-              onApply={() => void handleApplyPlot()}
-              onDiscard={() => {
-                setPlotPreview(null);
-                setSelectedPlotIndices(new Set());
-              }}
-            />
-          )}
-
-          {loading && <Loading message="章一覧を読み込み中..." />}
-
-          {!loading &&
-            chapters.length === 0 &&
-            !generatingPlot &&
-            !plotPreview && (
-              <EmptyState
-                title="章が登録されていません"
-                description="「章を追加」または「プロット自動生成」から構成を作成しましょう。"
-              />
-            )}
-
-          {!loading && chapters.length > 0 && (
-            <div className="space-y-3">
-              {chapters.map((chapter, chIdx) => (
-                <ChapterTreeItem
-                  key={chapter.id}
-                  chapter={chapter}
-                  isExpanded={expandedChapterIds.has(chapter.id)}
-                  onToggle={() => toggleChapterExpand(chapter.id)}
-                  onEditChapter={() => setChapterForm(chapter)}
-                  onDeleteChapter={() =>
-                    setDeleteTarget({ type: "chapter", id: chapter.id })
-                  }
-                  onAddSection={() => setSectionForm({ chapterId: chapter.id })}
-                  onEditSection={(section) =>
-                    setSectionForm({ chapterId: chapter.id, section })
-                  }
-                  onDeleteSection={(section) =>
-                    setDeleteTarget({ type: "section", id: section.id })
-                  }
-                  onGenerateChapterSummary={() =>
-                    handleGenerateChapterSummaryAction(chapter.id)
-                  }
-                  onGenerateSectionSummary={(s) =>
-                    handleGenerateSectionSummaryAction(s.id)
-                  }
-                  onMoveChapterUp={() =>
-                    void handleMoveChapter(chapter.id, "up")
-                  }
-                  onMoveChapterDown={() =>
-                    void handleMoveChapter(chapter.id, "down")
-                  }
-                  onMoveSectionUp={(sId) =>
-                    void handleMoveSection(chapter.id, sId, "up")
-                  }
-                  onMoveSectionDown={(sId) =>
-                    void handleMoveSection(chapter.id, sId, "down")
-                  }
-                  canMoveUp={chIdx > 0}
-                  canMoveDown={chIdx < chapters.length - 1}
-                  generatingSummaryId={activeGeneratingId}
-                />
-              ))}
-            </div>
-          )}
-
-          <ChapterSectionFormModal
-            mode="chapter"
-            isOpen={!!chapterForm}
-            onClose={() => setChapterForm(null)}
-            onSubmit={handleSaveChapter}
-            isLoading={chapterForm ? updating : creating}
-            title={chapterForm ? "章を編集" : "章を追加"}
-            defaultValues={chapterForm ?? undefined}
-          />
-          <ChapterSectionFormModal
-            mode="section"
-            isOpen={!!sectionForm}
-            onClose={() => setSectionForm(null)}
-            onSubmit={handleSaveSection}
-            isLoading={sectionForm?.section ? updating : creating}
-            title={sectionForm?.section ? "節を編集" : "節を追加"}
-            defaultValues={sectionForm?.section}
-          />
-          <ConfirmDialog
-            isOpen={!!deleteTarget}
-            onClose={() => setDeleteTarget(null)}
-            onConfirm={handleDelete}
-            title={
-              deleteTarget?.type === "chapter"
-                ? "章を削除しますか？"
-                : "節を削除しますか？"
+        <PlotStructureView
+          chapters={chapters}
+          loading={loading}
+          generatingPlot={generatingPlot}
+          generateStartedAt={generateStartedAt}
+          plotPreview={plotPreview}
+          selectedPlotIndices={selectedPlotIndices}
+          expandedChapterIds={expandedChapterIds}
+          chapterForm={chapterForm}
+          sectionForm={sectionForm}
+          deleteTarget={deleteTarget}
+          creating={creating}
+          updating={updating}
+          deleting={deleting}
+          activeGeneratingId={activeGeneratingId}
+          onToggleChapter={toggleChapterExpand}
+          onEditChapter={setChapterForm}
+          onDeleteChapter={(id) => setDeleteTarget({ type: "chapter", id })}
+          onAddSection={(chapterId) => setSectionForm({ chapterId })}
+          onEditSection={(chapterId, section) =>
+            setSectionForm({ chapterId, section })
+          }
+          onDeleteSection={(id) => setDeleteTarget({ type: "section", id })}
+          onGenerateChapterSummary={handleGenerateChapterSummaryAction}
+          onGenerateSectionSummary={handleGenerateSectionSummaryAction}
+          onMoveChapter={(id, dir) => void handleMoveChapter(id, dir)}
+          onMoveSection={(cId, sId, dir) =>
+            void handleMoveSection(cId, sId, dir)
+          }
+          onToggleAllPlot={(checked) => {
+            if (checked && plotPreview) {
+              setSelectedPlotIndices(
+                new Set(plotPreview.chapters.map((_, i) => i))
+              );
+            } else {
+              setSelectedPlotIndices(new Set());
             }
-            message="紐づく本文や時系列も削除されます。"
-            confirmLabel="削除"
-            isLoading={deleting}
-          />
-        </div>
+          }}
+          onTogglePlotIndex={(index) => {
+            setSelectedPlotIndices((prev) => {
+              const next = new Set(prev);
+              if (next.has(index)) {
+                next.delete(index);
+              } else {
+                next.add(index);
+              }
+              return next;
+            });
+          }}
+          onApplyPlot={() => void handleApplyPlot()}
+          onDiscardPlot={() => {
+            setPlotPreview(null);
+            setSelectedPlotIndices(new Set());
+          }}
+          onCancelGeneration={cancelGeneration}
+          onSaveChapter={handleSaveChapter}
+          onSaveSection={handleSaveSection}
+          onCloseChapterForm={() => setChapterForm(null)}
+          onCloseSectionForm={() => setSectionForm(null)}
+          onCloseDelete={() => setDeleteTarget(null)}
+          onConfirmDelete={() => void handleDelete()}
+        />
       )}
     </div>
   );
