@@ -94,14 +94,14 @@ describe("EntityListTab", () => {
     expect(screen.getAllByText("世界観").length).toBeGreaterThan(0);
   });
 
-  it("ビュー切替でカード表示とマークダウン編集が切り替わること", () => {
+  it("ビュー切替でカードとマークダウンが切り替わること", () => {
     renderTab();
 
     // 初期はカード表示
     expect(screen.getByText("勇敢な少女")).toBeInTheDocument();
     expect(screen.queryByText("マークダウンエディタ")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("マークダウン編集"));
+    fireEvent.click(screen.getByText("マークダウン"));
 
     expect(screen.getByText("マークダウンエディタ")).toBeInTheDocument();
     expect(screen.queryByText("勇敢な少女")).not.toBeInTheDocument();

@@ -5,7 +5,9 @@ import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { EmptyState } from "@/components/EmptyState.js";
 import { LLMModelSelector } from "@/components/LLMModelSelector.js";
 import { Loading } from "@/components/Loading.js";
+import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
 import { useChapters } from "@/hooks/useChapters.js";
+
 import { useGenerate } from "@/hooks/useGenerate.js";
 import { useNovel } from "@/hooks/useNovel.js";
 import { useToast } from "@/hooks/useToast.js";
@@ -316,30 +318,6 @@ export function PlotTab({
           <h2 className="font-bold text-foreground text-xl">
             章立て・プロット
           </h2>
-          <div className="flex rounded-lg border border-border bg-surface-raised p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setViewMode("structure")}
-              className={`rounded-md px-2.5 py-1 font-medium transition ${
-                viewMode === "structure"
-                  ? "bg-surface text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              構成ツリー
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("markdown")}
-              className={`rounded-md px-2.5 py-1 font-medium transition ${
-                viewMode === "markdown"
-                  ? "bg-surface text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              マークダウン
-            </button>
-          </div>
           {viewMode === "structure" && chapters.length > 0 && (
             <button
               onClick={toggleExpandAll}
@@ -352,42 +330,54 @@ export function PlotTab({
           )}
         </div>
 
-        {viewMode === "structure" && (
-          <div className="flex flex-wrap items-center gap-2">
-            <LLMModelSelector
-              value={selectedModelConfigId}
-              onChange={setSelectedModelConfigId}
-              size="sm"
-            />
-            <Button
-              variant="secondary"
-              onClick={handleGeneratePlot}
-              isLoading={generatingPlot}
-              leftIcon={<SparklesIcon />}
-              className="shrink-0 whitespace-nowrap"
-            >
-              プロット自動生成
-            </Button>
-            <Button
-              onClick={() => setChapterForm({} as Chapter)}
-              leftIcon={<PlusIcon />}
-              className="shrink-0 whitespace-nowrap"
-            >
-              章を追加
-            </Button>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {viewMode === "structure" && (
+            <>
+              <LLMModelSelector
+                value={selectedModelConfigId}
+                onChange={setSelectedModelConfigId}
+                size="sm"
+              />
+              <Button
+                variant="secondary"
+                onClick={handleGeneratePlot}
+                isLoading={generatingPlot}
+                leftIcon={<SparklesIcon />}
+                className="shrink-0 whitespace-nowrap"
+              >
+                プロット自動生成
+              </Button>
+              <Button
+                onClick={() => setChapterForm({} as Chapter)}
+                leftIcon={<PlusIcon />}
+                className="shrink-0 whitespace-nowrap"
+              >
+                章を追加
+              </Button>
+            </>
+          )}
+          <ViewModeSwitch
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              { label: "ツリー", value: "structure" },
+              { label: "マークダウン", value: "markdown" },
+            ]}
+          />
+        </div>
       </div>
 
       {viewMode === "markdown" ? (
-        <PlotMarkdownEditor
-          novelId={novel.id}
-          fetchPlotMarkdown={fetchPlotMarkdown}
-          savePlotMarkdown={savePlotMarkdown}
-          savingMarkdown={savingMarkdown}
-        />
+        <div className="min-h-0 flex-1">
+          <PlotMarkdownEditor
+            novelId={novel.id}
+            fetchPlotMarkdown={fetchPlotMarkdown}
+            savePlotMarkdown={savePlotMarkdown}
+            savingMarkdown={savingMarkdown}
+          />
+        </div>
       ) : (
-        <div className="space-y-6">
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
           {generatingPlot && (
             <div className="fade-in animate-in rounded-xl border border-primary/40 bg-surface-raised p-5 shadow-md duration-200">
               <AIProgressIndicator

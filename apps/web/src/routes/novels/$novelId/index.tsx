@@ -65,13 +65,8 @@ const TAB_CONTENT: Record<
   editor: EditorTab,
 };
 
-/** 本文コンテンツをスクロールラッパーで包むタブ */
-const SCROLLABLE_TABS: ReadonlySet<TabId> = new Set<TabId>([
-  "overview",
-  "plot",
-  "timeline",
-  "foreshadowing",
-]);
+/** 本文コンテンツをスクロールラッパーで包むタブ（概要タブのみ。他は各タブ内で高さ100%管理） */
+const SCROLLABLE_TABS: ReadonlySet<TabId> = new Set<TabId>(["overview"]);
 
 export const Route = createFileRoute("/novels/$novelId/")({
   validateSearch: (search: Record<string, unknown>) =>

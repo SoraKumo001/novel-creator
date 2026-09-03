@@ -7,6 +7,7 @@ import { Loading } from "@/components/Loading.js";
 import { Modal } from "@/components/Modal.js";
 import { Select } from "@/components/Select.js";
 import { Textarea } from "@/components/Textarea.js";
+import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
 import { useNovel } from "@/hooks/useNovel.js";
 import { useTimelines } from "@/hooks/useTimelines.js";
 import type { Chapter, Section, Timeline } from "@/lib/types.js";
@@ -104,55 +105,41 @@ export function TimelineTab({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <h2 className="font-bold text-foreground text-xl">タイムライン</h2>
-          <div className="flex rounded-lg border border-border bg-surface-raised p-0.5 text-xs">
-            <button
-              type="button"
-              onClick={() => setViewMode("cards")}
-              className={`rounded-md px-2.5 py-1 font-medium transition ${
-                viewMode === "cards"
-                  ? "bg-surface text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
+    <div className="flex h-full flex-col space-y-4">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b pb-3">
+        <h2 className="font-bold text-foreground text-xl">タイムライン</h2>
+        <div className="flex flex-wrap items-center gap-3">
+          {viewMode === "cards" && (
+            <Button
+              onClick={handleOpenCreate}
+              leftIcon={<PlusIcon />}
+              className="shrink-0 whitespace-nowrap"
             >
-              一覧
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("markdown")}
-              className={`rounded-md px-2.5 py-1 font-medium transition ${
-                viewMode === "markdown"
-                  ? "bg-surface text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              マークダウン
-            </button>
-          </div>
+              イベント追加
+            </Button>
+          )}
+          <ViewModeSwitch
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              { label: "一覧", value: "cards" },
+              { label: "マークダウン", value: "markdown" },
+            ]}
+          />
         </div>
-        {viewMode === "cards" && (
-          <Button
-            onClick={handleOpenCreate}
-            leftIcon={<PlusIcon />}
-            className="shrink-0 whitespace-nowrap"
-          >
-            イベント追加
-          </Button>
-        )}
       </div>
 
       {viewMode === "markdown" ? (
-        <TimelinesMarkdownEditor
-          novelId={novel.id}
-          fetchTimelinesMarkdown={fetchTimelinesMarkdown}
-          saveTimelinesMarkdown={saveTimelinesMarkdown}
-          savingMarkdown={savingMarkdown}
-        />
+        <div className="min-h-0 flex-1">
+          <TimelinesMarkdownEditor
+            novelId={novel.id}
+            fetchTimelinesMarkdown={fetchTimelinesMarkdown}
+            saveTimelinesMarkdown={saveTimelinesMarkdown}
+            savingMarkdown={savingMarkdown}
+          />
+        </div>
       ) : (
-        <>
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
           {loading && <Loading message="タイムラインを読み込み中..." />}
 
           {!loading && timelines.length === 0 && (
@@ -234,7 +221,7 @@ export function TimelineTab({
             confirmLabel="削除"
             isLoading={deleting}
           />
-        </>
+        </div>
       )}
     </div>
   );

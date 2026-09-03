@@ -18,6 +18,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { EmptyState } from "@/components/EmptyState.js";
 import { Loading } from "@/components/Loading.js";
 import { Select } from "@/components/Select.js";
+import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
 import { IconButton, PencilIcon, PlusIcon, TrashIcon } from "./-Icons.js";
 
 export interface EntityListTabConfig<
@@ -250,28 +251,14 @@ export function EntityListTab<
               </Button>
             </>
           )}
-          <div className="flex shrink-0 rounded-lg border border-border bg-surface p-0.5">
-            <button
-              onClick={() => setViewMode("cards")}
-              className={`rounded-md px-3 py-1.5 font-medium text-sm transition ${
-                viewMode === "cards"
-                  ? "bg-primary text-primary-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              カード表示
-            </button>
-            <button
-              onClick={() => setViewMode("markdown")}
-              className={`rounded-md px-3 py-1.5 font-medium text-sm transition ${
-                viewMode === "markdown"
-                  ? "bg-primary text-primary-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              マークダウン編集
-            </button>
-          </div>
+          <ViewModeSwitch
+            value={viewMode}
+            onChange={setViewMode}
+            options={[
+              { label: "カード", value: "cards" },
+              { label: "マークダウン", value: "markdown" },
+            ]}
+          />
         </div>
       </div>
 

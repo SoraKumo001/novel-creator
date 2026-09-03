@@ -3,7 +3,14 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TimelineTab } from "../src/routes/novels/_components/-TimelineTab.js";
 
+vi.mock("../src/routes/novels/_components/-TimelinesMarkdownEditor.js", () => ({
+  TimelinesMarkdownEditor: () => (
+    <div data-testid="timelines-markdown-editor">マークダウンエディタ</div>
+  ),
+}));
+
 const mockCreateTimeline = vi.fn().mockResolvedValue({ id: "t-new" });
+
 const mockUpdateTimeline = vi.fn().mockResolvedValue({ id: "t-1" });
 const mockDeleteTimeline = vi.fn().mockResolvedValue(undefined);
 
@@ -128,5 +135,21 @@ describe("TimelineTab", () => {
       });
       expect(mockRefresh).toHaveBeenCalled();
     });
+  });
+
+  it("表示切替スイッチをクリックしてマークダウン編集に切り替えられること", () => {
+    render(<TimelineTab novel={mockNovel as never} onRefresh={vi.fn()} />);
+
+    expect(
+      screen.getByRole("button", { name: /イベント追加/ })
+    ).toBeInTheDocument();
+    const mdSwitchBtn = screen.getByRole("button", { name: "マークダウン" });
+    fireEvent.click(mdSwitchBtn);
+
+    // マークダウン切り替え時はヘッダーの「イベント追加」ボタンが非表示になり、エディタが表示される
+    expect(
+      screen.queryByRole("button", { name: /イベント追加/ })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId("timelines-markdown-editor")).toBeInTheDocument();
   });
 });
