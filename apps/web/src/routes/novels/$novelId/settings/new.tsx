@@ -1,11 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { SettingEditor } from "../../_components/-SettingEditor.js";
+import { RoutePending } from "@/routes/-pending.js";
 
 export const Route = createFileRoute("/novels/$novelId/settings/new")({
-  component: NewSettingPage,
+  pendingComponent: RoutePending,
 });
-
-function NewSettingPage() {
-  const { novelId } = Route.useParams();
-  return <SettingEditor novelId={novelId} />;
-}

@@ -2,10 +2,15 @@
 
 export {
   buildReasoningProviderOptions,
+  DEFAULT_LLM_MAX_OUTPUT_TOKENS,
+  DEFAULT_LLM_TIMEOUT_MS,
+  type GenerateJSONOptions,
+  type GenerateTextOptions,
   generateEmbedding,
   generateEmbeddings,
   generateJSON,
   generateText,
+  JSONValidationError,
   type ProviderOptions,
   streamText,
   streamTextResult,

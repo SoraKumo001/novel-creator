@@ -16,7 +16,7 @@ import {
   serializeForeshadowingsToMarkdown,
 } from "@novel-creator/shared";
 import type { ForeshadowingStatus } from "@novel-creator/shared/schemas";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { searchContext, upsertEntityEmbedding } from "../rag.js";
 import { insertEditHistory } from "./history.service.js";
 import { assertFound, type ServiceContext, ValidationError } from "./types.js";
@@ -215,20 +215,22 @@ export class ForeshadowingDomainService {
 
     const createdIds: string[] = [];
     await this.ctx.db.transaction(async (tx) => {
-      for (const item of diff.toCreate) {
-        const [row] = await tx
+      if (diff.toCreate.length > 0) {
+        const rows = await tx
           .insert(foreshadowings)
-          .values({
-            category: item.category,
-            description: item.description,
-            novelId,
-            placedSectionId: item.placedSectionId,
-            resolvedSectionId: item.resolvedSectionId,
-            status: item.status,
-            title: item.title,
-          })
+          .values(
+            diff.toCreate.map((item) => ({
+              category: item.category,
+              description: item.description,
+              novelId,
+              placedSectionId: item.placedSectionId,
+              resolvedSectionId: item.resolvedSectionId,
+              status: item.status,
+              title: item.title,
+            }))
+          )
           .returning();
-        createdIds.push(row.id);
+        createdIds.push(...rows.map((row) => row.id));
       }
 
       for (const u of diff.toUpdate) {
@@ -246,8 +248,10 @@ export class ForeshadowingDomainService {
           .where(eq(foreshadowings.id, u.id));
       }
 
-      for (const id of diff.toDelete) {
-        await tx.delete(foreshadowings).where(eq(foreshadowings.id, id));
+      if (diff.toDelete.length > 0) {
+        await tx
+          .delete(foreshadowings)
+          .where(inArray(foreshadowings.id, diff.toDelete));
       }
     });
 

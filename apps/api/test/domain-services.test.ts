@@ -18,6 +18,7 @@ import {
   TimelineDomainService,
   ValidationError,
 } from "../src/core/index.js";
+import { upsertEntityEmbedding } from "../src/rag.js";
 
 function createMockContext(mockDb: unknown): ServiceContext {
   return {
@@ -147,6 +148,69 @@ describe("Domain Services", () => {
       await expect(service.getContent("non-existent")).rejects.toThrow(
         NotFoundError
       );
+    });
+
+    it("updateContent - 本文更新時に content のベクトルを upsert すること", async () => {
+      const row = { body: "sample body", id: "c1", sectionId: "s1" };
+      const mockDb = {
+        insert: vi.fn().mockReturnValue({
+          values: vi.fn().mockReturnValue({
+            onConflictDoUpdate: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([row]),
+            }),
+            returning: vi.fn().mockResolvedValue([row]),
+          }),
+        }),
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi
+              .fn()
+              .mockResolvedValueOnce([{ chapterId: "c1" }])
+              .mockResolvedValueOnce([{ novelId: "n1" }]),
+          }),
+        }),
+      };
+      const ctx = createMockContext(mockDb);
+      const service = new ContentDomainService(ctx);
+      const res = await service.updateContent("s1", "sample body");
+      expect(res).toEqual(row);
+      expect(upsertEntityEmbedding).toHaveBeenCalledWith(
+        ctx.vectorStore,
+        ctx.embedding,
+        "n1",
+        "content",
+        "s1",
+        "sample body",
+        ctx.env
+      );
+    });
+
+    it("updateContent - ベクトル upsert に失敗しても本文保存は成功すること", async () => {
+      const row = { body: "sample body", id: "c1", sectionId: "s1" };
+      const mockDb = {
+        insert: vi.fn().mockReturnValue({
+          values: vi.fn().mockReturnValue({
+            onConflictDoUpdate: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([row]),
+            }),
+            returning: vi.fn().mockResolvedValue([row]),
+          }),
+        }),
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi
+              .fn()
+              .mockResolvedValueOnce([{ chapterId: "c1" }])
+              .mockResolvedValueOnce([{ novelId: "n1" }]),
+          }),
+        }),
+      };
+      upsertEntityEmbedding.mockRejectedValueOnce(
+        new Error("embedding failed")
+      );
+      const service = new ContentDomainService(createMockContext(mockDb));
+      const res = await service.updateContent("s1", "sample body");
+      expect(res).toEqual(row);
     });
   });
 

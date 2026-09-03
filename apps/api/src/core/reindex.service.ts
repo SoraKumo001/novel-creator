@@ -27,6 +27,20 @@ export interface EntityToEmbed {
   title: string;
 }
 
+/**
+ * アクティブなベクトルストアがインデックスの初期化
+ * （recreateSchema / clearAll）をサポートしていない場合に投げられるエラー。
+ * サイレントスキップによる stale ベクトルの蓄積を防ぐため、明示的に失敗させる。
+ */
+export class VectorStoreResetError extends Error {
+  constructor(
+    message = "現在のベクトルストアはインデックスの初期化（recreateSchema / clearAll）をサポートしていません"
+  ) {
+    super(message);
+    this.name = "VectorStoreResetError";
+  }
+}
+
 export class ReindexDomainService {
   private readonly embeddingConfigService: EmbeddingConfigDomainService;
 
@@ -56,6 +70,9 @@ export class ReindexDomainService {
       await this.ctx.vectorStore.recreateSchema(dimensions);
     } else if (this.ctx.vectorStore.clearAll) {
       await this.ctx.vectorStore.clearAll();
+    } else {
+      // クリアできないまま再構築すると stale ベクトルが蓄積するため、黙ってスキップしない。
+      throw new VectorStoreResetError();
     }
 
     // 3. 全小説のエンティティ（人物、設定、本文）を収集

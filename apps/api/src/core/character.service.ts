@@ -11,7 +11,7 @@ import {
   parseCharactersMarkdown,
   serializeCharactersToMarkdown,
 } from "@novel-creator/shared";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { searchContext, upsertEntityEmbedding } from "../rag.js";
 import { insertEditHistory } from "./history.service.js";
 import { assertFound, type ServiceContext, ValidationError } from "./types.js";
@@ -218,19 +218,21 @@ export class CharacterDomainService {
 
     const createdIds: string[] = [];
     await this.ctx.db.transaction(async (tx) => {
-      for (const ch of diff.toCreate) {
-        const [row] = await tx
+      if (diff.toCreate.length > 0) {
+        const rows = await tx
           .insert(characters)
-          .values({
-            category: ch.category,
-            description: ch.description,
-            name: ch.name,
-            novelId,
-            relationships: ch.relationships,
-            traits: ch.traits,
-          })
+          .values(
+            diff.toCreate.map((ch) => ({
+              category: ch.category,
+              description: ch.description,
+              name: ch.name,
+              novelId,
+              relationships: ch.relationships,
+              traits: ch.traits,
+            }))
+          )
           .returning();
-        createdIds.push(row.id);
+        createdIds.push(...rows.map((row) => row.id));
       }
 
       for (const u of diff.toUpdate) {
@@ -246,8 +248,10 @@ export class CharacterDomainService {
           .where(eq(characters.id, u.id));
       }
 
-      for (const id of diff.toDelete) {
-        await tx.delete(characters).where(eq(characters.id, id));
+      if (diff.toDelete.length > 0) {
+        await tx
+          .delete(characters)
+          .where(inArray(characters.id, diff.toDelete));
       }
     });
 

@@ -31,24 +31,240 @@ import {
 } from "@/lib/services/index.js";
 import { type DiffTabItem, ProposalDiffModal } from "./ProposalDiffModal.js";
 
-export interface ProposalPayload {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  data: Record<string, any>;
+/** ストーリー構想の更新モード */
+type StoryOutlineMode = "append" | "full_document" | "prepend" | "replace";
+
+/** 伏線のステータス */
+type ForeshadowingStatus = "abandoned" | "resolved" | "unresolved";
+
+/** 一括登録（bulk）の登場人物アイテム。LLM ツール出力のため title 表記の揺れを許容する */
+interface BulkCharacterItem {
+  category?: string;
+  description?: string;
+  name?: string;
+  title?: string;
+  traits?: string[];
+}
+
+/** 一括登録（bulk）の世界観・設定アイテム */
+interface BulkSettingItem {
+  category?: string;
+  description?: string;
+  name?: string;
+  title?: string;
+}
+
+/** 一括登録（bulk）の伏線アイテム（title が無く name / description のみのケースを許容） */
+interface BulkForeshadowingItem {
+  category?: string;
+  description?: string;
+  name?: string;
+  status?: ForeshadowingStatus;
+  title?: string;
+}
+
+/** 一括登録（bulk）の年表イベントアイテム */
+interface BulkTimelineItem {
+  event?: string;
+  timestamp?: string | null;
+  title?: string;
+}
+
+/**
+ * 提案ペイロードの data 部。
+ * バックエンドの proposeTools（apps/api/src/core/tools/proposeTools.ts）が返す形状を
+ * 元にした、フロント側の防御的・最小限の型。reason / sectionName / mode は
+ * 一部の提案タイプ（story_outline / delete_*）でのみ使われるが、カード上部の
+ * 共通表示ロジックが安全に読めるよう基底に持たせる。
+ */
+interface ProposalDataBase {
+  /** ストーリー構想の更新モード */
+  mode?: StoryOutlineMode;
+  /** 登録・削除・更新の理由（あれば） */
+  reason?: string | null;
+  /** ストーリー構想（story_outline）の対象セクション名 */
+  sectionName?: string;
+}
+
+interface BulkProposalData extends ProposalDataBase {
+  characters?: BulkCharacterItem[];
+  deleteCharacters?: string[];
+  deleteSettings?: string[];
+  foreshadowings?: BulkForeshadowingItem[];
+  settings?: BulkSettingItem[];
+  timelines?: BulkTimelineItem[];
+}
+
+interface CharacterProposalData extends ProposalDataBase {
+  category?: string;
+  description?: string;
+  name: string;
+  oldCharacterName?: string | null;
+  traits?: string[];
+}
+
+interface SettingProposalData extends ProposalDataBase {
+  category?: string;
+  description?: string;
+  name: string;
+  oldSettingName?: string | null;
+}
+
+interface DeleteProposalData extends ProposalDataBase {
+  name: string;
+}
+
+interface ForeshadowingProposalData extends ProposalDataBase {
+  category?: string;
+  description?: string;
+  name?: string;
+  status?: ForeshadowingStatus;
+  title: string;
+}
+
+interface TimelineProposalData extends ProposalDataBase {
+  event: string;
+  order?: number | null;
+  timestamp?: string | null;
+}
+
+interface PlotProposalData extends ProposalDataBase {
+  chapterTitle: string;
+  summary: string;
+  /** LLM 出力の表記ゆれ（title）も許容する防御的フィールド */
+  title: string;
+}
+
+interface StoryOutlineProposalData extends ProposalDataBase {
+  content?: string;
+}
+
+interface ProposalPayloadBase {
   novelId: string;
-  proposalType:
-    | "bulk"
-    | "character"
-    | "setting"
-    | "delete_setting"
-    | "delete_character"
-    | "foreshadowing"
-    | "timeline"
-    | "plot"
-    | "story_outline";
   reason?: string;
   sectionName?: string;
   summary: string;
   type: "proposal";
+}
+
+export type ProposalPayload =
+  | (ProposalPayloadBase & {
+      data: BulkProposalData;
+      proposalType: "bulk";
+    })
+  | (ProposalPayloadBase & {
+      data: CharacterProposalData;
+      proposalType: "character";
+    })
+  | (ProposalPayloadBase & {
+      data: DeleteProposalData;
+      proposalType: "delete_character";
+    })
+  | (ProposalPayloadBase & {
+      data: DeleteProposalData;
+      proposalType: "delete_setting";
+    })
+  | (ProposalPayloadBase & {
+      data: ForeshadowingProposalData;
+      proposalType: "foreshadowing";
+    })
+  | (ProposalPayloadBase & {
+      data: PlotProposalData;
+      proposalType: "plot";
+    })
+  | (ProposalPayloadBase & {
+      data: SettingProposalData;
+      proposalType: "setting";
+    })
+  | (ProposalPayloadBase & {
+      data: StoryOutlineProposalData;
+      proposalType: "story_outline";
+    })
+  | (ProposalPayloadBase & {
+      data: TimelineProposalData;
+      proposalType: "timeline";
+    });
+
+/** normalizeProposal() が返す正規化済み一括データ */
+interface NormalizedBulkProposal {
+  characters: (BulkCharacterItem & { name: string })[];
+  deleteCharacters: string[];
+  deleteSettings: string[];
+  foreshadowings: (BulkForeshadowingItem & { title: string })[];
+  settings: (BulkSettingItem & { name: string })[];
+  timelines: (BulkTimelineItem & { event: string })[];
+}
+
+/**
+ * 一括提案（bulk）の data を反映処理と差分プレビューで共通利用する形状へ正規化する。
+ * LLM ツール出力は name|title などの表記ゆれがあるため、安全な既定値を補完して
+ * 空配列に倒し込む（handleApply / handleOpenDiff の両方が同じ変換を使う）。
+ */
+function normalizeProposal(data: BulkProposalData): NormalizedBulkProposal {
+  const characters = (
+    Array.isArray(data.characters) ? data.characters : []
+  ).map((c) => ({
+    ...c,
+    name: (c.name || c.title || "無題の登場人物").trim(),
+  }));
+  const settings = (Array.isArray(data.settings) ? data.settings : []).map(
+    (s) => ({
+      ...s,
+      name: (s.name || s.title || "無題の設定").trim(),
+    })
+  );
+  const foreshadowings = (
+    Array.isArray(data.foreshadowings) ? data.foreshadowings : []
+  ).map((f) => ({
+    ...f,
+    title: (
+      f.title ||
+      f.name ||
+      f.description?.slice(0, 30) ||
+      "無題の伏線"
+    ).trim(),
+  }));
+  const timelines = (Array.isArray(data.timelines) ? data.timelines : []).map(
+    (t) => ({
+      ...t,
+      event: (t.event || t.title || "無題の出来事").trim(),
+    })
+  );
+  const deleteSettings: string[] = Array.isArray(data.deleteSettings)
+    ? data.deleteSettings.map((s) => String(s || "").trim()).filter(Boolean)
+    : [];
+  const deleteCharacters: string[] = Array.isArray(data.deleteCharacters)
+    ? data.deleteCharacters.map((c) => String(c || "").trim()).filter(Boolean)
+    : [];
+  return {
+    characters,
+    deleteCharacters,
+    deleteSettings,
+    foreshadowings,
+    settings,
+    timelines,
+  };
+}
+
+/** /novels/$novelId ルートの search.tab が受け付けるタブID */
+type NovelRouteTabId =
+  | "characters"
+  | "editor"
+  | "foreshadowing"
+  | "outline"
+  | "overview"
+  | "plot"
+  | "settings"
+  | "timeline";
+
+/**
+ * DiffTabItem.targetTab（例: "foreshadowings"）はルートの search.tab のタブID
+ * （例: "foreshadowing"）と表記ゆれがあるため、型がそのまま一致しない。
+ * ルーター側の validateSearch が未知の値は undefined に正規化するため、
+ * ここでは型合わせのための変換のみを行う（値はそのまま渡す）。
+ */
+function toRouteTab(tab: string): NovelRouteTabId {
+  return tab as NovelRouteTabId;
 }
 
 interface ChatProposalCardProps {
@@ -114,47 +330,14 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
     setIsApplying(true);
     try {
       if (proposalType === "bulk") {
-        const characters = (
-          Array.isArray(data.characters) ? data.characters : []
-        ).map((c: any) => ({
-          ...c,
-          name: (c.name || c.title || "無題の登場人物").trim(),
-        }));
-        const settings = (
-          Array.isArray(data.settings) ? data.settings : []
-        ).map((s: any) => ({
-          ...s,
-          name: (s.name || s.title || "無題の設定").trim(),
-        }));
-        const foreshadowings = (
-          Array.isArray(data.foreshadowings) ? data.foreshadowings : []
-        ).map((f: any) => ({
-          ...f,
-          title: (
-            f.title ||
-            f.name ||
-            f.description?.slice(0, 30) ||
-            "無題の伏線"
-          ).trim(),
-        }));
-        const timelines = (
-          Array.isArray(data.timelines) ? data.timelines : []
-        ).map((t: any) => ({
-          ...t,
-          event: (t.event || t.title || "無題の出来事").trim(),
-        }));
-        const deleteSettingsList: string[] = Array.isArray(data.deleteSettings)
-          ? data.deleteSettings
-              .map((s: any) => String(s || "").trim())
-              .filter(Boolean)
-          : [];
-        const deleteCharactersList: string[] = Array.isArray(
-          data.deleteCharacters
-        )
-          ? data.deleteCharacters
-              .map((c: any) => String(c || "").trim())
-              .filter(Boolean)
-          : [];
+        const {
+          characters,
+          deleteCharacters: deleteCharactersList,
+          deleteSettings: deleteSettingsList,
+          foreshadowings,
+          settings,
+          timelines,
+        } = normalizeProposal(data);
 
         // 人物マークダウンの反映
         if (characters.length > 0 || deleteCharactersList.length > 0) {
@@ -717,45 +900,14 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
         });
         setDiffModalOpen(true);
       } else if (proposalType === "bulk") {
-        const delChars = (
-          Array.isArray(data.deleteCharacters) ? data.deleteCharacters : []
-        )
-          .map((c: any) => String(c || "").trim())
-          .filter(Boolean);
-        const delSets = (
-          Array.isArray(data.deleteSettings) ? data.deleteSettings : []
-        )
-          .map((s: any) => String(s || "").trim())
-          .filter(Boolean);
-        const characters = (
-          Array.isArray(data.characters) ? data.characters : []
-        ).map((c: any) => ({
-          ...c,
-          name: (c.name || c.title || "無題の登場人物").trim(),
-        }));
-        const settings = (
-          Array.isArray(data.settings) ? data.settings : []
-        ).map((s: any) => ({
-          ...s,
-          name: (s.name || s.title || "無題の設定").trim(),
-        }));
-        const foreshadowings = (
-          Array.isArray(data.foreshadowings) ? data.foreshadowings : []
-        ).map((f: any) => ({
-          ...f,
-          title: (
-            f.title ||
-            f.name ||
-            f.description?.slice(0, 30) ||
-            "無題の伏線"
-          ).trim(),
-        }));
-        const timelines = (
-          Array.isArray(data.timelines) ? data.timelines : []
-        ).map((t: any) => ({
-          ...t,
-          event: (t.event || t.title || "無題の出来事").trim(),
-        }));
+        const {
+          characters,
+          deleteCharacters: delChars,
+          deleteSettings: delSets,
+          foreshadowings,
+          settings,
+          timelines,
+        } = normalizeProposal(data);
 
         const items: DiffTabItem[] = [];
 
@@ -884,7 +1036,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
     navigate({
       to: "/novels/$novelId",
       params: { novelId: targetNovelId },
-      search: { tab: resolvedTab as any },
+      search: { tab: toRouteTab(resolvedTab) },
     });
 
     // 遷移後のエディタに提案適用後Markdownを渡すイベントを発火
@@ -1077,7 +1229,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
                   👤 登場人物 ({data.characters.length}名)
                 </div>
                 <div className="mt-1 space-y-1 border-indigo-200 border-l-2 pl-1.5 dark:border-indigo-800">
-                  {data.characters.map((c: any, i: number) => (
+                  {data.characters.map((c, i: number) => (
                     <div key={i} className="text-[11px]">
                       <span className="font-semibold text-slate-900 dark:text-slate-100">
                         {c.name}
@@ -1102,7 +1254,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
                   🌍 世界観・設定 ({data.settings.length}件)
                 </div>
                 <div className="mt-1 space-y-1 border-teal-200 border-l-2 pl-1.5 dark:border-teal-800">
-                  {data.settings.map((s: any, i: number) => (
+                  {data.settings.map((s, i: number) => (
                     <div key={i} className="text-[11px]">
                       <span className="font-semibold text-slate-900 dark:text-slate-100">
                         {s.name}
@@ -1127,29 +1279,6 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
                   <div className="font-bold text-[11px] text-amber-700 dark:text-amber-400">
                     🔍 伏線 ({data.foreshadowings.length}件)
                   </div>
-                  <div className="mt-1 space-y-1 border-amber-200 border-l-2 pl-1.5 dark:border-amber-800">
-                    {data.foreshadowings.map((f: any, i: number) => {
-                      const displayTitle =
-                        f.title ||
-                        f.name ||
-                        (f.description
-                          ? f.description.slice(0, 24) +
-                            (f.description.length > 24 ? "..." : "")
-                          : "（伏線）");
-                      return (
-                        <div key={i} className="text-[11px]">
-                          <span className="font-semibold text-slate-900 dark:text-slate-100">
-                            {displayTitle}
-                          </span>
-                          {f.description && f.title && (
-                            <p className="line-clamp-1 text-[10px] text-slate-600 dark:text-slate-400">
-                              {f.description}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
                 </div>
               )}
             {Array.isArray(data.timelines) && data.timelines.length > 0 && (
@@ -1158,7 +1287,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
                   ⏳ 年表イベント ({data.timelines.length}件)
                 </div>
                 <div className="mt-1 space-y-1 border-blue-200 border-l-2 pl-1.5 dark:border-blue-800">
-                  {data.timelines.map((t: any, i: number) => (
+                  {data.timelines.map((t, i: number) => (
                     <div key={i} className="text-[11px]">
                       <span className="font-semibold text-slate-900 dark:text-slate-100">
                         {t.event}

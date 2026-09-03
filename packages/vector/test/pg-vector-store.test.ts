@@ -85,6 +85,24 @@ describe("PgVectorStore 次元検証", () => {
     expect(callsContaining("CREATE TABLE")).toHaveLength(1);
   });
 
+  it("デフォルト次元が Drizzle スキーマの embedding 列（3072）と一致すること", async () => {
+    stubDimensionQuery(null);
+    const store = createPgVectorStore("postgres://mock");
+    await store.delete("11111111-1111-4111-8111-111111111111");
+    expect(callsContaining("CREATE TABLE")).toHaveLength(1);
+    expect(callsContaining("vector(3072)")).toHaveLength(1);
+  });
+
+  it("デフォルト次元（3072）と既存テーブルの次元が異なる場合は明確なエラーで失敗すること", async () => {
+    stubDimensionQuery(1536);
+    const store = createPgVectorStore("postgres://mock");
+    await expect(
+      store.delete("11111111-1111-4111-8111-111111111111")
+    ).rejects.toThrow(
+      /embedding 列の次元（1536）.*要求された次元（3072）.*一致しません/
+    );
+  });
+
   it("upsert が呼び出されること", async () => {
     stubDimensionQuery(1536);
     const store = createPgVectorStore("postgres://mock", 1536);

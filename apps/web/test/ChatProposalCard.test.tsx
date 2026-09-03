@@ -236,7 +236,8 @@ describe("ChatProposalCard", () => {
       expect(screen.getAllByText(/一括登録/).length).toBeGreaterThan(0);
       expect(screen.getByText("アレン")).toBeInTheDocument();
       expect(screen.getByText("帝国")).toBeInTheDocument();
-      expect(screen.getByText("黒幕の正体")).toBeInTheDocument();
+      // 伏線は件数ヘッダーのみ表示（個別プレビューは非表示のためタイトルは出ない）
+      expect(screen.getByText(/伏線 \(1件\)/)).toBeInTheDocument();
       expect(screen.getByText("王都陥落")).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /小説に反映する/ })

@@ -30,6 +30,44 @@ function maskApiKey(key?: string | null): {
   return { apiKeyMasked: `${prefix}....${suffix}`, hasApiKey: true };
 }
 
+/**
+ * baseUrl の入力値を検証する。不合格の場合は ValidationError を投げる。
+ * - 未指定（undefined / null / 空文字）は許容する
+ * - http(s) 以外のスキームを拒否する
+ * - http は localhost / 127.0.0.1 のみ許容する（それ以外は https を要求）
+ * - 埋め込みクレデンシャル（user:pass@）を拒否する
+ */
+function assertValidBaseUrl(baseUrl?: string | null): void {
+  if (!baseUrl?.trim()) {
+    return;
+  }
+  const raw = baseUrl.trim();
+
+  if (!URL.canParse(raw)) {
+    throw new ValidationError(
+      "baseUrl must be a valid URL (e.g. https://api.example.com/v1)"
+    );
+  }
+  const url = new URL(raw);
+
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new ValidationError("baseUrl must use http or https scheme");
+  }
+  if (url.username !== "" || url.password !== "") {
+    throw new ValidationError(
+      "baseUrl must not contain embedded credentials (user:pass@)"
+    );
+  }
+  if (url.protocol === "http:") {
+    const hostname = url.hostname.toLowerCase();
+    if (hostname !== "localhost" && hostname !== "127.0.0.1") {
+      throw new ValidationError(
+        "http:// baseUrl is only allowed for localhost / 127.0.0.1"
+      );
+    }
+  }
+}
+
 export class LlmConfigDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
@@ -162,6 +200,7 @@ export class LlmConfigDomainService {
   }
 
   async testConfig(input: LLMConfigInput) {
+    assertValidBaseUrl(input.baseUrl);
     return testLLMConnection(input, this.ctx.env);
   }
 

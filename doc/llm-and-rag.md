@@ -133,9 +133,6 @@ export async function upsertEntityEmbedding(
 ### 3.3 ツール呼び出しとクライアント連携
 
 - **自律的探索**: LLM はユーザーの質問（例:「第2章の伏線と主人公の関係性は？」）に応じて、`getForeshadowings` や `getCharacters`、`getPlotAndChapters` を連鎖的に呼び出して文脈を把握します。
-- **提案とインライン承認 (`ChatProposalCard`)**: LLM が `propose〜` ツールを呼ぶと、即時書き込みは行わず提案ペイロードを返します。クライアント側では**AIの解説テキスト本文の直下（メッセージ最下部）**に提案カードが描画され、作家がスクロールの手間なくワンクリックで小説データへ登録できます。
-- **Monaco DiffEditor による差分確認 (`ProposalDiffModal`)**: 反映前に変更前後の Markdown 全文差分を左右並列／行内統合で比較可能。一括登録提案（`proposeBulkCreate`）時は全カテゴリ（人物・設定・伏線・年表）をタブ切り替えで精査できます。
-- **UI 表示 (`ToolActivity`)**: AI SDK UI の Data Stream 経由でツール呼び出し（`tool-call`）と実行結果（`tool-result`）がクライアントにリアルタイム配信され、チャット上部にコンパクトな折りたたみカードとして展開されます。
 
 ---
 
@@ -202,3 +199,13 @@ sequenceDiagram
     API-->>UI: data: {"done": true}
     Note over UI: タブ / 並列比較 (Split View) で描画 & 選択採用
 ```
+
+---
+
+## 既知の制限
+
+### LLM API キーの平文保存
+
+- LLM / Embedding の API キーはデータベース（`llm_configs` 等）に**平文のまま保存**されます。
+- 読み出し時（一覧・レスポンス）には `apiKeyMasked` としてマスク表示されますが、これは**表示上の対策**であり、保存データ自体は暗号化されていません。
+- 本番環境へデプロイする際はこのリスクを評価し、必要に応じてシークレット管理基盤（KMS / Vault 等）や保存時暗号化の導入を検討してください。

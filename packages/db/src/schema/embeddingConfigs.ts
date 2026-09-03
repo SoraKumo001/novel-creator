@@ -13,7 +13,8 @@ export const embeddingConfigs = pgTable("embedding_configs", {
   baseUrl: text("base_url"),
   createdAt: timestamp("created_at").defaultNow(),
   description: text("description"),
-  dimensions: integer("dimensions").notNull().default(1536),
+  // デフォルト次元は @novel-creator/vector の DEFAULT_VECTOR_DIMENSIONS (3072) と同期させること。
+  dimensions: integer("dimensions").notNull().default(3072),
   id: uuid("id").primaryKey().defaultRandom(),
   isDefault: boolean("is_default").default(false).notNull(),
   modelId: text("model_id").notNull(),

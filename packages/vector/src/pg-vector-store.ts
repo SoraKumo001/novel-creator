@@ -13,12 +13,21 @@ import { Pool } from "pg";
 
 import type { VectorRecord, VectorSearchResult, VectorStore } from "./types.js";
 
+/**
+ * vector_embeddings テーブルの embedding 列の次元（Drizzle スキーマ）と、
+ * ストア生成時のデフォルト次元を同期させるための共通定数。
+ * 変更時は packages/db の embedding_configs.dimensions デフォルトも合わせること。
+ */
+export const DEFAULT_VECTOR_DIMENSIONS = 3072;
+
 export const vectorEmbeddings = pgTable(
   "vector_embeddings",
   {
     content: text("content").notNull(),
     createdAt: timestamp("created_at").defaultNow(),
-    embedding: vector("embedding", { dimensions: 3072 }).notNull(),
+    embedding: vector("embedding", {
+      dimensions: DEFAULT_VECTOR_DIMENSIONS,
+    }).notNull(),
     entityId: uuid("entity_id").notNull(),
     entityType: text("entity_type").notNull(),
     id: uuid("id").primaryKey(),
@@ -41,7 +50,7 @@ export type NewVectorEmbedding = typeof vectorEmbeddings.$inferInsert;
 
 export function createPgVectorStore(
   connectionString: string,
-  dimensions = 1536
+  dimensions = DEFAULT_VECTOR_DIMENSIONS
 ): VectorStore {
   const pool = new Pool({ connectionString });
   const db = drizzle(pool, { schema: { vectorEmbeddings } });

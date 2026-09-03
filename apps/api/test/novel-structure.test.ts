@@ -33,7 +33,10 @@ import {
   type AnalysisStreamEvent,
 } from "../src/core/analysis.service.js";
 import { fetchNovelStructureWithContents } from "../src/core/novel-structure.js";
-import { ReindexDomainService } from "../src/core/reindex.service.js";
+import {
+  ReindexDomainService,
+  VectorStoreResetError,
+} from "../src/core/reindex.service.js";
 import type { ServiceContext } from "../src/core/types.js";
 
 type Row = Record<string, unknown>;
@@ -531,5 +534,21 @@ describe("ReindexDomainService.reindexAll", () => {
     expect(
       vi.mocked(generateEmbedding).mock.calls.map(([, content]) => content)
     ).toEqual(["名前: 太郎", "あ", "い"]);
+  });
+
+  it("recreateSchema も clearAll も持たないストアでは VectorStoreResetError を投げること", async () => {
+    const { db } = createCountingDb(REINDEX_MULTI_FIXTURE);
+    const vectorStore = {
+      deleteByEntity: vi.fn().mockResolvedValue(undefined),
+      deleteByNovel: vi.fn().mockResolvedValue(undefined),
+      search: vi.fn().mockResolvedValue([]),
+      upsertBatch: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = new ReindexDomainService(createContext(db, vectorStore));
+
+    // クリア手段がないストアで reindex すると stale ベクトルが蓄積するため、
+    // 黙ってスキップせず明示的に失敗する。
+    await expect(service.reindexAll()).rejects.toThrow(VectorStoreResetError);
+    expect(vectorStore.upsertBatch).not.toHaveBeenCalled();
   });
 });

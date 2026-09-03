@@ -1,13 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CharacterEditor } from "../../_components/-CharacterEditor.js";
+import { RoutePending } from "@/routes/-pending.js";
 
 export const Route = createFileRoute(
   "/novels/$novelId/characters/$characterId"
 )({
-  component: EditCharacterPage,
+  pendingComponent: RoutePending,
 });
-
-function EditCharacterPage() {
-  const { novelId, characterId } = Route.useParams();
-  return <CharacterEditor novelId={novelId} characterId={characterId} />;
-}

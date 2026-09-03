@@ -1,5 +1,6 @@
 import { chapters, contents, sections } from "@novel-creator/db";
 import { eq } from "drizzle-orm";
+import { upsertEntityEmbedding } from "../rag.js";
 import { insertEditHistory } from "./history.service.js";
 import { assertFound, type ServiceContext } from "./types.js";
 
@@ -43,7 +44,8 @@ export class ContentDomainService {
       })
       .returning();
 
-    // 履歴を記録
+    // 履歴を記録（失敗しても本文保存自体は成功させる）
+    let novelId: string | undefined;
     try {
       const [sec] = await this.ctx.db
         .select()
@@ -55,6 +57,7 @@ export class ContentDomainService {
           .from(chapters)
           .where(eq(chapters.id, sec.chapterId));
         if (ch) {
+          novelId = ch.novelId;
           await insertEditHistory(this.ctx.db, {
             content: body,
             description,
@@ -68,6 +71,23 @@ export class ContentDomainService {
       }
     } catch (e) {
       console.error("[history] failed to record content history", e);
+    }
+
+    // 本文のベクトルを更新（失敗しても本文保存は成功させる）
+    if (novelId) {
+      try {
+        await upsertEntityEmbedding(
+          this.ctx.vectorStore,
+          this.ctx.embedding,
+          novelId,
+          "content",
+          sectionId,
+          body,
+          this.ctx.env
+        );
+      } catch (e) {
+        console.error("[vector] failed to upsert content embedding", e);
+      }
     }
 
     return row;

@@ -5,6 +5,10 @@ import type { VectorStore } from "@novel-creator/vector";
 import type { EmbeddingModel } from "ai";
 
 export interface SearchContextOptions {
+  /** 本文（content）の最大検索件数（既定: 3。チャンクが長いため少なめに抑える） */
+  contentTopK?: number;
+  /** 伏線（foreshadowing）の最大検索件数（既定: topK） */
+  foreshadowingTopK?: number;
   minScore?: number;
   previousContent?: string;
   query: string;
@@ -13,6 +17,8 @@ export interface SearchContextOptions {
 
 export interface SearchContextResult {
   characters: string[];
+  contents: string[];
+  foreshadowings: string[];
   previousContent?: string;
   settings: string[];
 }
@@ -33,8 +39,9 @@ function buildEmbeddingProviderOptions(
 }
 
 /**
- * VectorStore を検索して、関連する人物・設定のテキスト配列を返す。
+ * VectorStore を検索して、関連する人物・設定・本文・伏線のテキスト配列を返す。
  * 生成エンドポイントのコンテキスト構築に使用する。
+ * エンティティタイプごとに件数上限（topK 等）を適用してトークン予算を抑える。
  */
 export async function searchContext(
   vectorStore: VectorStore,
@@ -44,18 +51,37 @@ export async function searchContext(
   env: Env
 ): Promise<SearchContextResult> {
   const topK = options.topK ?? 5;
+  const contentTopK = options.contentTopK ?? 3;
+  const foreshadowingTopK = options.foreshadowingTopK ?? topK;
   const minScore = options.minScore;
   const providerOptions = buildEmbeddingProviderOptions(env);
   const queryVector = await generateEmbedding(embedding, options.query, {
     providerOptions,
   });
 
-  const [characterResults, settingResults] = await Promise.all([
+  const [
+    characterResults,
+    contentResults,
+    foreshadowingResults,
+    settingResults,
+  ] = await Promise.all([
     vectorStore.search(queryVector, {
       entityType: "character",
       minScore,
       novelId,
       topK,
+    }),
+    vectorStore.search(queryVector, {
+      entityType: "content",
+      minScore,
+      novelId,
+      topK: contentTopK,
+    }),
+    vectorStore.search(queryVector, {
+      entityType: "foreshadowing",
+      minScore,
+      novelId,
+      topK: foreshadowingTopK,
     }),
     vectorStore.search(queryVector, {
       entityType: "setting",
@@ -67,6 +93,8 @@ export async function searchContext(
 
   return {
     characters: characterResults.map((r) => r.content),
+    contents: contentResults.map((r) => r.content),
+    foreshadowings: foreshadowingResults.map((r) => r.content),
     previousContent: options.previousContent,
     settings: settingResults.map((r) => r.content),
   };

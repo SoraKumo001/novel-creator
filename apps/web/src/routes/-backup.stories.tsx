@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { ToastProvider } from "@/components/Toast.js";
-import { BackupPage } from "./backup.js";
+import { BackupPage } from "./backup.lazy.js";
 
 // ストーリー専用の QueryClient（再試行無効・長時間キャッシュ）
 function makeQueryClient() {

@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { toErrorMessage } from "@/lib/errors.js";
 import {
   createChatSession,
   deleteChatSession,
@@ -288,9 +289,17 @@ export function useChatStreaming({
         autoCreatedSessionRef.current = null;
         const title = extractTitle(message);
         if (title && currentSessionIdRef.current) {
-          void updateChatSession(currentSessionIdRef.current, { title }).catch(
-            () => {}
-          );
+          // セッションタイトルの永続化失敗はユーザーに見える状態（セッション一覧の
+          // タイトル）へ影響するため、既存のエラー経路（error state）で通知する。
+          void updateChatSession(currentSessionIdRef.current, {
+            title,
+          }).catch((err) => {
+            console.error(
+              "チャットセッションのタイトル保存に失敗しました",
+              toErrorMessage(err)
+            );
+            setError(toErrorMessage(err));
+          });
         }
       }
       void refreshSessions();
@@ -314,7 +323,14 @@ export function useChatStreaming({
           setUiMessages(parsed);
         }
       }
-    } catch {}
+    } catch (err) {
+      // キャッシュ復元はベストエフォート（失敗時はサーバー再取得にフォールバックする）ため、
+      // ユーザーへエラーを出さずログに残す。
+      console.error(
+        "チャットメッセージキャッシュの復元に失敗しました",
+        toErrorMessage(err)
+      );
+    }
   }, [currentSessionId, setUiMessages]);
 
   // メッセージ更新時にローカルキャッシュへ即時同期
@@ -328,7 +344,15 @@ export function useChatStreaming({
           `${CHAT_MESSAGES_CACHE_PREFIX}${currentSessionId}`,
           JSON.stringify(uiMessages)
         );
-      } catch {}
+      } catch (err) {
+        // メッセージのローカル永続化（リロード後の復元用）の失敗は、ストリーム終了後に
+        // 表示履歴が残らない状態へ直結するため、既存のエラー経路で通知する。
+        console.error(
+          "チャットメッセージキャッシュの保存に失敗しました",
+          toErrorMessage(err)
+        );
+        setError(toErrorMessage(err));
+      }
     }
   }, [currentSessionId, uiMessages]);
 

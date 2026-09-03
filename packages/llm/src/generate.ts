@@ -15,6 +15,7 @@ import {
   embed,
   embedMany,
 } from "ai";
+import type { ZodError, ZodType } from "zod";
 
 /**
  * リトライ設定。
@@ -32,14 +33,98 @@ const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
   retryDelay: 1000,
 };
 
+/** LLM 呼び出しの既定タイムアウト（ms）。 */
+export const DEFAULT_LLM_TIMEOUT_MS = 120_000;
+
+/** LLM 呼び出しの既定最大出力トークン数。 */
+export const DEFAULT_LLM_MAX_OUTPUT_TOKENS = 8192;
+
+/** 推論（reasoning）を有効化する対象の OpenAI モデル ID パターン（o1 / o3 / o4 / gpt-5 系）の既定値。 */
+const DEFAULT_OPENAI_REASONING_MODEL_PATTERN = /^(o[134](-|$)|gpt-5)/;
+
+/** Anthropic の thinking 予算トークン数の既定値。 */
+const DEFAULT_ANTHROPIC_THINKING_BUDGET_TOKENS = 4000;
+
+/**
+ * 環境変数から正の整数を読み取る。
+ * 未設定・不正値（非数値・0以下）の場合は fallback を返す。
+ */
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw =
+    (typeof process !== "undefined" ? process.env?.[name] : undefined) ?? "";
+  if (raw.trim() === "") {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+/**
+ * 環境変数から正規表現を読み取る。
+ * 未設定・不正なパターンの場合は fallback を返す。
+ */
+function readRegexEnv(name: string, fallback: RegExp): RegExp {
+  const raw =
+    (typeof process !== "undefined" ? process.env?.[name] : undefined) ?? "";
+  if (raw.trim() === "") {
+    return fallback;
+  }
+  try {
+    return new RegExp(raw.trim());
+  } catch {
+    return fallback;
+  }
+}
+
+/** LLM タイムアウト（ms）。環境変数 `LLM_TIMEOUT_MS` で上書き可能。既定 120 秒。 */
+const LLM_TIMEOUT_MS = readPositiveIntEnv(
+  "LLM_TIMEOUT_MS",
+  DEFAULT_LLM_TIMEOUT_MS
+);
+
+/** LLM 最大出力トークン数。環境変数 `LLM_MAX_OUTPUT_TOKENS` で上書き可能。既定 8192。 */
+const LLM_MAX_OUTPUT_TOKENS = readPositiveIntEnv(
+  "LLM_MAX_OUTPUT_TOKENS",
+  DEFAULT_LLM_MAX_OUTPUT_TOKENS
+);
+
+/** 推論（reasoning）を有効化する対象の OpenAI モデル ID パターン。環境変数 `OPENAI_REASONING_MODEL_PATTERN` で上書き可能。 */
+const OPENAI_REASONING_MODEL_PATTERN = readRegexEnv(
+  "OPENAI_REASONING_MODEL_PATTERN",
+  DEFAULT_OPENAI_REASONING_MODEL_PATTERN
+);
+
+/** Anthropic の thinking 予算トークン数。環境変数 `ANTHROPIC_THINKING_BUDGET_TOKENS` で上書き可能。 */
+const ANTHROPIC_THINKING_BUDGET_TOKENS = readPositiveIntEnv(
+  "ANTHROPIC_THINKING_BUDGET_TOKENS",
+  DEFAULT_ANTHROPIC_THINKING_BUDGET_TOKENS
+);
+
+/**
+ * AbortSignal.timeout などによる中断エラー（AbortError）かどうかを判定する。
+ */
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name: unknown }).name === "AbortError"
+  );
+}
+
 /**
  * リトライ対象のエラーかどうかを判定する。
+ * - タイムアウト（AbortSignal.timeout）による中断: 再試行しない（terminal）
  * - ネットワークエラー（fetch の TypeError など）
  * - 429（Rate Limit）
  * - 500 系エラー
  * - AI SDK が isRetryable とマークしたエラー
  */
 function isRetryableError(error: unknown): boolean {
+  // タイムアウトによる中断は再試行すると無駄な待機が発生するため終端扱いにする。
+  if (isAbortError(error)) {
+    return false;
+  }
   if (APICallError.isInstance(error)) {
     const status = error.statusCode;
     if (status === 429) {
@@ -85,32 +170,69 @@ async function withRetry<T>(
 }
 
 /**
+ * generateText / streamText の呼び出しオプション。
+ * RetryOptions に加え、呼び出し単位のタイムアウトと最大出力トークン数を指定できる。
+ * 未指定時は環境変数（LLM_TIMEOUT_MS / LLM_MAX_OUTPUT_TOKENS）または既定値にフォールバックする。
+ */
+export interface GenerateTextOptions extends RetryOptions {
+  /** 最大出力トークン数。未指定時は既定値（8192） */
+  maxOutputTokens?: number;
+  /** 呼び出し単位のタイムアウト（ms）。未指定時は既定値（120000） */
+  timeoutMs?: number;
+}
+
+/**
  * AI SDK の generateText ラッパー。生成されたテキストを返す。
  * ネットワークエラー・429・500 系エラーはリトライする。
+ * タイムアウト（AbortSignal.timeout）による中断はリトライせずそのまま伝播する。
  */
 export async function generateText(
   model: LanguageModel,
   prompt: string,
-  options: RetryOptions = {}
+  options: GenerateTextOptions = {}
 ): Promise<string> {
+  const {
+    maxOutputTokens = LLM_MAX_OUTPUT_TOKENS,
+    timeoutMs = LLM_TIMEOUT_MS,
+    ...retryOptions
+  } = options;
+  const abortSignal = AbortSignal.timeout(timeoutMs);
   return withRetry(async () => {
-    const result = await aiGenerateText({ model, prompt });
+    const result = await aiGenerateText({
+      model,
+      prompt,
+      abortSignal,
+      maxOutputTokens,
+    });
     return result.text;
-  }, options);
+  }, retryOptions);
 }
 
 /**
  * AI SDK の streamText ラッパー。テキストのチャンクを逐次 yield する。
  * ストリーム開始後はリトライできないため、接続時（ストリーム開始前）のみリトライする。
+ * タイムアウト（AbortSignal.timeout）による中断はリトライせずそのまま伝播する。
  */
 export async function* streamText(
   model: LanguageModel,
   prompt: string,
-  options: RetryOptions = {}
+  options: GenerateTextOptions = {}
 ): AsyncGenerator<string> {
+  const {
+    maxOutputTokens = LLM_MAX_OUTPUT_TOKENS,
+    timeoutMs = LLM_TIMEOUT_MS,
+    ...retryOptions
+  } = options;
+  const abortSignal = AbortSignal.timeout(timeoutMs);
   const result = await withRetry(
-    async () => aiStreamText({ model, prompt }),
-    options
+    async () =>
+      aiStreamText({
+        model,
+        prompt,
+        abortSignal,
+        maxOutputTokens,
+      }),
+    retryOptions
   );
   for await (const chunk of result.textStream) {
     yield chunk;
@@ -150,21 +272,19 @@ export interface StepProgress {
 }
 
 export interface StreamTextOptions extends RetryOptions {
+  /** 最大出力トークン数。未指定時は既定値（8192） */
+  maxOutputTokens?: number;
   /** 各 LLM ステップの開始・終了時に呼ばれる進捗コールバック */
   onStep?: (progress: StepProgress) => void;
   /** プロバイダ固有オプション（例: reasoning / thinking の有効化） */
   providerOptions?: ProviderOptions;
   /** ツールループの停止条件。未指定時は AI SDK デフォルト（isStepCount(1)） */
   stopWhen?: Arrayable<StopCondition<ToolSet, Record<string, unknown>>>;
+  /** 呼び出し単位のタイムアウト（ms）。未指定時は既定値（120000） */
+  timeoutMs?: number;
   /** LLM に渡すツール群（AI SDK の tool() 形式） */
   tools?: ToolSet;
 }
-
-/** 推論（reasoning）を有効化する対象の OpenAI モデル ID パターン（o1 / o3 / o4 / gpt-5 系） */
-const OPENAI_REASONING_MODEL_PATTERN = /^(o[134](-|$)|gpt-5)/;
-
-/** Anthropic の thinking 予算トークン数 */
-const ANTHROPIC_THINKING_BUDGET_TOKENS = 4000;
 
 /**
  * 解決されたプロバイダ・モデル ID から、推論（reasoning / thinking）を
@@ -214,11 +334,19 @@ export async function streamTextResult<
   prompt: string,
   options: StreamTextOptions = {} as StreamTextOptions
 ): Promise<StreamTextResult<TOOLS, Record<string, unknown>, OutputInterface>> {
+  const {
+    maxOutputTokens = LLM_MAX_OUTPUT_TOKENS,
+    timeoutMs = LLM_TIMEOUT_MS,
+    ...retryOptions
+  } = options;
+  const abortSignal = AbortSignal.timeout(timeoutMs);
   return withRetry(
     async () =>
       aiStreamText({
         model,
         prompt,
+        abortSignal,
+        maxOutputTokens,
         ...(options.tools ? { tools: options.tools as TOOLS } : {}),
         ...(options.stopWhen
           ? {
@@ -250,24 +378,28 @@ export async function streamTextResult<
             }
           : {}),
       }),
-    options
+    retryOptions
   );
 }
 
 /**
+ * LLM 出力から ```json ... ``` または ``` ... ``` のコードブロックを除去する。
+ * コードブロックが含まれない場合は入力文字列をそのまま返す。
+ * コードブロックの内側はトリムして返す。
+ */
+function stripJSONCodeBlock(text: string): string {
+  const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  return codeBlockMatch ? codeBlockMatch[1].trim() : text;
+}
+
+/**
  * LLM 出力から JSON 文字列を抽出する。
- * - ```json ... ``` コードブロックを除去
+ * - ```json ... ``` コードブロックを除去（stripJSONCodeBlock に集約）
  * - 前後の空白・改行をトリム
  * - 先頭の { や [ から末尾の } や ] までを抽出
  */
 function extractJSON(text: string): string {
-  let cleaned = text.trim();
-
-  // ```json ... ``` または ``` ... ``` コードブロックを除去
-  const codeBlockMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (codeBlockMatch) {
-    cleaned = codeBlockMatch[1].trim();
-  }
+  let cleaned = stripJSONCodeBlock(text.trim());
 
   // 先頭の { や [ から末尾の } や ] までを抽出
   const startIdx = cleaned.search(/[{[]/);
@@ -285,18 +417,87 @@ function extractJSON(text: string): string {
 }
 
 /**
+ * generateJSON の呼び出しオプション。
+ * RetryOptions に加え、呼び出し単位のタイムアウトと最大出力トークン数を指定できる。
+ */
+export interface GenerateJSONOptions extends RetryOptions {
+  /** 最大出力トークン数。未指定時は既定値（8192） */
+  maxOutputTokens?: number;
+  /** 呼び出し単位のタイムアウト（ms）。未指定時は既定値（120000） */
+  timeoutMs?: number;
+}
+
+/**
+ * zod スキーマのバリデーションに失敗したことを表すエラー。
+ * 元の ZodError は zodError プロパティに保持する。
+ */
+export class JSONValidationError extends Error {
+  readonly zodError: ZodError;
+
+  constructor(message: string, zodError: ZodError) {
+    super(message);
+    this.name = "JSONValidationError";
+    this.zodError = zodError;
+  }
+}
+
+/** ZodError を修復プロンプトに埋め込める1行サマリーへ変換する。 */
+function summarizeZodError(error: ZodError): string {
+  return error.issues
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join(".") : "(root)";
+      return `${path}: ${issue.message}`;
+    })
+    .join("; ");
+}
+
+/**
  * AI SDK の generateText を利用して JSON を生成し、パースして返す。
  * モデルが JSON を返すようプロンプト側で指示する前提。
  * コードブロック（```json ... ```）で囲まれている場合も自動的に除去する。
+ *
+ * schema が渡された場合はパース結果を zod で検証し、失敗時は zod エラーサマリーを
+ * 付与した修復プロンプトで1回だけ再生成する。再生成後も失敗した場合は
+ * JSONValidationError を投げる。
  */
 export async function generateJSON<T>(
   model: LanguageModel,
   prompt: string,
-  options: RetryOptions = {}
+  schema?: ZodType<T>,
+  options: GenerateJSONOptions = {}
 ): Promise<T> {
-  const text = await generateText(model, prompt, options);
-  const jsonStr = extractJSON(text);
-  return JSON.parse(jsonStr) as T;
+  const generateOnce = async (currentPrompt: string): Promise<T> => {
+    const text = await generateText(model, currentPrompt, options);
+    const jsonStr = extractJSON(text);
+    const value = JSON.parse(jsonStr) as unknown;
+
+    if (schema) {
+      const parsed = schema.safeParse(value);
+      if (!parsed.success) {
+        throw new JSONValidationError(
+          summarizeZodError(parsed.error),
+          parsed.error
+        );
+      }
+      return parsed.data;
+    }
+    return value as T;
+  };
+
+  try {
+    return await generateOnce(prompt);
+  } catch (error) {
+    if (!(error instanceof JSONValidationError)) {
+      throw error;
+    }
+    // zod バリデーション失敗時は1回だけ、エラー内容を付与した修復プロンプトで再生成する。
+    const repairPrompt =
+      `${prompt}\n\n` +
+      "前回の出力は以下のバリデーションエラーがありました。" +
+      "エラーを解消するよう、JSON のみを修正して再出力してください。\n" +
+      `エラー: ${error.message}`;
+    return generateOnce(repairPrompt);
+  }
 }
 
 /**

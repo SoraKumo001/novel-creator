@@ -2,10 +2,11 @@ import { z } from "zod";
 
 import { llmProviders } from "./constants.js";
 
+/** ローカル開発専用のフォールバック接続文字列（本番では使ってはいけない）。 */
+const DATABASE_URL_FALLBACK = "postgres://novel:novel@localhost:5433/novel";
+
 export const envSchema = z.object({
-  DATABASE_URL: z
-    .string()
-    .default("postgres://novel:novel@localhost:5433/novel"),
+  DATABASE_URL: z.string().default(DATABASE_URL_FALLBACK),
   EMBEDDING_API_KEY: z.string().optional(),
   EMBEDDING_BASE_URL: z.string().optional(),
   EMBEDDING_DIMENSIONS: z.coerce.number().int().positive().default(1536),
@@ -30,10 +31,27 @@ export const envSchema = z.object({
 
 export type Env = z.infer<typeof envSchema>;
 
+let warnedDatabaseUrlFallback = false;
+
+/** 本番環境で DATABASE_URL のフォールバックが使われた場合に一度だけ警告する。 */
+function warnDatabaseUrlFallback(): void {
+  if (warnedDatabaseUrlFallback) {
+    return;
+  }
+  warnedDatabaseUrlFallback = true;
+  console.warn(
+    "[env] DATABASE_URL is not set; falling back to the local development default. Set DATABASE_URL when running in production."
+  );
+}
+
 export function parseEnv(
   source: Record<string, string | undefined> = process.env
 ): Env {
-  return envSchema.parse(source);
+  const env = envSchema.parse(source);
+  if (source.DATABASE_URL === undefined && env.NODE_ENV === "production") {
+    warnDatabaseUrlFallback();
+  }
+  return env;
 }
 
 /**
@@ -41,7 +59,9 @@ export function parseEnv(
  *
  * 文字列（または undefined）のバインディングのみを環境変数として扱い、
  * Hyperdrive・Vectorize などのオブジェクト型バインディングは無視する。
- * デフォルト値・optional・バリデーションエラー等のパース挙動は parseEnv と完全に同一。
+ * デプロイ済みの Workers は必ずバインディング経由で設定を受け取るため、
+ * DATABASE_URL は必須（欠落時は即座にエラーを投げる）。
+ * それ以外のデフォルト値・optional・バリデーションエラー等のパース挙動は parseEnv と同一。
  */
 export function parseEnvFromBindings(bindings: Record<string, unknown>): Env {
   const source: Record<string, string | undefined> = {};
@@ -50,5 +70,12 @@ export function parseEnvFromBindings(bindings: Record<string, unknown>): Env {
       source[key] = value;
     }
   }
+
+  if (!source.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL is required in Worker bindings. Add it as a string binding (or wire it from a Hyperdrive connection string) before calling parseEnvFromBindings."
+    );
+  }
+
   return parseEnv(source);
 }

@@ -1,5 +1,6 @@
-import mermaid from "mermaid";
+type MermaidModule = typeof import("mermaid");
 
+let mermaidPromise: Promise<MermaidModule> | null = null;
 let initialized = false;
 let currentTheme: "default" | "dark" = "default";
 
@@ -12,7 +13,13 @@ function resolveTheme(): "default" | "dark" {
     : "default";
 }
 
-function ensureInitialized(): void {
+/** mermaid モジュールを一度だけ読み込む（動的 import で初期バンドルから除外する） */
+function loadMermaid(): Promise<MermaidModule> {
+  mermaidPromise ??= import("mermaid");
+  return mermaidPromise;
+}
+
+function ensureInitialized(mermaid: MermaidModule["default"]): void {
   const theme = resolveTheme();
   if (initialized && theme === currentTheme) {
     return;
@@ -42,7 +49,8 @@ export async function renderMermaid(container: HTMLElement): Promise<void> {
     return;
   }
 
-  ensureInitialized();
+  const { default: mermaid } = await loadMermaid();
+  ensureInitialized(mermaid);
 
   await Promise.all(
     nodes.map(async (node) => {
