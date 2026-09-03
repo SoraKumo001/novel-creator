@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build workspace libraries
+        run: pnpm --filter @novel-creator/api... -r build
+
       - name: Lint
         run: pnpm lint:check
 
