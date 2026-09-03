@@ -173,6 +173,8 @@ export function useMarkdownEntityEditor<
   checkDraftRef.current = checkDraft;
 
   useEffect(() => {
+    // storageKey は再実行トリガー（編集対象エンティティの切り替え時に再読み込みする）
+    void storageKey;
     let active = true;
     setLoading(true);
     setError(null);

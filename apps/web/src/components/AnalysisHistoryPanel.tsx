@@ -88,9 +88,8 @@ export function AnalysisHistoryPanel({
       if (requestSeq.current === seq) {
         setEntries(list);
       }
-    } catch (e) {
-      // 履歴取得失敗は致命的ではないので静かに扱う
-      console.error("分析履歴の取得に失敗しました", e);
+    } catch {
+      // 履歴取得失敗は致命的ではないので静かに扱う（空表示にフォールバック）
       if (requestSeq.current === seq) {
         setEntries([]);
       }
@@ -103,6 +102,8 @@ export function AnalysisHistoryPanel({
 
   // モーダルが開いたとき・新規実行後に履歴を取得
   useEffect(() => {
+    // refreshKey は再取得トリガー（新規解析完了時に親がインクリメントする）
+    void refreshKey;
     if (!isOpen) {
       return;
     }

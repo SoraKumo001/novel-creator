@@ -15,6 +15,11 @@ import type {
 
 export type { AnalysisProgress };
 
+/** abort 由来のエラーかどうか（fetch の DOMException とラップ済み Error の両方を吸収）。 */
+function isAbortError(e: unknown): boolean {
+  return e instanceof Error && e.name === "AbortError";
+}
+
 /**
  * 実行中の分析（story-arc / check-voice / persona-review）を管理するフック。
  * 複数の同時実行を許容し、running / progress は最後に開始した実行を反映する。
@@ -56,11 +61,6 @@ export function useAnalysis(): {
     new Map()
   );
   const lastControllerRef = useRef<AbortController | null>(null);
-
-  /** abort 由来のエラーかどうか（fetch の DOMException とラップ済み Error の両方を吸収）。 */
-  function isAbortError(e: unknown): boolean {
-    return e instanceof Error && e.name === "AbortError";
-  }
 
   const run = useCallback(
     async <T>(

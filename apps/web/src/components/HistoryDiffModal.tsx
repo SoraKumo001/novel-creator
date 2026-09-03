@@ -6,6 +6,8 @@ import { Loading } from "@/components/Loading.js";
 import { Modal } from "@/components/Modal.js";
 import { useHistories } from "@/hooks/useHistories.js";
 import { useTheme } from "@/hooks/useTheme.js";
+import { useToast } from "@/hooks/useToast.js";
+import { toErrorMessage } from "@/lib/errors.js";
 import type { HistoryItem } from "@/lib/services/index.js";
 
 // @monaco-editor/react は差分表示時にだけ読み込む（初期バンドルから除外する）
@@ -35,6 +37,7 @@ export function HistoryDiffModal({
   onRestoreSuccess,
 }: HistoryDiffModalProps) {
   const { resolvedTheme } = useTheme();
+  const toast = useToast();
   const { histories, loading, restore, restoring } = useHistories({
     novelId,
     entityType,
@@ -91,7 +94,7 @@ export function HistoryDiffModal({
       onRestoreSuccess?.(originalText);
       onClose();
     } catch (e) {
-      console.error("Failed to restore history:", e);
+      toast.error(toErrorMessage(e));
     }
   };
 

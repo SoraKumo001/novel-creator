@@ -28,6 +28,10 @@ export function MarkdownText({
     if (disableMermaid) {
       return;
     }
+    // mermaid フェンスが無い HTML では DOM 走査を省略する（結果は不変）
+    if (!html.includes("language-mermaid")) {
+      return;
+    }
 
     const el = containerRef.current;
     if (!el) {

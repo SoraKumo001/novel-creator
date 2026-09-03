@@ -175,6 +175,24 @@ function createCtx(db: unknown): ServiceContext {
   };
 }
 
+/**
+ * ToolSet の execute を適正型で呼び出すテストヘルパー。
+ * createReadTools / createProposeTools の戻り値は AI SDK の ToolSet であり、
+ * Tool 型の execute シグネチャは広いため、構造的部分型で execute のみを抽出する。
+ * 戻り値はレコードとして受け、要素アクセスが必要な箇所では具体型へ絞り込む。
+ */
+type TestToolResult = Record<string, unknown>;
+
+async function executeTool(
+  tool: unknown,
+  params: Record<string, unknown>
+): Promise<TestToolResult> {
+  const executable = tool as {
+    execute: (args: Record<string, unknown>) => Promise<TestToolResult>;
+  };
+  return executable.execute(params);
+}
+
 function makeCharacters(
   novelId: string,
   count: number,
@@ -212,8 +230,7 @@ describe("readTools", () => {
 
   it("novelId が未指定の場合にエラーを返す", async () => {
     const tools = createReadTools(createCtx(createMockDb({})), null);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const res = await (tools.getNovelInfo as any).execute({
+    const res = await executeTool(tools.getNovelInfo, {
       novelId: undefined,
     });
     expect(res).toEqual({ error: "対象の小説が指定されていません。" });
@@ -225,18 +242,16 @@ describe("readTools", () => {
         createCtx(createMockDb({ characters: makeCharacters(NOVEL_ID, 31) })),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getCharacters as any).execute({});
+      const res = await executeTool(tools.getCharacters, {});
+      const characters = res.characters as Row[];
 
       expect(res.count).toBe(31);
       expect(res.truncated).toBe(
         "[truncated: showing 30 of 31] 残り 1 件は省略されました"
       );
-      expect(res.characters).toHaveLength(MAX_LIST_ITEMS);
-      expect(res.characters[0].name).toBe("人物1");
-      expect(
-        res.characters.find((c: Row) => c.name === "人物31")
-      ).toBeUndefined();
+      expect(characters).toHaveLength(MAX_LIST_ITEMS);
+      expect(characters[0].name).toBe("人物1");
+      expect(characters.find((c: Row) => c.name === "人物31")).toBeUndefined();
     });
 
     it("getCharacters - 30 件以下の場合は省略明示を含まない", async () => {
@@ -244,8 +259,7 @@ describe("readTools", () => {
         createCtx(createMockDb({ characters: makeCharacters(NOVEL_ID, 30) })),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getCharacters as any).execute({});
+      const res = await executeTool(tools.getCharacters, {});
 
       expect(res.count).toBe(30);
       expect(res.truncated).toBeUndefined();
@@ -271,11 +285,11 @@ describe("readTools", () => {
         ),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getCharacters as any).execute({});
+      const res = await executeTool(tools.getCharacters, {});
+      const characters = res.characters as Row[];
 
-      expect(res.characters).toHaveLength(1);
-      const desc: string = res.characters[0].description;
+      expect(characters).toHaveLength(1);
+      const desc = characters[0].description as string;
       expect(desc.endsWith(TRUNCATION_SUFFIX)).toBe(true);
       expect(desc.length).toBe(MAX_TEXT_LENGTH + TRUNCATION_SUFFIX.length);
       expect(desc.startsWith("長".repeat(MAX_TEXT_LENGTH))).toBe(true);
@@ -298,9 +312,9 @@ describe("readTools", () => {
         ),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getCharacters as any).execute({});
-      expect(res.characters[0].description).toBeNull();
+      const res = await executeTool(tools.getCharacters, {});
+      const characters = res.characters as Row[];
+      expect(characters[0].description).toBeNull();
     });
 
     it("getSettings - 31 件中 30 件を返し、省略明示を含む", async () => {
@@ -315,8 +329,7 @@ describe("readTools", () => {
         createCtx(createMockDb({ settings })),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getSettings as any).execute({});
+      const res = await executeTool(tools.getSettings, {});
 
       expect(res.count).toBe(31);
       expect(res.truncated).toBe(
@@ -340,8 +353,7 @@ describe("readTools", () => {
         createCtx(createMockDb({ chapters })),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getPlotAndChapters as any).execute({});
+      const res = await executeTool(tools.getPlotAndChapters, {});
 
       expect(res.chapterCount).toBe(MAX_STRUCTURE_ITEMS + 1);
       expect(res.truncated).toBe(
@@ -367,8 +379,7 @@ describe("readTools", () => {
         createCtx(createMockDb({ foreshadowings })),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getForeshadowings as any).execute({});
+      const res = await executeTool(tools.getForeshadowings, {});
 
       expect(res.count).toBe(MAX_STRUCTURE_ITEMS + 1);
       expect(res.truncated).toContain("showing 50 of 51");
@@ -391,8 +402,7 @@ describe("readTools", () => {
         createCtx(createMockDb({ timelines })),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getTimelines as any).execute({});
+      const res = await executeTool(tools.getTimelines, {});
 
       expect(res.count).toBe(MAX_STRUCTURE_ITEMS + 1);
       expect(res.truncated).toContain("showing 50 of 51");
@@ -409,8 +419,7 @@ describe("readTools", () => {
       });
 
       const tools = createReadTools(createCtx(createMockDb({})), NOVEL_ID);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.searchNovelKnowledge as any).execute({
+      const res = await executeTool(tools.searchNovelKnowledge, {
         query: "魔法",
       });
 
@@ -468,8 +477,7 @@ describe("readTools", () => {
         ),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getSectionContent as any).execute({
+      const res = await executeTool(tools.getSectionContent, {
         sectionId: SECTION_ID,
       });
 
@@ -488,8 +496,7 @@ describe("readTools", () => {
         ),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getSectionContent as any).execute({
+      const res = await executeTool(tools.getSectionContent, {
         sectionId: SECTION_ID,
       });
 
@@ -502,8 +509,7 @@ describe("readTools", () => {
         createCtx(setupDb({ boundNovelId: null, chapterNovelId: NOVEL_ID })),
         null
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getSectionContent as any).execute({
+      const res = await executeTool(tools.getSectionContent, {
         sectionId: SECTION_ID,
       });
 
@@ -521,8 +527,7 @@ describe("readTools", () => {
         ),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getSectionContent as any).execute({
+      const res = await executeTool(tools.getSectionContent, {
         sectionId: SECTION_ID,
       });
 
@@ -548,15 +553,13 @@ describe("readTools", () => {
         ),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getSectionContent as any).execute({
+      const res = await executeTool(tools.getSectionContent, {
         sectionId: SECTION_ID,
       });
+      const content = res.content as string;
 
-      expect(res.content.endsWith(TRUNCATION_SUFFIX)).toBe(true);
-      expect(res.content.length).toBe(
-        MAX_TEXT_LENGTH + TRUNCATION_SUFFIX.length
-      );
+      expect(content.endsWith(TRUNCATION_SUFFIX)).toBe(true);
+      expect(content.length).toBe(MAX_TEXT_LENGTH + TRUNCATION_SUFFIX.length);
     });
   });
 
@@ -580,8 +583,7 @@ describe("readTools", () => {
         ),
         NOVEL_ID
       );
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.getNovelInfo as any).execute({});
+      const res = await executeTool(tools.getNovelInfo, {});
 
       expect(typeof res.createdAt).toBe("string");
       expect(typeof res.updatedAt).toBe("string");

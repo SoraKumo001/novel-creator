@@ -59,9 +59,9 @@
         "useSimplifiedLogicExpression": "off"
       },
       "correctness": {
-        "noUnsafeOptionalChaining": "off",
+        "noUnsafeOptionalChaining": "error",
         "noUnusedFunctionParameters": "off",
-        "useExhaustiveDependencies": "off"
+        "useExhaustiveDependencies": "error"
       },
       "performance": {
         "noAwaitInLoops": "off",
@@ -112,7 +112,7 @@
         "noEmptySource": "off",
         "noEqualsToNull": "off",
         "noEvolvingTypes": "off",
-        "noExplicitAny": "off",
+        "noExplicitAny": "error",
         "noGlobalIsNan": "off",
         "noLeakedRender": "off",
         "noReactForwardRef": "off",

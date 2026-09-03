@@ -5,7 +5,11 @@ import {
 } from "@novel-creator/db";
 import { createEmbeddingProvider, createLLMProvider } from "@novel-creator/llm";
 import type { Env } from "@novel-creator/shared";
-import { createVectorStore, type VectorStore } from "@novel-creator/vector";
+import {
+  createVectorStore,
+  type VectorizeBinding,
+  type VectorStore,
+} from "@novel-creator/vector";
 import type { EmbeddingModel, LanguageModel } from "ai";
 import type { Env as HonoEnv } from "hono";
 
@@ -39,7 +43,7 @@ export function createContext(env: Env): AppContext["Variables"] {
  */
 export function createContextForWorkers(
   env: Env,
-  bindings: { hyperdrive: Hyperdrive; vectorize: unknown }
+  bindings: { hyperdrive: Hyperdrive; vectorize: VectorizeBinding }
 ): AppContext["Variables"] {
   const db = createDbForHyperdrive(bindings.hyperdrive);
   const llm = createLLMProvider(env);

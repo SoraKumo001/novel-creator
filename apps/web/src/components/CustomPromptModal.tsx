@@ -79,6 +79,8 @@ export function CustomPromptModal({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // open は再実行トリガー（モーダルを開くたびにフォームを再同期する）
+    void open;
     if (editingPrompt) {
       setName(editingPrompt.name);
       setDescription(editingPrompt.description || "");

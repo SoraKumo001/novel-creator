@@ -205,12 +205,8 @@ export function createEmbeddingModel(
       break;
     case "anthropic": {
       // Anthropic は embedding 非対応。OpenAI にフォールバックする。
-      if (!settings.apiKey) {
-        console.warn(
-          "[llm] Anthropic は embedding 非対応のため OpenAI にフォールバックします。" +
-            "API キーが設定されていないため embedding は失敗する可能性があります。"
-        );
-      }
+      // 注意: API キー未設定時は後段の embedding 呼び出しが失敗する。
+      // ログ出力は呼び出し側の appLogger に統一するためここでは出力しない（振る舞い維持）。
       instance = createOpenAI(settings).embedding(model);
       break;
     }

@@ -236,9 +236,10 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
       // セッションの updatedAt が更新される
       const sessionUpdate = updateCalls.find((c) => c.table === chatSessions);
       expect(sessionUpdate).toBeDefined();
-      expect(
-        (sessionUpdate?.values as { updatedAt: Date }).updatedAt
-      ).toBeInstanceOf(Date);
+      const sessionValues = sessionUpdate?.values as
+        | { updatedAt: Date }
+        | undefined;
+      expect(sessionValues?.updatedAt).toBeInstanceOf(Date);
     });
 
     it("role=user メッセージが存在しない場合は ValidationError を投げ、永続化しないこと", async () => {

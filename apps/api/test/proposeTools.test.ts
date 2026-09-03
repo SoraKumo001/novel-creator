@@ -12,6 +12,22 @@ function createDummyCtx(): ServiceContext {
   };
 }
 
+/**
+ * ToolSet の execute を適正型で呼び出すテストヘルパー。
+ * 構造的部分型で execute のみを抽出し、戻り値はレコードとして受ける。
+ */
+type TestToolResult = Record<string, unknown>;
+
+async function executeTool(
+  tool: unknown,
+  params: Record<string, unknown>
+): Promise<TestToolResult> {
+  const executable = tool as {
+    execute: (args: Record<string, unknown>) => Promise<TestToolResult>;
+  };
+  return executable.execute(params);
+}
+
 describe("proposeTools", () => {
   const NOVEL_ID = "novel-uuid-123";
 
@@ -31,8 +47,7 @@ describe("proposeTools", () => {
   describe("proposeCreateSetting", () => {
     it("oldSettingName を指定した場合に置換・削除情報を含む提案ペイロードを生成すること", async () => {
       const tools = createProposeTools(createDummyCtx(), NOVEL_ID);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.proposeCreateSetting as any).execute({
+      const res = await executeTool(tools.proposeCreateSetting, {
         category: "世界観",
         description: "新たな皇国",
         name: "神聖ルミナス皇国",
@@ -58,8 +73,7 @@ describe("proposeTools", () => {
   describe("proposeDeleteSetting", () => {
     it("設定削除の提案ペイロードを生成できること", async () => {
       const tools = createProposeTools(createDummyCtx(), NOVEL_ID);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.proposeDeleteSetting as any).execute({
+      const res = await executeTool(tools.proposeDeleteSetting, {
         name: "旧帝国",
         reason: "世界観再構築のため",
       });
@@ -80,8 +94,7 @@ describe("proposeTools", () => {
   describe("proposeBulkCreate", () => {
     it("複数の人物や設定、および削除リストを含む一括提案ペイロードを生成できること", async () => {
       const tools = createProposeTools(createDummyCtx(), NOVEL_ID);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.proposeBulkCreate as any).execute({
+      const res = await executeTool(tools.proposeBulkCreate, {
         characters: [{ name: "ルーク", description: "騎士" }],
         deleteSettings: ["旧帝国"],
         settings: [
@@ -119,8 +132,7 @@ describe("proposeTools", () => {
   describe("proposeUpdateStoryOutline", () => {
     it("セクション名・本文・モード・理由を指定して提案ペイロードを生成できること", async () => {
       const tools = createProposeTools(createDummyCtx(), NOVEL_ID);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.proposeUpdateStoryOutline as any).execute({
+      const res = await executeTool(tools.proposeUpdateStoryOutline, {
         content: "主人公が勝利する結末。",
         mode: "replace",
         reason: "王道エンド",
@@ -144,8 +156,7 @@ describe("proposeTools", () => {
 
     it("小説IDが未解決の場合はエラーを返すこと", async () => {
       const tools = createProposeTools(createDummyCtx(), null);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const res = await (tools.proposeUpdateStoryOutline as any).execute({
+      const res = await executeTool(tools.proposeUpdateStoryOutline, {
         content: "あらすじテキスト",
         sectionName: "全体あらすじ",
       });

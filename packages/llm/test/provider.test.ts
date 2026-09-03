@@ -1,3 +1,4 @@
+import type { Env } from "@novel-creator/shared";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearModelCache,
@@ -26,10 +27,8 @@ vi.mock("@ai-sdk/openai", () => {
     const modelFn = vi.fn().mockImplementation((model: string) => ({
       modelId: `openai-default:${model}`,
     }));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (modelFn as any).chat = chatFn;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (modelFn as any).embedding = embeddingFn;
+    Object.assign(modelFn, { chat: chatFn });
+    Object.assign(modelFn, { embedding: embeddingFn });
     return modelFn;
   });
   return { createOpenAI };
@@ -49,12 +48,11 @@ vi.mock("@ai-sdk/google", () => {
     const modelFn = vi
       .fn()
       .mockImplementation((model: string) => ({ modelId: `google:${model}` }));
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (modelFn as any).embedding = vi
-      .fn()
-      .mockImplementation((model: string) => ({
+    Object.assign(modelFn, {
+      embedding: vi.fn().mockImplementation((model: string) => ({
         modelId: `google-emb:${model}`,
-      }));
+      })),
+    });
     return modelFn;
   });
   return { createGoogleGenerativeAI };
@@ -277,8 +275,7 @@ describe("createEmbeddingProvider", () => {
       LLM_BASE_URL: "https://llm.example.com/v1",
       LLM_MODEL: "llm-model",
       LLM_PROVIDER: "openai",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+    } as unknown as Env);
     expect(vi.mocked(createOpenAI)).toHaveBeenCalledWith({
       apiKey: "emb-key",
       baseURL: "https://emb.example.com/v1",
@@ -295,8 +292,7 @@ describe("createEmbeddingProvider", () => {
       LLM_BASE_URL: "https://llm.example.com/v1",
       LLM_MODEL: "llm-model",
       LLM_PROVIDER: "openai",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+    } as unknown as Env);
     expect(vi.mocked(createOpenAI)).toHaveBeenCalledWith({
       apiKey: "emb-key",
       baseURL: "https://llm.example.com/v1",
@@ -313,8 +309,7 @@ describe("createEmbeddingProvider", () => {
       LLM_BASE_URL: "https://llm.example.com/v1",
       LLM_MODEL: "llm-model",
       LLM_PROVIDER: "openai",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any);
+    } as unknown as Env);
     expect(vi.mocked(createGoogleGenerativeAI)).toHaveBeenCalledWith({
       apiKey: "google-key",
       baseURL: undefined,

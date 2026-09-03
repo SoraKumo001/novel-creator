@@ -79,8 +79,7 @@ export class LlmConfigDomainService {
 
     return rows.map((row) => {
       const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { apiKey, ...rest } = row;
+      const { apiKey: _, ...rest } = row;
       return {
         ...rest,
         apiKeyMasked,
@@ -125,8 +124,7 @@ export class LlmConfigDomainService {
       .returning();
 
     const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { apiKey, ...rest } = row;
+    const { apiKey: _, ...rest } = row;
     return { ...rest, apiKeyMasked, hasApiKey };
   }
 

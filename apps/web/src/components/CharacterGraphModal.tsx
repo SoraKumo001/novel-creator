@@ -29,6 +29,9 @@ export function CharacterGraphModal({
   );
 
   useEffect(() => {
+    // mermaidCode は再実行トリガー（コンテナは key={mermaidCode} で再マウントされ、
+    // 描画内容は DOM 経由で renderMermaid が参照するため、ここで参照を明示する）
+    void mermaidCode;
     if (isOpen && !viewCode && containerRef.current) {
       // Mermaid レンダリング
       const timer = setTimeout(() => {

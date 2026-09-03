@@ -2,11 +2,13 @@ import type { Env } from "@novel-creator/shared";
 
 import { createPgVectorStore } from "./pg-vector-store.js";
 import type { VectorStore } from "./types.js";
-import { createVectorizeStore } from "./vectorize-store.js";
+import {
+  createVectorizeStore,
+  type VectorizeBinding,
+} from "./vectorize-store.js";
 
 export interface CreateVectorStoreOptions {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  vectorizeBinding?: any;
+  vectorizeBinding?: VectorizeBinding;
 }
 
 export function createVectorStore(
