@@ -12,14 +12,15 @@ export function ChatFloatingButton() {
     <button
       type="button"
       onClick={toggleChat}
-      className="group fixed right-6 bottom-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-tr from-indigo-600 to-violet-600 text-white shadow-indigo-500/25 shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-indigo-500/40 focus:outline-none focus:ring-4 focus:ring-primary/40 active:scale-95"
+      className="group fixed right-6 bottom-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-linear-to-tr from-indigo-600 to-violet-600 text-white shadow-indigo-500/25 shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-indigo-500/40 focus:outline-none focus:ring-4 focus:ring-primary/40 active:scale-95 motion-reduce:transition-none motion-reduce:hover:scale-100"
       aria-label="創作相談チャットを開く"
+      aria-expanded="false"
       title="創作相談チャット"
     >
       {/* ストリーミング中のパルスリング */}
       {isStreaming && (
         <span className="absolute -top-1 -right-1 flex h-4 w-4">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:animate-none" />
           <span className="relative inline-flex h-4 w-4 rounded-full bg-emerald-500" />
         </span>
       )}

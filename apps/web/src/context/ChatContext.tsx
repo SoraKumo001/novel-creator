@@ -119,6 +119,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     sendMessage,
     abortStream,
     clearMessages,
+    markTitleEdited,
   } = useChatStreaming({ selectedNovelIdRef, refreshSessions });
 
   // 特定セッションのメッセージ読み込み
@@ -128,19 +129,30 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       setError(null);
       try {
         const detail = await fetchChatSession(sessionId);
+        // 取得中に別セッションへ切り替わっていたらDB確定しない
+        // （キャッシュ→DB の順序を守り、古い応答で新セッションを上書きしない）。
+        if (currentSessionIdRef.current !== sessionId) {
+          return;
+        }
         if (detail && Array.isArray(detail.messages)) {
           // DB の行を UI Message に変換して useChat に seed する
+          // （DB行の createdAt を保持する）
           const seeded: UIMessage[] = detail.messages.map((m) =>
             rowToUIMessage({
               id: m.id,
               role: m.role,
               content: m.content,
               parts: m.parts,
+              createdAt: m.createdAt,
             })
           );
           setMessages(seeded);
         }
       } catch (err) {
+        // 読み込み中に切り替わっていた場合はエラーも反映しない
+        if (currentSessionIdRef.current !== sessionId) {
+          return;
+        }
         const msg =
           err instanceof Error ? err.message : "メッセージの取得に失敗しました";
         setError(msg);
@@ -149,7 +161,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         setLoadingMessages(false);
       }
     },
-    [setError, setMessages]
+    [setError, setMessages, currentSessionIdRef]
   );
 
   // マウント時（リロード時）に保存されていたアクティブセッションのメッセージを最新化
@@ -198,7 +210,8 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     ]
   );
 
-  // セッションタイトル更新（成否を呼び出し元が判定できるよう結果を返す）
+  // セッションタイトル更新（成否を呼び出し元が判定できるよう結果を返す）。
+  // 手動編集として記録し、onFinish の自動タイトル付与で上書きされないようにする。
   const updateSessionTitle = useCallback(
     async (sessionId: string, newTitle: string): Promise<boolean> => {
       const trimmed = newTitle.trim();
@@ -206,6 +219,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return false;
       }
       try {
+        markTitleEdited(sessionId);
         await updateChatSession(sessionId, { title: trimmed });
         await queryClient.invalidateQueries({ queryKey: chatKeys.all });
         return true;
@@ -216,7 +230,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
         return false;
       }
     },
-    [queryClient, setError]
+    [queryClient, setError, markTitleEdited]
   );
 
   // 小説変更ハンドラ

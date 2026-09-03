@@ -76,7 +76,11 @@ export function ChatSessionList({
     });
 
   return (
-    <div className="flex-1 space-y-3 overflow-y-auto p-4">
+    <div
+      className="flex-1 space-y-3 overflow-y-auto p-4"
+      role="log"
+      aria-label="相談履歴の一覧"
+    >
       <div className="flex items-center justify-between border-border border-b pb-2">
         <h3 className="font-bold text-muted-foreground text-xs uppercase tracking-wider">
           {currentNovelTitle
@@ -97,7 +101,11 @@ export function ChatSessionList({
       {/* 検索入力 */}
       {sessions.length > 0 && (
         <div className="relative">
+          <label htmlFor="chat-history-search" className="sr-only">
+            相談履歴を検索する
+          </label>
           <input
+            id="chat-history-search"
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -123,7 +131,7 @@ export function ChatSessionList({
             : EMPTY_CHAT_SESSION_MESSAGE}
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2" role="list" aria-label="相談履歴">
           {filteredSessions.map((sess) => {
             const isSelected = sess.id === currentSessionId;
             const isEditing = sess.id === editingSessionId;
@@ -141,7 +149,8 @@ export function ChatSessionList({
             return (
               <div
                 key={sess.id}
-                className={`group relative rounded-xl border p-3 transition ${
+                role="listitem"
+                className={`group relative rounded-xl border p-3 transition motion-reduce:transition-none ${
                   isSelected
                     ? "border-primary bg-primary/10"
                     : "border-border bg-surface hover:border-primary/50 hover:bg-surface-hover"
@@ -181,9 +190,12 @@ export function ChatSessionList({
                   </div>
                 ) : (
                   <div>
-                    <div
-                      className="cursor-pointer"
+                    <button
+                      type="button"
+                      className="w-full cursor-pointer text-left motion-reduce:transition-none"
                       onClick={() => onSelectSession(sess.id)}
+                      aria-current={isSelected ? "true" : undefined}
+                      aria-label={`相談「${sess.title}」を開く${isSelected ? "（開いています）" : ""}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <h4
@@ -207,7 +219,7 @@ export function ChatSessionList({
                           </span>
                         )}
                       </div>
-                    </div>
+                    </button>
 
                     {/* アクションボタン */}
                     <div className="mt-2 flex items-center justify-end gap-1 border-border/50 border-t pt-2 opacity-80 transition group-hover:opacity-100">

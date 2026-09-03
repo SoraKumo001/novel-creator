@@ -4,8 +4,12 @@ import {
 } from "@novel-creator/llm";
 import type { ToolSet } from "ai";
 import type { z } from "zod";
+import { appLogger } from "../middleware/logger.js";
 import type { chatRequestSchema } from "../schemas/index.js";
-import { buildChatContextPrompt } from "./chat/chat-context.js";
+import {
+  buildChatContextPrompt,
+  type ChatContextResult,
+} from "./chat/chat-context.js";
 import { extractChatEntitiesFromText } from "./chat/chat-entities.js";
 import {
   createChatSession,
@@ -66,7 +70,8 @@ export class ChatDomainService {
    * 創作相談チャットを AI SDK の UI Message Stream 形式でストリーミング生成する。
    * - リクエストの messages から最後の role='user' メッセージのみを採用し、DB に永続化する。
    * - 会話履歴はサーバー DB を正史とし、DB 履歴（ユーザーメッセージ挿入後）からプロンプトを構築する。
-   * - RAG 検索・小説取得失敗時は空コンテキストで継続する。
+   * - RAG 検索・小説取得失敗時は warnings に記録し空コンテキストで継続する。
+   * - 要求 novelId とセッションの novelId が両方あり不一致の場合は 400 相当で拒否する。
    */
   async streamCreativeChat(input: {
     sessionId: string;
@@ -80,11 +85,23 @@ export class ChatDomainService {
     const { userText } = await this.persistUserMessage(sessionId, messages);
 
     const effectiveNovelId = novelId ?? session.novelId;
-    const [prompt, resolvedModel]: [string, ResolvedLLMModel] =
+    const [context, resolvedModel]: [ChatContextResult, ResolvedLLMModel] =
       await Promise.all([
-        this.buildChatContext(sessionId, effectiveNovelId, userText),
+        this.buildChatContext(
+          sessionId,
+          effectiveNovelId,
+          userText,
+          session.novelId
+        ),
         resolveLLMModelWithInfo(this.ctx, modelConfigId, "throw"),
       ]);
+    if (context.warnings.length > 0) {
+      appLogger.warn("[Chat] context warnings", {
+        sessionId,
+        warnings: context.warnings,
+      });
+    }
+    const prompt = context.prompt;
 
     const providerOptions = buildReasoningProviderOptions(
       resolvedModel.provider,
@@ -116,13 +133,15 @@ export class ChatDomainService {
   private async buildChatContext(
     sessionId: string,
     effectiveNovelId: string | null | undefined,
-    userText: string
-  ) {
+    userText: string,
+    sessionNovelId?: string | null
+  ): Promise<ChatContextResult> {
     return buildChatContextPrompt(
       this.ctx,
       sessionId,
       effectiveNovelId,
-      userText
+      userText,
+      sessionNovelId
     );
   }
 

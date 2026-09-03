@@ -57,14 +57,18 @@ export function ChatErrorPanel({
   error,
   lastPrompt,
   isStreaming,
+  failedDraft,
   onClose,
   onRetry,
+  onRestoreDraft,
 }: {
   error: string;
   lastPrompt: string | null;
   isStreaming: boolean;
+  failedDraft?: string | null;
   onClose: () => void;
   onRetry: () => void;
+  onRestoreDraft?: () => void;
 }) {
   return (
     <div
@@ -100,7 +104,18 @@ export function ChatErrorPanel({
         {error}
       </div>
       {lastPrompt && (
-        <div className="flex items-center justify-end gap-2 pt-1">
+        <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+          {failedDraft && onRestoreDraft && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={onRestoreDraft}
+              className="h-7 text-xs"
+            >
+              📝 入力に戻す
+            </Button>
+          )}
           <Button
             type="button"
             size="sm"
@@ -117,33 +132,66 @@ export function ChatErrorPanel({
   );
 }
 
-/** 入力フォーム */
+/** 入力フォーム（返信中も追記メモとして編集できる） */
 export function ChatInputBar({
   chatFocus,
   input,
   isStreaming,
   textareaRef,
+  failedDraft,
   onConsumeFocus,
   onTextareaInput,
   onKeyDown,
   onSend,
   onAbort,
+  onRestoreDraft,
+  onDismissFailedDraft,
 }: {
   chatFocus: ChatFocusContext | null;
   input: string;
   isStreaming: boolean;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
+  failedDraft?: string | null;
   onConsumeFocus: () => void;
   onTextareaInput: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
   onSend: () => void;
   onAbort: () => void;
+  onRestoreDraft?: () => void;
+  onDismissFailedDraft?: () => void;
 }) {
+  const placeholder = isStreaming
+    ? "AIが返信を作成中です… 続きの相談はそのまま入力しておけます（返信後に送信できます）"
+    : "創作の相談を入力... (Ctrl + Enter で送信)";
   return (
     <div className="shrink-0 border-border border-t bg-surface p-3">
       <div className="relative flex flex-col gap-2">
+        {failedDraft && (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-amber-300/60 bg-amber-50 px-2.5 py-1.5 text-xs dark:border-amber-800/60 dark:bg-amber-950/30">
+            <span className="min-w-0 flex-1 truncate text-amber-900 dark:text-amber-200">
+              前回の送信内容を残しています。必要なら入力欄に戻せます。
+            </span>
+            <span className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={onRestoreDraft}
+                className="cursor-pointer rounded bg-amber-600 px-2 py-0.5 font-medium text-white hover:bg-amber-700"
+              >
+                入力に戻す
+              </button>
+              <button
+                type="button"
+                onClick={onDismissFailedDraft}
+                className="cursor-pointer rounded px-1.5 py-0.5 text-amber-800 hover:bg-amber-100 dark:text-amber-300"
+                aria-label="保存した送信内容を破棄する"
+              >
+                ✕
+              </button>
+            </span>
+          </div>
+        )}
         {chatFocus && (
-          <div className="fade-in flex animate-in items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs duration-150">
+          <div className="fade-in flex animate-in items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs duration-150 motion-reduce:animate-none motion-reduce:transition-none">
             <div className="flex min-w-0 items-center gap-1.5 text-foreground">
               <span className="shrink-0 text-primary">📎</span>
               <span className="shrink-0 font-semibold text-primary">
@@ -169,17 +217,23 @@ export function ChatInputBar({
           value={input}
           onChange={onTextareaInput}
           onKeyDown={onKeyDown}
-          placeholder="創作の相談を入力... (Ctrl + Enter で送信)"
+          placeholder={placeholder}
           rows={1}
-          disabled={isStreaming}
-          className="max-h-[11.25rem] w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-foreground text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          aria-label="創作相談の入力欄"
+          aria-describedby="chat-input-hint"
+          className="max-h-[11.25rem] w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-foreground text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary motion-reduce:transition-none"
         />
         <div className="flex items-center justify-between">
-          <span className="text-[11px] text-muted-foreground">
-            Ctrl + Enter で送信
+          <span
+            id="chat-input-hint"
+            className="text-[11px] text-muted-foreground"
+          >
+            {isStreaming
+              ? "返信中も入力できます。返信が終わったら送信できます"
+              : "Ctrl + Enter で送信"}
           </span>
           <div className="flex items-center gap-2">
-            {isStreaming ? (
+            {isStreaming && (
               <Button
                 type="button"
                 size="sm"
@@ -188,17 +242,23 @@ export function ChatInputBar({
               >
                 ■ 停止
               </Button>
-            ) : (
-              <Button
-                type="button"
-                size="sm"
-                variant="primary"
-                onClick={onSend}
-                disabled={!input.trim()}
-              >
-                送信
-              </Button>
             )}
+            <Button
+              type="button"
+              size="sm"
+              variant="primary"
+              onClick={onSend}
+              disabled={!input.trim() || isStreaming}
+              title={
+                isStreaming
+                  ? "AIが返信中です。返信が終わってから送信できます"
+                  : input.trim()
+                    ? "相談を送信する"
+                    : "相談内容を入力すると送信できます"
+              }
+            >
+              {isStreaming ? "返信待ち…" : "送信"}
+            </Button>
           </div>
         </div>
       </div>

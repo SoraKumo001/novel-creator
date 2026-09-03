@@ -48,7 +48,10 @@ export const chatMessages = pgTable(
       .notNull()
       .references(() => chatSessions.id, { onDelete: "cascade" }),
   },
-  (t) => [index("chat_messages_session_id_idx").on(t.sessionId)]
+  (t) => [
+    index("chat_messages_session_id_idx").on(t.sessionId),
+    index("chat_messages_session_created_idx").on(t.sessionId, t.createdAt),
+  ]
 );
 
 export type ChatSession = typeof chatSessions.$inferSelect;

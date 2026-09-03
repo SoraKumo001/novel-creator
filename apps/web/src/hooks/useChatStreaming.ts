@@ -14,11 +14,12 @@ import {
   type ChatMessage,
   extractTitle,
   hasToolPart,
+  messageCreatedAt,
   textOf,
 } from "./chatStreamingTypes.js";
 import {
-  chatCacheKey,
   loadCachedMessages,
+  saveCachedMessages,
   useChatTransport,
 } from "./chatTransport.js";
 import { useChatActions } from "./useChatActions.js";
@@ -91,6 +92,19 @@ export function useChatStreaming({
   // 新規セッションの初回応答後にタイトルを応答から設定するためのフラグ
   const autoCreatedSessionRef = useRef<string | null>(null);
 
+  // ユーザーが手動でタイトルを編集したセッションIDの集合。
+  // onFinish の自動タイトル付与で上書きしないためのガードに使う。
+  const titleEditedRef = useRef<Set<string>>(new Set());
+
+  // セッションタイトルが手動編集されたことを記録する。
+  // ChatContext の updateSessionTitle から呼び出される。
+  const markTitleEdited = useCallback((sessionId: string) => {
+    titleEditedRef.current.add(sessionId);
+    if (autoCreatedSessionRef.current === sessionId) {
+      autoCreatedSessionRef.current = null;
+    }
+  }, []);
+
   // state の currentSessionId を同期更新するラッパー
   const setCurrentSessionId = useCallback((id: string | null) => {
     currentSessionIdRef.current = id;
@@ -151,21 +165,26 @@ export function useChatStreaming({
       if (isAbort || isError) {
         return;
       }
-      // 新規セッションの初回応答完了後: 応答テキストからタイトル案を PUT + 一覧再取得
+      // 新規セッションの初回応答完了後: 応答テキストからタイトル案を PUT + 一覧再取得。
+      // 自動付与はセッション作成直後の初回のみ行い、ユーザーが手動編集済みの
+      // セッションは上書きしない（仮題→応答先頭30字の無条件PUT競合を避ける）。
       if (
         autoCreatedSessionRef.current &&
         autoCreatedSessionRef.current === currentSessionIdRef.current
       ) {
+        const targetSessionId = autoCreatedSessionRef.current;
         autoCreatedSessionRef.current = null;
-        const title = extractTitle(message);
-        if (title && currentSessionIdRef.current) {
-          // セッションタイトルの永続化失敗はユーザーに見える状態（セッション一覧の
-          // タイトル）へ影響するため、既存のエラー経路（error state）で通知する。
-          void updateChatSession(currentSessionIdRef.current, {
-            title,
-          }).catch((err: unknown) => {
-            setError(toErrorMessage(err));
-          });
+        if (!titleEditedRef.current.has(targetSessionId)) {
+          const title = extractTitle(message);
+          if (title) {
+            // セッションタイトルの永続化失敗はユーザーに見える状態（セッション一覧の
+            // タイトル）へ影響するため、既存のエラー経路（error state）で通知する。
+            void updateChatSession(targetSessionId, {
+              title,
+            }).catch((err: unknown) => {
+              setError(toErrorMessage(err));
+            });
+          }
         }
       }
       void refreshSessions();
@@ -173,6 +192,9 @@ export function useChatStreaming({
   });
 
   // マウント時に sessionStorage にキャッシュされたメッセージがあれば即座に初期表示
+  // する（楽観表示）。DB の正式な履歴は ChatContext の loadSessionMessages が
+  // sessionId 一致確認後に上書き確定するため、キャッシュ→DB の順序を守る。
+  // 一致しないセッションのDB応答は破棄され、キャッシュが別セッションを汚さない。
   const cacheLoadedRef = useRef(false);
   useEffect(() => {
     if (cacheLoadedRef.current || !currentSessionId) {
@@ -185,22 +207,15 @@ export function useChatStreaming({
     }
   }, [currentSessionId, setUiMessages]);
 
-  // メッセージ更新時にローカルキャッシュへ即時同期
+  // メッセージ更新時にローカルキャッシュへ即時同期（直近のみに軽量化）。
+  // 保存失敗（QuotaExceededError 等）はリロード後復元用のベストエフォートのため
+  // error state には波及させず静かに破棄する。
   useEffect(() => {
     if (!currentSessionId || typeof window === "undefined") {
       return;
     }
     if (uiMessages.length > 0) {
-      try {
-        sessionStorage.setItem(
-          chatCacheKey(currentSessionId),
-          JSON.stringify(uiMessages)
-        );
-      } catch (err: unknown) {
-        // メッセージのローカル永続化（リロード後の復元用）の失敗は、ストリーム終了後に
-        // 表示履歴が残らない状態へ直結するため、既存のエラー経路で通知する。
-        setError(toErrorMessage(err));
-      }
+      saveCachedMessages(currentSessionId, uiMessages);
     }
   }, [currentSessionId, uiMessages]);
 
@@ -241,20 +256,32 @@ export function useChatStreaming({
     }
   }, [isStreaming, ensureProgressStarted, setProgress, resetProgress]);
 
+  // ストリーミング中のアシスタントメッセージID。
+  // index===length-1 判定ではなくID一致で除外するため、末尾以外の位置に
+  // 進行中メッセージがあっても二重表示・消失しない。
+  const streamingAssistantId = useMemo(() => {
+    if (!isStreaming) {
+      return null;
+    }
+    for (let index = uiMessages.length - 1; index >= 0; index -= 1) {
+      const candidate = uiMessages[index];
+      if (candidate && candidate.role === "assistant") {
+        return candidate.id;
+      }
+    }
+    return null;
+  }, [uiMessages, isStreaming]);
+
   // 画面に表示する確定済みメッセージ。
-  // ストリーミング中は最後のアシスタント応答（進行中）を丸ごと除外し、
+  // ストリーミング中は進行中のアシスタント応答をID一致で除外し、
   // streamingContent / streamingParts 側で表示する（二重表示防止）。
   // 多段ツール実行で text パーツがまだ流れていない間も、この除外により同じツールカードが
   // メッセージ一覧 と ストリーミングバブル に二重表示されない。
   const messages: ChatMessage[] = useMemo(() => {
     return uiMessages
-      .filter((m, index) => {
-        // ストリーミング中: 最後のアシスタント応答（進行中のチャンク）を除外する
-        if (
-          isStreaming &&
-          index === uiMessages.length - 1 &&
-          m.role === "assistant"
-        ) {
+      .filter((m) => {
+        // ストリーミング中: 進行中のアシスタント応答（ID一致）を除外する
+        if (streamingAssistantId && m.id === streamingAssistantId) {
           return false;
         }
         // 旧来の除外条件（streaming text パーツを持つメッセージ）。残骸があれば引き続き除外する。
@@ -263,42 +290,44 @@ export function useChatStreaming({
         );
         return !hasStreamingText;
       })
-      .map((m) => ({
+      .map((m, index) => ({
         id: m.id,
         role: (m.role === "assistant" ? "assistant" : "user") as
           | "assistant"
           | "user",
         content: textOf(m),
-        createdAt: Date.now(),
+        // DB行由来の createdAt があれば保持し、無ければメッセージid順（index）を
+        // フォールバックにする。Date.now() のダミー埋めは行わない。
+        createdAt: messageCreatedAt(m, index),
         parts: m.parts,
       }))
       .filter((m) => m.content !== "" || hasToolPart(m.parts));
-  }, [uiMessages, isStreaming]);
+  }, [uiMessages, streamingAssistantId]);
 
   // ストリーミング中のリアルタイム表示用テキスト
   const streamingContent = useMemo(() => {
-    if (!isStreaming) {
+    if (!isStreaming || !streamingAssistantId) {
       return "";
     }
-    const last = uiMessages[uiMessages.length - 1];
-    if (!last || last.role !== "assistant") {
+    const streaming = uiMessages.find((m) => m.id === streamingAssistantId);
+    if (!streaming || streaming.role !== "assistant") {
       return "";
     }
-    return textOf(last);
-  }, [uiMessages, isStreaming]);
+    return textOf(streaming);
+  }, [uiMessages, isStreaming, streamingAssistantId]);
 
   // ストリーミング中のアシスタントメッセージの生 parts。
   // ツール呼び出しパーツを送信完了前でも随時表示するために公開する。
   const streamingParts = useMemo<UIMessage["parts"] | null>(() => {
-    if (!isStreaming) {
+    if (!isStreaming || !streamingAssistantId) {
       return null;
     }
-    const last = uiMessages[uiMessages.length - 1];
-    if (!last || last.role !== "assistant") {
+    const streaming = uiMessages.find((m) => m.id === streamingAssistantId);
+    if (!streaming || streaming.role !== "assistant") {
       return null;
     }
-    return last.parts;
-  }, [uiMessages, isStreaming]);
+    return streaming.parts;
+  }, [uiMessages, isStreaming, streamingAssistantId]);
 
   // セッション操作・送信・中断・再試行は useChatActions に委譲する（単一 source の一部）
   const {
@@ -315,7 +344,7 @@ export function useChatStreaming({
     autoCreatedSessionRef,
     chatSendMessage,
     currentSessionIdRef,
-    isStreaming,
+    isStreamingRef,
     messages,
     refreshSessions,
     selectedNovelIdLiveRef,
@@ -352,6 +381,7 @@ export function useChatStreaming({
       abortStream,
       abortStreamDiscard,
       clearMessages,
+      markTitleEdited,
     }),
     [
       currentSessionId,
@@ -374,6 +404,7 @@ export function useChatStreaming({
       abortStream,
       abortStreamDiscard,
       clearMessages,
+      markTitleEdited,
     ]
   );
 }

@@ -83,26 +83,69 @@ export function hasToolPart(parts: UIMessage["parts"]): boolean {
   });
 }
 
+/** DB行の createdAt（ISO文字列 / EPOCH ms / null）を EPOCH ms に正規化する。欠損・不正値は null */
+export function toCreatedAtTimestamp(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Date.parse(value);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+  return null;
+}
+
+/**
+ * UIMessage に保持された createdAt（metadata.createdAt）を読み出す。
+ * 保持されていない場合は呼び出し側が渡すフォールバック（メッセージid順の
+ * インデックス等）を返す。Date.now() によるダミー埋めは行わない。
+ */
+export function messageCreatedAt(message: UIMessage, fallback: number): number {
+  const metadata = (message as { metadata?: unknown }).metadata;
+  if (metadata && typeof metadata === "object") {
+    const timestamp = toCreatedAtTimestamp(
+      (metadata as Record<string, unknown>).createdAt
+    );
+    if (timestamp !== null) {
+      return timestamp;
+    }
+  }
+  return fallback;
+}
+
 /**
  * セッション詳細（DB行）を UI Message に変換して useChat へ seed する。
  * parts があればそれをそのまま使い、無ければ text パーツを合成する。
  * サーバーはリクエストの最後のユーザーメッセージのみを採用し履歴は DB から
  * 構築するため、ここでは id/role/parts を正しく設定する。
+ * DB行の createdAt があれば metadata.createdAt（EPOCH ms）として保持し、
+ * 無ければ付与しない（呼び出し側がメッセージid順フォールバックで補う）。
  */
 export function rowToUIMessage(row: {
   id: string;
   role: "user" | "assistant";
   content: string;
   parts?: unknown[] | null;
+  createdAt?: string | number | null;
 }): UIMessage {
   const parts: UIMessage["parts"] =
     Array.isArray(row.parts) && row.parts.length > 0
       ? (row.parts as UIMessage["parts"])
       : [{ type: "text", text: row.content, state: "done" }];
-  return {
+  const base: UIMessage = {
     id: row.id,
     role: row.role,
     parts,
+  };
+  const timestamp = toCreatedAtTimestamp(row.createdAt);
+  if (timestamp === null) {
+    return base;
+  }
+  return {
+    ...base,
+    metadata: { createdAt: timestamp },
   };
 }
 

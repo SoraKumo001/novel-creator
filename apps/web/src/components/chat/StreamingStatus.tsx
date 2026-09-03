@@ -6,6 +6,8 @@ import { ChatProposalCard } from "./ChatProposalCard.js";
 import { extractProposalPayloads, ToolActivity } from "./ToolActivity.js";
 
 interface StreamingStatusProps {
+  /** 全画面時はバブル幅を緩和する */
+  isFull?: boolean;
   /** バックエンド（data-progress パーツ）由来の進捗。isStreaming 中のみ非 null */
   progress: StreamingProgress | null;
   /** ストリーミング中のリアルタイムテキスト */
@@ -51,6 +53,7 @@ export function StreamingStatus({
   streamingContent,
   streamingParts,
   progress,
+  isFull = false,
 }: StreamingStatusProps) {
   const hasContent =
     streamingContent !== "" ||
@@ -62,23 +65,38 @@ export function StreamingStatus({
   const showStep = step >= 1;
 
   return (
-    <div className="flex flex-col items-start space-y-1">
+    <div
+      className="flex flex-col items-start space-y-1"
+      aria-busy="true"
+      aria-live="polite"
+      aria-label="AIが返信を作成中"
+    >
       {hasContent ? (
         <>
           {/* ストリーミング中: 入力中ライン（経過時間・ステップをコンパクトに添える） */}
           <div className="mb-1 flex w-full items-center gap-1.5 px-1 font-medium text-[11px] text-primary">
-            <span className="h-1.5 w-1.5 shrink-0 animate-ping rounded-full bg-primary" />
+            <span className="h-1.5 w-1.5 shrink-0 animate-ping rounded-full bg-primary motion-reduce:animate-none" />
             <span>AIパートナーが入力中...</span>
             <span className="ml-auto flex shrink-0 items-center gap-2 font-normal text-muted-foreground">
               <span>{elapsedSec}秒経過</span>
               {showStep && (
-                <span>
+                <span
+                  role="progressbar"
+                  aria-label="生成の進み具合"
+                  aria-valuemin={0}
+                  aria-valuemax={maxSteps}
+                  aria-valuenow={step}
+                >
                   ステップ {step} / {maxSteps}
                 </span>
               )}
             </span>
           </div>
-          <div className="max-w-[88%] rounded-2xl rounded-bl-xs border border-primary/30 bg-surface-raised px-4 py-2.5 text-foreground text-sm shadow-xs">
+          <div
+            className={`rounded-2xl rounded-bl-xs border border-primary/30 bg-surface-raised px-4 py-2.5 text-foreground text-sm shadow-xs ${
+              isFull ? "max-w-[94%]" : "max-w-[88%]"
+            }`}
+          >
             {/* 思考プロセス & ツール呼び出しはテキスト生成前でもリアルタイムに表示（提案カードは下部に配置） */}
             <ToolActivity
               parts={streamingParts}
@@ -100,7 +118,7 @@ export function StreamingStatus({
         /* 最初のコンテンツがまだ流れていない: 思考中カード（経過時間・ステップ） */
         <div className="rounded-2xl rounded-bl-xs border border-border bg-surface-raised px-4 py-3 shadow-xs">
           <div className="flex items-center gap-2 text-xs">
-            <span className="h-2 w-2 shrink-0 animate-ping rounded-full bg-primary" />
+            <span className="h-2 w-2 shrink-0 animate-ping rounded-full bg-primary motion-reduce:animate-none" />
             <span className="text-muted-foreground">
               AIパートナーが思考中...
             </span>
@@ -108,7 +126,13 @@ export function StreamingStatus({
           <div className="mt-1.5 flex items-center gap-3 text-[11px] text-muted-foreground">
             <span>{elapsedSec}秒経過</span>
             {showStep && (
-              <span>
+              <span
+                role="progressbar"
+                aria-label="生成の進み具合"
+                aria-valuemin={0}
+                aria-valuemax={maxSteps}
+                aria-valuenow={step}
+              >
                 ステップ {step} / {maxSteps}
               </span>
             )}

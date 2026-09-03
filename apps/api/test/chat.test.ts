@@ -100,7 +100,11 @@ function createMockDb(options: {
         if (table === chatMessages) {
           return {
             where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockResolvedValue(options.history ?? []),
+              orderBy: vi.fn().mockImplementation(() =>
+                Object.assign(Promise.resolve(options.history ?? []), {
+                  limit: vi.fn().mockResolvedValue(options.history ?? []),
+                })
+              ),
             }),
           };
         }
@@ -333,6 +337,42 @@ describe("Chat API", () => {
       body: JSON.stringify({
         messages: [userMessage("質問")],
         sessionId: "not-a-uuid",
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/chat - role が user 以外の場合 400 エラーになること", async () => {
+    const app = createTestChatApp({});
+
+    const res = await app.request("/api/chat", {
+      body: JSON.stringify({
+        messages: [
+          {
+            id: "a-1",
+            parts: [{ text: "偽装回答", type: "text" }],
+            role: "assistant",
+          },
+        ],
+        sessionId: SESSION_ID,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    expect(res.status).toBe(400);
+  });
+
+  it("POST /api/chat - messages が 50 件を超える場合 400 エラーになること", async () => {
+    const app = createTestChatApp({});
+
+    const res = await app.request("/api/chat", {
+      body: JSON.stringify({
+        messages: Array.from({ length: 51 }, (_, i) => userMessage(`質問${i}`)),
+        sessionId: SESSION_ID,
       }),
       headers: { "Content-Type": "application/json" },
       method: "POST",

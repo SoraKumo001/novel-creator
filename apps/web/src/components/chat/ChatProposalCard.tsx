@@ -105,6 +105,20 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
   const isDeleteOnly =
     proposalType === "delete_setting" || proposalType === "delete_character";
 
+  const isApplyDisabled =
+    isApplying ||
+    diffLoading ||
+    !targetNovelId ||
+    (proposalType === "story_outline" && !data.content?.trim());
+
+  const applyDisabledReason = !targetNovelId
+    ? "対象の小説を選ぶと反映できます"
+    : proposalType === "story_outline" && !data.content?.trim()
+      ? "本文が空のため反映できません"
+      : isApplying || diffLoading
+        ? "処理中です。終わるまでお待ちください"
+        : null;
+
   const cardBorderClass = isApplied
     ? "border-emerald-300 bg-linear-to-br from-emerald-50/90 to-teal-50/40 dark:border-emerald-800/80 dark:from-emerald-950/30 dark:to-teal-950/20"
     : isDismissed
@@ -115,7 +129,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
 
   return (
     <div
-      className={`my-3 overflow-hidden rounded-xl border p-3 shadow-xs transition ${cardBorderClass}`}
+      className={`my-3 overflow-hidden rounded-xl border p-3 shadow-xs transition motion-reduce:transition-none ${cardBorderClass}`}
     >
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
@@ -175,7 +189,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
         targetNovelId={targetNovelId}
       />
 
-      <div className="mt-2.5 flex items-center justify-between gap-2">
+      <div className="mt-2.5 flex flex-col gap-2 min-[560px]:flex-row min-[560px]:items-center min-[560px]:justify-between">
         {isApplied ? (
           <div className="flex items-center gap-1.5 font-medium text-emerald-800 text-xs dark:text-emerald-300">
             <svg
@@ -198,10 +212,10 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           </div>
         ) : (
           <>
-            <div className="truncate text-[11px] text-slate-500 dark:text-slate-400">
+            <div className="min-w-0 flex-1 truncate text-[11px] text-slate-500 dark:text-slate-400">
               {cleanSummary}
             </div>
-            <div className="flex shrink-0 items-center gap-1.5">
+            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
               {canShowDiff && (
                 <Button
                   type="button"
@@ -228,16 +242,17 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
                 size="sm"
                 variant="primary"
                 onClick={() => void handleApply()}
-                disabled={
-                  isApplying ||
-                  diffLoading ||
-                  !targetNovelId ||
-                  (proposalType === "story_outline" && !data.content?.trim())
-                }
+                disabled={isApplyDisabled}
+                title={applyDisabledReason ?? "小説に反映する"}
               >
                 {isApplying ? "反映中..." : "✔ 小説に反映する"}
               </Button>
             </div>
+            {applyDisabledReason && !isApplying && !diffLoading && (
+              <p className="text-[11px] text-muted-foreground">
+                {applyDisabledReason}
+              </p>
+            )}
           </>
         )}
       </div>

@@ -16,7 +16,7 @@ import { createReadTools } from "../tools/readTools.js";
 import type { ServiceContext } from "../types.js";
 
 /** 創作相談チャットのツールループ最大ステップ数 */
-export const CHAT_MAX_STEPS = 8;
+export const CHAT_MAX_STEPS = 4;
 
 /** 進捗データパーツ（data-progress）の data 部。step は start 時 0、ステップ進行時は 1 始まり */
 export interface ChatProgressData {
@@ -35,7 +35,7 @@ export interface ChatProgressPart {
 
 /**
  * ツール群（読み取りツール ＋ 設定提案ツール）を構築する（ツール対象は小説コンテキストがある場合のみ）。
- * 構築に失敗してもチャット自体は継続させる（RAG フォールバック方針に倣う）。
+ * 構築に失敗した場合は警告ログを残し、ツールなしで継続する（呼び出し元は warnings で UI 通知可能）。
  */
 export function buildChatTools(
   ctx: ServiceContext,
@@ -48,8 +48,9 @@ export function buildChatTools(
     const readTools = createReadTools(ctx, effectiveNovelId);
     const proposeTools = createProposeTools(ctx, effectiveNovelId);
     return { ...readTools, ...proposeTools } as ToolSet;
-  } catch {
-    // ツール構築失敗時はツールなしで継続
+  } catch (err) {
+    // ツール構築失敗時はツールなしで継続（沈黙させず警告ログを残す）
+    appLogger.warn("[Chat Tools] build failed, continuing without tools", err);
     return undefined;
   }
 }
@@ -85,22 +86,25 @@ export async function streamChatAssistantResponse(
   });
 
   let assistantSaved = false;
+  let assistantSaveError: string | undefined;
   const uiStream = toUIMessageStream({
     onEnd: async ({ responseMessage }) => {
       if (assistantSaved) {
         return;
       }
       assistantSaved = true;
-      const fullText = responseMessage.parts
+      const parts = Array.isArray(responseMessage.parts)
+        ? responseMessage.parts
+        : [];
+      const fullText = parts
         .filter((p) => p.type === "text")
         .map((p) => (p as { text?: string }).text ?? "")
         .join("");
       try {
         const hasMeaningfulContent =
           fullText.trim() !== "" ||
-          (responseMessage.parts &&
-            responseMessage.parts.length > 0 &&
-            responseMessage.parts.some(
+          (parts.length > 0 &&
+            parts.some(
               (p) => p.type !== "text" || (p.text && p.text.trim().length > 0)
             ));
 
@@ -109,8 +113,8 @@ export async function streamChatAssistantResponse(
         }
 
         const savedParts =
-          responseMessage.parts && responseMessage.parts.length > 0
-            ? JSON.parse(JSON.stringify(responseMessage.parts))
+          parts.length > 0
+            ? (JSON.parse(JSON.stringify(parts)) as unknown)
             : [{ text: fullText, type: "text" }];
 
         await ctx.db.insert(chatMessages).values({
@@ -123,8 +127,27 @@ export async function streamChatAssistantResponse(
           .update(chatSessions)
           .set({ updatedAt: new Date() })
           .where(eq(chatSessions.id, sessionId));
-      } catch {
-        // ベストエフォート保存: 永続化失敗はストリームを中断しない
+      } catch (err) {
+        // 永続化失敗はストリームを中断しないが、握り潰さずログ＋末尾警告で通知する
+        appLogger.error(
+          "[Chat Stream] Failed to persist assistant message",
+          err
+        );
+        assistantSaveError = err instanceof Error ? err.message : String(err);
+        try {
+          writeProgressPart?.({
+            data: {
+              finishReason: "save-failed",
+              maxSteps: CHAT_MAX_STEPS,
+              phase: "done",
+              step: lastStep,
+            },
+            transient: true,
+            type: "data-progress",
+          });
+        } catch {
+          // 警告パートの送出自体はベストエフォート
+        }
       }
     },
     onError: (error) => {
@@ -162,6 +185,7 @@ export async function streamChatAssistantResponse(
 
         writeProgressPart({
           data: {
+            finishReason: assistantSaveError ? "save-failed" : undefined,
             maxSteps: CHAT_MAX_STEPS,
             phase: "done",
             step: lastStep,

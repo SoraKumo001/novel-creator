@@ -94,14 +94,14 @@ function StatusBadge({ item }: { item: ToolInvocationItem }) {
     case "input-streaming":
       return (
         <span className="flex items-center gap-1 font-medium text-primary">
-          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary/60" />
+          <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-primary/60 motion-reduce:animate-none" />
           <span>実行準備中...</span>
         </span>
       );
     default:
       return (
         <span className="flex items-center gap-1 font-medium text-primary">
-          <span className="inline-block h-2 w-2 animate-ping rounded-full bg-primary" />
+          <span className="inline-block h-2 w-2 animate-ping rounded-full bg-primary motion-reduce:animate-none" />
           <span>実行中...</span>
         </span>
       );
@@ -157,7 +157,7 @@ export function ToolActivity({
             return (
               <div
                 key={inv.toolCallId}
-                className={`overflow-hidden rounded-lg border text-[12px] shadow-xs backdrop-blur transition ${
+                className={`overflow-hidden rounded-lg border text-[12px] shadow-xs backdrop-blur transition motion-reduce:transition-none ${
                   inv.state === "output-error"
                     ? "border-danger/40 bg-danger/5"
                     : "border-border/70 bg-surface/80"
@@ -199,7 +199,7 @@ export function ToolActivity({
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 20 20"
                         fill="currentColor"
-                        className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 ${
+                        className={`h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 motion-reduce:transition-none ${
                           isExpanded ? "rotate-180" : ""
                         }`}
                       >

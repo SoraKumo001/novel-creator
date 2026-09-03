@@ -61,8 +61,9 @@ type ChatServiceInternals = {
   buildChatContext(
     sessionId: string,
     effectiveNovelId: string | null | undefined,
-    userText: string
-  ): Promise<string>;
+    userText: string,
+    sessionNovelId?: string | null
+  ): Promise<{ prompt: string; warnings: string[] }>;
   buildChatTools(
     effectiveNovelId: string | null | undefined
   ): ToolSet | undefined;
@@ -113,7 +114,11 @@ function createMockDb(
         if (table === chatMessages) {
           return {
             where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockResolvedValue(options.history ?? []),
+              orderBy: vi.fn().mockImplementation(() =>
+                Object.assign(Promise.resolve(options.history ?? []), {
+                  limit: vi.fn().mockResolvedValue(options.history ?? []),
+                })
+              ),
             }),
           };
         }
@@ -266,6 +271,38 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
       expect(insertCalls).toHaveLength(0);
       expect(updateCalls).toHaveLength(0);
     });
+
+    it("直前の user メッセージと同文かつ 30 秒以内は再保存をスキップすること", async () => {
+      const { db, insertCalls } = createMockDb({
+        history: [
+          {
+            content: "こんにちは世界",
+            createdAt: new Date(),
+            id: "m1",
+            parts: null,
+            role: "user",
+            sessionId: SESSION_ID,
+          },
+        ],
+      });
+      const service = createService(db);
+
+      const { userText } = await internalsOf(service).persistUserMessage(
+        SESSION_ID,
+        [
+          {
+            parts: [{ text: "こんにちは世界", type: "text" }],
+            role: "user",
+          },
+        ]
+      );
+
+      expect(userText).toBe("こんにちは世界");
+      // 重複のため user 行の再保存はスキップされる
+      expect(insertCalls.filter((c) => c.table === chatMessages)).toHaveLength(
+        0
+      );
+    });
   });
 
   describe("buildChatContext", () => {
@@ -290,7 +327,7 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
       });
       const service = createService(db);
 
-      const prompt = await internalsOf(service).buildChatContext(
+      const { prompt, warnings } = await internalsOf(service).buildChatContext(
         SESSION_ID,
         undefined,
         "今回の質問"
@@ -301,6 +338,7 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
       expect(prompt).toContain("ユーザー: 前回の質問");
       expect(prompt).toContain("アシスタント: 前回の回答");
       expect(prompt.split("\n\n")).toHaveLength(3);
+      expect(warnings).toEqual([]);
 
       // 小説コンテキストがない場合は novels を取得せず RAG も検索しない
       expect(mockSearchContext).not.toHaveBeenCalled();
@@ -336,7 +374,7 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
       });
       const service = createService(db);
 
-      const prompt = await internalsOf(service).buildChatContext(
+      const { prompt, warnings } = await internalsOf(service).buildChatContext(
         SESSION_ID,
         NOVEL_ID,
         "今回の質問"
@@ -355,6 +393,7 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
         settings: ["設定Aの説明"],
       });
       expect(prompt).toContain("ユーザー: 今回の質問");
+      expect(warnings).toEqual([]);
     });
 
     it("RAG 検索が失敗しても空コンテキストでプロンプトを構築すること", async () => {
@@ -378,7 +417,7 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
       mockSearchContext.mockRejectedValue(new Error("rag unavailable"));
       const service = createService(db);
 
-      const prompt = await internalsOf(service).buildChatContext(
+      const { prompt, warnings } = await internalsOf(service).buildChatContext(
         SESSION_ID,
         NOVEL_ID,
         "今回の質問"
@@ -391,6 +430,22 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
         settings: [],
       });
       expect(prompt).toContain("ユーザー: 今回の質問");
+      // 失敗は warnings に記録され、呼び出し元が UI 警告できる
+      expect(warnings).toContain("rag_unavailable");
+    });
+
+    it("要求 novelId とセッションの novelId が不一致の場合は ValidationError を投げること", async () => {
+      const { db } = createMockDb({ history: [] });
+      const service = createService(db);
+
+      await expect(
+        internalsOf(service).buildChatContext(
+          SESSION_ID,
+          NOVEL_ID,
+          "今回の質問",
+          "33333333-3333-4333-8333-333333333333"
+        )
+      ).rejects.toBeInstanceOf(ValidationError);
     });
   });
 
@@ -485,18 +540,36 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
             if (table === chatMessages) {
               return {
                 where: vi.fn().mockReturnValue({
-                  orderBy: vi.fn().mockImplementation(async () => {
-                    await sleep(BRANCH_DELAY_MS);
-                    return [
+                  orderBy: vi.fn().mockImplementation(() =>
+                    Object.assign(
+                      (async () => {
+                        await sleep(BRANCH_DELAY_MS);
+                        return [
+                          {
+                            content: "前回の質問",
+                            id: "m1",
+                            parts: null,
+                            role: "user",
+                            sessionId: SESSION_ID,
+                          },
+                        ];
+                      })(),
                       {
-                        content: "前回の質問",
-                        id: "m1",
-                        parts: null,
-                        role: "user",
-                        sessionId: SESSION_ID,
-                      },
-                    ];
-                  }),
+                        limit: vi.fn().mockImplementation(async () => {
+                          await sleep(BRANCH_DELAY_MS);
+                          return [
+                            {
+                              content: "前回の質問",
+                              id: "m1",
+                              parts: null,
+                              role: "user",
+                              sessionId: SESSION_ID,
+                            },
+                          ];
+                        }),
+                      }
+                    )
+                  ),
                 }),
               };
             }
@@ -521,7 +594,7 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
       const contextService = createService(delayedDb);
 
       const contextStart = Date.now();
-      const prompt = await internalsOf(contextService).buildChatContext(
+      const { prompt } = await internalsOf(contextService).buildChatContext(
         SESSION_ID,
         NOVEL_ID,
         "今回の質問"
@@ -557,7 +630,7 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
         .spyOn(serviceInternals, "buildChatContext")
         .mockImplementation(async () => {
           await sleep(SERVICE_DELAY_MS);
-          return "PARALLEL_PROMPT";
+          return { prompt: "PARALLEL_PROMPT", warnings: [] };
         });
       const streamSpy = vi
         .spyOn(serviceInternals, "streamAssistantResponse")

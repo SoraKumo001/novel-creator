@@ -160,21 +160,40 @@ export function classifyError(err: unknown): ClassifiedError {
 }
 
 /**
+ * 内部詳細に含まれうる機微情報（API キー断片・URL など）をマスクする。
+ * ユーザー向けメッセージに流す前のサニタイズ用。元の詳細はログのみに残す。
+ */
+function sanitizeDetailText(text: string): string {
+  return (
+    text
+      // sk- で始まるキー断片
+      .replace(/sk-[A-Za-z0-9-_]{8,}/g, "[REDACTED]")
+      // apiKey=xxx / api-key: xxx 形式の値部のみマスク
+      .replace(/(api[_-]?key\s*[:=]\s*)([^\s;,'"]+)/gi, "$1[REDACTED]")
+      // URL はホスト等が内部情報になりうるためマスク
+      .replace(/https?:\/\/[^\s"'<>]+/g, "[URL]")
+  );
+}
+
+/**
  * エラーオブジェクトからユーザー向けの詳細エラーメッセージ文字列を整形する。
  * ストリーミング中の onError コールバックなどで使用する。
+ * ユーザー向けには定型文のみを返し、内部詳細はログに残す。
+ * 開発環境（NODE_ENV=development）のみ詳細を含める。
  */
 export function formatErrorMessage(err: unknown): string {
   const classified = classifyError(err);
-  let message = classified.message;
+  const message = classified.message;
 
+  const rawDetails: string[] = [];
   if (classified.details && typeof classified.details === "string") {
-    message = `${message}\n詳細: ${classified.details}`;
+    rawDetails.push(classified.details);
   } else if (
     APICallError.isInstance(err) &&
     err.message &&
     err.message !== classified.message
   ) {
-    message = `${message}\n詳細: ${err.message}`;
+    rawDetails.push(err.message);
   } else if (
     err &&
     typeof err === "object" &&
@@ -189,14 +208,34 @@ export function formatErrorMessage(err: unknown): string {
           ? String((cause as { message: unknown }).message)
           : String(cause);
     if (causeMsg) {
-      // 巨大なクエリ本体を避けて原因を先頭に付与
-      message = `${message.split("\n")[0]}\n詳細: ${causeMsg}`;
+      rawDetails.push(causeMsg);
     }
+  }
+
+  if (rawDetails.length > 0) {
+    // 内部詳細はログのみに残す
+    appLogger.error("[Error Detail]", ...rawDetails);
+  }
+
+  // 開発環境のみ詳細を返却する
+  if (
+    rawDetails.length > 0 &&
+    (process.env["NODE_ENV"] === "development" ||
+      process.env["NODE_ENV"] === "test")
+  ) {
+    const detail = sanitizeDetailText(
+      rawDetails.join("\n").split("\n")[0] as string
+    );
+    let withDetail = `${message.split("\n")[0]}\n詳細: ${detail}`;
+    if (withDetail.length > 1000) {
+      withDetail = `${withDetail.slice(0, 1000)}...`;
+    }
+    return withDetail;
   }
 
   // SSE 等で数万文字のペイロードが送出されるのを防ぐため安全な長さに制限
   if (message.length > 1000) {
-    message = `${message.slice(0, 1000)}...`;
+    return `${message.slice(0, 1000)}...`;
   }
 
   return message;
