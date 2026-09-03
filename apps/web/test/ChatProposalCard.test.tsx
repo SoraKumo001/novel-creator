@@ -305,6 +305,61 @@ describe("ChatProposalCard", () => {
         ).toBeGreaterThan(0);
       });
     });
+
+    it("伏線にtitleがない場合（descriptionのみ等）でも「差分を確認」でエラーにならずモーダルが開くこと", async () => {
+      const proposalWithMissingTitle: ProposalPayload = {
+        type: "proposal",
+        proposalType: "bulk",
+        novelId: NOVEL_ID,
+        data: {
+          characters: [{ name: "アレン", category: "主人公" }],
+          settings: [{ name: "帝国", category: "世界観" }],
+          foreshadowings: [
+            {
+              // title が未定義で description のみあるケース
+              description:
+                "ライゼン家の血にはパラサイト型遺物への高い適性がある。",
+            },
+          ],
+        },
+        summary: "一括登録提案（伏線タイトル未定義）",
+      };
+
+      vi.mocked(services.fetchCharactersMarkdown).mockResolvedValue({
+        markdown: "# キャラ\n",
+      });
+      vi.mocked(services.fetchSettingsMarkdown).mockResolvedValue({
+        markdown: "# 設定\n",
+      });
+      vi.mocked(services.fetchForeshadowingsMarkdown).mockResolvedValue(
+        "# 伏線\n"
+      );
+
+      renderWithClient(
+        <ChatProposalCard proposal={proposalWithMissingTitle} />
+      );
+
+      const diffBtn = screen.getByRole("button", { name: /差分を確認/ });
+      fireEvent.click(diffBtn);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole("button", { name: /🎭 登場人物/ })
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /🌍 設定/ })
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: /🔍 伏線/ })
+        ).toBeInTheDocument();
+      });
+
+      // 伏線タブを開いてもエラーにならないことを確認
+      fireEvent.click(screen.getByRole("button", { name: /🔍 伏線/ }));
+      await waitFor(() => {
+        expect(screen.getByText(/差分プレビュー: 伏線/)).toBeInTheDocument();
+      });
+    });
   });
 
   describe("setting proposal with replacement", () => {

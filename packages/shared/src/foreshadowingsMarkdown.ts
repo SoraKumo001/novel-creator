@@ -67,14 +67,24 @@ export function serializeForeshadowingsToMarkdown(
     return "";
   }
 
-  const normalized = items.map((f) => ({
-    category: (f.category ?? "").trim() || "未分類",
-    description: (f.description ?? "").trim(),
-    placedSectionId: f.placedSectionId ?? null,
-    resolvedSectionId: f.resolvedSectionId ?? null,
-    status: f.status ?? "unresolved",
-    title: f.title.trim(),
-  }));
+  const normalized = items.map((f) => {
+    const rawTitle =
+      f.title ??
+      (f as { name?: string }).name ??
+      (f.description ? f.description.slice(0, 30) : "") ??
+      "無題の伏線";
+    return {
+      category: (f.category ?? "").trim() || "未分類",
+      description: (f.description ?? "").trim(),
+      placedSectionId: f.placedSectionId ?? null,
+      resolvedSectionId: f.resolvedSectionId ?? null,
+      status: f.status ?? "unresolved",
+      title:
+        typeof rawTitle === "string" && rawTitle.trim()
+          ? rawTitle.trim()
+          : "無題の伏線",
+    };
+  });
 
   const sorted = [...normalized].sort((a, b) => {
     const c = a.category.localeCompare(b.category, "ja");
@@ -383,12 +393,21 @@ export function applyForeshadowingsToMarkdown(
   );
   const map = new Map<string, ParsedForeshadowingSection>();
   for (const f of existing) {
-    if (!deleteSet.has(f.title.trim())) {
-      map.set(f.title.trim(), f);
+    const t = typeof f.title === "string" ? f.title.trim() : "";
+    if (t && !deleteSet.has(t)) {
+      map.set(t, f);
     }
   }
   for (const item of newItems) {
-    const trimmedTitle = item.title.trim();
+    const rawTitle =
+      item.title ??
+      (item as { name?: string }).name ??
+      (item.description ? item.description.slice(0, 30) : "") ??
+      "無題の伏線";
+    const trimmedTitle =
+      typeof rawTitle === "string" && rawTitle.trim()
+        ? rawTitle.trim()
+        : "無題の伏線";
     const prev = map.get(trimmedTitle);
     map.set(trimmedTitle, {
       category: item.category || prev?.category || "未分類",

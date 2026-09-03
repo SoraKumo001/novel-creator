@@ -29,7 +29,7 @@ import {
   saveStoryOutline,
   saveTimelinesMarkdown,
 } from "@/lib/services/index.js";
-import { ProposalDiffModal } from "./ProposalDiffModal.js";
+import { type DiffTabItem, ProposalDiffModal } from "./ProposalDiffModal.js";
 
 export interface ProposalPayload {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,6 +45,8 @@ export interface ProposalPayload {
     | "timeline"
     | "plot"
     | "story_outline";
+  reason?: string;
+  sectionName?: string;
   summary: string;
   type: "proposal";
 }
@@ -66,6 +68,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
   const [diffModalOpen, setDiffModalOpen] = useState(false);
   const [diffLoading, setDiffLoading] = useState(false);
   const [diffData, setDiffData] = useState<{
+    diffItems?: DiffTabItem[];
     entityType: string;
     originalMarkdown: string;
     targetTab: string;
@@ -111,21 +114,46 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
     setIsApplying(true);
     try {
       if (proposalType === "bulk") {
-        const characters = Array.isArray(data.characters)
-          ? data.characters
-          : [];
-        const settings = Array.isArray(data.settings) ? data.settings : [];
-        const foreshadowings = Array.isArray(data.foreshadowings)
-          ? data.foreshadowings
-          : [];
-        const timelines = Array.isArray(data.timelines) ? data.timelines : [];
+        const characters = (
+          Array.isArray(data.characters) ? data.characters : []
+        ).map((c: any) => ({
+          ...c,
+          name: (c.name || c.title || "無題の登場人物").trim(),
+        }));
+        const settings = (
+          Array.isArray(data.settings) ? data.settings : []
+        ).map((s: any) => ({
+          ...s,
+          name: (s.name || s.title || "無題の設定").trim(),
+        }));
+        const foreshadowings = (
+          Array.isArray(data.foreshadowings) ? data.foreshadowings : []
+        ).map((f: any) => ({
+          ...f,
+          title: (
+            f.title ||
+            f.name ||
+            f.description?.slice(0, 30) ||
+            "無題の伏線"
+          ).trim(),
+        }));
+        const timelines = (
+          Array.isArray(data.timelines) ? data.timelines : []
+        ).map((t: any) => ({
+          ...t,
+          event: (t.event || t.title || "無題の出来事").trim(),
+        }));
         const deleteSettingsList: string[] = Array.isArray(data.deleteSettings)
           ? data.deleteSettings
+              .map((s: any) => String(s || "").trim())
+              .filter(Boolean)
           : [];
         const deleteCharactersList: string[] = Array.isArray(
           data.deleteCharacters
         )
           ? data.deleteCharacters
+              .map((c: any) => String(c || "").trim())
+              .filter(Boolean)
           : [];
 
         // 人物マークダウンの反映
@@ -354,9 +382,15 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
         const currentMd = await fetchForeshadowingsMarkdown(
           targetNovelId
         ).catch(() => "");
+        const safeTitle = (
+          data.title ||
+          data.name ||
+          data.description?.slice(0, 30) ||
+          "無題の伏線"
+        ).trim();
         const updatedMd = applyForeshadowingsToMarkdown(currentMd, [
           {
-            title: data.title,
+            title: safeTitle,
             description: data.description,
             status: data.status || "unresolved",
             category: data.category,
@@ -620,16 +654,22 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
         const currentMd = await fetchForeshadowingsMarkdown(
           targetNovelId
         ).catch(() => "");
+        const safeTitle = (
+          data.title ||
+          data.name ||
+          data.description?.slice(0, 30) ||
+          "無題の伏線"
+        ).trim();
         const updatedMd = applyForeshadowingsToMarkdown(currentMd, [
           {
-            title: data.title,
+            title: safeTitle,
             description: data.description,
             status: data.status || "unresolved",
             category: data.category,
           },
         ]);
         setDiffData({
-          title: `伏線「${data.title}」`,
+          title: `伏線「${safeTitle}」`,
           targetTab: "foreshadowings",
           entityType: "foreshadowings_markdown",
           originalMarkdown: currentMd,
@@ -677,55 +717,142 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
         });
         setDiffModalOpen(true);
       } else if (proposalType === "bulk") {
-        const delChars = Array.isArray(data.deleteCharacters)
-          ? data.deleteCharacters
-          : [];
-        const delSets = Array.isArray(data.deleteSettings)
-          ? data.deleteSettings
-          : [];
-        const hasChars =
-          (Array.isArray(data.characters) && data.characters.length > 0) ||
-          delChars.length > 0;
-        const hasSets =
-          (Array.isArray(data.settings) && data.settings.length > 0) ||
-          delSets.length > 0;
+        const delChars = (
+          Array.isArray(data.deleteCharacters) ? data.deleteCharacters : []
+        )
+          .map((c: any) => String(c || "").trim())
+          .filter(Boolean);
+        const delSets = (
+          Array.isArray(data.deleteSettings) ? data.deleteSettings : []
+        )
+          .map((s: any) => String(s || "").trim())
+          .filter(Boolean);
+        const characters = (
+          Array.isArray(data.characters) ? data.characters : []
+        ).map((c: any) => ({
+          ...c,
+          name: (c.name || c.title || "無題の登場人物").trim(),
+        }));
+        const settings = (
+          Array.isArray(data.settings) ? data.settings : []
+        ).map((s: any) => ({
+          ...s,
+          name: (s.name || s.title || "無題の設定").trim(),
+        }));
+        const foreshadowings = (
+          Array.isArray(data.foreshadowings) ? data.foreshadowings : []
+        ).map((f: any) => ({
+          ...f,
+          title: (
+            f.title ||
+            f.name ||
+            f.description?.slice(0, 30) ||
+            "無題の伏線"
+          ).trim(),
+        }));
+        const timelines = (
+          Array.isArray(data.timelines) ? data.timelines : []
+        ).map((t: any) => ({
+          ...t,
+          event: (t.event || t.title || "無題の出来事").trim(),
+        }));
 
-        if (hasChars) {
+        const items: DiffTabItem[] = [];
+
+        // 1. 登場人物
+        if (characters.length > 0 || delChars.length > 0) {
           const res = await fetchCharactersMarkdown(targetNovelId).catch(
             () => ({ markdown: "" })
           );
           const currentMd = res.markdown ?? "";
           const updatedMd = applyCharactersToMarkdown(
             currentMd,
-            Array.isArray(data.characters) ? data.characters : [],
+            characters,
             delChars
           );
-          setDiffData({
-            title: `登場人物（一括 反映 ${data.characters?.length || 0}名 / 削除 ${delChars.length}名）`,
+          items.push({
+            id: "characters",
+            label: `🎭 登場人物 (${characters.length}名${delChars.length > 0 ? ` / 削除${delChars.length}名` : ""})`,
+            title: `登場人物（一括 反映 ${characters.length}名 / 削除 ${delChars.length}名）`,
             targetTab: "characters",
             entityType: "characters_markdown",
             originalMarkdown: currentMd,
             updatedMarkdown: updatedMd,
           });
-          setDiffModalOpen(true);
-        } else if (hasSets) {
+        }
+
+        // 2. 世界観・設定
+        if (settings.length > 0 || delSets.length > 0) {
           const res = await fetchSettingsMarkdown(targetNovelId).catch(() => ({
             markdown: "",
           }));
           const currentMd = res.markdown ?? "";
           const updatedMd = applySettingsToMarkdown(
             currentMd,
-            Array.isArray(data.settings) ? data.settings : [],
+            settings,
             delSets
           );
-          setDiffData({
-            title: `世界観・設定（一括 反映 ${data.settings?.length || 0}件 / 削除 ${delSets.length}件）`,
+          items.push({
+            id: "settings",
+            label: `🌍 設定 (${settings.length}件${delSets.length > 0 ? ` / 削除${delSets.length}件` : ""})`,
+            title: `世界観・設定（一括 反映 ${settings.length}件 / 削除 ${delSets.length}件）`,
             targetTab: "settings",
             entityType: "settings_markdown",
             originalMarkdown: currentMd,
             updatedMarkdown: updatedMd,
           });
+        }
+
+        // 3. 伏線
+        if (foreshadowings.length > 0) {
+          const currentMd = await fetchForeshadowingsMarkdown(
+            targetNovelId
+          ).catch(() => "");
+          const updatedMd = applyForeshadowingsToMarkdown(
+            currentMd,
+            foreshadowings
+          );
+          items.push({
+            id: "foreshadowings",
+            label: `🔍 伏線 (${foreshadowings.length}件)`,
+            title: `伏線（一括 反映 ${foreshadowings.length}件）`,
+            targetTab: "foreshadowings",
+            entityType: "foreshadowings_markdown",
+            originalMarkdown: currentMd,
+            updatedMarkdown: updatedMd,
+          });
+        }
+
+        // 4. 年表
+        if (timelines.length > 0) {
+          const res = await fetchTimelinesMarkdown(targetNovelId).catch(() => ({
+            markdown: "",
+          }));
+          const currentMd = res.markdown ?? "";
+          const updatedMd = applyTimelinesToMarkdown(currentMd, timelines);
+          items.push({
+            id: "timelines",
+            label: `⏳ 年表 (${timelines.length}件)`,
+            title: `年表（一括 反映 ${timelines.length}件）`,
+            targetTab: "timeline",
+            entityType: "timelines_markdown",
+            originalMarkdown: currentMd,
+            updatedMarkdown: updatedMd,
+          });
+        }
+
+        if (items.length > 0) {
+          setDiffData({
+            title: items[0].title,
+            targetTab: items[0].targetTab,
+            entityType: items[0].entityType,
+            originalMarkdown: items[0].originalMarkdown,
+            updatedMarkdown: items[0].updatedMarkdown,
+            diffItems: items,
+          });
           setDiffModalOpen(true);
+        } else {
+          toast.error("差分プレビュー可能な項目がありません");
         }
       }
     } catch (err) {
@@ -737,17 +864,27 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
     }
   };
 
-  const handleOpenInEditor = () => {
+  const handleOpenInEditor = (targetTabOverride?: string) => {
     if (!diffData || !targetNovelId) {
       return;
     }
     setDiffModalOpen(false);
 
+    // タブ指定があれば一致するアイテムから詳細情報を取得
+    const targetItem = diffData.diffItems?.find(
+      (item) => item.targetTab === targetTabOverride
+    );
+    const resolvedTab = targetTabOverride || diffData.targetTab;
+    const resolvedEntityType = targetItem?.entityType || diffData.entityType;
+    const resolvedMarkdown =
+      targetItem?.updatedMarkdown || diffData.updatedMarkdown;
+    const resolvedTitle = targetItem?.title || diffData.title;
+
     // 該当タブに遷移
     navigate({
       to: "/novels/$novelId",
       params: { novelId: targetNovelId },
-      search: { tab: diffData.targetTab as any },
+      search: { tab: resolvedTab as any },
     });
 
     // 遷移後のエディタに提案適用後Markdownを渡すイベントを発火
@@ -757,9 +894,9 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           new CustomEvent("novel-creator:markdown-preview-apply", {
             detail: {
               novelId: targetNovelId,
-              entityType: diffData.entityType,
-              markdown: diffData.updatedMarkdown,
-              appliedTitle: diffData.title,
+              entityType: resolvedEntityType,
+              markdown: resolvedMarkdown,
+              appliedTitle: resolvedTitle,
             },
           })
         );
@@ -990,20 +1127,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
                   <div className="font-bold text-[11px] text-amber-700 dark:text-amber-400">
                     🔍 伏線 ({data.foreshadowings.length}件)
                   </div>
-                  <div className="mt-1 space-y-1 border-amber-200 border-l-2 pl-1.5 dark:border-amber-800">
-                    {data.foreshadowings.map((f: any, i: number) => (
-                      <div key={i} className="text-[11px]">
-                        <span className="font-semibold text-slate-900 dark:text-slate-100">
-                          {f.title}
-                        </span>
-                        {f.description && (
-                          <p className="line-clamp-1 text-[10px] text-slate-600 dark:text-slate-400">
-                            {f.description}
-                          </p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                  <div className="mt-1 space-y-1 border-amber-200 border-l-2 pl-1.5 dark:border-amber-800"></div>
                 </div>
               )}
             {Array.isArray(data.timelines) && data.timelines.length > 0 && (
@@ -1283,6 +1407,7 @@ export function ChatProposalCard({ proposal }: ChatProposalCardProps) {
           proposalSummary={cleanSummary}
           originalMarkdown={diffData.originalMarkdown}
           updatedMarkdown={diffData.updatedMarkdown}
+          diffItems={diffData.diffItems}
           onApply={handleApply}
           onOpenInEditor={handleOpenInEditor}
           isApplying={isApplying}

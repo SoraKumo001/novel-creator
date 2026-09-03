@@ -352,12 +352,21 @@ export function applyCharactersToMarkdown(
   );
   const map = new Map<string, ParsedCharacterSection>();
   for (const c of existing) {
-    if (!deleteSet.has(c.name.trim())) {
-      map.set(c.name.trim(), c);
+    const name = typeof c.name === "string" ? c.name.trim() : "";
+    if (name && !deleteSet.has(name)) {
+      map.set(name, c);
     }
   }
   for (const nc of newCharacters) {
-    const trimmed = nc.name.trim();
+    const rawName =
+      nc.name ??
+      (nc as { title?: string }).title ??
+      (nc.description ? nc.description.slice(0, 30) : "") ??
+      "無題の登場人物";
+    const trimmed =
+      typeof rawName === "string" && rawName.trim()
+        ? rawName.trim()
+        : "無題の登場人物";
     const prev = map.get(trimmed);
     map.set(trimmed, {
       category: nc.category || prev?.category || "未分類",

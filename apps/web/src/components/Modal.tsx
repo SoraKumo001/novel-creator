@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { CloseIcon } from "./Icons.js";
 
 interface ModalProps {
@@ -15,7 +16,7 @@ const sizeMap = {
   md: "max-w-xl",
   lg: "max-w-3xl",
   xl: "max-w-6xl",
-  full: "max-w-7xl",
+  full: "max-w-[95vw]",
 };
 
 export function Modal({
@@ -41,10 +42,6 @@ export function Modal({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) {
-    return null;
-  }
-
   const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     isBackdropMouseDown.current = e.target === e.currentTarget;
   };
@@ -56,7 +53,11 @@ export function Modal({
     isBackdropMouseDown.current = false;
   };
 
-  return (
+  if (!isOpen || typeof document === "undefined") {
+    return null;
+  }
+
+  const modalContent = (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
       onMouseDown={handleBackdropMouseDown}
@@ -64,7 +65,7 @@ export function Modal({
       data-testid="modal-backdrop"
     >
       <div
-        className={`flex max-h-[90vh] w-full flex-col ${sizeMap[size]} overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl`}
+        className={`flex max-h-[92vh] w-full flex-col ${sizeMap[size]} overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-border-subtle border-b px-6 py-4">
@@ -89,4 +90,6 @@ export function Modal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

@@ -193,12 +193,21 @@ export function applySettingsToMarkdown(
   );
   const map = new Map<string, ParsedSettingSection>();
   for (const s of existing) {
-    if (!deleteSet.has(s.name.trim())) {
-      map.set(s.name.trim(), s);
+    const name = typeof s.name === "string" ? s.name.trim() : "";
+    if (name && !deleteSet.has(name)) {
+      map.set(name, s);
     }
   }
   for (const ns of newSettings) {
-    const trimmed = ns.name.trim();
+    const rawName =
+      ns.name ??
+      (ns as { title?: string }).title ??
+      (ns.description ? ns.description.slice(0, 30) : "") ??
+      "無題の設定";
+    const trimmed =
+      typeof rawName === "string" && rawName.trim()
+        ? rawName.trim()
+        : "無題の設定";
     const prev = map.get(trimmed);
     map.set(trimmed, {
       category: ns.category || prev?.category || "世界観",

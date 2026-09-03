@@ -2,7 +2,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { buildChatPrefill } from "../src/components/chat/ChatDrawer.js";
+import {
+  buildChatPrefill,
+  buildChatPromptWithFocus,
+} from "../src/components/chat/ChatDrawer.js";
 import {
   ChatProvider,
   useChatStreamingState,
@@ -314,6 +317,47 @@ describe("ChatContext & useChatUI / useChatStreamingState", () => {
     });
 
     expect(result.current.error).toBeNull();
+  });
+});
+
+describe("buildChatPromptWithFocus", () => {
+  it("focus が null のときはユーザー入力をそのまま返すこと", () => {
+    const text = buildChatPromptWithFocus("こんにちは", null);
+    expect(text).toBe("こんにちは");
+  });
+
+  it("summary があるときは参照コンテキストヘッダーと現在内容を前置してユーザー入力を合成すること", () => {
+    const text = buildChatPromptWithFocus("この設定を深掘りして", {
+      entityType: "setting",
+      title: "世界観設定",
+      summary: "魔法が失われた近未来",
+    });
+    expect(text).toContain("【参照コンテキスト: 世界観設定】");
+    expect(text).toContain("--- 現在の内容 ---");
+    expect(text).toContain("魔法が失われた近未来");
+    expect(text).toContain("--- ここまで ---");
+    expect(text.endsWith("この設定を深掘りして")).toBe(true);
+  });
+
+  it("selectedText があるときは選択テキスト引用を前置してユーザー入力を合成すること", () => {
+    const text = buildChatPromptWithFocus("この描写をより劇的にして", {
+      entityType: "selection",
+      title: "第1話 プロローグ",
+      selectedText: "彼は剣を抜いた。",
+    });
+    expect(text).toContain("【参照中のテキスト（第1話 プロローグ）】");
+    expect(text).toContain("彼は剣を抜いた。");
+    expect(text.endsWith("この描写をより劇的にして")).toBe(true);
+  });
+
+  it("summary が空のときはタイトルのみ前置してユーザー入力を合成すること", () => {
+    const text = buildChatPromptWithFocus("新しい人物を追加したい", {
+      entityType: "character",
+      title: "人物「ヒロイン」",
+    });
+    expect(text).toContain("【参照コンテキスト: 人物「ヒロイン」】");
+    expect(text).not.toContain("--- 現在の内容 ---");
+    expect(text.endsWith("新しい人物を追加したい")).toBe(true);
   });
 });
 

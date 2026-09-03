@@ -363,8 +363,9 @@ export function applyTimelinesToMarkdown(
   );
   const map = new Map<string, ParsedTimelineSection>();
   for (const t of existing) {
-    if (!deleteSet.has(t.event.trim())) {
-      map.set(t.event.trim(), t);
+    const ev = typeof t.event === "string" ? t.event.trim() : "";
+    if (ev && !deleteSet.has(ev)) {
+      map.set(ev, t);
     }
   }
   let maxOrder = 0;
@@ -375,7 +376,12 @@ export function applyTimelinesToMarkdown(
   }
 
   for (const item of newItems) {
-    const trimmedEvent = item.event.trim();
+    const rawEvent =
+      item.event ?? (item as { title?: string }).title ?? "無題の出来事";
+    const trimmedEvent =
+      typeof rawEvent === "string" && rawEvent.trim()
+        ? rawEvent.trim()
+        : "無題の出来事";
     const prev = map.get(trimmedEvent);
     maxOrder++;
     map.set(trimmedEvent, {

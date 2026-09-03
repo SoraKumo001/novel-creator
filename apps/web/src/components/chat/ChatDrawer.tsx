@@ -28,7 +28,7 @@ import { ToolActivity } from "./ToolActivity.js";
 type DrawerWidth = "normal" | "wide" | "full";
 type ChatLayoutMode = "overlay" | "docked";
 
-/** focus 情報から相談フォーカス用のプリフィルテキストを生成する（純関数・テスト可能） */
+/** focus 情報から相談フォーカス用のプリフィルテキストを生成する（互換用・純関数） */
 export function buildChatPrefill(focus: ChatFocusContext): string {
   if (focus.selectedText?.trim()) {
     const selected = focus.selectedText.trim();
@@ -41,6 +41,29 @@ export function buildChatPrefill(focus: ChatFocusContext): string {
     return `${header}\n\n`;
   }
   return `${header}\n\n--- 現在の内容 ---\n${summary}\n--- ここまで ---\n\n`;
+}
+
+/** focus 情報とユーザープロンプトを合成して送信メッセージを生成する（純関数・テスト可能） */
+export function buildChatPromptWithFocus(
+  userPrompt: string,
+  focus?: ChatFocusContext | null
+): string {
+  const trimmed = userPrompt.trim();
+  if (!focus) {
+    return trimmed;
+  }
+
+  if (focus.selectedText?.trim()) {
+    const selected = focus.selectedText.trim();
+    return `【参照中のテキスト（${focus.title}）】\n${selected}\n\n${trimmed}`;
+  }
+
+  const summary = focus.summary?.trim();
+  if (!summary) {
+    return `【参照コンテキスト: ${focus.title}】\n\n${trimmed}`;
+  }
+
+  return `【参照コンテキスト: ${focus.title}】\n--- 現在の内容 ---\n${summary}\n--- ここまで ---\n\n${trimmed}`;
 }
 
 interface ChatMessageItemProps {
@@ -228,25 +251,17 @@ export function ChatDrawer() {
     };
   }, [streamingContent, streamingParts, isStreaming]);
 
-  // エディタからの「AIと相談」フォーカスが未消費なら入力欄にプリフィルする。
-  // 既存入力は上書きせず末尾へ追記し、消費後はクリアして二重プリフィルを防ぐ。
+  // エディタからの「AIと相談」フォーカスが渡されたら入力欄にフォーカスする。
+  // （※以前は入力欄へ長文テキストを強制プリフィルしていたが、ユーザーの自由入力を妨げず
+  // クリア時の勝手な再挿入を防ぐため、入力欄上部の参照バッジ表示＋送信時合成に変更）
   useEffect(() => {
     if (!isOpen || !chatFocus) {
       return;
     }
-    const prefill = buildChatPrefill(chatFocus);
-    setInput((prev) => (prev ? `${prev}\n\n${prefill}` : prefill));
-    consumeFocus();
     requestAnimationFrame(() => {
-      const el = textareaRef.current;
-      if (el) {
-        el.style.height = "auto";
-        el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
-        el.focus();
-        el.setSelectionRange(el.value.length, el.value.length);
-      }
+      textareaRef.current?.focus();
     });
-  }, [isOpen, chatFocus, consumeFocus]);
+  }, [isOpen, chatFocus]);
 
   // 送信ハンドラ
   const handleSend = async () => {
@@ -258,7 +273,11 @@ export function ChatDrawer() {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
-    await sendMessage(text);
+    const finalPrompt = buildChatPromptWithFocus(text, chatFocus);
+    if (chatFocus) {
+      consumeFocus();
+    }
+    await sendMessage(finalPrompt);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -302,6 +321,9 @@ export function ChatDrawer() {
     setInput("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
+    }
+    if (chatFocus) {
+      consumeFocus();
     }
     startNewChat();
   };
@@ -722,6 +744,31 @@ export function ChatDrawer() {
           {/* 入力フォーム */}
           <div className="shrink-0 border-border border-t bg-surface p-3">
             <div className="relative flex flex-col gap-2">
+              {chatFocus && (
+                <div className="fade-in flex animate-in items-center justify-between rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1.5 text-xs duration-150">
+                  <div className="flex min-w-0 items-center gap-1.5 text-foreground">
+                    <span className="shrink-0 text-primary">📎</span>
+                    <span className="shrink-0 font-semibold text-primary">
+                      参照中:
+                    </span>
+                    <span
+                      className="truncate font-medium"
+                      title={chatFocus.title}
+                    >
+                      {chatFocus.title}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={consumeFocus}
+                    className="ml-2 shrink-0 cursor-pointer rounded p-0.5 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                    title="参照コンテキストを解除"
+                    aria-label="参照コンテキストを解除"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
               <textarea
                 ref={textareaRef}
                 value={input}
