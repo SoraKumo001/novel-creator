@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button.js";
+import { PencilIcon, SparklesIcon } from "@/components/Icons.js";
 import { LLMModelSelector } from "@/components/LLMModelSelector.js";
+import { formatReadingMinutes } from "@/lib/format.js";
 import type { Section } from "@/lib/types.js";
-import { PencilIcon, SparklesIcon } from "./-Icons.js";
 
 interface EditorToolbarProps {
   canExtract: boolean;
@@ -107,7 +108,7 @@ export function EditorToolbar({
   };
 
   // 読了目安時間（約400文字/分）
-  const readingMinutes = Math.max(1, Math.ceil(wordCount / 400));
+  const readingMinutes = formatReadingMinutes(wordCount);
   // 進捗率
   const progressPercent = Math.min(
     100,

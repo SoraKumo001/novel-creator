@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { formatCharCount } from "@/lib/format.js";
 
 export interface ReasoningItem {
   state?: "streaming" | "done";
@@ -85,7 +86,7 @@ export function ReasoningActivity({
           </span>
           {!isStreaming && (
             <span className="text-[10px] text-muted-foreground">
-              ({reasoning.text.length.toLocaleString()}文字)
+              ({formatCharCount(reasoning.text.length)})
             </span>
           )}
         </div>

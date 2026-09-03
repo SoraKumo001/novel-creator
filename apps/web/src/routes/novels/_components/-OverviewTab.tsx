@@ -8,6 +8,7 @@ import {
   useModalState,
 } from "@/hooks/useModalResultState.js";
 import { useNovel } from "@/hooks/useNovel.js";
+import { REQUIRED_TITLE_MESSAGE } from "@/lib/constants.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import type {
   AnalysisHistoryEntry,
@@ -171,7 +172,7 @@ export function OverviewTab({
   async function handleSave() {
     setFormError(null);
     if (!title.trim()) {
-      setFormError("タイトルを入力してください");
+      setFormError(REQUIRED_TITLE_MESSAGE);
       return;
     }
     try {

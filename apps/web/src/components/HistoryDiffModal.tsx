@@ -7,7 +7,9 @@ import { Modal } from "@/components/Modal.js";
 import { useHistories } from "@/hooks/useHistories.js";
 import { useTheme } from "@/hooks/useTheme.js";
 import { useToast } from "@/hooks/useToast.js";
+import { EMPTY_HISTORY_MESSAGE, LOADING_MESSAGES } from "@/lib/constants.js";
 import { toErrorMessage } from "@/lib/errors.js";
+import { formatCharCount, formatDateTimeJa } from "@/lib/format.js";
 import type { HistoryItem } from "@/lib/services/index.js";
 
 // @monaco-editor/react は差分表示時にだけ読み込む（初期バンドルから除外する）
@@ -139,8 +141,7 @@ export function HistoryDiffModal({
               </span>
               {activeHistory && (
                 <span className="text-muted-foreground">
-                  （選択中:{" "}
-                  {new Date(activeHistory.createdAt).toLocaleString("ja-JP")}）
+                  （選択中: {formatDateTimeJa(activeHistory.createdAt)}）
                 </span>
               )}
             </div>
@@ -163,24 +164,21 @@ export function HistoryDiffModal({
             {/* 左カラム: 履歴タイムラインリスト (260px) */}
             <div className="w-64 shrink-0 space-y-1.5 overflow-y-auto rounded-lg border border-border bg-surface-raised/40 p-2 text-xs">
               {loading ? (
-                <Loading message="履歴を読み込み中..." />
+                <Loading message={LOADING_MESSAGES.history} />
               ) : histories.length === 0 ? (
                 <div className="p-4 text-center text-muted-foreground italic">
-                  まだ編集履歴がありません
+                  {EMPTY_HISTORY_MESSAGE}
                 </div>
               ) : (
                 histories.map((item, index) => {
                   const isSelected = activeHistory?.id === item.id;
-                  const dateStr = new Date(item.createdAt).toLocaleString(
-                    "ja-JP",
-                    {
-                      month: "numeric",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      second: "2-digit",
-                    }
-                  );
+                  const dateStr = formatDateTimeJa(item.createdAt, {
+                    month: "numeric",
+                    day: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                  });
 
                   return (
                     <button
@@ -206,7 +204,7 @@ export function HistoryDiffModal({
                       </div>
                       {item.wordCount !== undefined && (
                         <div className="mt-0.5 text-[10px] text-muted-foreground">
-                          {item.wordCount.toLocaleString()} 文字
+                          {formatCharCount(item.wordCount)}
                         </div>
                       )}
                     </button>
@@ -262,9 +260,7 @@ export function HistoryDiffModal({
         onConfirm={handleRestore}
         title="このバージョンに復元しますか？"
         message={`選択した過去バージョン（${
-          activeHistory
-            ? new Date(activeHistory.createdAt).toLocaleString("ja-JP")
-            : ""
+          activeHistory ? formatDateTimeJa(activeHistory.createdAt) : ""
         }）の内容で現在のデータを上書きします。未保存の変更は失われます。`}
         confirmLabel="復元する"
         cancelLabel="キャンセル"

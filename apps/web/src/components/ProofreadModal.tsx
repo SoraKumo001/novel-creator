@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { MarkdownText } from "@/components/MarkdownText.js";
+import { formatCharCount } from "@/lib/format.js";
 import type { ProofreadResult } from "@/lib/types.js";
 import { AIProgressIndicator } from "./AIProgressIndicator.js";
 import { Badge, type BadgeVariant } from "./Badge.js";
@@ -199,8 +200,7 @@ export function ProofreadModal({
           <div className="space-y-2">
             <div className="flex items-center justify-between text-muted-foreground text-xs">
               <span>
-                推敲後テキスト ({result.polishedBody.length.toLocaleString()}{" "}
-                文字)
+                推敲後テキスト ({formatCharCount(result.polishedBody.length)})
               </span>
             </div>
             <textarea

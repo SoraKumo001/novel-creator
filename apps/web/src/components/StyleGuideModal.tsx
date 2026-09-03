@@ -7,6 +7,7 @@ import {
 import { useEffect, useState, useTransition } from "react";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
+import { formatCharCount } from "@/lib/format.js";
 import { generateStyleGuideDraft } from "@/lib/services/novel.js";
 import { MonacoEditor } from "../routes/novels/_components/-MonacoEditor.js";
 import { Button } from "./Button.js";
@@ -143,8 +144,8 @@ export function StyleGuideModal({
         footer={
           <div className="flex w-full items-center justify-between">
             <div className="text-muted-foreground text-xs">
-              {styleGuide.length.toLocaleString()}{" "}
-              文字（Markdown形式で自由に定義可能）
+              {formatCharCount(styleGuide.length)}
+              （Markdown形式で自由に定義可能）
             </div>
             <div className="flex items-center gap-2">
               <Button variant="secondary" onClick={onClose} disabled={saving}>

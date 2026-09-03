@@ -1,4 +1,3 @@
-import type { Chapter, Section } from "@/lib/types.js";
 import {
   ArrowDownIcon,
   ArrowUpIcon,
@@ -9,7 +8,8 @@ import {
   PlusIcon,
   SparklesIcon,
   TrashIcon,
-} from "./-Icons.js";
+} from "@/components/Icons.js";
+import type { Chapter, Section } from "@/lib/types.js";
 
 export function ChapterTreeItem({
   chapter,

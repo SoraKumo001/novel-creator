@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
+import { formatDateTimeJa } from "@/lib/format.js";
 import { streamReindex } from "@/lib/services/vector.js";
 import type { BackupData, ReindexProgressEvent } from "@/lib/types.js";
 
@@ -53,17 +54,13 @@ export function formatBackupDate(value: string | null | undefined): string {
   if (!value) {
     return "未設定";
   }
-  try {
-    return new Date(value).toLocaleDateString("ja-JP", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return value;
-  }
+  return formatDateTimeJa(value, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 export function downloadBackupFile(data: BackupData, novelId: string) {

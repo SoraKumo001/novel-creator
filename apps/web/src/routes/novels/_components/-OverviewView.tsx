@@ -1,15 +1,19 @@
+import { ActionCardButton } from "@/components/ActionCardButton.js";
 import { Button } from "@/components/Button.js";
 import { Card, CardHeader } from "@/components/Card.js";
 import { CharacterHeatmapModal } from "@/components/CharacterHeatmapModal.js";
 import { CharacterVoiceCheckerModal } from "@/components/CharacterVoiceCheckerModal.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
+import { TrashIcon } from "@/components/Icons.js";
 import { Input } from "@/components/Input.js";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import { Modal } from "@/components/Modal.js";
 import { MultiPersonaReviewModal } from "@/components/MultiPersonaReviewModal.js";
+import { StatCard } from "@/components/StatCard.js";
 import { StoryArcChartModal } from "@/components/StoryArcChartModal.js";
 import { StyleGuideModal } from "@/components/StyleGuideModal.js";
 import { Textarea } from "@/components/Textarea.js";
+import { formatReadingMinutes } from "@/lib/format.js";
 import type {
   AnalysisHistoryEntry,
   AnalysisProgress,
@@ -19,7 +23,6 @@ import type {
   NovelDetail,
   StoryArcResult,
 } from "@/lib/types.js";
-import { TrashIcon } from "./-Icons.js";
 
 export interface OverviewModalBundle {
   arc: {
@@ -93,52 +96,48 @@ export function OverviewView(props: OverviewViewProps) {
   const { novel, modals } = props;
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <StatCard
           label="章数 / 節数"
           value={`${novel.chapters.length} 章 / ${props.totalSections} 節`}
         />
         <StatCard label="登場人物" value={`${novel.characters.length} 人`} />
         <StatCard label="世界観設定" value={`${novel.settings.length} 件`} />
-        <Card className="flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between font-semibold text-muted-foreground text-xs">
-              <span>目標文字数</span>
-              {props.isEditingTarget ? (
-                <input
-                  type="number"
-                  autoFocus
-                  defaultValue={props.targetWordCount}
-                  onBlur={(e) =>
-                    props.onSaveTargetWords(Number.parseInt(e.target.value, 10))
+        <StatCard
+          label="目標文字数"
+          value={`${props.targetWordCount.toLocaleString()} 字`}
+          action={
+            props.isEditingTarget ? (
+              <input
+                type="number"
+                autoFocus
+                defaultValue={props.targetWordCount}
+                onBlur={(e) =>
+                  props.onSaveTargetWords(Number.parseInt(e.target.value, 10))
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    props.onSaveTargetWords(
+                      Number.parseInt(e.currentTarget.value, 10)
+                    );
                   }
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      props.onSaveTargetWords(
-                        Number.parseInt(e.currentTarget.value, 10)
-                      );
-                    }
-                  }}
-                  className="w-20 rounded border border-primary bg-background px-1 py-0.5 text-foreground text-xs"
-                />
-              ) : (
-                <button
-                  type="button"
-                  onClick={props.onEditTarget}
-                  className="cursor-pointer text-[11px] text-primary hover:underline"
-                >
-                  変更
-                </button>
-              )}
-            </div>
-            <div className="mt-1 font-bold text-2xl text-foreground">
-              {props.targetWordCount.toLocaleString()} 字
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] text-muted-foreground">
-            読了目安: 約 {Math.ceil(props.targetWordCount / 400)} 分
-          </div>
-        </Card>
+                }}
+                className="w-20 rounded border border-primary bg-background px-1 py-0.5 text-foreground text-xs"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={props.onEditTarget}
+                className="cursor-pointer text-[11px] text-primary hover:underline"
+              >
+                変更
+              </button>
+            )
+          }
+          footer={
+            <>読了目安: 約 {formatReadingMinutes(props.targetWordCount)} 分</>
+          }
+        />
       </div>
 
       <Card>
@@ -182,27 +181,27 @@ export function OverviewView(props: OverviewViewProps) {
             </span>
           }
         />
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <AnalysisButton
-            emoji="📈"
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ActionCardButton
+            icon="📈"
             title="感情アーク & テンション"
             description="全章節の盛り上がり度・緊張感の起伏をグラフで可視化・診断"
             onClick={props.onRunStoryArc}
           />
-          <AnalysisButton
-            emoji="🎭"
+          <ActionCardButton
+            icon="🎭"
             title="キャラクター口調チェッカー"
             description="一人称・二人称・語尾のブレやキャラ崩壊を一括検出"
             onClick={props.onRunVoiceCheck}
           />
-          <AnalysisButton
-            emoji="👥"
+          <ActionCardButton
+            icon="👥"
             title="模擬読者・編集部レビュー"
             description="商業編集者や考察派ファン等4名のペルソナが作品を査読"
             onClick={props.onRunPersonaReview}
           />
-          <AnalysisButton
-            emoji="📊"
+          <ActionCardButton
+            icon="📊"
             title="人物出現頻度ヒートマップ"
             description="誰がどの章に出ているかをマトリックス表示し出番偏りを防止"
             onClick={modals.heatmap.open}
@@ -221,7 +220,7 @@ export function OverviewView(props: OverviewViewProps) {
         />
         {novel.styleGuide?.trim() ? (
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 font-semibold text-primary text-xs">
                 設定済み（{novel.styleGuide.length.toLocaleString()}文字）
               </span>
@@ -380,44 +379,5 @@ export function OverviewView(props: OverviewViewProps) {
         saving={props.updating}
       />
     </div>
-  );
-}
-
-function AnalysisButton({
-  emoji,
-  title,
-  description,
-  onClick,
-}: {
-  emoji: string;
-  title: string;
-  description: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="group flex cursor-pointer flex-col items-start rounded-xl border border-border bg-surface-raised p-3.5 text-left transition hover:border-primary hover:bg-primary/5"
-    >
-      <span className="mb-1 text-2xl">{emoji}</span>
-      <div className="font-bold text-foreground text-sm group-hover:text-primary">
-        {title}
-      </div>
-      <div className="mt-1 text-muted-foreground text-xs leading-relaxed">
-        {description}
-      </div>
-    </button>
-  );
-}
-
-function StatCard({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <Card>
-      <div className="text-slate-500 text-sm dark:text-slate-400">{label}</div>
-      <div className="mt-1 font-bold text-2xl text-slate-900 dark:text-slate-100">
-        {value}
-      </div>
-    </Card>
   );
 }

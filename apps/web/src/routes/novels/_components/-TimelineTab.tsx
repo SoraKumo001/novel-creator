@@ -3,19 +3,22 @@ import { Button } from "@/components/Button.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { EmptyState } from "@/components/EmptyState.js";
 import { FormModal } from "@/components/FormModal.js";
+import {
+  IconButton,
+  PencilIcon,
+  PlusIcon,
+  TrashIcon,
+} from "@/components/Icons.js";
 import { Input } from "@/components/Input.js";
 import { Loading } from "@/components/Loading.js";
 import { Select } from "@/components/Select.js";
-
 import { TabHeader } from "@/components/TabHeader.js";
 import { Textarea } from "@/components/Textarea.js";
 import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
-
 import { useNovel } from "@/hooks/useNovel.js";
 import { useTimelines } from "@/hooks/useTimelines.js";
 import type { Chapter, Section, Timeline } from "@/lib/types.js";
-import { IconButton, PencilIcon, PlusIcon, TrashIcon } from "./-Icons.js";
-import { TimelinesMarkdownEditor } from "./-TimelinesMarkdownEditor.js";
+import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
 
 export function TimelineTab({
   novel,
@@ -136,10 +139,11 @@ export function TimelineTab({
 
       {viewMode === "markdown" ? (
         <div className="min-h-0 flex-1">
-          <TimelinesMarkdownEditor
+          <PresetEntityMarkdownEditor
+            preset="timelines"
             novelId={novel.id}
-            fetchTimelinesMarkdown={fetchTimelinesMarkdown}
-            saveTimelinesMarkdown={saveTimelinesMarkdown}
+            fetchMarkdown={fetchTimelinesMarkdown}
+            saveMarkdown={saveTimelinesMarkdown}
             savingMarkdown={savingMarkdown}
           />
         </div>

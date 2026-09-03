@@ -379,7 +379,7 @@ describe("GenerateDomainService.inlineAssist", () => {
       await flushAsync();
     });
 
-    it("エラー以前に到着したチャンクは先に取りり出せてから reject すること（現行挙動）", async () => {
+    it("エラー以前に到着したチャンクは先に取り出せてから reject すること（現行挙動）", async () => {
       const gateA2 = createGate();
       const gateB1 = createGate();
       const failure = new Error("variant 1 でエラー");
@@ -398,7 +398,7 @@ describe("GenerateDomainService.inlineAssist", () => {
         variantCount: 2,
       });
 
-      // エラーは到着順の1項目として扱われるため、先に到着したチャンクは取りり出せる
+      // エラーは到着順の1項目として扱われるため、先に到着したチャンクは取り出せる
       expect(await iter.next()).toEqual({
         done: false,
         value: { text: "A1", variant: 0 },

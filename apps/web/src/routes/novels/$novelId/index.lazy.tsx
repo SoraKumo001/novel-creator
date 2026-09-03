@@ -11,7 +11,6 @@ import { Button } from "@/components/Button.js";
 import { ExportModal } from "@/components/ExportModal.js";
 import { KeyboardShortcutsModal } from "@/components/KeyboardShortcutsModal.js";
 import { Loading } from "@/components/Loading.js";
-import { MarkdownText } from "@/components/MarkdownText.js";
 import { useChatUI } from "@/context/ChatContext.js";
 import { useNovel } from "@/hooks/useNovel.js";
 import { useToast } from "@/hooks/useToast.js";
@@ -195,21 +194,15 @@ export function NovelDetailPage() {
       {novel && (
         <>
           <header className="mb-4 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
+            <div className="min-w-0 flex-1">
               <div className="mb-1 font-semibold text-primary text-xs uppercase tracking-wider">
                 小説ワークスペース
               </div>
-              <h1 className="font-bold text-2xl text-foreground tracking-tight sm:text-3xl">
+              <h1 className="break-words font-bold text-2xl text-foreground tracking-tight sm:text-3xl">
                 {novel.title}
               </h1>
-              {novel.description && (
-                <MarkdownText
-                  content={novel.description}
-                  className="mt-1 line-clamp-2 max-w-4xl text-muted-foreground text-sm [&_p]:my-0"
-                />
-              )}
             </div>
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex min-w-0 flex-wrap items-center gap-2 sm:shrink-0">
               <Button
                 variant="secondary"
                 onClick={() => setShortcutsOpen(true)}

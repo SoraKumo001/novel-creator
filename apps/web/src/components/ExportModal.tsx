@@ -5,6 +5,7 @@ import {
 } from "@novel-creator/shared";
 import { useMemo, useState } from "react";
 import { useToast } from "@/hooks/useToast.js";
+import { formatCharCount } from "@/lib/format.js";
 import { Button } from "./Button.js";
 import { Modal } from "./Modal.js";
 
@@ -143,7 +144,7 @@ export function ExportModal({ isOpen, onClose, novel }: ExportModalProps) {
 
         {/* プレビュー情報ヘッダー */}
         <div className="flex items-center justify-between text-muted-foreground text-xs">
-          <span>プレビュー ({characterCount.toLocaleString()} 文字)</span>
+          <span>プレビュー ({formatCharCount(characterCount)})</span>
           <span>章数: {novel.chapters.length}</span>
         </div>
 

@@ -9,7 +9,9 @@ import { Loading } from "@/components/Loading.js";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import { Textarea } from "@/components/Textarea.js";
 import { useNovels } from "@/hooks/useNovels.js";
+import { REQUIRED_TITLE_MESSAGE } from "@/lib/constants.js";
 import { toErrorMessage } from "@/lib/errors.js";
+import { formatDateJa } from "@/lib/format.js";
 
 export const Route = createLazyFileRoute("/novels/")({
   component: NovelsIndexPage,
@@ -24,20 +26,13 @@ export function NovelsIndexPage() {
   const [formError, setFormError] = useState<string | null>(null);
 
   function formatDate(value: string | null): string {
-    if (!value) {
-      return "未設定";
-    }
-    return new Date(value).toLocaleDateString("ja-JP", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+    return formatDateJa(value);
   }
 
   async function handleSubmit(): Promise<void> {
     setFormError(null);
     if (!title.trim()) {
-      setFormError("タイトルを入力してください");
+      setFormError(REQUIRED_TITLE_MESSAGE);
       return;
     }
     try {

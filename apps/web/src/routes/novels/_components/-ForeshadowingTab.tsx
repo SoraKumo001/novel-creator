@@ -7,7 +7,7 @@ import { useForeshadowings } from "@/hooks/useForeshadowings.js";
 import { useNovel } from "@/hooks/useNovel.js";
 import type { Foreshadowing, ForeshadowingStatus } from "@/lib/types.js";
 import { EntityListTab } from "./-EntityListTab.js";
-import { ForeshadowingsMarkdownEditor } from "./-ForeshadowingsMarkdownEditor.js";
+import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
 
 interface ForeshadowingTabProps {
   novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;
@@ -169,10 +169,11 @@ export function ForeshadowingTab({ novel, onRefresh }: ForeshadowingTabProps) {
           );
         },
         renderMarkdownEditor: (novelId) => (
-          <ForeshadowingsMarkdownEditor
+          <PresetEntityMarkdownEditor
+            preset="foreshadowings"
             novelId={novelId}
-            fetchForeshadowingsMarkdown={fetchForeshadowingsMarkdown}
-            saveForeshadowingsMarkdown={saveForeshadowingsMarkdown}
+            fetchMarkdown={fetchForeshadowingsMarkdown}
+            saveMarkdown={saveForeshadowingsMarkdown}
             savingMarkdown={savingMarkdown}
           />
         ),

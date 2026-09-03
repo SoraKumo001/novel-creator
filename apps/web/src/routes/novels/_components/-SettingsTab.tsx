@@ -4,7 +4,7 @@ import { useNovel } from "@/hooks/useNovel.js";
 import { useSettings } from "@/hooks/useSettings.js";
 import type { Setting } from "@/lib/types.js";
 import { EntityListTab } from "./-EntityListTab.js";
-import { SettingsMarkdownEditor } from "./-SettingsMarkdownEditor.js";
+import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
 
 export function SettingsTab({
   novel,
@@ -60,10 +60,11 @@ export function SettingsTab({
           />
         ),
         renderMarkdownEditor: (novelId) => (
-          <SettingsMarkdownEditor
+          <PresetEntityMarkdownEditor
+            preset="settings"
             novelId={novelId}
-            fetchSettingsMarkdown={fetchSettingsMarkdown}
-            saveSettingsMarkdown={saveSettingsMarkdown}
+            fetchMarkdown={fetchSettingsMarkdown}
+            saveMarkdown={saveSettingsMarkdown}
             savingMarkdown={savingMarkdown}
           />
         ),

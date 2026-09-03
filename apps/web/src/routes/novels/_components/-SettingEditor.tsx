@@ -7,6 +7,7 @@ import { useModalState } from "@/hooks/useModalResultState.js";
 import { useSettings } from "@/hooks/useSettings.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
+import { formatCharCount } from "@/lib/format.js";
 import { EntityEditorShell } from "./-EntityEditorShell.js";
 import { MonacoEditor } from "./-MonacoEditor.js";
 
@@ -267,7 +268,7 @@ export function SettingEditor({ novelId, settingId }: SettingEditorProps) {
             説明（Markdown 対応）
           </label>
           <span className="text-[11px] text-muted-foreground">
-            {description.length.toLocaleString()} 文字
+            {formatCharCount(description.length)}
           </span>
         </div>
         <div className="min-h-[300px] flex-1 overflow-hidden rounded-xl border border-border bg-surface shadow-inner">

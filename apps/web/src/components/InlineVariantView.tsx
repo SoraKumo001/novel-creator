@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { MarkdownText } from "@/components/MarkdownText.js";
+import { formatCharCount } from "@/lib/format.js";
 import { formatElapsed } from "./AIProgressIndicator.js";
 import { Button } from "./Button.js";
 
@@ -126,7 +127,7 @@ export function InlineVariantView({
                   案 {idx + 1} {activeVariantIndex === idx && "（選択中）"}
                 </span>
                 <span className="font-mono text-[10px] text-muted-foreground">
-                  {vText.length} 文字
+                  {formatCharCount(vText.length)}
                 </span>
               </div>
               <div className="max-h-40 overflow-y-auto text-foreground">
@@ -160,7 +161,7 @@ export function InlineVariantView({
                 : `🎉 案 ${activeVariantIndex + 1} の生成結果`}
             </span>
             <span className="font-mono text-muted-foreground">
-              {currentVariantText.length.toLocaleString()} 文字
+              {formatCharCount(currentVariantText.length)}
             </span>
           </div>
           {currentVariantText ? (

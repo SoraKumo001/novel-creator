@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useElapsedSeconds } from "@/hooks/useElapsedSeconds.js";
+import { formatCharCount } from "@/lib/format.js";
 import type { InlineAssistAction } from "@/lib/types.js";
 import { InlineAssistActions } from "./InlineAssistActions.js";
 import { InlineVariantView } from "./InlineVariantView.js";
@@ -59,7 +60,7 @@ export function InlineAIAssistant({
             ✨ インライン AI 推敲・加筆
           </span>
           <span className="rounded border border-border bg-surface px-2 py-0.5 text-[11px] text-muted-foreground">
-            選択中: {selectedText.length.toLocaleString()} 文字
+            選択中: {formatCharCount(selectedText.length)}
           </span>
         </div>
 

@@ -1,5 +1,6 @@
 import type { DynamicToolUIPart, ToolUIPart, UITools } from "ai";
 import { getToolName } from "ai";
+import { formatCharCount } from "@/lib/format.js";
 
 /** ツールの日本語表示名マップ */
 export const TOOL_LABELS: Record<string, string> = {
@@ -222,7 +223,7 @@ export function toPreviewJson(value: unknown): string {
     json = String(value);
   }
   if (json.length > PREVIEW_LIMIT) {
-    return `${json.slice(0, PREVIEW_LIMIT)}\n… (残り ${(json.length - PREVIEW_LIMIT).toLocaleString()} 文字)`;
+    return `${json.slice(0, PREVIEW_LIMIT)}\n… (残り ${formatCharCount(json.length - PREVIEW_LIMIT)})`;
   }
   return json;
 }

@@ -6,11 +6,11 @@ import {
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
+import { PlusIcon } from "@/components/Icons.js";
 import { Select } from "@/components/Select.js";
 import { TabHeader } from "@/components/TabHeader.js";
 import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
 import { EntityCardGrid, SidebarTreeNode } from "./-EntityListParts.js";
-import { PlusIcon } from "./-Icons.js";
 import {
   scrollToElementById,
   useOverlapHover,

@@ -9,6 +9,7 @@ import { useLlmInstructions } from "@/hooks/useLlmInstructions.js";
 import { useModalState } from "@/hooks/useModalResultState.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
+import { formatCharCount } from "@/lib/format.js";
 import type { ForeshadowingStatus } from "@/lib/types.js";
 import { EntityEditorShell } from "./-EntityEditorShell.js";
 import { MonacoEditor } from "./-MonacoEditor.js";
@@ -338,7 +339,7 @@ export function ForeshadowingEditor({
             詳細メモ（Markdown 対応）
           </label>
           <span className="text-[11px] text-muted-foreground">
-            {description.length.toLocaleString()} 文字
+            {formatCharCount(description.length)}
           </span>
         </div>
         <div className="min-h-[260px] flex-1 overflow-hidden rounded-xl border border-border bg-surface shadow-inner">

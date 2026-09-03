@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatElapsed } from "@/components/AIProgressIndicator.js";
+import { formatCharCount } from "@/lib/format.js";
 
 interface GenerateContentPanelProps {
   generatedChars?: number;
@@ -44,7 +45,7 @@ export function GenerateContentPanel({
             </span>
             {generatedChars > 0 && (
               <span className="rounded bg-primary/10 px-1.5 py-0.5 font-semibold text-[11px] text-primary">
-                +{generatedChars.toLocaleString()} 文字
+                +{formatCharCount(generatedChars)}
               </span>
             )}
           </div>

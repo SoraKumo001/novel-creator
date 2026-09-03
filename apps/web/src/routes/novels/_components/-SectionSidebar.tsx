@@ -1,10 +1,10 @@
-import type { ChapterWithSections } from "@/lib/types.js";
 import {
   ChevronDownIcon,
   ChevronUpIcon,
   GripVerticalIcon,
   PlusIcon,
-} from "./-Icons.js";
+} from "@/components/Icons.js";
+import type { ChapterWithSections } from "@/lib/types.js";
 
 interface SectionSidebarProps {
   chapters: ChapterWithSections[];

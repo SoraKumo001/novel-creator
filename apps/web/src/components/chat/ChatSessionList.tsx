@@ -1,5 +1,10 @@
 import { useState } from "react";
 import { Button } from "@/components/Button.js";
+import {
+  EMPTY_CHAT_SESSION_MESSAGE,
+  EMPTY_SEARCH_SESSION_MESSAGE,
+} from "@/lib/constants.js";
+import { formatDateTimeJa } from "@/lib/format.js";
 import type { ChatSession } from "@/lib/types.js";
 
 interface ChatSessionListProps {
@@ -114,8 +119,8 @@ export function ChatSessionList({
       {filteredSessions.length === 0 ? (
         <div className="py-12 text-center text-muted-foreground text-xs">
           {searchQuery
-            ? "検索条件に一致する相談履歴はありません。"
-            : "まだ相談履歴はありません。"}
+            ? EMPTY_SEARCH_SESSION_MESSAGE
+            : EMPTY_CHAT_SESSION_MESSAGE}
         </div>
       ) : (
         <div className="space-y-2">
@@ -125,7 +130,7 @@ export function ChatSessionList({
             const isDeleting = sess.id === deletingSessionId;
             const isPinned = pinnedIds.has(sess.id);
             const dateStr = sess.updatedAt
-              ? new Date(sess.updatedAt).toLocaleString("ja-JP", {
+              ? formatDateTimeJa(sess.updatedAt, {
                   month: "numeric",
                   day: "numeric",
                   hour: "2-digit",
@@ -171,7 +176,7 @@ export function ChatSessionList({
                       onClick={() => setEditingSessionId(null)}
                       className="rounded bg-surface-raised px-2 py-1 text-[11px] text-foreground hover:bg-surface-hover"
                     >
-                      取消
+                      キャンセル
                     </button>
                   </div>
                 ) : (

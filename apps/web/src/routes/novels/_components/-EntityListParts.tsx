@@ -1,8 +1,8 @@
 import type { CategoryTreeNode } from "@novel-creator/shared";
 import { Card, CardHeader } from "@/components/Card.js";
 import { EmptyState } from "@/components/EmptyState.js";
+import { IconButton, PencilIcon, TrashIcon } from "@/components/Icons.js";
 import { Loading } from "@/components/Loading.js";
-import { IconButton, PencilIcon, TrashIcon } from "./-Icons.js";
 
 export interface EntityCardItem {
   id: string;

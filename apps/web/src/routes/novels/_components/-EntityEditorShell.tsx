@@ -190,7 +190,7 @@ export function EntityEditorShell({
         {/* 左カラム: 基本情報 + Monaco エディタ (7/12) */}
         <div className="flex min-h-0 flex-col space-y-4 lg:col-span-7 xl:col-span-8">
           <Card className="flex min-h-0 flex-1 flex-col overflow-hidden">
-            <CardHeader title="基本情報" />
+            <CardHeader title="編集内容" />
             <div className="flex min-h-0 flex-1 flex-col space-y-4 p-1">
               {children}
             </div>

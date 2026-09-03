@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/Button.js";
+import { PlusIcon, SparklesIcon } from "@/components/Icons.js";
 import { LLMModelSelector } from "@/components/LLMModelSelector.js";
 import { TabHeader } from "@/components/TabHeader.js";
 import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
@@ -9,10 +10,9 @@ import { useNovel } from "@/hooks/useNovel.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import type { Chapter, Section } from "@/lib/types.js";
-import { PlusIcon, SparklesIcon } from "./-Icons.js";
-import { PlotMarkdownEditor } from "./-PlotMarkdownEditor.js";
 import { swapChapterOrder, swapSectionOrder } from "./-PlotMoveUtils.js";
 import { PlotStructureView } from "./-PlotStructureView.js";
+import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
 
 export function PlotTab({
   novel,
@@ -315,10 +315,11 @@ export function PlotTab({
 
       {viewMode === "markdown" ? (
         <div className="min-h-0 flex-1">
-          <PlotMarkdownEditor
+          <PresetEntityMarkdownEditor
+            preset="plot"
             novelId={novel.id}
-            fetchPlotMarkdown={fetchPlotMarkdown}
-            savePlotMarkdown={savePlotMarkdown}
+            fetchMarkdown={fetchPlotMarkdown}
+            saveMarkdown={savePlotMarkdown}
             savingMarkdown={savingMarkdown}
           />
         </div>

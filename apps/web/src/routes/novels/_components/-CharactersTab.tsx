@@ -4,8 +4,8 @@ import { Tag } from "@/components/Tag.js";
 import { useCharacters } from "@/hooks/useCharacters.js";
 import { useNovel } from "@/hooks/useNovel.js";
 import type { Character } from "@/lib/types.js";
-import { CharactersMarkdownEditor } from "./-CharactersMarkdownEditor.js";
 import { EntityListTab } from "./-EntityListTab.js";
+import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
 
 export function CharactersTab({
   novel,
@@ -69,10 +69,11 @@ export function CharactersTab({
             </span>
           ),
         renderMarkdownEditor: (novelId) => (
-          <CharactersMarkdownEditor
+          <PresetEntityMarkdownEditor
+            preset="characters"
             novelId={novelId}
-            fetchCharactersMarkdown={fetchCharactersMarkdown}
-            saveCharactersMarkdown={saveCharactersMarkdown}
+            fetchMarkdown={fetchCharactersMarkdown}
+            saveMarkdown={saveCharactersMarkdown}
             savingMarkdown={savingMarkdown}
           />
         ),
