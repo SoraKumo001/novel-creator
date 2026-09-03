@@ -12,6 +12,7 @@ import {
   serializeCharactersToMarkdown,
 } from "@novel-creator/shared";
 import { eq, inArray } from "drizzle-orm";
+import { appLogger } from "../middleware/logger.js";
 import { searchContext, upsertEntityEmbedding } from "../rag.js";
 import { insertEditHistory } from "./history.service.js";
 import { assertFound, type ServiceContext, ValidationError } from "./types.js";
@@ -125,7 +126,7 @@ export class CharacterDomainService {
         title: row.name,
       });
     } catch (e) {
-      console.error("[history] failed to record character history", e);
+      appLogger.warn("failed to record character history", e);
     }
 
     await upsertEntityEmbedding(
@@ -150,7 +151,7 @@ export class CharacterDomainService {
     try {
       await this.ctx.vectorStore.deleteByEntity("character", id);
     } catch (err) {
-      console.error("[vector] failed to delete character embedding", err);
+      appLogger.warn("failed to delete character embedding", err);
     }
     return row;
   }
@@ -298,10 +299,7 @@ export class CharacterDomainService {
         wordCount: markdown.length,
       });
     } catch (e) {
-      console.error(
-        "[history] failed to record characters_markdown history",
-        e
-      );
+      appLogger.warn("failed to record characters_markdown history", e);
     }
 
     return {

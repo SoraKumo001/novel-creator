@@ -17,6 +17,7 @@ import {
 } from "@novel-creator/shared";
 import type { ForeshadowingStatus } from "@novel-creator/shared/schemas";
 import { eq, inArray } from "drizzle-orm";
+import { appLogger } from "../middleware/logger.js";
 import { searchContext, upsertEntityEmbedding } from "../rag.js";
 import { insertEditHistory } from "./history.service.js";
 import { assertFound, type ServiceContext, ValidationError } from "./types.js";
@@ -142,7 +143,7 @@ export class ForeshadowingDomainService {
         title: updated.title,
       });
     } catch (e) {
-      console.error("[history] failed to record foreshadowing history", e);
+      appLogger.warn("failed to record foreshadowing history", e);
     }
 
     await upsertEntityEmbedding(
@@ -173,7 +174,7 @@ export class ForeshadowingDomainService {
     try {
       await this.ctx.vectorStore.deleteByEntity("foreshadowing", id);
     } catch (err) {
-      console.error("[vector] failed to delete foreshadowing embedding", err);
+      appLogger.warn("failed to delete foreshadowing embedding", err);
     }
 
     return deleted;
@@ -284,7 +285,7 @@ export class ForeshadowingDomainService {
       try {
         await this.ctx.vectorStore.deleteByEntity("foreshadowing", id);
       } catch (err) {
-        console.error("[vector] failed to delete foreshadowing embedding", err);
+        appLogger.warn("failed to delete foreshadowing embedding", err);
       }
     }
 
@@ -300,10 +301,7 @@ export class ForeshadowingDomainService {
           title: "伏線マークダウン一括編集",
         });
       } catch (e) {
-        console.error(
-          "[history] failed to record foreshadowing doc history",
-          e
-        );
+        appLogger.warn("failed to record foreshadowing doc history", e);
       }
     }
 
@@ -339,10 +337,7 @@ export class ForeshadowingDomainService {
         title: "伏線マークダウンAI編集",
       });
     } catch (e) {
-      console.error(
-        "[history] failed to record foreshadowing doc AI history",
-        e
-      );
+      appLogger.warn("failed to record foreshadowing doc AI history", e);
     }
 
     return { markdown: generated };

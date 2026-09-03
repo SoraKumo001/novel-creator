@@ -3,6 +3,7 @@ import { characters, novels, settings } from "@novel-creator/db";
 import { generateEmbedding, generateEmbeddings } from "@novel-creator/llm";
 import type { VectorRecord } from "@novel-creator/vector";
 import { eq } from "drizzle-orm";
+import { appLogger } from "../middleware/logger.js";
 import { chunkText } from "./chunking.js";
 import { EmbeddingConfigDomainService } from "./embedding-config.service.js";
 import { fetchNovelStructureWithContents } from "./novel-structure.js";
@@ -226,8 +227,8 @@ export class ReindexDomainService {
           novelId: item.novelId,
         }));
       } catch (batchErr) {
-        console.warn(
-          "[reindex] Batch embedding failed, falling back to individual calls:",
+        appLogger.warn(
+          "Batch embedding failed, falling back to individual calls:",
           batchErr
         );
         // 一括取得が失敗した場合はフォールバックとして個別実行
@@ -246,7 +247,7 @@ export class ReindexDomainService {
               novelId: item.novelId,
             });
           } catch (e) {
-            console.error(`[reindex] Failed to embed ${item.title}:`, e);
+            appLogger.warn(`Failed to embed ${item.title}:`, e);
           }
         }
       }

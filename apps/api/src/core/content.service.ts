@@ -1,5 +1,6 @@
 import { chapters, contents, sections } from "@novel-creator/db";
 import { eq } from "drizzle-orm";
+import { appLogger } from "../middleware/logger.js";
 import { upsertEntityEmbedding } from "../rag.js";
 import { insertEditHistory } from "./history.service.js";
 import { assertFound, type ServiceContext } from "./types.js";
@@ -70,7 +71,7 @@ export class ContentDomainService {
         }
       }
     } catch (e) {
-      console.error("[history] failed to record content history", e);
+      appLogger.warn("failed to record content history", e);
     }
 
     // 本文のベクトルを更新（失敗しても本文保存は成功させる）
@@ -86,7 +87,7 @@ export class ContentDomainService {
           this.ctx.env
         );
       } catch (e) {
-        console.error("[vector] failed to upsert content embedding", e);
+        appLogger.warn("failed to upsert content embedding", e);
       }
     }
 

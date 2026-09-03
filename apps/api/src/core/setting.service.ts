@@ -13,6 +13,7 @@ import {
   serializeSettingsToMarkdown,
 } from "@novel-creator/shared";
 import { and, eq, inArray } from "drizzle-orm";
+import { appLogger } from "../middleware/logger.js";
 import { searchContext, upsertEntityEmbedding } from "../rag.js";
 import { insertEditHistory } from "./history.service.js";
 import { assertFound, type ServiceContext, ValidationError } from "./types.js";
@@ -121,7 +122,7 @@ export class SettingDomainService {
         title: row.name,
       });
     } catch (e) {
-      console.error("[history] failed to record setting history", e);
+      appLogger.warn("failed to record setting history", e);
     }
 
     await upsertEntityEmbedding(
@@ -146,7 +147,7 @@ export class SettingDomainService {
     try {
       await this.ctx.vectorStore.deleteByEntity("setting", id);
     } catch (err) {
-      console.error("[vector] failed to delete setting embedding", err);
+      appLogger.warn("failed to delete setting embedding", err);
     }
     return row;
   }
@@ -297,7 +298,7 @@ export class SettingDomainService {
         wordCount: markdown.length,
       });
     } catch (e) {
-      console.error("[history] failed to record settings_markdown history", e);
+      appLogger.warn("failed to record settings_markdown history", e);
     }
 
     return {

@@ -22,6 +22,7 @@ import {
 } from "@novel-creator/db";
 import { eq, inArray, type Table } from "drizzle-orm";
 import { getTableColumns } from "drizzle-orm/utils";
+import { appLogger } from "../middleware/logger.js";
 import { assertFound, type ServiceContext, ValidationError } from "./types.js";
 
 /**
@@ -271,7 +272,7 @@ export class BackupDomainService {
     try {
       await this.ctx.vectorStore.deleteByNovel(novelId);
     } catch (err) {
-      console.error("[backup] failed to clean up orphaned vectors", err);
+      appLogger.warn("failed to clean up orphaned vectors", err);
     }
 
     return {

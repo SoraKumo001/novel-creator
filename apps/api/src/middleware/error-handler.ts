@@ -4,7 +4,8 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { ZodError } from "zod";
 
 import type { AppContext } from "../context.js";
-import { NotFoundError, ValidationError } from "../core/types.js";
+import { AppError, NotFoundError, ValidationError } from "../core/types.js";
+import { appLogger } from "./logger.js";
 
 /**
  * エラーレスポンスの共通形式。
@@ -113,6 +114,14 @@ function classifyValidationError(err: ZodError): ClassifiedError {
  * エラーを分類して適切な HTTP ステータスコードとメッセージを返す。
  */
 export function classifyError(err: unknown): ClassifiedError {
+  if (err instanceof AppError) {
+    return {
+      code: err.code,
+      details: err.details,
+      message: err.message,
+      status: err.status as ContentfulStatusCode,
+    };
+  }
   if (err instanceof NotFoundError) {
     return {
       code: "NOT_FOUND",
@@ -198,7 +207,7 @@ export function formatErrorMessage(err: unknown): string {
  * 未処理の例外をエラータイプに応じて分類し、JSON エラーレスポンスに変換する。
  */
 export function errorHandler(err: Error, c: Context<AppContext>): Response {
-  console.error("[error]", err);
+  appLogger.error("[error]", err);
   const classified = classifyError(err);
   const body: ErrorResponseBody = {
     error: {
