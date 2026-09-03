@@ -140,16 +140,18 @@ export async function persistChatUserMessage(
     .map((p) => (p as { text?: string }).text ?? "")
     .join("");
 
-  await ctx.db.insert(chatMessages).values({
-    content: userText,
-    parts: lastUserMessage.parts,
-    role: "user",
-    sessionId,
-  });
-  await ctx.db
-    .update(chatSessions)
-    .set({ updatedAt: new Date() })
-    .where(eq(chatSessions.id, sessionId));
+  await Promise.all([
+    ctx.db.insert(chatMessages).values({
+      content: userText,
+      parts: lastUserMessage.parts,
+      role: "user",
+      sessionId,
+    }),
+    ctx.db
+      .update(chatSessions)
+      .set({ updatedAt: new Date() })
+      .where(eq(chatSessions.id, sessionId)),
+  ]);
 
   return { userText };
 }

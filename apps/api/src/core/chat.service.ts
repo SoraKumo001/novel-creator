@@ -80,17 +80,11 @@ export class ChatDomainService {
     const { userText } = await this.persistUserMessage(sessionId, messages);
 
     const effectiveNovelId = novelId ?? session.novelId;
-    const prompt = await this.buildChatContext(
-      sessionId,
-      effectiveNovelId,
-      userText
-    );
-
-    const resolvedModel = await resolveLLMModelWithInfo(
-      this.ctx,
-      modelConfigId,
-      "throw"
-    );
+    const [prompt, resolvedModel]: [string, ResolvedLLMModel] =
+      await Promise.all([
+        this.buildChatContext(sessionId, effectiveNovelId, userText),
+        resolveLLMModelWithInfo(this.ctx, modelConfigId, "throw"),
+      ]);
 
     const providerOptions = buildReasoningProviderOptions(
       resolvedModel.provider,

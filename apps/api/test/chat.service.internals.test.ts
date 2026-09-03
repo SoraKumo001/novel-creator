@@ -3,6 +3,7 @@ import { creativeChatSystemPrompt, streamTextResult } from "@novel-creator/llm";
 import type { LanguageModel, ToolSet } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatDomainService } from "../src/core/chat.service.js";
+import { resolveLLMModelWithInfo } from "../src/core/model-resolver.js";
 import { createProposeTools } from "../src/core/tools/proposeTools.js";
 import { createReadTools } from "../src/core/tools/readTools.js";
 import {
@@ -25,6 +26,11 @@ vi.mock("../src/core/tools/proposeTools.js", () => ({
   createProposeTools: vi.fn(),
 }));
 
+// モデル解決をモック（streamCreativeChat の並列実行タイミング検証用）
+vi.mock("../src/core/model-resolver.js", () => ({
+  resolveLLMModelWithInfo: vi.fn(),
+}));
+
 // システムプロンプトとストリーム生成をモック（プロンプト構築の検証を単純化する）
 vi.mock("@novel-creator/llm", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@novel-creator/llm")>();
@@ -36,6 +42,7 @@ vi.mock("@novel-creator/llm", async (importOriginal) => {
 });
 
 const mockSearchContext = vi.mocked(searchContext);
+const mockResolveLLMModelWithInfo = vi.mocked(resolveLLMModelWithInfo);
 const mockStreamTextResult = vi.mocked(streamTextResult);
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
@@ -458,6 +465,125 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
 
       const sessionUpdate = updateCalls.find((c) => c.table === chatSessions);
       expect(sessionUpdate).toBeDefined();
+    });
+  });
+
+  describe("parallel fan-out", () => {
+    it("3ブランチ (履歴・小説・RAG) と buildChatContext/resolveLLMModel が合計ではなく最大時間で完了すること", async () => {
+      const sleep = (ms: number): Promise<void> =>
+        new Promise((resolve) => setTimeout(resolve, ms));
+      const BRANCH_DELAY_MS = 80;
+
+      // chat-context の 3 ブランチをそれぞれ遅延させる
+      mockSearchContext.mockImplementation(async () => {
+        await sleep(BRANCH_DELAY_MS);
+        return { characters: ["人物Aの説明"], settings: ["設定Aの説明"] };
+      });
+      const delayedDb = {
+        select: vi.fn().mockImplementation(() => ({
+          from: vi.fn().mockImplementation((table: unknown) => {
+            if (table === chatMessages) {
+              return {
+                where: vi.fn().mockReturnValue({
+                  orderBy: vi.fn().mockImplementation(async () => {
+                    await sleep(BRANCH_DELAY_MS);
+                    return [
+                      {
+                        content: "前回の質問",
+                        id: "m1",
+                        parts: null,
+                        role: "user",
+                        sessionId: SESSION_ID,
+                      },
+                    ];
+                  }),
+                }),
+              };
+            }
+            if (table === novels) {
+              return {
+                where: vi.fn().mockImplementation(async () => {
+                  await sleep(BRANCH_DELAY_MS);
+                  return [
+                    {
+                      description: "説明",
+                      styleGuide: null,
+                      title: "テスト小説",
+                    },
+                  ];
+                }),
+              };
+            }
+            return { where: vi.fn().mockResolvedValue([]) };
+          }),
+        })),
+      };
+      const contextService = createService(delayedDb);
+
+      const contextStart = Date.now();
+      const prompt = await internalsOf(contextService).buildChatContext(
+        SESSION_ID,
+        NOVEL_ID,
+        "今回の質問"
+      );
+      const contextElapsed = Date.now() - contextStart;
+
+      // 逐次実行なら 240ms (= 80ms x 3) 以上かかるため、200ms 未満なら並列実行の証拠になる
+      expect(contextElapsed).toBeLessThan(200);
+      expect(prompt).toContain("MOCK_SYSTEM_PROMPT");
+      expect(prompt).toContain("ユーザー: 前回の質問");
+      expect(vi.mocked(creativeChatSystemPrompt)).toHaveBeenCalledWith({
+        characters: ["人物Aの説明"],
+        novel: { description: "説明", styleGuide: null, title: "テスト小説" },
+        settings: ["設定Aの説明"],
+      });
+
+      // サービス層: buildChatContext と resolveLLMModelWithInfo の並列実行
+      const SERVICE_DELAY_MS = 100;
+      const { db } = createMockDb({
+        session: { id: SESSION_ID, novelId: NOVEL_ID, title: "相談" },
+      });
+      const service = createService(db);
+      const serviceInternals = internalsOf(service);
+      mockResolveLLMModelWithInfo.mockImplementation(async () => {
+        await sleep(SERVICE_DELAY_MS);
+        return {
+          model: {} as LanguageModel,
+          modelId: "test-model",
+          provider: "ollama",
+        };
+      });
+      const buildSpy = vi
+        .spyOn(serviceInternals, "buildChatContext")
+        .mockImplementation(async () => {
+          await sleep(SERVICE_DELAY_MS);
+          return "PARALLEL_PROMPT";
+        });
+      const streamSpy = vi
+        .spyOn(serviceInternals, "streamAssistantResponse")
+        .mockResolvedValue(new Response("ok"));
+
+      const serviceStart = Date.now();
+      const res = await service.streamCreativeChat({
+        messages: [
+          {
+            parts: [{ text: "こんにちは", type: "text" }],
+            role: "user" as const,
+          },
+        ],
+        modelConfigId: null,
+        novelId: NOVEL_ID,
+        sessionId: SESSION_ID,
+      });
+      const serviceElapsed = Date.now() - serviceStart;
+
+      // 逐次実行なら 200ms (= 100ms x 2) 以上かかるため、160ms 未満なら並列実行の証拠になる
+      expect(res.status).toBe(200);
+      expect(serviceElapsed).toBeLessThan(160);
+      expect(buildSpy).toHaveBeenCalledTimes(1);
+      expect(mockResolveLLMModelWithInfo).toHaveBeenCalledTimes(1);
+      expect(streamSpy).toHaveBeenCalledTimes(1);
+      expect(streamSpy.mock.calls[0]?.[2]).toBe("PARALLEL_PROMPT");
     });
   });
 });
