@@ -24,21 +24,6 @@ export interface SearchContextResult {
 }
 
 /**
- * プロバイダ別の embedding オプションを構築する。
- * Google の場合は outputDimensionality を指定して次元数を制御する。
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildEmbeddingProviderOptions(
-  env: Env
-): Record<string, any> | undefined {
-  const provider = env.EMBEDDING_PROVIDER ?? env.LLM_PROVIDER;
-  if (provider === "google") {
-    return { google: { outputDimensionality: env.EMBEDDING_DIMENSIONS } };
-  }
-  return undefined;
-}
-
-/**
  * VectorStore を検索して、関連する人物・設定・本文・伏線のテキスト配列を返す。
  * 生成エンドポイントのコンテキスト構築に使用する。
  * エンティティタイプごとに件数上限（topK 等）を適用してトークン予算を抑える。
@@ -54,9 +39,8 @@ export async function searchContext(
   const contentTopK = options.contentTopK ?? 3;
   const foreshadowingTopK = options.foreshadowingTopK ?? topK;
   const minScore = options.minScore;
-  const providerOptions = buildEmbeddingProviderOptions(env);
   const queryVector = await generateEmbedding(embedding, options.query, {
-    providerOptions,
+    dimensions: env.EMBEDDING_DIMENSIONS,
   });
 
   const [
@@ -113,9 +97,8 @@ export async function upsertEntityEmbedding(
   content: string,
   env: Env
 ): Promise<void> {
-  const providerOptions = buildEmbeddingProviderOptions(env);
   const vector = await generateEmbedding(embedding, content, {
-    providerOptions,
+    dimensions: env.EMBEDDING_DIMENSIONS,
   });
   await vectorStore.deleteByEntity(entityType, entityId);
   await vectorStore.upsert({

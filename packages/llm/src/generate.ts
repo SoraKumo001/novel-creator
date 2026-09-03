@@ -36,6 +36,9 @@ const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
 /** LLM 呼び出しの既定タイムアウト（ms）。 */
 export const DEFAULT_LLM_TIMEOUT_MS = 120_000;
 
+/** 埋め込み（embed / embedMany）呼び出しの既定タイムアウト（ms）。LLM 呼び出しと同じ既定値を再利用する。 */
+export const DEFAULT_EMBEDDING_TIMEOUT_MS = DEFAULT_LLM_TIMEOUT_MS;
+
 /** LLM 呼び出しの既定最大出力トークン数。 */
 export const DEFAULT_LLM_MAX_OUTPUT_TOKENS = 8192;
 
@@ -80,6 +83,12 @@ function readRegexEnv(name: string, fallback: RegExp): RegExp {
 const LLM_TIMEOUT_MS = readPositiveIntEnv(
   "LLM_TIMEOUT_MS",
   DEFAULT_LLM_TIMEOUT_MS
+);
+
+/** 埋め込みタイムアウト（ms）。環境変数 `EMBEDDING_TIMEOUT_MS` で上書き可能。既定 120 秒。 */
+const EMBEDDING_TIMEOUT_MS = readPositiveIntEnv(
+  "EMBEDDING_TIMEOUT_MS",
+  DEFAULT_EMBEDDING_TIMEOUT_MS
 );
 
 /** LLM 最大出力トークン数。環境変数 `LLM_MAX_OUTPUT_TOKENS` で上書き可能。既定 8192。 */
@@ -501,27 +510,88 @@ export async function generateJSON<T>(
 }
 
 /**
+ * プロバイダ別の埋め込みオプションを構築する。
+ * - Google: { google: { outputDimensionality: dimensions } }
+ * - OpenAI / Custom OpenAI: { openai: { dimensions } }
+ */
+export function buildEmbeddingProviderOptions(
+  providerOrModel?: LLMProviderType | string | EmbeddingModel | null,
+  dimensions?: number | null
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Record<string, any> | undefined {
+  if (!dimensions || dimensions <= 0) {
+    return undefined;
+  }
+  let providerStr = "";
+  if (typeof providerOrModel === "string") {
+    providerStr = providerOrModel;
+  } else if (typeof providerOrModel === "object" && providerOrModel !== null) {
+    const rawProvider = (providerOrModel as { provider?: unknown }).provider;
+    if (typeof rawProvider === "string") {
+      providerStr = rawProvider;
+    } else {
+      const rawModelId = (providerOrModel as { modelId?: unknown }).modelId;
+      if (typeof rawModelId === "string") {
+        providerStr = rawModelId;
+      }
+    }
+  }
+
+  const p = providerStr.toLowerCase();
+  if (p === "google" || p.includes("google")) {
+    return { google: { outputDimensionality: dimensions } };
+  }
+  if (p === "openai" || p.includes("openai") || p === "custom_openai") {
+    return { openai: { dimensions } };
+  }
+  return undefined;
+}
+
+export interface GenerateEmbeddingOptions extends RetryOptions {
+  /** 埋め込み次元数。指定された場合、プロバイダに応じた providerOptions を自動生成する */
+  dimensions?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  providerOptions?: Record<string, any>;
+  /** 呼び出し単位のタイムアウト（ms）。未指定時は既定値（120000） */
+  timeoutMs?: number;
+}
+
+/**
  * AI SDK の embed 関数ラッパー。テキストの埋め込みベクトルを返す。
  * ネットワークエラー・429・500 系エラーはリトライする。
+ * タイムアウト（AbortSignal.timeout）による中断はリトライせずそのまま伝播する。
  *
- * providerOptions でプロバイダ固有のオプションを渡せる。
- * 例: Google の outputDimensionality, taskType
- *   { providerOptions: { google: { outputDimensionality: 768 } } }
+ * dimensions を指定すると各プロバイダに応じた次元数オプションが自動設定される。
+ * providerOptions でプロバイダ固有のオプションを直接渡すことも可能。
  */
 export async function generateEmbedding(
   model: EmbeddingModel,
   text: string,
-  options: RetryOptions & {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    providerOptions?: Record<string, any>;
-  } = {}
+  options: GenerateEmbeddingOptions = {}
 ): Promise<number[]> {
-  const { providerOptions, ...retryOptions } = options;
+  const {
+    dimensions,
+    providerOptions,
+    timeoutMs = EMBEDDING_TIMEOUT_MS,
+    ...retryOptions
+  } = options;
+  const autoOptions = dimensions
+    ? buildEmbeddingProviderOptions(model, dimensions)
+    : undefined;
+  const mergedProviderOptions =
+    autoOptions || providerOptions
+      ? { ...autoOptions, ...providerOptions }
+      : undefined;
+
+  const abortSignal = AbortSignal.timeout(timeoutMs);
   return withRetry(async () => {
     const result = await embed({
       model,
       value: text,
-      ...(providerOptions ? { providerOptions } : {}),
+      abortSignal,
+      ...(mergedProviderOptions
+        ? { providerOptions: mergedProviderOptions }
+        : {}),
     });
     return result.embedding;
   }, retryOptions);
@@ -530,24 +600,42 @@ export async function generateEmbedding(
 /**
  * AI SDK の embedMany 関数ラッパー。複数テキストの埋め込みベクトル配列を一括で返す。
  * ネットワークエラー・429・500 系エラーはリトライする。
+ * タイムアウト（AbortSignal.timeout）による中断はリトライせずそのまま伝播する。
+ *
+ * dimensions を指定すると各プロバイダに応じた次元数オプションが自動設定される。
+ * providerOptions でプロバイダ固有のオプションを直接渡すことも可能。
  */
 export async function generateEmbeddings(
   model: EmbeddingModel,
   texts: string[],
-  options: RetryOptions & {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    providerOptions?: Record<string, any>;
-  } = {}
+  options: GenerateEmbeddingOptions = {}
 ): Promise<number[][]> {
   if (texts.length === 0) {
     return [];
   }
-  const { providerOptions, ...retryOptions } = options;
+  const {
+    dimensions,
+    providerOptions,
+    timeoutMs = EMBEDDING_TIMEOUT_MS,
+    ...retryOptions
+  } = options;
+  const autoOptions = dimensions
+    ? buildEmbeddingProviderOptions(model, dimensions)
+    : undefined;
+  const mergedProviderOptions =
+    autoOptions || providerOptions
+      ? { ...autoOptions, ...providerOptions }
+      : undefined;
+
+  const abortSignal = AbortSignal.timeout(timeoutMs);
   return withRetry(async () => {
     const result = await embedMany({
       model,
       values: texts,
-      ...(providerOptions ? { providerOptions } : {}),
+      abortSignal,
+      ...(mergedProviderOptions
+        ? { providerOptions: mergedProviderOptions }
+        : {}),
     });
     return result.embeddings;
   }, retryOptions);

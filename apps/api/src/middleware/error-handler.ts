@@ -156,17 +156,41 @@ export function classifyError(err: unknown): ClassifiedError {
  */
 export function formatErrorMessage(err: unknown): string {
   const classified = classifyError(err);
+  let message = classified.message;
+
   if (classified.details && typeof classified.details === "string") {
-    return `${classified.message}\n詳細: ${classified.details}`;
-  }
-  if (
+    message = `${message}\n詳細: ${classified.details}`;
+  } else if (
     APICallError.isInstance(err) &&
     err.message &&
     err.message !== classified.message
   ) {
-    return `${classified.message}\n詳細: ${err.message}`;
+    message = `${message}\n詳細: ${err.message}`;
+  } else if (
+    err &&
+    typeof err === "object" &&
+    "cause" in err &&
+    (err as { cause: unknown }).cause
+  ) {
+    const cause = (err as { cause: unknown }).cause;
+    const causeMsg =
+      cause instanceof Error
+        ? cause.message
+        : typeof cause === "object" && cause !== null && "message" in cause
+          ? String((cause as { message: unknown }).message)
+          : String(cause);
+    if (causeMsg) {
+      // 巨大なクエリ本体を避けて原因を先頭に付与
+      message = `${message.split("\n")[0]}\n詳細: ${causeMsg}`;
+    }
   }
-  return classified.message;
+
+  // SSE 等で数万文字のペイロードが送出されるのを防ぐため安全な長さに制限
+  if (message.length > 1000) {
+    message = `${message.slice(0, 1000)}...`;
+  }
+
+  return message;
 }
 
 /**

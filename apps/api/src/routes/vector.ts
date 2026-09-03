@@ -24,7 +24,11 @@ const vectorRouter = new Hono<AppContext>()
         await emit("done", { done: true, result });
       },
       // reindex SSE のエラーペイロードは解析系と異なる { error } 形状を維持する
-      { buildErrorPayload: (message) => ({ error: message }) }
+      {
+        buildErrorPayload: (message) => ({
+          error: message.length > 500 ? `${message.slice(0, 500)}...` : message,
+        }),
+      }
     );
   });
 

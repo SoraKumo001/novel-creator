@@ -20,8 +20,78 @@ import {
   settings,
   timelines,
 } from "@novel-creator/db";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, type Table } from "drizzle-orm";
+import { getTableColumns } from "drizzle-orm/utils";
 import { assertFound, type ServiceContext, ValidationError } from "./types.js";
+
+/**
+ * スキーマ定義から PgTimestamp（mode: "date"）カラム名を導出する。
+ * ハードコードせずスキーマを参照するため、テーブル・カラムの追加/変更時に
+ * タイムスタンプフィールドを見落とすことがない。
+ */
+function timestampFieldsOf(table: Table): string[] {
+  return Object.entries(getTableColumns(table))
+    .filter(([, column]) => column.columnType === "PgTimestamp")
+    .map(([name]) => name);
+}
+
+/**
+ * バックアップ JSON 上のタイムスタンプ値を Drizzle が要求する Date に変換する。
+ * JSON.stringify により Date は ISO 文字列としてシリアライズされるため、
+ * mode: "date" の timestamp カラムへは文字列を Date へ戻してから渡す。
+ * - string: new Date(str) に変換（不正な日時文字列は ValidationError）
+ * - Date: そのまま
+ * - null / undefined: そのまま
+ * - 上記以外（number など）: 意図しない入力のため ValidationError
+ */
+function normalizeTimestampValue(value: unknown, field: string): unknown {
+  if (value instanceof Date) {
+    return value;
+  }
+  if (value === null || value === undefined) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new ValidationError(
+        `Invalid timestamp value for field "${field}": ${JSON.stringify(value)}`
+      );
+    }
+    return date;
+  }
+  throw new ValidationError(
+    `Invalid timestamp value for field "${field}": expected an ISO-8601 string, Date, or null`
+  );
+}
+
+/**
+ * 単一行のタイムスタンプフィールドを正規化して新しい行を返す。
+ * 入力行を変更せずコピーを返す。
+ */
+function normalizeTimestamps<T extends object>(
+  row: T,
+  fields: readonly string[]
+): T {
+  const normalized = { ...row } as Record<string, unknown>;
+  for (const field of fields) {
+    if (field in normalized) {
+      normalized[field] = normalizeTimestampValue(normalized[field], field);
+    }
+  }
+  return normalized as T;
+}
+
+/**
+ * 複数行のタイムスタンプフィールドを正規化する。
+ */
+function normalizeRows<T extends object>(
+  rows: readonly T[],
+  table: Table
+): T[] {
+  const fields = timestampFieldsOf(table);
+  return rows.map((row) => normalizeTimestamps(row, fields));
+}
 
 export interface BackupBody {
   meta: {
@@ -147,34 +217,54 @@ export class BackupDomainService {
 
     await this.ctx.db.transaction(async (tx) => {
       await tx.delete(novels).where(eq(novels.id, novelId));
-      await tx.insert(novels).values(body.rdb.novel);
+      await tx
+        .insert(novels)
+        .values(normalizeTimestamps(body.rdb.novel, timestampFieldsOf(novels)));
 
       if (body.rdb.chapters?.length) {
-        await tx.insert(chapters).values(body.rdb.chapters);
+        await tx
+          .insert(chapters)
+          .values(normalizeRows(body.rdb.chapters, chapters));
       }
       if (body.rdb.sections?.length) {
-        await tx.insert(sections).values(body.rdb.sections);
+        await tx
+          .insert(sections)
+          .values(normalizeRows(body.rdb.sections, sections));
       }
       if (body.rdb.contents?.length) {
-        await tx.insert(contents).values(body.rdb.contents);
+        await tx
+          .insert(contents)
+          .values(normalizeRows(body.rdb.contents, contents));
       }
       if (body.rdb.characters?.length) {
-        await tx.insert(characters).values(body.rdb.characters);
+        await tx
+          .insert(characters)
+          .values(normalizeRows(body.rdb.characters, characters));
       }
       if (body.rdb.settings?.length) {
-        await tx.insert(settings).values(body.rdb.settings);
+        await tx
+          .insert(settings)
+          .values(normalizeRows(body.rdb.settings, settings));
       }
       if (body.rdb.timelines?.length) {
-        await tx.insert(timelines).values(body.rdb.timelines);
+        await tx
+          .insert(timelines)
+          .values(normalizeRows(body.rdb.timelines, timelines));
       }
       if (body.rdb.llmInstructions?.length) {
-        await tx.insert(llmInstructions).values(body.rdb.llmInstructions);
+        await tx
+          .insert(llmInstructions)
+          .values(normalizeRows(body.rdb.llmInstructions, llmInstructions));
       }
       if (body.rdb.chatSessions?.length) {
-        await tx.insert(chatSessions).values(body.rdb.chatSessions);
+        await tx
+          .insert(chatSessions)
+          .values(normalizeRows(body.rdb.chatSessions, chatSessions));
       }
       if (body.rdb.chatMessages?.length) {
-        await tx.insert(chatMessages).values(body.rdb.chatMessages);
+        await tx
+          .insert(chatMessages)
+          .values(normalizeRows(body.rdb.chatMessages, chatMessages));
       }
     });
 

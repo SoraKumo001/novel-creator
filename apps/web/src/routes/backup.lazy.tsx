@@ -4,13 +4,16 @@ import { Button } from "@/components/Button.js";
 import { Card, CardHeader } from "@/components/Card.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { Loading } from "@/components/Loading.js";
+import { ReindexProgressModal } from "@/components/ReindexProgressModal.js";
 import { Select } from "@/components/Select.js";
 import { useExportNovel } from "@/hooks/useBackup.js";
+import { useEmbeddingConfigs } from "@/hooks/useEmbeddingConfigs.js";
 import { useNovels } from "@/hooks/useNovels.js";
 import { useRestoreNovel } from "@/hooks/useRestore.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
-import type { BackupData } from "@/lib/types.js";
+import { streamReindex } from "@/lib/services/vector.js";
+import type { BackupData, ReindexProgressEvent } from "@/lib/types.js";
 
 export const Route = createLazyFileRoute("/backup")({
   component: BackupPage,
@@ -20,6 +23,7 @@ export function BackupPage() {
   const { novels, loading: loadingNovels, error: novelsError } = useNovels();
   const { exportNovel, exporting } = useExportNovel();
   const { restoreNovel, restoring } = useRestoreNovel();
+  const { defaultConfig: defaultEmbeddingConfig } = useEmbeddingConfigs();
   const toast = useToast();
 
   const [selectedNovelId, setSelectedNovelId] = useState("");
@@ -27,6 +31,13 @@ export function BackupPage() {
   const [parsed, setParsed] = useState<BackupData | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // インデックス再構築モーダルステート（設定ページと同じフロー）
+  const [reindexModalOpen, setReindexModalOpen] = useState(false);
+  const [reindexProgress, setReindexProgress] =
+    useState<ReindexProgressEvent | null>(null);
+  const [reindexRunning, setReindexRunning] = useState(false);
+  const [reindexDone, setReindexDone] = useState(false);
+  const [reindexError, setReindexError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleExport() {
@@ -97,6 +108,46 @@ export function BackupPage() {
       );
       resetFile();
     } catch (e) {
+      toast.error(toErrorMessage(e));
+    }
+  }
+
+  function handleOpenReindexModal() {
+    setReindexProgress(null);
+    setReindexDone(false);
+    setReindexError(null);
+    setReindexModalOpen(true);
+  }
+
+  async function handleStartReindex() {
+    setReindexRunning(true);
+    setReindexDone(false);
+    setReindexError(null);
+    setReindexProgress({
+      current: 0,
+      total: 0,
+      percent: 0,
+      stage: "再構築を開始しています...",
+    });
+
+    try {
+      await streamReindex({
+        embeddingConfigId: defaultEmbeddingConfig?.id,
+        onProgress: (p) => setReindexProgress(p),
+        onDone: () => {
+          setReindexRunning(false);
+          setReindexDone(true);
+          toast.success("インデックス再構築が完了しました");
+        },
+        onError: (err) => {
+          setReindexRunning(false);
+          setReindexError(err);
+          toast.error(`再構築エラー: ${err}`);
+        },
+      });
+    } catch (e) {
+      setReindexRunning(false);
+      setReindexError(toErrorMessage(e));
       toast.error(toErrorMessage(e));
     }
   }
@@ -190,6 +241,17 @@ export function BackupPage() {
           </div>
 
           <div className="space-y-4">
+            <div>
+              <Button
+                onClick={handleOpenReindexModal}
+                disabled={reindexRunning}
+                isLoading={reindexRunning}
+                leftIcon={<span>⚡</span>}
+              >
+                ベクトルデータを再生成する
+              </Button>
+            </div>
+
             <div>
               <label
                 htmlFor="backup-file"
@@ -289,6 +351,20 @@ export function BackupPage() {
         confirmLabel="上書きして復元"
         cancelLabel="キャンセル"
         isLoading={restoring}
+      />
+
+      <ReindexProgressModal
+        isOpen={reindexModalOpen}
+        onClose={() => setReindexModalOpen(false)}
+        progress={reindexProgress}
+        isRunning={reindexRunning}
+        isDone={reindexDone}
+        error={reindexError}
+        onStart={handleStartReindex}
+        targetModelName={
+          defaultEmbeddingConfig?.name ?? "デフォルト埋め込みモデル"
+        }
+        dimensions={defaultEmbeddingConfig?.dimensions}
       />
     </div>
   );

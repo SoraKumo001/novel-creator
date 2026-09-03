@@ -7,6 +7,11 @@ vi.mock("@novel-creator/llm", async (importOriginal) => {
     ...actual,
     analyzeStoryArcPrompt: vi.fn((args: unknown) => JSON.stringify(args)),
     generateEmbedding: vi.fn().mockResolvedValue([0.1, 0.2, 0.3, 0.4]),
+    // 既定ではバッチ失敗（フォールバックで generateEmbedding 個別実行に切り替わる）。
+    // 個別テストで mockReturnValueOnce により保留状態に差し替えられる。
+    generateEmbeddings: vi
+      .fn()
+      .mockRejectedValue(new TypeError("mock: embedMany unavailable")),
     generateJSON: vi.fn().mockResolvedValue({ summary: "サマリー" }),
     multiPersonaReviewPrompt: vi.fn((args: unknown) => JSON.stringify(args)),
   };
@@ -26,6 +31,7 @@ import {
 import {
   analyzeStoryArcPrompt,
   generateEmbedding,
+  generateEmbeddings,
   multiPersonaReviewPrompt,
 } from "@novel-creator/llm";
 import {
@@ -35,6 +41,7 @@ import {
 import { fetchNovelStructureWithContents } from "../src/core/novel-structure.js";
 import {
   ReindexDomainService,
+  type ReindexProgressEvent,
   VectorStoreResetError,
 } from "../src/core/reindex.service.js";
 import type { ServiceContext } from "../src/core/types.js";
@@ -550,5 +557,50 @@ describe("ReindexDomainService.reindexAll", () => {
     // 黙ってスキップせず明示的に失敗する。
     await expect(service.reindexAll()).rejects.toThrow(VectorStoreResetError);
     expect(vectorStore.upsertBatch).not.toHaveBeenCalled();
+  });
+
+  it("埋め込みの完了前に、バッチ開始時点の進捗イベントを送出すること", async () => {
+    const { db } = createCountingDb(REINDEX_SINGLE_FIXTURE);
+    const vectorStore = createVectorStore();
+    const service = new ReindexDomainService(createContext(db, vectorStore));
+
+    // 1 バッチ目を保留状態にし、埋め込み解決前でも進捗が届くことを検証する
+    let resolveEmbeddings!: (value: number[][]) => void;
+    const pendingEmbeddings = new Promise<number[][]>((resolve) => {
+      resolveEmbeddings = resolve;
+    });
+    vi.mocked(generateEmbeddings).mockReturnValueOnce(pendingEmbeddings);
+
+    const events: ReindexProgressEvent[] = [];
+    const reindexPromise = service.reindexAll(undefined, (event) =>
+      events.push(event)
+    );
+
+    // 埋め込みがまだ解決していなくても、バッチ開始時点のイベントが届く
+    await vi.waitFor(() => {
+      expect(
+        events.some(
+          (event) =>
+            event.stage === "データをベクトル化中... (0/3)" &&
+            event.current === 0 &&
+            event.total === 3
+        )
+      ).toBe(true);
+    });
+
+    // 保留を解除すると処理が最後まで完了する
+    resolveEmbeddings!([
+      [0.1, 0.2, 0.3, 0.4],
+      [0.1, 0.2, 0.3, 0.4],
+      [0.1, 0.2, 0.3, 0.4],
+    ]);
+    const result = await reindexPromise;
+    expect(result).toEqual({ dimensions: 1536, totalIndexed: 3 });
+    expect(events.at(-1)).toEqual({
+      current: 3,
+      percent: 100,
+      stage: "全 3 件のインデックス再構築が完了しました",
+      total: 3,
+    });
   });
 });

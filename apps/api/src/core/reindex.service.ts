@@ -194,10 +194,26 @@ export class ReindexDomainService {
       const batch = itemsToEmbed.slice(i, i + batchSize);
       let vectorRecords: VectorRecord[] = [];
 
+      // 埋め込み呼び出しの前に進捗イベントを送出する。
+      // プロバイダが遅い・応答しない場合でも UI が「データをベクトル化中...」へ
+      // 遷移して進捗表示が更新され、ストールに見えないようにする。
+      const batchStartPercent = Math.min(
+        100,
+        Math.round((completedCount / total) * 100)
+      );
+      onProgress?.({
+        current: completedCount,
+        itemTitle: batch[0]?.title,
+        percent: batchStartPercent,
+        stage: `データをベクトル化中... (${completedCount}/${total})`,
+        total,
+      });
+
       try {
         const embeddings = await generateEmbeddings(
           model,
-          batch.map((item) => item.content)
+          batch.map((item) => item.content),
+          { dimensions }
         );
 
         vectorRecords = batch.map((item, idx) => ({
@@ -217,7 +233,9 @@ export class ReindexDomainService {
         // 一括取得が失敗した場合はフォールバックとして個別実行
         for (const item of batch) {
           try {
-            const vector = await generateEmbedding(model, item.content);
+            const vector = await generateEmbedding(model, item.content, {
+              dimensions,
+            });
             vectorRecords.push({
               content: item.content,
               embedding: vector,

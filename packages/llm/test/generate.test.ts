@@ -42,10 +42,32 @@ describe("generate.ts", () => {
 
       expect(result).toEqual([0.1, 0.2, 0.3]);
       expect(mockEmbed).toHaveBeenCalledWith({
+        abortSignal: expect.any(AbortSignal),
         model: mockModel,
         providerOptions: { google: { outputDimensionality: 768 } },
         value: "テストテキスト",
       });
+    });
+
+    it("embed が応答しない場合、指定タイムアウトで AbortError を送出すること", async () => {
+      mockEmbed.mockImplementation(
+        ({ abortSignal }: { abortSignal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            abortSignal.addEventListener("abort", () => {
+              reject(
+                new DOMException("The operation was aborted", "AbortError")
+              );
+            });
+          })
+      );
+      const mockModel = { modelId: "test-model" } as never;
+
+      const startedAt = Date.now();
+      await expect(
+        generateEmbedding(mockModel, "テストテキスト", { timeoutMs: 100 })
+      ).rejects.toMatchObject({ name: "AbortError" });
+      // 既定の 120 秒を待たず、指定タイムアウト（100ms）前後に即座に拒否されること
+      expect(Date.now() - startedAt).toBeLessThan(5000);
     });
   });
 
@@ -79,10 +101,32 @@ describe("generate.ts", () => {
         [0.3, 0.4],
       ]);
       expect(mockEmbedMany).toHaveBeenCalledWith({
+        abortSignal: expect.any(AbortSignal),
         model: mockModel,
         providerOptions: { google: { outputDimensionality: 768 } },
         values: ["テキスト1", "テキスト2"],
       });
+    });
+
+    it("embedMany が応答しない場合、指定タイムアウトで AbortError を送出すること", async () => {
+      mockEmbedMany.mockImplementation(
+        ({ abortSignal }: { abortSignal: AbortSignal }) =>
+          new Promise((_resolve, reject) => {
+            abortSignal.addEventListener("abort", () => {
+              reject(
+                new DOMException("The operation was aborted", "AbortError")
+              );
+            });
+          })
+      );
+      const mockModel = { modelId: "test-model" } as never;
+
+      const startedAt = Date.now();
+      await expect(
+        generateEmbeddings(mockModel, ["テキスト"], { timeoutMs: 100 })
+      ).rejects.toMatchObject({ name: "AbortError" });
+      // 既定の 120 秒を待たず、指定タイムアウト（100ms）前後に即座に拒否されること
+      expect(Date.now() - startedAt).toBeLessThan(5000);
     });
   });
 

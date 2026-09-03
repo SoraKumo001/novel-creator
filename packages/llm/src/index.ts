@@ -1,9 +1,12 @@
 // Phase 1B: LLM ラッパー
 
 export {
+  buildEmbeddingProviderOptions,
   buildReasoningProviderOptions,
+  DEFAULT_EMBEDDING_TIMEOUT_MS,
   DEFAULT_LLM_MAX_OUTPUT_TOKENS,
   DEFAULT_LLM_TIMEOUT_MS,
+  type GenerateEmbeddingOptions,
   type GenerateJSONOptions,
   type GenerateTextOptions,
   generateEmbedding,
