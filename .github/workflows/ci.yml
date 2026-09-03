@@ -12,6 +12,22 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: postgres://novel:novel@localhost:5433/novel
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: novel
+          POSTGRES_PASSWORD: novel
+          POSTGRES_DB: novel
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
 
@@ -35,6 +51,11 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Prepare test database
+        run: |
+          psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          pnpm db:push
 
       - name: Test
         run: pnpm test
