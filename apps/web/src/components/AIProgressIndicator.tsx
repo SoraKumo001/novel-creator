@@ -121,7 +121,7 @@ export function AIProgressIndicator({
           <button
             type="button"
             onClick={onCancel}
-            className="ml-1 cursor-pointer text-[11px] text-destructive hover:underline"
+            className="ml-1 cursor-pointer text-[11px] text-danger hover:underline"
           >
             {cancelLabel}
           </button>

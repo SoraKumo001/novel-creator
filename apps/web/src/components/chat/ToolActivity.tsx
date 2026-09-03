@@ -70,7 +70,7 @@ function StatusBadge({ item }: { item: ToolInvocationItem }) {
     }
     case "output-error":
       return (
-        <span className="flex items-center gap-1 font-medium text-destructive">
+        <span className="flex items-center gap-1 font-medium text-danger">
           <span aria-hidden>⚠️</span>
           <span>エラー</span>
         </span>
@@ -159,7 +159,7 @@ export function ToolActivity({
                 key={inv.toolCallId}
                 className={`overflow-hidden rounded-lg border text-[12px] shadow-xs backdrop-blur transition ${
                   inv.state === "output-error"
-                    ? "border-destructive/40 bg-destructive/5"
+                    ? "border-danger/40 bg-danger/5"
                     : "border-border/70 bg-surface/80"
                 }`}
               >
@@ -240,10 +240,10 @@ export function ToolActivity({
 
                     {hasErrorText && (
                       <div>
-                        <span className="font-sans font-semibold text-destructive">
+                        <span className="font-sans font-semibold text-danger">
                           エラー:
                         </span>
-                        <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-destructive/10 p-2 text-destructive">
+                        <pre className="mt-1 max-h-32 overflow-auto whitespace-pre-wrap rounded bg-danger/10 p-2 text-danger">
                           {inv.errorText}
                         </pre>
                       </div>

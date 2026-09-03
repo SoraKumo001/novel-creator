@@ -93,13 +93,13 @@ export function CharacterHeatmapModal({
     >
       <div className="space-y-4">
         {/* カテゴリフィルタ */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto pb-px text-xs [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <span className="text-muted-foreground">所属・勢力:</span>
             <button
               type="button"
               onClick={() => setSelectedCategory("all")}
-              className={`cursor-pointer rounded px-2.5 py-1 transition ${
+              className={`shrink-0 cursor-pointer rounded px-2.5 py-1 transition ${
                 selectedCategory === "all"
                   ? "bg-primary font-semibold text-primary-foreground"
                   : "bg-surface-raised text-foreground hover:bg-border"
@@ -112,7 +112,7 @@ export function CharacterHeatmapModal({
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`cursor-pointer rounded px-2.5 py-1 transition ${
+                className={`shrink-0 cursor-pointer rounded px-2.5 py-1 transition ${
                   selectedCategory === cat
                     ? "bg-primary font-semibold text-primary-foreground"
                     : "bg-surface-raised text-foreground hover:bg-border"
@@ -142,7 +142,7 @@ export function CharacterHeatmapModal({
             <table className="w-full border-collapse text-left text-xs">
               <thead>
                 <tr className="sticky top-0 z-10 border-border border-b bg-surface-raised">
-                  <th className="sticky left-0 z-20 min-w-36 border-border border-r bg-surface-raised p-3 font-semibold text-foreground">
+                  <th className="sticky left-0 z-20 min-w-28 border-border border-r bg-surface-raised p-3 font-semibold text-foreground sm:min-w-36">
                     登場人物
                   </th>
                   {allSections.map((sec, idx) => (

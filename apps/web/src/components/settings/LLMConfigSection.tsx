@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button } from "@/components/Button.js";
-import { Card } from "@/components/Card.js";
+import { Card, interactiveCardHover } from "@/components/Card.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { getProviderBadge } from "@/components/LLMModelSelector.js";
 import { Loading } from "@/components/Loading.js";
@@ -89,7 +89,7 @@ export function LLMConfigSection({
           const isRowTesting = testingId === cfg.id;
 
           return (
-            <Card key={cfg.id} className="transition hover:border-border-hover">
+            <Card key={cfg.id} className={interactiveCardHover}>
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-2">

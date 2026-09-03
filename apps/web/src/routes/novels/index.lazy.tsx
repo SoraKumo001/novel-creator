@@ -3,10 +3,10 @@ import { useState } from "react";
 import { Button } from "@/components/Button.js";
 import { Card, CardHeader } from "@/components/Card.js";
 import { EmptyState } from "@/components/EmptyState.js";
+import { FormModal } from "@/components/FormModal.js";
 import { Input } from "@/components/Input.js";
 import { Loading } from "@/components/Loading.js";
 import { MarkdownText } from "@/components/MarkdownText.js";
-import { Modal } from "@/components/Modal.js";
 import { Textarea } from "@/components/Textarea.js";
 import { useNovels } from "@/hooks/useNovels.js";
 import { toErrorMessage } from "@/lib/errors.js";
@@ -34,8 +34,7 @@ export function NovelsIndexPage() {
     });
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit(): Promise<void> {
     setFormError(null);
     if (!title.trim()) {
       setFormError("タイトルを入力してください");
@@ -53,6 +52,14 @@ export function NovelsIndexPage() {
     } catch (e) {
       setFormError(toErrorMessage(e));
     }
+  }
+
+  function handleModalClose(): void {
+    if (creating) {
+      return;
+    }
+    setIsModalOpen(false);
+    setFormError(null);
   }
 
   return (
@@ -121,50 +128,31 @@ export function NovelsIndexPage() {
         </div>
       )}
 
-      <Modal
+      <FormModal
         isOpen={isModalOpen}
-        onClose={() => {
-          if (creating) {
-            return;
-          }
-          setIsModalOpen(false);
-          setFormError(null);
-        }}
+        onClose={handleModalClose}
+        onSubmit={handleSubmit}
         title="新しい小説を作成"
         size="md"
-        footer={
-          <>
-            <Button
-              variant="secondary"
-              onClick={() => setIsModalOpen(false)}
-              disabled={creating}
-            >
-              キャンセル
-            </Button>
-            <Button onClick={handleSubmit} isLoading={creating}>
-              作成
-            </Button>
-          </>
-        }
+        isLoading={creating}
+        submitLabel="作成"
       >
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <Input
-            label="タイトル"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="例: 星を紡ぐ者たち"
-            autoFocus
-          />
-          <Textarea
-            label="説明"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="物語のあらすじやテーマを簡潔に"
-            rows={4}
-          />
-          {formError && <p className="text-rose-500 text-sm">{formError}</p>}
-        </form>
-      </Modal>
+        <Input
+          label="タイトル"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="例: 星を紡ぐ者たち"
+          autoFocus
+        />
+        <Textarea
+          label="説明"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="物語のあらすじやテーマを簡潔に"
+          rows={4}
+        />
+        {formError && <p className="text-danger text-sm">{formError}</p>}
+      </FormModal>
     </div>
   );
 }

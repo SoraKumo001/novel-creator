@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
 import { createPortal } from "react-dom";
 import { CloseIcon } from "./Icons.js";
 
@@ -19,6 +19,13 @@ const sizeMap = {
   full: "max-w-[95vw]",
 };
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function getFocusableElements(root: HTMLElement): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+}
+
 export function Modal({
   isOpen,
   onClose,
@@ -28,6 +35,8 @@ export function Modal({
   size = "md",
 }: ModalProps) {
   const isBackdropMouseDown = useRef(false);
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const titleId = `modal-title-${useId().replace(/:/g, "")}`;
 
   useEffect(() => {
     if (!isOpen) {
@@ -36,11 +45,70 @@ export function Modal({
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         onClose();
+        return;
+      }
+      if (e.key !== "Tab") {
+        return;
+      }
+      const panel = panelRef.current;
+      if (!panel) {
+        return;
+      }
+      const focusables = getFocusableElements(panel);
+      if (focusables.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey) {
+        if (active === first || !panel.contains(active)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else if (active === last || !panel.contains(active)) {
+        e.preventDefault();
+        first.focus();
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    const previouslyFocused = document.activeElement;
+    const panel = panelRef.current;
+    if (
+      panel &&
+      !(
+        previouslyFocused instanceof HTMLElement ||
+        panel.contains(previouslyFocused)
+      )
+    ) {
+      const focusables = getFocusableElements(panel);
+      (focusables[0] ?? panel).focus();
+    }
+    return () => {
+      if (previouslyFocused instanceof HTMLElement) {
+        previouslyFocused.focus();
+      }
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
 
   const handleBackdropMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     isBackdropMouseDown.current = e.target === e.currentTarget;
@@ -65,11 +133,18 @@ export function Modal({
       data-testid="modal-backdrop"
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabIndex={-1}
         className={`flex max-h-[92vh] w-full flex-col ${sizeMap[size]} overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between border-border-subtle border-b px-6 py-4">
-          <h2 className="font-semibold text-foreground text-lg">{title}</h2>
+          <h2 id={titleId} className="font-semibold text-foreground text-lg">
+            {title}
+          </h2>
           <button
             type="button"
             onClick={onClose}

@@ -295,7 +295,7 @@ export function EmbeddingConfigModal({
             className={`rounded-lg border p-3 text-xs ${
               testResult.success
                 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                : "border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400"
+                : "border-danger/30 bg-danger/10 text-danger"
             }`}
           >
             <div className="font-semibold">

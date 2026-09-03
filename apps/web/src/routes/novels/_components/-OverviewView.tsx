@@ -301,7 +301,7 @@ export function OverviewView(props: OverviewViewProps) {
             rows={5}
           />
           {props.formError && (
-            <p className="text-rose-500 text-sm">{props.formError}</p>
+            <p className="text-danger text-sm">{props.formError}</p>
           )}
         </div>
       </Modal>

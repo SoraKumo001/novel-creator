@@ -1,7 +1,10 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "@/components/Button.js";
+import { interactiveCardHover } from "@/components/Card.js";
+import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { CustomPromptModal } from "@/components/CustomPromptModal.js";
+import { EmptyState } from "@/components/EmptyState.js";
 import { ReindexProgressModal } from "@/components/ReindexProgressModal.js";
 import { EmbeddingConfigModal } from "@/components/settings/EmbeddingConfigModal.js";
 import { EmbeddingConfigSection } from "@/components/settings/EmbeddingConfigSection.js";
@@ -89,6 +92,9 @@ export function SettingsPage() {
 
   const [promptModalOpen, setPromptModalOpen] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<CustomPrompt | null>(null);
+  const [deleteTargetPrompt, setDeleteTargetPrompt] =
+    useState<CustomPrompt | null>(null);
+  const [deletingPrompt, setDeletingPrompt] = useState(false);
 
   // インデックス再構築モーダルステート
   const [reindexModalOpen, setReindexModalOpen] = useState(false);
@@ -180,19 +186,19 @@ export function SettingsPage() {
     }
   }
 
-  async function handleDeletePrompt(id: string, name: string) {
-    if (
-      !window.confirm(
-        `カスタムプロンプト「${name}」を削除してもよろしいですか？`
-      )
-    ) {
+  async function handleConfirmDeletePrompt(): Promise<void> {
+    if (!deleteTargetPrompt) {
       return;
     }
+    setDeletingPrompt(true);
     try {
-      await deletePrompt(id);
+      await deletePrompt(deleteTargetPrompt.id);
+      setDeleteTargetPrompt(null);
       toast.success("プロンプトを削除しました");
     } catch {
       toast.error("削除に失敗しました");
+    } finally {
+      setDeletingPrompt(false);
     }
   }
 
@@ -211,7 +217,7 @@ export function SettingsPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-bold text-2xl text-foreground tracking-tight">
-            ⚙️ 設定
+            <span aria-hidden="true">⚙️</span> 設定
           </h1>
           <p className="mt-1 text-muted-foreground text-xs">
             LLMプロバイダ、埋め込みモデル、およびカスタムプロンプトを管理します。
@@ -245,44 +251,46 @@ export function SettingsPage() {
       </div>
 
       {/* タブ切り替え */}
-      <div className="flex gap-2 border-border border-b">
-        <button
-          type="button"
-          onClick={() => setActiveTab("llm")}
-          className={`flex cursor-pointer items-center gap-2 border-b-2 px-4 py-2 font-semibold text-xs transition ${
-            activeTab === "llm"
-              ? "border-primary bg-primary/5 text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <span>🤖</span>
-          <span>テキスト生成 LLM ({llmConfigs.length})</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("embedding")}
-          className={`flex cursor-pointer items-center gap-2 border-b-2 px-4 py-2 font-semibold text-xs transition ${
-            activeTab === "embedding"
-              ? "border-primary bg-primary/5 text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <span>🧬</span>
-          <span>埋め込み (Embedding) モデル ({embeddingConfigs.length})</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("prompt")}
-          className={`flex cursor-pointer items-center gap-2 border-b-2 px-4 py-2 font-semibold text-xs transition ${
-            activeTab === "prompt"
-              ? "border-primary bg-primary/5 text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          <span>🪄</span>
-          <span>カスタムプロンプト ({customPrompts.length})</span>
-        </button>
-      </div>
+      <nav className="border-border border-b">
+        <div className="flex gap-2 overflow-x-auto scroll-smooth pb-px [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <button
+            type="button"
+            onClick={() => setActiveTab("llm")}
+            className={`group flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 font-medium text-sm transition ${
+              activeTab === "llm"
+                ? "border-primary bg-primary/5 font-semibold text-primary"
+                : "border-transparent text-muted-foreground hover:border-border hover:bg-surface-hover hover:text-foreground"
+            }`}
+          >
+            <span aria-hidden="true">🤖</span>
+            <span>テキスト生成 LLM ({llmConfigs.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("embedding")}
+            className={`group flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 font-medium text-sm transition ${
+              activeTab === "embedding"
+                ? "border-primary bg-primary/5 font-semibold text-primary"
+                : "border-transparent text-muted-foreground hover:border-border hover:bg-surface-hover hover:text-foreground"
+            }`}
+          >
+            <span aria-hidden="true">🧬</span>
+            <span>埋め込み (Embedding) モデル ({embeddingConfigs.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("prompt")}
+            className={`group flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 font-medium text-sm transition ${
+              activeTab === "prompt"
+                ? "border-primary bg-primary/5 font-semibold text-primary"
+                : "border-transparent text-muted-foreground hover:border-border hover:bg-surface-hover hover:text-foreground"
+            }`}
+          >
+            <span aria-hidden="true">🪄</span>
+            <span>カスタムプロンプト ({customPrompts.length})</span>
+          </button>
+        </div>
+      </nav>
 
       {/* LLM タブ */}
       {activeTab === "llm" && (
@@ -329,25 +337,22 @@ export function SettingsPage() {
               {promptsError}
             </div>
           ) : customPrompts.length === 0 ? (
-            <div className="space-y-3 py-12 text-center">
-              <span className="text-3xl">🪄</span>
-              <p className="text-muted-foreground text-xs">
-                カスタムプロンプトがまだ登録されていません
-              </p>
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={openCreatePromptModal}
-              >
-                プロンプトを登録する
-              </Button>
-            </div>
+            <EmptyState
+              title="カスタムプロンプトがまだ登録されていません"
+              actionLabel="プロンプトを登録する"
+              onAction={openCreatePromptModal}
+              icon={
+                <span aria-hidden="true" className="text-3xl">
+                  🪄
+                </span>
+              }
+            />
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               {customPrompts.map((p) => (
                 <div
                   key={p.id}
-                  className="flex flex-col justify-between space-y-2.5 rounded-xl border border-border bg-surface p-4 shadow-sm transition hover:border-primary/50"
+                  className={`flex flex-col justify-between space-y-2.5 rounded-xl border border-border bg-surface p-4 shadow-sm ${interactiveCardHover}`}
                 >
                   <div className="space-y-2">
                     <div className="flex items-start justify-between gap-2">
@@ -360,7 +365,7 @@ export function SettingsPage() {
                             {p.name}
                           </h3>
                           <div className="mt-0.5 flex items-center gap-2 text-[10px] text-muted-foreground">
-                            <span className="rounded border border-border/70 bg-muted px-1.5 py-0.2">
+                            <span className="rounded border border-border/70 bg-muted px-1.5 py-px">
                               {p.category === "inline"
                                 ? "インライン推敲"
                                 : p.category === "generation"
@@ -385,7 +390,7 @@ export function SettingsPage() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDeletePrompt(p.id, p.name)}
+                          onClick={() => setDeleteTargetPrompt(p)}
                           className="cursor-pointer rounded p-1.5 text-muted-foreground text-xs hover:bg-muted hover:text-danger"
                           title="削除"
                         >
@@ -441,6 +446,22 @@ export function SettingsPage() {
         onClose={() => setPromptModalOpen(false)}
         onSubmit={handlePromptModalSubmit}
         editingPrompt={editingPrompt}
+      />
+
+      {/* カスタムプロンプト削除確認 */}
+      <ConfirmDialog
+        isOpen={deleteTargetPrompt !== null}
+        onClose={() => {
+          if (!deletingPrompt) {
+            setDeleteTargetPrompt(null);
+          }
+        }}
+        onConfirm={() => void handleConfirmDeletePrompt()}
+        title="プロンプトの削除"
+        message={`カスタムプロンプト「${deleteTargetPrompt?.name ?? ""}」を削除してもよろしいですか？`}
+        confirmLabel="削除"
+        cancelLabel="キャンセル"
+        isLoading={deletingPrompt}
       />
 
       {/* インデックス再構築モーダル */}

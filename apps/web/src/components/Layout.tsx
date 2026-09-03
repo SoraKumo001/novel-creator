@@ -36,7 +36,7 @@ export function Layout({ children }: LayoutProps) {
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
       <NovelRouteSync />
       <Nav />
-      <main className="min-w-0 flex-1 overflow-y-auto p-6 md:p-8">
+      <main className="min-w-0 flex-1 overflow-y-auto p-4 pb-24 sm:p-6 md:p-8">
         {children}
       </main>
       <ChatFloatingButton />

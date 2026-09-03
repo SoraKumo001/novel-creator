@@ -1,52 +1,46 @@
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useChatUI } from "@/context/ChatContext.js";
 import { type ThemeMode, useTheme } from "@/hooks/useTheme.js";
 
-export function Nav() {
+const themeOptions: { mode: ThemeMode; label: string; icon: string }[] = [
+  { mode: "light", label: "ライト", icon: "☀️" },
+  { mode: "dark", label: "ダーク", icon: "🌙" },
+  { mode: "system", label: "自動", icon: "💻" },
+];
+
+interface NavPanelProps {
+  collapsed: boolean;
+  onNavigate?: () => void;
+  onToggleCollapsed: () => void;
+}
+
+function NavPanel({ collapsed, onNavigate, onToggleCollapsed }: NavPanelProps) {
   const { toggleChat, isOpen } = useChatUI();
   const { theme, setTheme } = useTheme();
 
-  const [isCollapsed, setIsCollapsed] = useState<boolean>(
-    () => localStorage.getItem("novel-creator:nav-collapsed") === "true"
-  );
-
-  const toggleCollapsed = () => {
-    setIsCollapsed((prev) => {
-      const next = !prev;
-      localStorage.setItem("novel-creator:nav-collapsed", String(next));
-      return next;
-    });
-  };
-
-  const themeOptions: { mode: ThemeMode; label: string; icon: string }[] = [
-    { mode: "light", label: "ライト", icon: "☀️" },
-    { mode: "dark", label: "ダーク", icon: "🌙" },
-    { mode: "system", label: "自動", icon: "💻" },
-  ];
-
-  const cycleTheme = () => {
+  const cycleTheme = (): void => {
     const nextMode: ThemeMode =
       theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
     setTheme(nextMode);
   };
 
+  const handleChatClick = (): void => {
+    toggleChat();
+    onNavigate?.();
+  };
+
   return (
-    <aside
-      aria-label="メインナビゲーション"
-      aria-expanded={!isCollapsed}
-      className={`flex h-full shrink-0 flex-col border-border border-r bg-surface transition-all duration-200 ${
-        isCollapsed ? "w-16" : "w-56"
-      }`}
-    >
+    <>
       {/* ヘッダー & ロゴ */}
       <div
-        className={`flex items-center p-3 ${isCollapsed ? "justify-center" : "justify-between"}`}
+        className={`flex items-center p-3 ${collapsed ? "justify-center" : "justify-between"}`}
       >
         <Link
           to="/"
+          onClick={onNavigate}
           className={`flex items-center gap-2 overflow-hidden ${
-            isCollapsed ? "justify-center px-0" : "px-2"
+            collapsed ? "justify-center px-0" : "px-2"
           }`}
           title="Novel Creator ホーム"
         >
@@ -66,7 +60,7 @@ export function Nav() {
               />
             </svg>
           </div>
-          {!isCollapsed && (
+          {!collapsed && (
             <span className="truncate whitespace-nowrap font-bold text-base text-foreground tracking-tight">
               Novel Creator
             </span>
@@ -74,10 +68,10 @@ export function Nav() {
         </Link>
 
         {/* 折りたたみ / 展開トグルボタン */}
-        {!isCollapsed && (
+        {!collapsed && (
           <button
             type="button"
-            onClick={toggleCollapsed}
+            onClick={onToggleCollapsed}
             className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
             title="メニューを縮小"
             aria-label="メニューを縮小"
@@ -101,11 +95,11 @@ export function Nav() {
       </div>
 
       {/* 縮小時の展開トグルボタン（ロゴ直下に配置） */}
-      {isCollapsed && (
+      {collapsed && (
         <div className="flex justify-center pb-2">
           <button
             type="button"
-            onClick={toggleCollapsed}
+            onClick={onToggleCollapsed}
             className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
             title="メニューを展開"
             aria-label="メニューを展開"
@@ -129,11 +123,12 @@ export function Nav() {
       )}
 
       {/* ナビゲーションリンク */}
-      <nav className={`flex-1 space-y-1 py-2 ${isCollapsed ? "px-2" : "px-3"}`}>
+      <nav className={`flex-1 space-y-1 py-2 ${collapsed ? "px-2" : "px-3"}`}>
         <Link
           to="/novels"
+          onClick={onNavigate}
           className={`group flex items-center rounded-lg font-medium text-foreground-secondary text-sm transition hover:bg-surface-hover hover:text-foreground ${
-            isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
+            collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
           }`}
           activeProps={{
             className: "bg-primary-subtle text-primary-subtle-fg",
@@ -154,14 +149,14 @@ export function Nav() {
               d="M8.25 6.75h7.5M8.25 12h7.5m-7.5 5.25h7.5M3.75 6.75h.007v.008H3.75V6.75zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zM3.75 12h.007v.008H3.75V12zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm-.375 5.25h.007v.008H3.75v-.008zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"
             />
           </svg>
-          {!isCollapsed && <span className="truncate">小説一覧</span>}
+          {!collapsed && <span className="truncate">小説一覧</span>}
         </Link>
 
         <button
           type="button"
-          onClick={toggleChat}
+          onClick={handleChatClick}
           className={`group flex w-full cursor-pointer items-center rounded-lg font-medium text-sm transition ${
-            isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
+            collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
           } ${
             isOpen
               ? "bg-primary-subtle text-primary-subtle-fg"
@@ -185,7 +180,7 @@ export function Nav() {
               d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
             />
           </svg>
-          {!isCollapsed && <span className="truncate">AI創作相談</span>}
+          {!collapsed && <span className="truncate">AI創作相談</span>}
         </button>
 
         <div className="pt-2 pb-1">
@@ -194,8 +189,9 @@ export function Nav() {
 
         <Link
           to="/settings"
+          onClick={onNavigate}
           className={`group flex items-center rounded-lg font-medium text-foreground-secondary text-sm transition hover:bg-surface-hover hover:text-foreground ${
-            isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
+            collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
           }`}
           activeProps={{
             className: "bg-primary-subtle text-primary-subtle-fg",
@@ -221,13 +217,14 @@ export function Nav() {
               d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
             />
           </svg>
-          {!isCollapsed && <span className="truncate">LLM設定</span>}
+          {!collapsed && <span className="truncate">LLM設定</span>}
         </Link>
 
         <Link
           to="/backup"
+          onClick={onNavigate}
           className={`group flex items-center rounded-lg font-medium text-foreground-secondary text-sm transition hover:bg-surface-hover hover:text-foreground ${
-            isCollapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
+            collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
           }`}
           activeProps={{
             className: "bg-primary-subtle text-primary-subtle-fg",
@@ -248,13 +245,13 @@ export function Nav() {
               d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.5 16.556 18.375 12 18.375s-8.25-1.875-8.25-4.375v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125"
             />
           </svg>
-          {!isCollapsed && <span className="truncate">バックアップ</span>}
+          {!collapsed && <span className="truncate">バックアップ</span>}
         </Link>
       </nav>
 
       {/* テーマ切り替え & フッター */}
       <div className="space-y-2 border-border border-t p-2">
-        {isCollapsed ? (
+        {collapsed ? (
           <div className="flex justify-center">
             <button
               type="button"
@@ -302,6 +299,129 @@ export function Nav() {
           </>
         )}
       </div>
-    </aside>
+    </>
+  );
+}
+
+export function Nav() {
+  const [isCollapsed, setIsCollapsed] = useState<boolean>(
+    () => localStorage.getItem("novel-creator:nav-collapsed") === "true"
+  );
+  const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
+
+  const toggleCollapsed = (): void => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("novel-creator:nav-collapsed", String(next));
+      return next;
+    });
+  };
+
+  const closeMobileNav = (): void => {
+    setIsMobileOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isMobileOpen) {
+      return;
+    }
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === "Escape") {
+        setIsMobileOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMobileOpen]);
+
+  return (
+    <>
+      {/* モバイル用ハンバーガーボタン（チャットFABと対称の左下配置） */}
+      <button
+        type="button"
+        onClick={() => setIsMobileOpen(true)}
+        className="fixed bottom-6 left-4 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-border bg-surface text-foreground shadow-lg transition hover:bg-surface-hover md:hidden"
+        aria-label="メニューを開く"
+        aria-expanded={isMobileOpen}
+        title="メニュー"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={2}
+          stroke="currentColor"
+          className="h-6 w-6"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"
+          />
+        </svg>
+      </button>
+
+      {/* デスクトップ用サイドバー */}
+      <aside
+        aria-label="メインナビゲーション"
+        aria-expanded={!isCollapsed}
+        className={`hidden h-full shrink-0 flex-col border-border border-r bg-surface transition-all duration-200 md:flex ${
+          isCollapsed ? "w-16" : "w-56"
+        }`}
+      >
+        <NavPanel collapsed={isCollapsed} onToggleCollapsed={toggleCollapsed} />
+      </aside>
+
+      {/* モバイル用ドロワー */}
+      {isMobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            onClick={closeMobileNav}
+            aria-hidden="true"
+          />
+          <aside
+            aria-label="メインナビゲーション"
+            className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col border-border border-r bg-surface shadow-2xl"
+          >
+            <div className="flex justify-end p-2">
+              <button
+                type="button"
+                onClick={closeMobileNav}
+                className="cursor-pointer rounded-lg p-1.5 text-muted-foreground transition hover:bg-surface-hover hover:text-foreground"
+                aria-label="メニューを閉じる"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                  className="h-5 w-5"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+              <NavPanel
+                collapsed={false}
+                onNavigate={closeMobileNav}
+                onToggleCollapsed={toggleCollapsed}
+              />
+            </div>
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

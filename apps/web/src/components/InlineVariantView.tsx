@@ -49,7 +49,7 @@ export function InlineVariantView({
                 <span>案 {idx + 1}</span>
                 {charCount > 0 && (
                   <span
-                    className={`rounded px-1 py-0.2 font-mono text-[10px] ${
+                    className={`rounded px-1 py-px font-mono text-[10px] ${
                       isActive
                         ? "bg-primary-foreground/20 text-primary-foreground"
                         : "bg-muted text-muted-foreground"

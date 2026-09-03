@@ -52,7 +52,7 @@ export function GenerateContentPanel({
             <button
               type="button"
               onClick={onCancel}
-              className="cursor-pointer rounded px-2.5 py-1 font-semibold text-destructive text-xs transition hover:bg-destructive/10"
+              className="cursor-pointer rounded px-2.5 py-1 font-semibold text-danger text-xs transition hover:bg-danger/10"
             >
               ■ 生成停止
             </button>
@@ -60,7 +60,7 @@ export function GenerateContentPanel({
         </div>
       )}
       {streamError && (
-        <div className="shrink-0 border-destructive/20 border-t bg-destructive/10 px-5 py-2 text-destructive text-xs">
+        <div className="shrink-0 border-danger/20 border-t bg-danger/10 px-5 py-2 text-danger text-xs">
           {streamError}
         </div>
       )}

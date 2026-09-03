@@ -69,7 +69,7 @@ export function ChatErrorPanel({
   return (
     <div
       role="alert"
-      className="space-y-2 rounded-xl border border-destructive/40 bg-destructive/10 p-3.5 text-destructive text-xs shadow-xs"
+      className="space-y-2 rounded-xl border border-danger/40 bg-danger/10 p-3.5 text-danger text-xs shadow-xs"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 font-semibold">
@@ -90,13 +90,13 @@ export function ChatErrorPanel({
         <button
           type="button"
           onClick={onClose}
-          className="cursor-pointer p-0.5 text-destructive/70 text-xs hover:text-destructive"
+          className="cursor-pointer p-0.5 text-danger/70 text-xs hover:text-danger"
           title="閉じる"
         >
           ✕
         </button>
       </div>
-      <div className="wrap-break-word max-h-36 overflow-y-auto whitespace-pre-wrap rounded border border-destructive/20 bg-background/60 p-2 font-mono text-[11px] text-foreground/90">
+      <div className="wrap-break-word max-h-36 overflow-y-auto whitespace-pre-wrap rounded border border-danger/20 bg-background/60 p-2 font-mono text-[11px] text-foreground/90">
         {error}
       </div>
       {lastPrompt && (
@@ -172,7 +172,7 @@ export function ChatInputBar({
           placeholder="創作の相談を入力... (Ctrl + Enter で送信)"
           rows={1}
           disabled={isStreaming}
-          className="max-h-45 w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-foreground text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className="max-h-[11.25rem] w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-foreground text-sm placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
         <div className="flex items-center justify-between">
           <span className="text-[11px] text-muted-foreground">

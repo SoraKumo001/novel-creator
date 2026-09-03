@@ -167,7 +167,7 @@ export function TimelineTab({
                     className="relative flex items-start gap-4 py-3"
                   >
                     <div className="z-10 mt-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-surface" />
-                    <div className="flex-1 rounded-xl border border-border bg-surface p-4 shadow-sm transition hover:border-border-hover">
+                    <div className="flex-1 rounded-xl border border-border bg-surface p-4 shadow-sm transition hover:border-primary/50 hover:shadow-md">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
@@ -353,7 +353,7 @@ function TimelineFormModal({
           </Select>
         </div>
       )}
-      {error && <p className="text-rose-500 text-sm">{error}</p>}
+      {error && <p className="text-danger text-sm">{error}</p>}
     </FormModal>
   );
 }

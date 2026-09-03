@@ -7,7 +7,10 @@ import type {
   UpdateCustomPromptInput,
 } from "@/lib/types.js";
 import { Button } from "./Button.js";
+import { interactiveCardHover } from "./Card.js";
+import { ConfirmDialog } from "./ConfirmDialog.js";
 import { CustomPromptModal } from "./CustomPromptModal.js";
+import { EmptyState } from "./EmptyState.js";
 import { Modal } from "./Modal.js";
 
 interface CustomPromptManagerModalProps {
@@ -34,6 +37,8 @@ export function CustomPromptManagerModal({
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [editingPrompt, setEditingPrompt] = useState<CustomPrompt | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<CustomPrompt | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const toast = useToast();
 
   const filteredPrompts = prompts.filter((p) => {
@@ -53,19 +58,19 @@ export function CustomPromptManagerModal({
     setModalOpen(true);
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (
-      !window.confirm(
-        `カスタムプロンプト「${name}」を削除してもよろしいですか？`
-      )
-    ) {
+  const handleConfirmDelete = async (): Promise<void> => {
+    if (!deleteTarget) {
       return;
     }
+    setDeleting(true);
     try {
-      await deletePrompt(id);
+      await deletePrompt(deleteTarget.id);
+      setDeleteTarget(null);
       toast.success("プロンプトを削除しました");
     } catch {
       toast.error("削除に失敗しました");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -150,21 +155,22 @@ export function CustomPromptManagerModal({
               {error}
             </div>
           ) : filteredPrompts.length === 0 ? (
-            <div className="space-y-2 py-12 text-center">
-              <span className="text-3xl">🪄</span>
-              <p className="text-muted-foreground text-xs">
-                登録されているプロンプトがありません
-              </p>
-              <Button size="sm" variant="secondary" onClick={handleOpenNew}>
-                最初のプロンプトを登録する
-              </Button>
-            </div>
+            <EmptyState
+              title="登録されているプロンプトがありません"
+              actionLabel="最初のプロンプトを登録する"
+              onAction={handleOpenNew}
+              icon={
+                <span aria-hidden="true" className="text-3xl">
+                  🪄
+                </span>
+              }
+            />
           ) : (
             <div className="grid max-h-[60vh] grid-cols-1 gap-3 overflow-y-auto pr-1 md:grid-cols-2">
               {filteredPrompts.map((p) => (
                 <div
                   key={p.id}
-                  className="flex flex-col justify-between space-y-2.5 rounded-xl border border-border bg-surface p-3.5 shadow-sm transition hover:border-primary/50"
+                  className={`flex flex-col justify-between space-y-2.5 rounded-xl border border-border bg-surface p-3.5 shadow-sm ${interactiveCardHover}`}
                 >
                   <div className="space-y-1.5">
                     <div className="flex items-start justify-between gap-2">
@@ -177,7 +183,7 @@ export function CustomPromptManagerModal({
                             {p.name}
                           </h4>
                           <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                            <span className="rounded border border-border/60 bg-muted px-1.5 py-0.2">
+                            <span className="rounded border border-border/60 bg-muted px-1.5 py-px">
                               {p.category === "inline"
                                 ? "インライン推敲"
                                 : p.category === "generation"
@@ -202,7 +208,7 @@ export function CustomPromptManagerModal({
                         </button>
                         <button
                           type="button"
-                          onClick={() => handleDelete(p.id, p.name)}
+                          onClick={() => setDeleteTarget(p)}
                           className="cursor-pointer rounded p-1 text-muted-foreground text-xs hover:bg-muted hover:text-danger"
                           title="削除"
                         >
@@ -241,6 +247,21 @@ export function CustomPromptManagerModal({
         onSubmit={handleModalSubmit}
         editingPrompt={editingPrompt}
         novelId={novelId}
+      />
+
+      <ConfirmDialog
+        isOpen={deleteTarget !== null}
+        onClose={() => {
+          if (!deleting) {
+            setDeleteTarget(null);
+          }
+        }}
+        onConfirm={() => void handleConfirmDelete()}
+        title="プロンプトの削除"
+        message={`カスタムプロンプト「${deleteTarget?.name ?? ""}」を削除してもよろしいですか？`}
+        confirmLabel="削除"
+        cancelLabel="キャンセル"
+        isLoading={deleting}
       />
     </>
   );

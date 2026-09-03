@@ -226,7 +226,7 @@ export function StoryOutlineMarkdownEditor({
           title="ストーリー構想から章立て（プロット）を設計しました"
           size="xl"
           footer={
-            <div className="flex w-full items-center justify-between">
+            <div className="flex w-full flex-wrap items-center justify-between gap-3">
               <span className="text-muted-foreground text-xs">
                 選択中: {selectedPlotIndices.size} /{" "}
                 {plotPreview.chapters.length} 章

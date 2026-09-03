@@ -22,6 +22,11 @@ interface SectionSidebarProps {
     targetChapterId: string,
     targetSectionId: string
   ) => void;
+  onMoveSection: (
+    chapterId: string,
+    sectionId: string,
+    direction: -1 | 1
+  ) => void;
   onSelectSection: (chapterId: string, sectionId: string) => void;
   onToggleChapter: (chapterId: string) => void;
   selectedChapterId: string | null;
@@ -44,6 +49,7 @@ export function SectionSidebar({
   onDragOver,
   onDragEnd,
   onDrop,
+  onMoveSection,
 }: SectionSidebarProps) {
   return (
     <aside className="flex h-full w-72 shrink-0 flex-col overflow-y-auto rounded-xl border border-border bg-surface p-3">
@@ -99,13 +105,16 @@ export function SectionSidebar({
                   </button>
                 </div>
 
-                {/* 節一覧（ドラッグ＆ドロップ対応） */}
+                {/* 節一覧（ドラッグ＆ドロップ対応。キーボードでは ↑↓ ボタンで並び替え） */}
                 {isExpanded && hasSections && (
                   <div className="space-y-1 border-border/40 border-t px-2 py-1.5">
-                    {chapter.sections.map((section) => {
+                    {chapter.sections.map((section, sectionIndex) => {
                       const isSelected = selectedSectionId === section.id;
                       const isDragging = draggingSectionId === section.id;
                       const isDragOver = dragOverSectionId === section.id;
+                      const isFirst = sectionIndex === 0;
+                      const isLast =
+                        sectionIndex === chapter.sections.length - 1;
 
                       return (
                         <div
@@ -115,7 +124,16 @@ export function SectionSidebar({
                           onDragOver={(e) => onDragOver(e, section.id)}
                           onDragEnd={onDragEnd}
                           onDrop={(e) => onDrop(e, chapter.id, section.id)}
-                          className={`group relative flex cursor-pointer select-none items-center gap-1 rounded px-1.5 py-1 text-xs transition ${
+                          role="button"
+                          tabIndex={0}
+                          aria-label={`${section.title || `節 ${section.order}`} を選択`}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              onSelectSection(chapter.id, section.id);
+                            }
+                          }}
+                          className={`group relative flex cursor-pointer select-none items-center gap-1 rounded px-1.5 py-1 text-xs transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 ${
                             isDragging ? "opacity-30" : ""
                           } ${
                             isSelected
@@ -148,6 +166,36 @@ export function SectionSidebar({
 
                           <span className="flex-1 truncate">
                             {section.title || `節 ${section.order}`}
+                          </span>
+
+                          {/* キーボード操作用の並び替えボタン */}
+                          <span className="flex shrink-0 items-center opacity-0 transition focus-within:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onMoveSection(chapter.id, section.id, -1);
+                              }}
+                              disabled={isFirst}
+                              className="rounded p-0.5 transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-30"
+                              title="一つ上に移動"
+                              aria-label={`${section.title || `節 ${section.order}`} を一つ上に移動`}
+                            >
+                              <ChevronUpIcon />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onMoveSection(chapter.id, section.id, 1);
+                              }}
+                              disabled={isLast}
+                              className="rounded p-0.5 transition hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-30"
+                              title="一つ下に移動"
+                              aria-label={`${section.title || `節 ${section.order}`} を一つ下に移動`}
+                            >
+                              <ChevronDownIcon />
+                            </button>
                           </span>
                         </div>
                       );

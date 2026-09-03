@@ -180,7 +180,7 @@ export function EntityEditorShell({
       </div>
 
       {error && (
-        <div className="shrink-0 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-destructive text-sm">
+        <div className="shrink-0 rounded-lg border border-danger/30 bg-danger/10 p-3 text-danger text-sm">
           {error}
         </div>
       )}

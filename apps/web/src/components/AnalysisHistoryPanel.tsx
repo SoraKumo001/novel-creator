@@ -193,7 +193,7 @@ export function AnalysisHistoryPanel({
                       type="button"
                       onClick={() => setDeleteTarget(entry)}
                       aria-label="この履歴を削除"
-                      className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition hover:bg-rose-500/10 hover:text-rose-600 focus:opacity-100 group-hover:opacity-100"
+                      className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition hover:bg-danger/10 hover:text-danger focus:opacity-100 group-hover:opacity-100"
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"

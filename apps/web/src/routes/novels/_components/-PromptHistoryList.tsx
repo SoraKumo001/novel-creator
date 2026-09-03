@@ -38,7 +38,7 @@ export function PromptHistoryList({
               type="button"
               onClick={() => onRequestDelete(item.id)}
               title="履歴から削除"
-              className="shrink-0 rounded p-1 text-muted-foreground opacity-60 transition hover:bg-destructive/10 hover:text-destructive hover:opacity-100"
+              className="shrink-0 rounded p-1 text-muted-foreground opacity-60 transition hover:bg-danger/10 hover:text-danger hover:opacity-100"
             >
               <TrashIcon />
             </button>

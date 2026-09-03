@@ -9,6 +9,7 @@ import {
 } from "react";
 import { Button } from "@/components/Button.js";
 import { ExportModal } from "@/components/ExportModal.js";
+import { KeyboardShortcutsModal } from "@/components/KeyboardShortcutsModal.js";
 import { Loading } from "@/components/Loading.js";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import { useChatUI } from "@/context/ChatContext.js";
@@ -85,6 +86,7 @@ export function NovelDetailPage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [exportLoading, setExportLoading] = useState(false);
   const [exportData, setExportData] = useState<NovelExportData | null>(null);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
   const checkTabScroll = useCallback(() => {
     const el = tabListRef.current;
@@ -186,7 +188,7 @@ export function NovelDetailPage() {
     <div className="flex h-full min-h-0 w-full flex-col overflow-hidden">
       {loading && <Loading message="小説を読み込み中..." />}
       {!loading && error && (
-        <div className="shrink-0 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-destructive text-sm">
+        <div className="shrink-0 rounded-lg border border-danger/30 bg-danger/10 p-4 text-danger text-sm">
           {error}
         </div>
       )}
@@ -208,6 +210,13 @@ export function NovelDetailPage() {
               )}
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => setShortcutsOpen(true)}
+                title="キーボードショートカット一覧"
+              >
+                <span aria-hidden="true">⌨</span> ショートカット
+              </Button>
               <Button
                 variant="secondary"
                 onClick={handleOpenExport}
@@ -260,14 +269,14 @@ export function NovelDetailPage() {
                         search: { tab: t.id },
                       })
                     }
-                    className={`group flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 py-1.5 font-medium text-xs transition sm:px-3 sm:py-2 sm:text-sm ${
+                    className={`group flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 font-medium text-sm transition ${
                       isActive
-                        ? "border-primary bg-primary/5 font-bold text-primary"
+                        ? "border-primary bg-primary/5 font-semibold text-primary"
                         : "border-transparent text-muted-foreground hover:border-border hover:bg-surface-hover hover:text-foreground"
                     }`}
                     title={`Alt + ${t.shortcut}`}
                   >
-                    <span>{t.icon}</span>
+                    <span aria-hidden="true">{t.icon}</span>
                     <span>{t.label}</span>
                     <span className="hidden rounded px-1 text-[10px] text-muted-foreground opacity-60 group-hover:opacity-100 xl:inline-block">
                       Alt+{t.shortcut}
@@ -320,6 +329,11 @@ export function NovelDetailPage() {
           novel={exportData}
         />
       )}
+
+      <KeyboardShortcutsModal
+        isOpen={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+      />
     </div>
   );
 }

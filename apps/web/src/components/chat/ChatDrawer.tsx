@@ -1,4 +1,6 @@
 import { LLMModelSelector } from "@/components/LLMModelSelector.js";
+import { Loading } from "@/components/Loading.js";
+import { Select } from "@/components/Select.js";
 import { QUICK_PROMPTS } from "@/context/ChatContext.js";
 import {
   ChatErrorPanel,
@@ -74,8 +76,8 @@ export function ChatDrawer() {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1">
-          {/* 配置モード切り替え（重ねる ⇔ 占有） */}
+        <div className="flex shrink-0 items-center gap-1 max-sm:gap-0.5">
+          {/* 配置モード切り替え（重ねる ⇔ 占有。狭幅では常時オーバーレイのため非表示） */}
           <button
             type="button"
             onClick={() =>
@@ -83,7 +85,7 @@ export function ChatDrawer() {
                 d.layoutMode === "docked" ? "overlay" : "docked"
               )
             }
-            className={`cursor-pointer rounded-lg border p-1.5 text-xs transition ${
+            className={`cursor-pointer rounded-lg border p-1.5 text-xs transition max-sm:hidden ${
               d.layoutMode === "docked"
                 ? "border-primary/40 bg-primary/10 text-primary hover:bg-primary/20"
                 : "border-border bg-surface text-muted-foreground hover:bg-surface-hover hover:text-foreground"
@@ -120,7 +122,7 @@ export function ChatDrawer() {
             )}
           </button>
 
-          {/* 幅切り替え（サイクル: 標準 -> ワイド -> 全画面） */}
+          {/* 幅切り替え（サイクル: 標準 -> ワイド -> 全画面。狭幅では常時全幅のため非表示） */}
           <button
             type="button"
             onClick={() => {
@@ -132,7 +134,7 @@ export function ChatDrawer() {
                     : "normal";
               d.handleWidthChange(next);
             }}
-            className="flex cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface p-1.5 text-muted-foreground text-xs transition hover:bg-surface-hover hover:text-foreground"
+            className="flex cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface p-1.5 text-muted-foreground text-xs transition hover:bg-surface-hover hover:text-foreground max-sm:hidden"
             title={`チャット幅: ${
               d.drawerWidth === "normal"
                 ? "標準 (クリックでワイド幅へ)"
@@ -239,15 +241,15 @@ export function ChatDrawer() {
             htmlFor="chat-novel-select"
             className="flex shrink-0 items-center gap-1 font-medium text-muted-foreground"
           >
-            <span>📚 対象:</span>
+            <span aria-hidden="true">📚</span> 対象:
           </label>
-          <select
+          <Select
             id="chat-novel-select"
             value={d.selectedNovelId ?? ""}
             onChange={(e) =>
               d.setSelectedNovelId(e.target.value ? e.target.value : null)
             }
-            className="max-w-45 truncate rounded border border-border bg-surface px-2 py-1 text-foreground text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="max-w-[11.25rem] truncate px-2 py-1 text-xs focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="">（全般相談）</option>
             {d.novels.map((n) => (
@@ -255,7 +257,7 @@ export function ChatDrawer() {
                 {n.title}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         <div className="flex items-center gap-1.5">
@@ -315,9 +317,7 @@ export function ChatDrawer() {
             )}
 
             {d.loadingMessages && (
-              <div className="py-8 text-center text-muted-foreground text-xs">
-                メッセージを読み込み中...
-              </div>
+              <Loading size="sm" message="メッセージを読み込み中..." />
             )}
 
             {d.error && (

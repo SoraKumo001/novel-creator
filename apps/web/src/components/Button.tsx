@@ -19,7 +19,7 @@ const variantStyles: Record<ButtonVariant, string> = {
     "bg-primary text-primary-foreground hover:bg-primary-hover focus:ring-primary",
   secondary:
     "bg-surface text-foreground border border-border hover:bg-surface-hover focus:ring-primary",
-  danger: "bg-rose-600 text-white hover:bg-rose-700 focus:ring-rose-500",
+  danger: "bg-danger text-white hover:bg-danger-hover focus:ring-danger",
   ghost:
     "bg-transparent text-foreground-secondary hover:bg-surface-hover hover:text-foreground focus:ring-primary",
 };

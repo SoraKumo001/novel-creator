@@ -106,7 +106,7 @@ export function HistoryDiffModal({
         title={`編集履歴と差分: ${title}`}
         size="xl"
         footer={
-          <div className="flex w-full items-center justify-between">
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-muted-foreground text-xs">
               <span className="inline-block h-2 w-2 rounded-full bg-rose-500" />
               <span>過去バージョン（左/赤）</span>
@@ -130,9 +130,9 @@ export function HistoryDiffModal({
           </div>
         }
       >
-        <div className="flex h-[620px] min-h-0 w-full flex-col space-y-3">
+        <div className="flex h-[60vh] min-h-0 w-full flex-col space-y-3 sm:h-[620px]">
           {/* 上部コントロールバー */}
-          <div className="flex shrink-0 items-center justify-between border-border border-b pb-2 text-xs">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-border border-b pb-2 text-xs">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-foreground">
                 履歴件数: {histories.length} 件
@@ -196,7 +196,7 @@ export function HistoryDiffModal({
                       <div className="flex items-center justify-between text-[11px]">
                         <span className="font-semibold">{dateStr}</span>
                         {index === 0 && (
-                          <span className="rounded bg-primary/20 px-1 py-0.2 font-bold text-[9px] text-primary">
+                          <span className="rounded bg-primary/20 px-1 py-px font-bold text-[9px] text-primary">
                             最新
                           </span>
                         )}

@@ -172,7 +172,7 @@ export function ProposalCardBody({
               {data.traits.map((t: string, i: number) => (
                 <span
                   key={i}
-                  className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                  className="rounded bg-slate-100 px-1.5 py-px text-[10px] text-slate-600 dark:bg-slate-800 dark:text-slate-300"
                 >
                   #{t}
                 </span>
@@ -249,7 +249,7 @@ export function ProposalCardBody({
         <div className="space-y-1">
           <div className="font-bold text-slate-900 dark:text-slate-100">
             {data.title}{" "}
-            <span className="rounded bg-amber-50 px-1.5 py-0.2 text-[10px] text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+            <span className="rounded bg-amber-50 px-1.5 py-px text-[10px] text-amber-700 dark:bg-amber-950 dark:text-amber-300">
               {data.status || "未回収"}
             </span>
           </div>
@@ -289,7 +289,7 @@ export function ProposalCardBody({
             <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-slate-100">
               <span>📝 {safeSectionName}</span>
               {data.mode && data.mode !== "replace" && (
-                <span className="rounded bg-amber-100 px-1.5 py-0.2 font-medium text-[10px] text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                <span className="rounded bg-amber-100 px-1.5 py-px font-medium text-[10px] text-amber-800 dark:bg-amber-950 dark:text-amber-300">
                   {data.mode === "append"
                     ? "追記"
                     : data.mode === "prepend"

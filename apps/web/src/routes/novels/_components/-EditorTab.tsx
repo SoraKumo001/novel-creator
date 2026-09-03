@@ -116,6 +116,39 @@ export function EditorTab({
     await onRefresh();
   };
 
+  // キーボード操作での節の並び替え（ドラッグ＆ドロップの代替手段。同一章内のみ）
+  const handleMoveSection = async (
+    chapterId: string,
+    sectionId: string,
+    direction: -1 | 1
+  ): Promise<void> => {
+    const targetChapter = chapters.find((c) => c.id === chapterId);
+    if (!targetChapter) {
+      return;
+    }
+    const ordered = [...targetChapter.sections].sort(
+      (a, b) => a.order - b.order
+    );
+    const currentIndex = ordered.findIndex((s) => s.id === sectionId);
+    const swapIndex = currentIndex + direction;
+    if (currentIndex === -1 || !ordered[swapIndex]) {
+      return;
+    }
+    const current = ordered[currentIndex];
+    const other = ordered[swapIndex];
+    await updateSection(current.id, {
+      title: current.title ?? "",
+      order: other.order,
+      summary: current.summary ?? "",
+    });
+    await updateSection(other.id, {
+      title: other.title ?? "",
+      order: current.order,
+      summary: other.summary ?? "",
+    });
+    await onRefresh();
+  };
+
   // ドラッグ＆ドロップハンドラ
   const handleDragStart = useCallback(
     (e: React.DragEvent, sectionId: string) => {
@@ -247,6 +280,9 @@ export function EditorTab({
           onDrop={(e, chapterId, sectionId) =>
             void handleDrop(e, chapterId, sectionId)
           }
+          onMoveSection={(chapterId, sectionId, direction) =>
+            void handleMoveSection(chapterId, sectionId, direction)
+          }
         />
       )}
 
@@ -269,7 +305,9 @@ export function EditorTab({
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center space-y-4 p-8 text-center">
-            <div className="text-4xl">✍️</div>
+            <div className="text-4xl" aria-hidden="true">
+              ✍️
+            </div>
             <div>
               <h3 className="font-semibold text-base text-foreground">
                 {selectedChapter

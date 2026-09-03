@@ -128,7 +128,7 @@ export function StoryArcChartModal({
             キャンセル
           </Button>
         ) : (
-          <div className="flex w-full items-center justify-between gap-3">
+          <div className="flex w-full flex-wrap items-center justify-between gap-3">
             <span className="text-[11px] text-muted-foreground">
               分析結果は自動保存されます
             </span>

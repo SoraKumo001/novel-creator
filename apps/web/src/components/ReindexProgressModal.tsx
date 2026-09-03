@@ -126,7 +126,7 @@ export function ReindexProgressModal({
         )}
 
         {error && (
-          <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-rose-600 text-xs dark:text-rose-400">
+          <div className="rounded-xl border border-danger/30 bg-danger/10 p-3 text-danger text-xs">
             <div className="font-bold">エラーが発生しました</div>
             <div className="mt-1">{error}</div>
           </div>

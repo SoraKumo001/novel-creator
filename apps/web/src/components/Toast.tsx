@@ -155,7 +155,7 @@ function ToastViewport({
   onDismiss: (id: number) => void;
 }) {
   return (
-    <div className="pointer-events-none fixed right-6 bottom-6 z-100 flex w-88 max-w-[calc(100vw-3rem)] flex-col gap-2.5">
+    <div className="pointer-events-none fixed right-6 bottom-6 z-[100] flex w-[22rem] max-w-[calc(100vw-3rem)] flex-col gap-2.5">
       {toasts.map((toast) => (
         <div
           key={toast.id}

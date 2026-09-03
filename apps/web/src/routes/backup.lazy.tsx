@@ -204,21 +204,20 @@ export function BackupPage() {
                 onChange={handleFileChange}
                 className="sr-only"
               />
-              <label
-                htmlFor="backup-file"
-                className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 text-foreground text-sm transition hover:border-primary hover:bg-primary-subtle"
-              >
-                <UploadIcon className="h-5 w-5 text-muted" />
-                <span className="flex-1 truncate">
-                  {file ? file.name : "JSONファイルを選択"}
-                </span>
+              <div className="flex items-center gap-3 rounded-lg border border-border bg-surface px-4 py-3 text-foreground text-sm transition hover:border-primary hover:bg-primary-subtle">
+                <label
+                  htmlFor="backup-file"
+                  className="flex flex-1 cursor-pointer items-center gap-3"
+                >
+                  <UploadIcon className="h-5 w-5 text-muted" />
+                  <span className="flex-1 truncate">
+                    {file ? file.name : "JSONファイルを選択"}
+                  </span>
+                </label>
                 {file && (
                   <button
                     type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      resetFile();
-                    }}
+                    onClick={() => resetFile()}
                     className="rounded p-1 text-muted transition hover:bg-surface-hover hover:text-foreground"
                     aria-label="クリア"
                   >
@@ -238,9 +237,9 @@ export function BackupPage() {
                     </svg>
                   </button>
                 )}
-              </label>
+              </div>
               {parseError && (
-                <p className="mt-1.5 text-rose-500 text-xs">{parseError}</p>
+                <p className="mt-1.5 text-danger text-xs">{parseError}</p>
               )}
             </div>
             {parsed && counts && (
