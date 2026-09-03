@@ -1,4 +1,5 @@
 import { chapters } from "@novel-creator/db";
+import type { ToolSet } from "ai";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { searchContext } from "../../rag.js";
@@ -10,7 +11,7 @@ import { SectionDomainService } from "../section.service.js";
 import { SettingDomainService } from "../setting.service.js";
 import { TimelineDomainService } from "../timeline.service.js";
 import type { ServiceContext } from "../types.js";
-import { scopedTool } from "./scopedTool.js";
+import { createNovelScope, createTool } from "./scopedTool.js";
 
 // ===== トークン爆発防止のための truncation ヘルパー（pure function） =====
 
@@ -105,7 +106,7 @@ export function isSectionInScope(
 export function createReadTools(
   ctx: ServiceContext,
   defaultNovelId?: string | null
-): Record<string, unknown> {
+): ToolSet {
   const novelService = new NovelDomainService(ctx);
   const characterService = new CharacterDomainService(ctx);
   const settingService = new SettingDomainService(ctx);
@@ -114,15 +115,14 @@ export function createReadTools(
   const foreshadowingService = new ForeshadowingDomainService(ctx);
   const timelineService = new TimelineDomainService(ctx);
 
-  const resolveNovelId = (providedId?: string | null): string | null =>
-    providedId || defaultNovelId || null;
+  const novelScope = createNovelScope(defaultNovelId);
 
   return {
-    getCharacters: scopedTool({
+    getCharacters: createTool({
       description:
         "小説に登場するキャラクター一覧または特定のキャラクターの詳細を取得します。名前やカテゴリで絞り込み可能です。",
       errorMessage: "キャラクター情報の取得に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         category: z
           .string()
           .optional()
@@ -136,8 +136,8 @@ export function createReadTools(
           .optional()
           .describe("対象の小説ID（省略時は現在の相談対象小説）"),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: async (targetId, { name, category }) => {
+      scope: novelScope.fromParam,
+      handler: async (targetId, { name, category }) => {
         let list = await characterService.listCharacters(targetId);
         if (name) {
           const query = name.toLowerCase();
@@ -166,11 +166,11 @@ export function createReadTools(
       },
     }),
 
-    getForeshadowings: scopedTool({
+    getForeshadowings: createTool({
       description:
         "小説に登録されている伏線の一覧、進捗状況（未回収/回収済/破棄）、詳細説明を取得します。",
       errorMessage: "伏線情報の取得に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         novelId: z
           .string()
           .optional()
@@ -182,8 +182,8 @@ export function createReadTools(
             "伏線のステータスで絞り込み（unresolved: 未回収, resolved: 回収済, abandoned: 破棄）"
           ),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: async (targetId, { status }) => {
+      scope: novelScope.fromParam,
+      handler: async (targetId, { status }) => {
         let list =
           await foreshadowingService.getForeshadowingsByNovel(targetId);
         if (status) {
@@ -208,17 +208,17 @@ export function createReadTools(
         };
       },
     }),
-    getNovelInfo: scopedTool({
+    getNovelInfo: createTool({
       description: "小説の基本情報（タイトル、あらすじ、概要）を取得します。",
       errorMessage: "指定された小説が見つかりませんでした。",
-      parameters: z.object({
+      inputSchema: z.object({
         novelId: z
           .string()
           .optional()
           .describe("対象の小説ID（省略時は現在の相談対象小説）"),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: async (targetId) => {
+      scope: novelScope.fromParam,
+      handler: async (targetId) => {
         const detail = await novelService.getNovelDetail(targetId);
         return {
           chapterCount: detail.chapters.length,
@@ -240,18 +240,18 @@ export function createReadTools(
       },
     }),
 
-    getPlotAndChapters: scopedTool({
+    getPlotAndChapters: createTool({
       description:
         "小説の全章（Chapter）および各節（Section）の構成、プロット・あらすじ一覧を取得します。",
       errorMessage: "章・プロット情報の取得に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         novelId: z
           .string()
           .optional()
           .describe("対象の小説ID（省略時は現在の相談対象小説）"),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: async (targetId) => {
+      scope: novelScope.fromParam,
+      handler: async (targetId) => {
         const chapterRows = await chapterService.listChapters(targetId);
         const chapterTrunc = truncateList(chapterRows, MAX_STRUCTURE_ITEMS);
         const chaptersWithSections = await Promise.all(
@@ -283,15 +283,15 @@ export function createReadTools(
       },
     }),
 
-    getSectionContent: scopedTool({
+    getSectionContent: createTool({
       description: "指定された節（Section）の本文テキストを取得します。",
       errorMessage: "指定された節または本文が見つかりませんでした。",
-      parameters: z.object({
+      inputSchema: z.object({
         sectionId: z.string().describe("取得対象の節ID（Section ID）"),
       }),
       // バインドされた novelId にスコープを限定する（LLM による指定は受け付けない）。
-      resolve: () => defaultNovelId || null,
-      run: async (scopedNovelId, { sectionId }) => {
+      scope: novelScope.boundOnly,
+      handler: async (scopedNovelId, { sectionId }) => {
         const { section, content } =
           await sectionService.getSectionWithContent(sectionId);
         // novelId スコープ判定: sections テーブルに novelId カラムはないため、
@@ -317,11 +317,11 @@ export function createReadTools(
       },
     }),
 
-    getSettings: scopedTool({
+    getSettings: createTool({
       description:
         "小説の世界観・設定（用語、地理、魔法、組織、アイテム等）の一覧または特定設定の詳細を取得します。",
       errorMessage: "設定情報の取得に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         category: z
           .string()
           .optional()
@@ -335,8 +335,8 @@ export function createReadTools(
           .optional()
           .describe("対象の小説ID（省略時は現在の相談対象小説）"),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: async (targetId, { name, category }) => {
+      scope: novelScope.fromParam,
+      handler: async (targetId, { name, category }) => {
         let list = await settingService.listSettings(targetId);
         if (name) {
           const query = name.toLowerCase();
@@ -364,18 +364,18 @@ export function createReadTools(
       },
     }),
 
-    getStoryOutline: scopedTool({
+    getStoryOutline: createTool({
       description:
         "小説のストーリー構想（全体のあらすじ、序盤・中盤・今後の展開候補、結末、構想メモ）のマークダウン内容を取得します。構成や今後の展開・結末の相談時に参照してください。",
       errorMessage: "ストーリー構想の取得に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         novelId: z
           .string()
           .optional()
           .describe("対象の小説ID（省略時は現在の相談対象小説）"),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: async (targetId) => {
+      scope: novelScope.fromParam,
+      handler: async (targetId) => {
         const detail = await novelService.getNovelDetail(targetId);
         return {
           storyOutline:
@@ -386,17 +386,17 @@ export function createReadTools(
       },
     }),
 
-    getTimelines: scopedTool({
+    getTimelines: createTool({
       description: "作中の時系列・年表イベントの一覧を取得します。",
       errorMessage: "タイムライン情報の取得に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         novelId: z
           .string()
           .optional()
           .describe("対象の小説ID（省略時は現在の相談対象小説）"),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: async (targetId) => {
+      scope: novelScope.fromParam,
+      handler: async (targetId) => {
         const list = await timelineService.listTimelines(targetId);
         const trunc = truncateList(list, MAX_STRUCTURE_ITEMS);
         return {
@@ -413,19 +413,19 @@ export function createReadTools(
       },
     }),
 
-    searchNovelKnowledge: scopedTool({
+    searchNovelKnowledge: createTool({
       description:
         "質問やキーワードに関連する小説情報（設定・人物・本文等）をセマンティック検索（ベクトル検索）します。",
       errorMessage: "関連ナレッジの検索に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         novelId: z
           .string()
           .optional()
           .describe("対象の小説ID（省略時は現在の相談対象小説）"),
         query: z.string().describe("検索キーワードまたは質問文"),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: async (targetId, { query }) => {
+      scope: novelScope.fromParam,
+      handler: async (targetId, { query }) => {
         const ragResult = await searchContext(
           ctx.vectorStore,
           ctx.embedding,

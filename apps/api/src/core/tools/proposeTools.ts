@@ -1,6 +1,7 @@
+import type { ToolSet } from "ai";
 import { z } from "zod";
 import type { ServiceContext } from "../types.js";
-import { scopedTool } from "./scopedTool.js";
+import { createNovelScope, createTool } from "./scopedTool.js";
 
 /**
  * 創作相談チャット用の小説設定提案ツール群（Propose Tools）。
@@ -11,16 +12,15 @@ import { scopedTool } from "./scopedTool.js";
 export function createProposeTools(
   _ctx: ServiceContext,
   defaultNovelId?: string | null
-): Record<string, unknown> {
-  const resolveNovelId = (providedId?: string | null): string | null =>
-    providedId || defaultNovelId || null;
+): ToolSet {
+  const novelScope = createNovelScope(defaultNovelId);
 
   return {
-    proposeAddForeshadowing: scopedTool({
+    proposeAddForeshadowing: createTool({
       description:
         "新しい伏線の登録をユーザーに提案します。作中に散りばめる謎や回収計画が考案された場合に使用してください。",
       errorMessage: "伏線登録提案の生成に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         description: z.string().describe("伏線の詳細、真相、回収アイデア"),
         novelId: z
           .string()
@@ -33,8 +33,8 @@ export function createProposeTools(
           .describe("ステータス（通常は unresolved）"),
         title: z.string().describe("伏線のタイトル・概要"),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: (targetId, { title, description, status = "unresolved" }) => ({
+      scope: novelScope.fromParam,
+      handler: (targetId, { title, description, status = "unresolved" }) => ({
         data: {
           description,
           status,
@@ -47,11 +47,11 @@ export function createProposeTools(
       }),
     }),
 
-    proposeAddTimelineEvent: scopedTool({
+    proposeAddTimelineEvent: createTool({
       description:
         "作中の時系列・年表への新しい出来事（イベント）の追加をユーザーに提案します。",
       errorMessage: "年表イベント追加提案の生成に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         event: z.string().describe("出来事・イベントの内容"),
         novelId: z
           .string()
@@ -64,8 +64,8 @@ export function createProposeTools(
             "作中時期や日時・順序を表す文字列（例: 帝都暦742年、物語開始直前など）"
           ),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: (targetId, { event, timestamp }) => ({
+      scope: novelScope.fromParam,
+      handler: (targetId, { event, timestamp }) => ({
         data: {
           event,
           timestamp: timestamp || null,
@@ -76,11 +76,11 @@ export function createProposeTools(
         type: "proposal",
       }),
     }),
-    proposeCreateCharacter: scopedTool({
+    proposeCreateCharacter: createTool({
       description:
         "新しい登場人物（キャラクター）の登録、または既存の古い人物の削除を伴う設定更新・置換をユーザーに提案します。会話の中で新しい人物が考案されたり、既存人物の名前・設定の刷新が決まった場合に使用してください。",
       errorMessage: "キャラクター登録提案の生成に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         category: z
           .string()
           .optional()
@@ -110,8 +110,8 @@ export function createProposeTools(
             '特徴・キーワードの配列（例: ["銀髪", "冷静沈着", "炎魔法"]）'
           ),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: (
+      scope: novelScope.fromParam,
+      handler: (
         targetId,
         {
           name,
@@ -144,11 +144,11 @@ export function createProposeTools(
       },
     }),
 
-    proposeCreateSetting: scopedTool({
+    proposeCreateSetting: createTool({
       description:
         "新しい世界観・設定（用語、地理、魔法体系、組織、アイテムなど）の登録、または既存の古い設定の削除を伴う更新・置換をユーザーに提案します。会話の中で新しい設定が考案されたり、既存設定の名称変更・全面差し替えが決まった場合に使用してください。",
       errorMessage: "設定登録提案の生成に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         category: z
           .string()
           .describe(
@@ -167,8 +167,8 @@ export function createProposeTools(
             "置換・更新元の古い設定名。設定名変更や差し替えに伴い古い設定を削除したい場合に指定します。"
           ),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: (targetId, { name, category, description, oldSettingName }) => {
+      scope: novelScope.fromParam,
+      handler: (targetId, { name, category, description, oldSettingName }) => {
         const hasReplace =
           typeof oldSettingName === "string" &&
           oldSettingName.trim().length > 0;
@@ -191,11 +191,11 @@ export function createProposeTools(
       },
     }),
 
-    proposeDeleteSetting: scopedTool({
+    proposeDeleteSetting: createTool({
       description:
         "不要になった世界観・設定の削除をユーザーに提案します。会話の中で廃止・整理が決まった設定がある場合に使用してください。",
       errorMessage: "設定削除提案の生成に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         name: z.string().describe("削除する世界観・設定の名称"),
         novelId: z
           .string()
@@ -206,8 +206,8 @@ export function createProposeTools(
           .optional()
           .describe("この設定を削除する理由・背景の説明"),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: (targetId, { name, reason }) => ({
+      scope: novelScope.fromParam,
+      handler: (targetId, { name, reason }) => ({
         data: {
           name,
           reason: reason || null,
@@ -219,11 +219,11 @@ export function createProposeTools(
       }),
     }),
 
-    proposeDeleteCharacter: scopedTool({
+    proposeDeleteCharacter: createTool({
       description:
         "不要になった登場人物（キャラクター）の削除をユーザーに提案します。会話の中で廃止・退場が決まった人物がある場合に使用してください。",
       errorMessage: "キャラクター削除提案の生成に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         name: z.string().describe("削除する登場人物の名称"),
         novelId: z
           .string()
@@ -234,8 +234,8 @@ export function createProposeTools(
           .optional()
           .describe("この人物を削除する理由・背景の説明"),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: (targetId, { name, reason }) => ({
+      scope: novelScope.fromParam,
+      handler: (targetId, { name, reason }) => ({
         data: {
           name,
           reason: reason || null,
@@ -247,11 +247,11 @@ export function createProposeTools(
       }),
     }),
 
-    proposeUpdatePlot: scopedTool({
+    proposeUpdatePlot: createTool({
       description:
         "章のプロット・あらすじの作成または更新をユーザーに提案します。",
       errorMessage: "プロット反映提案の生成に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         chapterTitle: z.string().describe("章のタイトル（例: 第1章 旅立ち）"),
         novelId: z
           .string()
@@ -259,8 +259,8 @@ export function createProposeTools(
           .describe("対象の小説ID（省略時は現在の相談対象小説）"),
         summary: z.string().describe("提案する章のあらすじ・プロット内容"),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: (targetId, { chapterTitle, summary }) => ({
+      scope: novelScope.fromParam,
+      handler: (targetId, { chapterTitle, summary }) => ({
         data: {
           chapterTitle,
           summary,
@@ -272,11 +272,11 @@ export function createProposeTools(
       }),
     }),
 
-    proposeUpdateStoryOutline: scopedTool({
+    proposeUpdateStoryOutline: createTool({
       description:
         "ストーリー構想（全体のあらすじ、起承転結、序盤・中盤・結末、今後の展開候補、構想メモなど）のマークダウンの追加・更新・ブラッシュアップをユーザーに提案します。反映したい具体的な文章・マークダウン本文を必ず content 引数に完全に含めて呼び出してください。全体を一括更新する場合は mode: 'full_document'、特定セクションを更新する場合はそのセクション名を指定します。",
       errorMessage: "ストーリー構想更新提案の生成に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         content: z
           .string()
           .min(
@@ -308,8 +308,11 @@ export function createProposeTools(
             '反映先セクション名または見出し名（例: "全体あらすじ", "結（結末・エンディング）", "起（序盤・導入）", "承（中盤・展開）", "転（転換点・クライマックス）", "今後の展開候補 & 分岐アイデア", "作品コンセプト & ログライン", "ドキュメント全体" など。省略時は自動判定）'
           ),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: (targetId, { sectionName, content, mode = "replace", reason }) => {
+      scope: novelScope.fromParam,
+      handler: (
+        targetId,
+        { sectionName, content, mode = "replace", reason }
+      ) => {
         const resolvedSection =
           typeof sectionName === "string" &&
           sectionName.trim() &&
@@ -334,11 +337,11 @@ export function createProposeTools(
       },
     }),
 
-    proposeBulkCreate: scopedTool({
+    proposeBulkCreate: createTool({
       description:
         "複数の登場人物、世界観設定、伏線、年表イベントなどをまとめて一括でユーザーに登録提案します。会話の中で複数のキャラクターや設定が同時に考案された場合は、個別にツールを何度も呼ぶのではなく、必ずこの一括提案ツールを1回だけ呼び出してください。",
       errorMessage: "一括登録提案の生成に失敗しました。",
-      parameters: z.object({
+      inputSchema: z.object({
         characters: z
           .array(
             z.object({
@@ -407,8 +410,8 @@ export function createProposeTools(
           .default([])
           .describe("提案する年表イベントの配列"),
       }),
-      resolve: ({ novelId }) => resolveNovelId(novelId),
-      run: (
+      scope: novelScope.fromParam,
+      handler: (
         targetId,
         {
           characters = [],
