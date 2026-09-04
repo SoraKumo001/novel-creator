@@ -1,3 +1,4 @@
+import type { MarkdownCategoryNode } from "@novel-creator/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { useToast } from "@/hooks/useToast.js";
@@ -51,8 +52,31 @@ export function useOverlapHover(onClose?: () => void) {
   };
 }
 
-export function useSidebarResize(initialWidth = 256, min = 160, max = 500) {
-  const [sidebarWidth, setSidebarWidth] = useState(initialWidth);
+/**
+ * サイドバー分割幅・リサイズ操作の単一実装。
+ * useMarkdownEntityEditor 側の重複実装は廃止し、こちらに寄せている。
+ * storageKey 指定時のみ localStorage に永続化する（未指定時は従来通り state のみ）。
+ */
+export function useSidebarResize(
+  initialWidth = 256,
+  min = 160,
+  max = 500,
+  options?: { storageKey?: string }
+) {
+  const storageKey = options?.storageKey;
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (storageKey) {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          return Number.parseInt(saved, 10);
+        }
+      } catch {
+        // storage 利用不可時は初期値
+      }
+    }
+    return initialWidth;
+  });
   const isDraggingRef = useRef(false);
   const sidebarWidthRef = useRef(sidebarWidth);
   sidebarWidthRef.current = sidebarWidth;
@@ -76,13 +100,23 @@ export function useSidebarResize(initialWidth = 256, min = 160, max = 500) {
         isDraggingRef.current = false;
         document.body.style.cursor = "";
         document.body.style.userSelect = "";
+        if (storageKey) {
+          setSidebarWidth((current) => {
+            try {
+              localStorage.setItem(storageKey, String(current));
+            } catch {
+              // storage 利用不可時は state のみ維持
+            }
+            return current;
+          });
+        }
         window.removeEventListener("mousemove", handleMouseMove);
         window.removeEventListener("mouseup", handleMouseUp);
       };
       window.addEventListener("mousemove", handleMouseMove);
       window.addEventListener("mouseup", handleMouseUp);
     },
-    [min, max]
+    [min, max, storageKey]
   );
 
   return { sidebarWidth, setSidebarWidth, handleSplitterMouseDown };
@@ -471,19 +505,13 @@ export function useMarkdownExternalSync(options: {
   }, [entityTitle, entityType, novelId, setMarkdown, toast]);
 }
 
-export interface TocNode {
-  category: string;
-  children: { name: string; headingLine: number }[];
-  headingLine: number;
-}
-
 export function MarkdownTocNav({
   tree,
   activeCategory,
   activeName,
   onJump,
 }: {
-  tree: TocNode[];
+  tree: MarkdownCategoryNode[];
   activeCategory?: string;
   activeName?: string;
   onJump: (headingLine: number) => void;

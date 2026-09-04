@@ -17,5 +17,16 @@ describe("text utility", () => {
       expect(countWords("Hello world")).toBe(2);
       expect(countWords("The quick brown fox jumps over the lazy dog")).toBe(9);
     });
+
+    it("ルビ記法の読み（rt部分）を除外して数えること", () => {
+      expect(countWords("|漢字《かんじ》")).toBe(2);
+      expect(countWords("漢字《かんじ》")).toBe(2);
+      expect(countWords("《《秘密》》")).toBe(2);
+    });
+
+    it("日本語が1文字でもあると英語を無視すること（挙動固定）", () => {
+      expect(countWords("あ Hello")).toBe(1);
+      expect(countWords("Hello あ")).toBe(1);
+    });
   });
 });

@@ -5,6 +5,7 @@ import {
   findCharacterAtLine,
 } from "@novel-creator/shared";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { describe, expect, it, vi } from "vitest";
 import {
   type MonacoEditorInstance,
@@ -91,5 +92,87 @@ describe("useMarkdownEntityEditor", () => {
       column: 1,
     });
     expect(result.current.activeSection?.name).toBe("大正一");
+  });
+
+  it("編集後に markdown/Dirty は即時反映し、ToCツリーは遅延追従すること", async () => {
+    const { result } = renderHook(() =>
+      useMarkdownEntityEditor<CharacterCategoryNode[], CharacterSectionRange>({
+        storageKey: "test-key-deferred",
+        fetchMarkdown: async () => sampleMarkdown,
+        buildTree: buildCharacterTree,
+        findSectionAtLine: findCharacterAtLine,
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    const edited = `${sampleMarkdown}\n## 新人物\n追加された人物。\n`;
+    act(() => {
+      result.current.handleEditorChange(edited);
+    });
+
+    // 保存・Dirty 判定は即時 markdown ベース
+    expect(result.current.markdown).toBe(edited);
+    expect(result.current.isDirty).toBe(true);
+
+    // ToCツリーは遅延値から再計算され、最終的に新見出しを拾う
+    await waitFor(() => {
+      const names = result.current.tree.flatMap((node) => [
+        ...node.children.map((c) => c.name),
+      ]);
+      expect(names).toContain("新人物");
+    });
+  });
+
+  it("分割幅リサイズが一本化された useSidebarResize に委譲され、最大幅でクランプ＋永続化されること", async () => {
+    localStorage.clear();
+    const { result } = renderHook(() =>
+      useMarkdownEntityEditor<CharacterCategoryNode[], CharacterSectionRange>({
+        storageKey: "test-key-resize",
+        fetchMarkdown: async () => sampleMarkdown,
+        buildTree: buildCharacterTree,
+        findSectionAtLine: findCharacterAtLine,
+      })
+    );
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    expect(result.current.sidebarWidth).toBe(256);
+
+    // ドラッグ開始→大きく右へ→最大 600 でクランプされること
+    act(() => {
+      result.current.handleSplitterMouseDown({
+        preventDefault: () => {},
+        clientX: 100,
+      } as unknown as ReactMouseEvent);
+    });
+    act(() => {
+      window.dispatchEvent(new MouseEvent("mousemove", { clientX: 10_000 }));
+    });
+    expect(result.current.sidebarWidth).toBe(600);
+
+    // mouseup で localStorage に永続化されること
+    act(() => {
+      window.dispatchEvent(new MouseEvent("mouseup"));
+    });
+    expect(localStorage.getItem("test-key-resize:sidebar-width")).toBe("600");
+
+    // 大きく左へ→最小 160 でクランプされること
+    act(() => {
+      result.current.handleSplitterMouseDown({
+        preventDefault: () => {},
+        clientX: 600,
+      } as unknown as ReactMouseEvent);
+    });
+    act(() => {
+      window.dispatchEvent(new MouseEvent("mousemove", { clientX: -10_000 }));
+    });
+    expect(result.current.sidebarWidth).toBe(160);
+    act(() => {
+      window.dispatchEvent(new MouseEvent("mouseup"));
+    });
   });
 });

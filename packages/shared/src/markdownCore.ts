@@ -287,6 +287,9 @@ export function trimAndJoinLines(lines: string[]): string {
   return cloned.join("\n");
 }
 
+/**
+ * パーサ使い分け: レンダラ=marked（表示層）、整形/構造化=remark（本モジュール・各 format*Markdown）。将来一本化は保留。
+ */
 const remarkFormatter = unified()
   .use(remarkParse)
   .use(remarkGfm)

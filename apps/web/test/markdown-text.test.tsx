@@ -42,6 +42,14 @@ describe("MarkdownText", () => {
     });
   });
 
+  it("ルビ記法を後処理で <ruby> 化する", async () => {
+    const { container } = render(<MarkdownText content="|漢字《かんじ》" />);
+    await waitFor(() => {
+      expect(container.querySelector("ruby")).not.toBeNull();
+      expect(container.querySelector("rt")).toHaveTextContent("かんじ");
+    });
+  });
+
   it("mermaid ブロックがない場合は renderMermaid が呼ばれない", async () => {
     render(<MarkdownText content="# 通常見出し\n\n本文のみ" />);
     await waitFor(() => {

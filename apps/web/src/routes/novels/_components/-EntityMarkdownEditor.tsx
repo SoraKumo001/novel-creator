@@ -1,11 +1,13 @@
 import {
   formatCharactersMarkdown,
   formatForeshadowingsMarkdown,
+  formatPlotMarkdown,
   formatSettingsMarkdown,
   formatStoryOutlineMarkdown,
+  formatTimelinesMarkdown,
   type MarkdownCategoryNode,
 } from "@novel-creator/shared";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { HistoryDiffModal } from "@/components/HistoryDiffModal.js";
@@ -73,6 +75,7 @@ export function EntityMarkdownEditor<
     activeSection,
     discardOpen,
     setDiscardOpen,
+    draftError,
     hasDraft,
     isDirty,
     tree,
@@ -101,6 +104,13 @@ export function EntityMarkdownEditor<
   const { openChat } = useChatUI();
   const [historyOpen, setHistoryOpen] = useState(false);
   const toast = useToast();
+
+  // Quota 溢れ時は握り潰さず toast で通知する（保存・Dirty 判定は不変）。
+  useEffect(() => {
+    if (draftError) {
+      toast.error(draftError);
+    }
+  }, [draftError, toast]);
 
   useMarkdownExternalSync({
     novelId,
@@ -150,6 +160,10 @@ export function EntityMarkdownEditor<
       formatted = formatForeshadowingsMarkdown(markdown);
     } else if (entityType === "story_outline_markdown") {
       formatted = formatStoryOutlineMarkdown(markdown);
+    } else if (entityType === "plot_markdown") {
+      formatted = formatPlotMarkdown(markdown);
+    } else if (entityType === "timelines_markdown") {
+      formatted = formatTimelinesMarkdown(markdown);
     }
 
     if (formatted === markdown) {

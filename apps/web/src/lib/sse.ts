@@ -112,15 +112,6 @@ export async function streamGenerateContentAuto(
 
 /**
  * 日本語／英語混在のテキストのおおよその文字数・単語数を返す。
+ * 正本は `@novel-creator/shared` の `countWords`。ここでは再エクスポートのみ行う。
  */
-export function countWords(text: string): number {
-  const trimmed = text.trim();
-  if (!trimmed) {
-    return 0;
-  }
-  const japanese = trimmed.match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g);
-  if (japanese && japanese.length > 0) {
-    return japanese.length;
-  }
-  return trimmed.split(/\s+/).length;
-}
+export { countWords } from "@novel-creator/shared";

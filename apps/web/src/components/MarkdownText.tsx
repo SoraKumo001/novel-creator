@@ -1,7 +1,6 @@
-import DOMPurify from "dompurify";
-import { marked } from "marked";
 import { useEffect, useMemo, useRef } from "react";
 import { renderMermaid } from "@/lib/mermaid.js";
+import { renderMarkdownWithRuby } from "@/lib/sanitize.js";
 
 interface MarkdownTextProps {
   className?: string;
@@ -19,10 +18,7 @@ export function MarkdownText({
   disableMermaid,
 }: MarkdownTextProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const html = useMemo(() => {
-    const raw = marked.parse(content, { async: false, breaks: true }) as string;
-    return DOMPurify.sanitize(raw) as string;
-  }, [content]);
+  const html = useMemo(() => renderMarkdownWithRuby(content), [content]);
 
   useEffect(() => {
     if (disableMermaid) {

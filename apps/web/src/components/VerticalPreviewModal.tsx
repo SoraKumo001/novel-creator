@@ -1,5 +1,5 @@
-import { parseRubyToHtml } from "@novel-creator/shared";
 import { useMemo, useState } from "react";
+import { renderRubyLine } from "@/lib/sanitize.js";
 import { Button } from "./Button.js";
 import { Modal } from "./Modal.js";
 
@@ -27,7 +27,7 @@ export function VerticalPreviewModal({
     if (!body) {
       return [];
     }
-    return body.split("\n").map((line) => parseRubyToHtml(line));
+    return body.split("\n").map((line) => renderRubyLine(line));
   }, [body]);
 
   return (

@@ -64,12 +64,22 @@ export async function renderMermaid(container: HTMLElement): Promise<void> {
       } catch (err) {
         node.setAttribute("data-mermaid-rendered", "error");
         const message = err instanceof Error ? err.message : String(err);
-        node.innerHTML = `<pre class="mermaid-error">${escapeHtml(src)}\n\n// ${escapeHtml(message)}</pre>`;
+        node.textContent = "";
+        const pre = document.createElement("pre");
+        pre.className = "mermaid-error";
+        pre.textContent = `${src}\n\n// ${message}`;
+        node.append(pre);
       }
     })
   );
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+export function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/\//g, "&#x2F;");
 }

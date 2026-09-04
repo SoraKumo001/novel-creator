@@ -1,17 +1,23 @@
+import type { MarkdownCategoryNode } from "@novel-creator/shared";
 import type { editor } from "monaco-editor";
 import {
   type MutableRefObject,
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
 import { useMarkdownDraft } from "@/hooks/useMarkdownDraft.js";
+import { useSidebarResize } from "@/routes/novels/_components/-MarkdownEditorCore.js";
 
 export type MonacoEditorInstance = editor.IStandaloneCodeEditor;
 
-export interface UseMarkdownEntityEditorOptions<TTree, TSection> {
+export interface UseMarkdownEntityEditorOptions<
+  TTree extends MarkdownCategoryNode[],
+  TSection,
+> {
   buildTree: (markdown: string) => TTree;
   fetchMarkdown: () => Promise<string>;
   findSectionAtLine: (markdown: string, lineNumber: number) => TSection | null;
@@ -19,12 +25,13 @@ export interface UseMarkdownEntityEditorOptions<TTree, TSection> {
 }
 
 export interface UseMarkdownEntityEditorReturn<
-  TTree,
+  TTree extends MarkdownCategoryNode[],
   TSection = { category: string; name: string },
 > {
   activeSection: TSection | null;
   clearDraft: () => void;
   discardOpen: boolean;
+  draftError: string | null;
   editorRef: MutableRefObject<MonacoEditorInstance | null>;
   error: string | null;
   handleDiscard: () => Promise<void>;
@@ -60,7 +67,7 @@ export interface UseMarkdownEntityEditorReturn<
 }
 
 export function useMarkdownEntityEditor<
-  TTree,
+  TTree extends MarkdownCategoryNode[],
   TSection extends { category: string; name: string } = {
     category: string;
     name: string;
@@ -82,10 +89,11 @@ export function useMarkdownEntityEditor<
   const [savedMarkdown, setSavedMarkdown] = useState("");
   const [discardOpen, setDiscardOpen] = useState(false);
   const [selectedText, setSelectedText] = useState("");
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    const saved = localStorage.getItem(`${storageKey}:sidebar-width`);
-    return saved ? Number.parseInt(saved, 10) : 256;
-  });
+  // 分割幅・リサイズ操作は -MarkdownEditorCore.tsx の useSidebarResize に一本化する。
+  const { sidebarWidth, setSidebarWidth, handleSplitterMouseDown } =
+    useSidebarResize(256, 160, 600, {
+      storageKey: `${storageKey}:sidebar-width`,
+    });
   const [sidebarMode, setSidebarModeState] = useState<"pinned" | "overlap">(
     () => {
       const saved = localStorage.getItem(`${storageKey}:sidebar-mode`);
@@ -125,7 +133,6 @@ export function useMarkdownEntityEditor<
   }, []);
 
   const editorRef = useRef<MonacoEditorInstance | null>(null);
-  const isDraggingRef = useRef(false);
   const markdownRef = useRef(markdown);
   markdownRef.current = markdown;
   const findSectionAtLineRef = useRef(findSectionAtLine);
@@ -134,15 +141,22 @@ export function useMarkdownEntityEditor<
   const {
     hasDraft,
     draftContent,
+    draftError,
     saveDraft,
     clearDraft,
     dismissDraft,
     checkDraft,
   } = useMarkdownDraft({
     storageKey,
+    currentContent: savedMarkdown,
   });
 
-  const tree = useMemo(() => buildTree(markdown), [buildTree, markdown]);
+  // P5a: ToC用ツリー計算のみ遅延化し、大文書でも入力が詰まらないようにする（worker化はしない）。保存・Dirty・カーソル連動は即時 markdown のまま。
+  const deferredMarkdown = useDeferredValue(markdown);
+  const tree = useMemo(
+    () => buildTree(deferredMarkdown),
+    [buildTree, deferredMarkdown]
+  );
   const isDirty = markdown !== savedMarkdown;
 
   const updateActiveSection = useCallback(
@@ -272,46 +286,6 @@ export function useMarkdownEntityEditor<
     [updateActiveSection]
   );
 
-  const sidebarWidthRef = useRef(sidebarWidth);
-  sidebarWidthRef.current = sidebarWidth;
-
-  const handleSplitterMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      isDraggingRef.current = true;
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-
-      const startX = e.clientX;
-      const startWidth = sidebarWidthRef.current;
-
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        if (!isDraggingRef.current) {
-          return;
-        }
-        const delta = moveEvent.clientX - startX;
-        const newWidth = Math.max(160, Math.min(600, startWidth + delta));
-        setSidebarWidth(newWidth);
-      };
-
-      const handleMouseUp = () => {
-        isDraggingRef.current = false;
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-        setSidebarWidth((current) => {
-          localStorage.setItem(`${storageKey}:sidebar-width`, String(current));
-          return current;
-        });
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
-      };
-
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-    },
-    [storageKey]
-  );
-
   return {
     markdown,
     setMarkdown,
@@ -326,6 +300,7 @@ export function useMarkdownEntityEditor<
     setActiveSection,
     discardOpen,
     setDiscardOpen,
+    draftError,
     editorRef,
     hasDraft,
     isDirty,

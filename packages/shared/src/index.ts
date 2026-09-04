@@ -123,6 +123,7 @@ export {
   type StyleGuideSnippet,
   type StyleGuideTemplate,
 } from "./styleGuideTemplates.js";
+export { countWords } from "./text.js";
 export {
   applyTimelinesToMarkdown,
   buildTimelineCategoryTree,
