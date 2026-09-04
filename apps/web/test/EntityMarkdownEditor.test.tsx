@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { EntityMarkdownEditor } from "../src/routes/novels/_components/-EntityMarkdownEditor.js";
 
@@ -148,5 +148,97 @@ describe("EntityMarkdownEditor", () => {
     await vi.waitFor(() => {
       expect(mockToast.success).toHaveBeenCalledWith("保存しました");
     });
+  });
+
+  it("Monaco最小設定（検索・文字サイズ・折返し）ボタンが描画され、文字サイズ変更が永続化されること", async () => {
+    localStorage.clear();
+    render(<EntityMarkdownEditor {...defaultProps} />);
+
+    expect(
+      await screen.findByRole("button", { name: /検索/ })
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "A-" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "A+" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /折返し/ })).toBeInTheDocument();
+
+    const { act, fireEvent } = await import("@testing-library/react");
+    // エディタ未マウントでも検索ボタンは no-op で落ちないこと
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /検索/ }));
+    });
+
+    // A+ で 16 に永続化されること
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "A+" }));
+    });
+    expect(localStorage.getItem("test-key:monaco-font-size")).toBe("16");
+
+    // 折返しトグルで off が永続化されること
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /折返し/ }));
+    });
+    expect(localStorage.getItem("test-key:monaco-word-wrap")).toBe("off");
+  });
+
+  it("プレビュードックは既定で閉じており、開くと横プレビューが表示されること", async () => {
+    localStorage.clear();
+    render(<EntityMarkdownEditor {...defaultProps} />);
+    await screen.findByTestId("monaco-editor");
+
+    expect(
+      screen.queryByRole("complementary", { name: "プレビュー" })
+    ).not.toBeInTheDocument();
+
+    const { act, fireEvent } = await import("@testing-library/react");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /プレビュー/ }));
+    });
+
+    const dock = await screen.findByRole("complementary", {
+      name: "プレビュー",
+    });
+    // 横=GFMフルレンダ（MarkdownText 再利用）
+    expect(
+      within(dock).getByRole("heading", { name: "主要人物" })
+    ).toBeInTheDocument();
+  });
+
+  it("縦切替でルビ付き縦書き表示になり、閉じるとドックが消えること", async () => {
+    localStorage.clear();
+    const fetchMarkdown = vi
+      .fn()
+      .mockResolvedValue("# 体験版\n\n|漢字《かんじ》です。");
+    render(
+      <EntityMarkdownEditor {...defaultProps} fetchMarkdown={fetchMarkdown} />
+    );
+    await screen.findByTestId("monaco-editor");
+
+    const { act, fireEvent } = await import("@testing-library/react");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /プレビュー/ }));
+    });
+    const dock = await screen.findByRole("complementary", {
+      name: "プレビュー",
+    });
+
+    await act(async () => {
+      fireEvent.click(within(dock).getByRole("button", { name: "縦" }));
+    });
+
+    // 縦=行分割+ルビ（共通 sanitize 維持）
+    const vertical = within(dock).getByTestId("preview-vertical");
+    expect(vertical).toHaveStyle({ writingMode: "vertical-rl" });
+    expect(vertical.querySelector("ruby")).not.toBeNull();
+    expect(vertical.querySelector("rt")).toHaveTextContent("かんじ");
+    expect(vertical.querySelector("script")).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(
+        within(dock).getByRole("button", { name: "プレビューを閉じる" })
+      );
+    });
+    expect(
+      screen.queryByRole("complementary", { name: "プレビュー" })
+    ).not.toBeInTheDocument();
   });
 });

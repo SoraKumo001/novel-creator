@@ -1,7 +1,10 @@
 import type { MarkdownCategoryNode } from "@novel-creator/shared";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/Button.js";
+import { MarkdownText } from "@/components/MarkdownText.js";
+import type { MarkdownInsertKind } from "@/hooks/useMarkdownEntityEditor.js";
 import { useToast } from "@/hooks/useToast.js";
+import { renderRubyLine } from "@/lib/sanitize.js";
 
 /**
  * Markdown編集系で重複していたサイドバー/ツールバー/ショートカットの共通コア。
@@ -177,6 +180,112 @@ export function useEditorSaveShortcut(options: {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [canSave, canFormat, isBusy]);
+}
+
+/**
+ * 挿入ショートカット最小セット。既存の Ctrl+S（保存）/ Shift+Alt+F（整形）と重複させない。
+ * エディタフォーカス時のみ有効化し、IME 変換中（isComposing）は発火させない。
+ */
+export const MARKDOWN_INSERT_BUTTONS: {
+  kind: MarkdownInsertKind;
+  label: string;
+  title: string;
+}[] = [
+  { kind: "bold", label: "B", title: "太字 (Ctrl+B)" },
+  { kind: "italic", label: "I", title: "斜体 (Ctrl+I)" },
+  { kind: "strike", label: "S", title: "取消線 (Ctrl+Shift+X)" },
+  { kind: "heading", label: "H", title: "見出し (Ctrl+Shift+H)" },
+  { kind: "link", label: "🔗", title: "リンク (Ctrl+K)" },
+  { kind: "quote", label: "❝", title: "引用 (Ctrl+Shift+Q)" },
+  { kind: "ruby", label: "ルビ", title: "ルビ |漢字《よみ》 (Ctrl+Shift+R)" },
+  { kind: "bouten", label: "傍点", title: "傍点 《《》》 (Ctrl+Shift+E)" },
+];
+
+export function MarkdownInsertButtons({
+  onInsert,
+  disabled,
+}: {
+  onInsert: (kind: MarkdownInsertKind) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      className="flex items-center gap-1"
+      role="toolbar"
+      aria-label="書式挿入"
+    >
+      {MARKDOWN_INSERT_BUTTONS.map((b) => (
+        <button
+          key={b.kind}
+          type="button"
+          disabled={disabled}
+          onClick={() => onInsert(b.kind)}
+          title={b.title}
+          aria-label={b.title}
+          className="min-w-7 cursor-pointer rounded-md border border-border bg-surface px-1.5 py-1 text-muted-foreground text-xs transition hover:bg-surface-hover hover:text-foreground disabled:opacity-50"
+        >
+          {b.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function useMarkdownInsertShortcut(options: {
+  enabled: boolean;
+  isEditorFocused: () => boolean;
+  onInsert: (kind: MarkdownInsertKind) => void;
+}) {
+  const { enabled, isEditorFocused, onInsert } = options;
+  const insertRef = useRef(onInsert);
+  insertRef.current = onInsert;
+  const focusRef = useRef(isEditorFocused);
+  focusRef.current = isEditorFocused;
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // IME 変換中は Monaco・IME と競合させない
+      if (e.isComposing || e.keyCode === 229) {
+        return;
+      }
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) {
+        return;
+      }
+      if (!focusRef.current()) {
+        return;
+      }
+      const key = e.key.toLowerCase();
+      let kind: MarkdownInsertKind | null = null;
+      if (!e.shiftKey) {
+        if (key === "b") {
+          kind = "bold";
+        } else if (key === "i") {
+          kind = "italic";
+        } else if (key === "k") {
+          kind = "link";
+        }
+      } else if (key === "x") {
+        kind = "strike";
+      } else if (key === "h") {
+        kind = "heading";
+      } else if (key === "q") {
+        kind = "quote";
+      } else if (key === "r") {
+        kind = "ruby";
+      } else if (key === "e") {
+        kind = "bouten";
+      }
+      if (!kind) {
+        return;
+      }
+      e.preventDefault();
+      insertRef.current(kind);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [enabled]);
 }
 
 export function MarkdownDraftBanner({
@@ -366,6 +475,138 @@ export function TocHeader({
         {mode === "pinned" ? "📌" : "🔓"}
       </button>
     </div>
+  );
+}
+
+/**
+ * エディタ横の最小プレビュードック（開閉式）。
+ * 横=GFMフルレンダ（MarkdownText 再利用）、縦=行分割+ルビ（VerticalPreviewModal 相当の既定値流用）。
+ * サニタイズは共通 sanitize（renderRubyLine / MarkdownText 内蔵）を維持する。モーダルは削除しない。
+ */
+export type MarkdownPreviewMode = "horizontal" | "vertical";
+
+// VerticalPreviewModal の既定値流用（新規設定画面は作らない）
+const DOCK_VERTICAL_FONT_SIZE = 17;
+const DOCK_VERTICAL_LINE_HEIGHT = 1.9;
+const DOCK_VERTICAL_FONT_FAMILY =
+  '"Hiragino Mincho ProN", "Yu Mincho", "Source Han Serif JP", "Noto Serif JP", serif';
+
+function DockVerticalBody({ title, body }: { title: string; body: string }) {
+  const paragraphs = useMemo(() => {
+    if (!body) {
+      return [];
+    }
+    return body.split("\n").map((line) => renderRubyLine(line));
+  }, [body]);
+  return (
+    <div
+      data-testid="preview-vertical"
+      className="flex h-full flex-col justify-start text-stone-900 dark:text-stone-100"
+      style={{
+        writingMode: "vertical-rl",
+        textOrientation: "mixed",
+        fontFamily: DOCK_VERTICAL_FONT_FAMILY,
+        fontSize: `${DOCK_VERTICAL_FONT_SIZE}px`,
+        lineHeight: DOCK_VERTICAL_LINE_HEIGHT,
+      }}
+    >
+      {title && (
+        <h2
+          className="mb-8 border-stone-400 border-l-2 py-2 pl-4 font-bold text-stone-800 tracking-widest dark:border-stone-600 dark:text-stone-200"
+          style={{ fontSize: `${DOCK_VERTICAL_FONT_SIZE * 1.3}px` }}
+        >
+          {title}
+        </h2>
+      )}
+      <div className="space-y-0 text-justify tracking-wide">
+        {paragraphs.map((paraHtml, idx) => (
+          <p
+            key={idx}
+            className="min-h-[1em]"
+            style={{
+              textIndent:
+                paraHtml.startsWith("「") || paraHtml.startsWith("『")
+                  ? 0
+                  : "1em",
+              marginBottom: paraHtml ? undefined : "1em",
+            }}
+            dangerouslySetInnerHTML={{ __html: paraHtml || "&nbsp;" }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function MarkdownPreviewDock({
+  mode,
+  onModeChange,
+  onClose,
+  markdown,
+  title,
+}: {
+  mode: MarkdownPreviewMode;
+  onModeChange: (mode: MarkdownPreviewMode) => void;
+  onClose: () => void;
+  markdown: string;
+  title: string;
+}) {
+  return (
+    <aside
+      className="flex w-[380px] shrink-0 flex-col overflow-hidden border-border border-l bg-surface"
+      aria-label="プレビュー"
+    >
+      <div className="flex items-center justify-between border-border border-b px-3 py-1.5">
+        <div
+          className="flex items-center gap-1"
+          role="group"
+          aria-label="表示切替"
+        >
+          <button
+            type="button"
+            onClick={() => onModeChange("horizontal")}
+            aria-pressed={mode === "horizontal"}
+            title="横書きプレビュー（GFM）"
+            className={`cursor-pointer rounded px-2 py-1 text-xs transition ${
+              mode === "horizontal"
+                ? "bg-primary font-bold text-primary-foreground"
+                : "bg-surface-raised hover:text-foreground"
+            }`}
+          >
+            横
+          </button>
+          <button
+            type="button"
+            onClick={() => onModeChange("vertical")}
+            aria-pressed={mode === "vertical"}
+            title="縦書きプレビュー（文庫本ビューアー相当）"
+            className={`cursor-pointer rounded px-2 py-1 text-xs transition ${
+              mode === "vertical"
+                ? "bg-primary font-bold text-primary-foreground"
+                : "bg-surface-raised hover:text-foreground"
+            }`}
+          >
+            縦
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="プレビューを閉じる"
+          title="プレビューを閉じる"
+          className="cursor-pointer rounded p-1 text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="flex-1 overflow-auto bg-background p-4">
+        {mode === "horizontal" ? (
+          <MarkdownText content={markdown} />
+        ) : (
+          <DockVerticalBody title={title} body={markdown} />
+        )}
+      </div>
+    </aside>
   );
 }
 

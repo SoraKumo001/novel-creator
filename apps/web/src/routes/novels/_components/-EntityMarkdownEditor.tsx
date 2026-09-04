@@ -18,6 +18,9 @@ import { useToast } from "@/hooks/useToast.js";
 import {
   EditorSidebarShell,
   MarkdownDraftBanner,
+  MarkdownInsertButtons,
+  MarkdownPreviewDock,
+  type MarkdownPreviewMode,
   MarkdownTocNav,
   MarkdownToolbarRow,
   SelectionConsultBar,
@@ -25,7 +28,9 @@ import {
   TocToggleButton,
   useEditorSaveShortcut,
   useMarkdownExternalSync,
+  useMarkdownInsertShortcut,
   useOverlapHover,
+  usePersistedState,
 } from "./-MarkdownEditorCore.js";
 import { MonacoEditor } from "./-MonacoEditor.js";
 
@@ -76,7 +81,9 @@ export function EntityMarkdownEditor<
     discardOpen,
     setDiscardOpen,
     draftError,
+    editorRef,
     hasDraft,
+    insertMarkdown,
     isDirty,
     tree,
     sidebarWidth,
@@ -104,6 +111,59 @@ export function EntityMarkdownEditor<
   const { openChat } = useChatUI();
   const [historyOpen, setHistoryOpen] = useState(false);
   const toast = useToast();
+
+  // 最小プレビュードック（開閉式、既定は閉）。表示モードのみ永続化する。
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewMode, setPreviewMode] = usePersistedState<MarkdownPreviewMode>(
+    `${storageKey}:preview-mode`,
+    "horizontal"
+  );
+
+  // Monaco 最小設定（文字サイズ・折返し）。既定は従来表示（15 / on）のまま。
+  const [editorFontSize, setEditorFontSize] = useState(() => {
+    const saved = Number.parseInt(
+      localStorage.getItem(`${storageKey}:monaco-font-size`) ?? "",
+      10
+    );
+    return Number.isFinite(saved) ? Math.max(10, Math.min(24, saved)) : 15;
+  });
+  const [editorWordWrap, setEditorWordWrap] = useState<"on" | "off">(() =>
+    localStorage.getItem(`${storageKey}:monaco-word-wrap`) === "off"
+      ? "off"
+      : "on"
+  );
+
+  const handleEditorFontSize = useCallback(
+    (delta: number) => {
+      setEditorFontSize((prev) => {
+        const next = Math.max(10, Math.min(24, prev + delta));
+        try {
+          localStorage.setItem(`${storageKey}:monaco-font-size`, String(next));
+        } catch {
+          // storage 利用不可時は state のみ更新
+        }
+        return next;
+      });
+    },
+    [storageKey]
+  );
+
+  const handleToggleWordWrap = useCallback(() => {
+    setEditorWordWrap((prev) => {
+      const next = prev === "on" ? "off" : "on";
+      try {
+        localStorage.setItem(`${storageKey}:monaco-word-wrap`, next);
+      } catch {
+        // storage 利用不可時は state のみ更新
+      }
+      return next;
+    });
+  }, [storageKey]);
+
+  // Monaco 標準の検索ウィジェットを開く（検索・置換）。
+  const handleOpenFind = () => {
+    void editorRef.current?.getAction("actions.find")?.run();
+  };
 
   // Quota 溢れ時は握り潰さず toast で通知する（保存・Dirty 判定は不変）。
   useEffect(() => {
@@ -206,6 +266,13 @@ export function EntityMarkdownEditor<
     onFormat: handleFormat,
   });
 
+  // 挿入ショートカット最小セット（エディタフォーカス時のみ、IME変換中は無効）。
+  useMarkdownInsertShortcut({
+    enabled: !loading && !isBusy,
+    isEditorFocused: () => editorRef.current?.hasTextFocus() === true,
+    onInsert: insertMarkdown,
+  });
+
   const hover = useOverlapHover(() => setIsSidebarOpen(false));
 
   const showOverlapSidebar =
@@ -284,6 +351,48 @@ export function EntityMarkdownEditor<
             >
               🕒 履歴
             </Button>
+            <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+            <MarkdownInsertButtons
+              onInsert={insertMarkdown}
+              disabled={isBusy}
+            />
+            <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleOpenFind}
+              disabled={isBusy}
+              title="エディタ内を検索・置換 (Ctrl+F)"
+            >
+              🔍 検索
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => handleEditorFontSize(-1)}
+              disabled={isBusy || editorFontSize <= 10}
+              title="エディタの文字を小さく"
+            >
+              A-
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => handleEditorFontSize(1)}
+              disabled={isBusy || editorFontSize >= 24}
+              title="エディタの文字を大きく"
+            >
+              A+
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleToggleWordWrap}
+              disabled={isBusy}
+              title="行の折返し表示を切替"
+            >
+              {editorWordWrap === "on" ? "↩ 折返し:ON" : "↪ 折返し:OFF"}
+            </Button>
             {isDirty && (
               <span className="text-muted-foreground text-xs">
                 （未保存の変更があります）
@@ -294,6 +403,14 @@ export function EntityMarkdownEditor<
         right={
           <>
             {extraToolbarActions}
+            <Button
+              size="sm"
+              variant={previewOpen ? "primary" : "secondary"}
+              onClick={() => setPreviewOpen((prev) => !prev)}
+              title="エディタ横にプレビューを表示"
+            >
+              👁 プレビュー
+            </Button>
             <Button
               size="sm"
               variant="secondary"
@@ -327,6 +444,8 @@ export function EntityMarkdownEditor<
             onChange={handleEditorChange}
             onMount={handleEditorMount}
             onSelectionChange={handleSelectionChange}
+            fontSize={editorFontSize}
+            wordWrap={editorWordWrap}
           />
           <SelectionConsultBar
             selectedText={selectedText}
@@ -334,6 +453,16 @@ export function EntityMarkdownEditor<
             onConsult={handleOpenChat}
           />
         </main>
+
+        {previewOpen && (
+          <MarkdownPreviewDock
+            mode={previewMode}
+            onModeChange={setPreviewMode}
+            onClose={() => setPreviewOpen(false)}
+            markdown={markdown}
+            title={entityTitle}
+          />
+        )}
       </div>
 
       <ConfirmDialog

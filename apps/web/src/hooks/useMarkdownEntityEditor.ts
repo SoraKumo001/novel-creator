@@ -14,6 +14,178 @@ import { useSidebarResize } from "@/routes/novels/_components/-MarkdownEditorCor
 
 export type MonacoEditorInstance = editor.IStandaloneCodeEditor;
 
+/** 挿入ショートカット最小セット。Monaco既定・IMEと競合しない範囲に限定する。 */
+export type MarkdownInsertKind =
+  | "bold"
+  | "italic"
+  | "strike"
+  | "link"
+  | "quote"
+  | "heading"
+  | "ruby"
+  | "bouten";
+
+export interface MarkdownInsertResult {
+  selectionEnd: number;
+  selectionStart: number;
+  text: string;
+}
+
+function clampOffset(value: number, length: number): number {
+  return Math.max(0, Math.min(length, Math.floor(value)));
+}
+
+function wrapWith(
+  text: string,
+  start: number,
+  end: number,
+  prefix: string,
+  suffix: string,
+  placeholder: string
+): MarkdownInsertResult {
+  const selected = text.slice(start, end);
+  if (selected) {
+    // 選択範囲を wrap し、選択自体は維持する
+    return {
+      text: text.slice(0, start) + prefix + selected + suffix + text.slice(end),
+      selectionStart: start + prefix.length,
+      selectionEnd: start + prefix.length + selected.length,
+    };
+  }
+  return {
+    text:
+      text.slice(0, start) + prefix + placeholder + suffix + text.slice(end),
+    selectionStart: start + prefix.length,
+    selectionEnd: start + prefix.length + placeholder.length,
+  };
+}
+
+function lineBounds(
+  text: string,
+  offset: number
+): { lineStart: number; lineEnd: number } {
+  const lineStart = text.lastIndexOf("\n", offset - 1) + 1;
+  const next = text.indexOf("\n", offset);
+  return { lineStart, lineEnd: next === -1 ? text.length : next };
+}
+
+function prefixLines(
+  text: string,
+  start: number,
+  end: number,
+  prefix: string,
+  placeholder: string,
+  isPrefixed: (line: string) => boolean
+): MarkdownInsertResult {
+  // 未選択時はカーソル行のみ操作する
+  if (start === end) {
+    const { lineStart, lineEnd } = lineBounds(text, start);
+    const line = text.slice(lineStart, lineEnd);
+    if (line.length === 0) {
+      const inserted = prefix + placeholder;
+      return {
+        text: text.slice(0, lineStart) + inserted + text.slice(lineEnd),
+        selectionStart: lineStart + prefix.length,
+        selectionEnd: lineStart + prefix.length + placeholder.length,
+      };
+    }
+    if (isPrefixed(line)) {
+      return { text, selectionStart: start, selectionEnd: end };
+    }
+    return {
+      text: text.slice(0, lineStart) + prefix + line + text.slice(lineEnd),
+      selectionStart: start + prefix.length,
+      selectionEnd: end + prefix.length,
+    };
+  }
+  // 選択範囲に触れた行全体へ付与する（末尾が行頭ちょうどの場合はその行を除く）
+  const first = lineBounds(text, start);
+  const adjustedEnd = end > start && text[end - 1] === "\n" ? end - 1 : end;
+  const last = lineBounds(text, adjustedEnd);
+  const segment = text.slice(first.lineStart, last.lineEnd);
+  const converted = segment
+    .split("\n")
+    .map((line) =>
+      line.length === 0 || isPrefixed(line) ? line : prefix + line
+    )
+    .join("\n");
+  return {
+    text: text.slice(0, first.lineStart) + converted + text.slice(last.lineEnd),
+    selectionStart: first.lineStart,
+    selectionEnd: first.lineStart + converted.length,
+  };
+}
+
+/**
+ * 選択範囲 wrap・未選択時はスニペット挿入を行う純粋関数。
+ * ルビ/傍点記法は packages/shared の ruby.ts と同一形式にする。
+ */
+export function applyMarkdownInsert(
+  base: string,
+  rawStart: number,
+  rawEnd: number,
+  kind: MarkdownInsertKind
+): MarkdownInsertResult {
+  const text = base ?? "";
+  const lo = clampOffset(Math.min(rawStart, rawEnd), text.length);
+  const hi = clampOffset(Math.max(rawStart, rawEnd), text.length);
+  switch (kind) {
+    case "bold":
+      return wrapWith(text, lo, hi, "**", "**", "太字");
+    case "italic":
+      return wrapWith(text, lo, hi, "*", "*", "斜体");
+    case "strike":
+      return wrapWith(text, lo, hi, "~~", "~~", "取消線");
+    case "link": {
+      const selected = text.slice(lo, hi);
+      const url = "https://example.com";
+      if (selected) {
+        return {
+          text: `${text.slice(0, lo)}[${selected}](${url})${text.slice(hi)}`,
+          selectionStart: lo + selected.length + 3,
+          selectionEnd: lo + selected.length + 3 + url.length,
+        };
+      }
+      const label = "リンクテキスト";
+      return {
+        text: `${text.slice(0, lo)}[${label}](${url})${text.slice(hi)}`,
+        selectionStart: lo + 1,
+        selectionEnd: lo + 1 + label.length,
+      };
+    }
+    case "quote":
+      return prefixLines(text, lo, hi, "> ", "引用文", (line) =>
+        line.startsWith(">")
+      );
+    case "heading":
+      return prefixLines(text, lo, hi, "## ", "見出し", (line) =>
+        /^#{1,6}\s/.test(line)
+      );
+    case "ruby": {
+      const selected = text.slice(lo, hi);
+      if (selected) {
+        const reading = "よみ";
+        return {
+          text: `${text.slice(0, lo)}|${selected}《${reading}》${text.slice(hi)}`,
+          selectionStart: lo + selected.length + 2,
+          selectionEnd: lo + selected.length + 2 + reading.length,
+        };
+      }
+      const baseText = "テキスト";
+      const reading = "よみ";
+      return {
+        text: `${text.slice(0, lo)}|${baseText}《${reading}》${text.slice(hi)}`,
+        selectionStart: lo + 1,
+        selectionEnd: lo + 1 + baseText.length,
+      };
+    }
+    case "bouten":
+      return wrapWith(text, lo, hi, "《《", "》》", "強調");
+    default:
+      return { text, selectionStart: lo, selectionEnd: hi };
+  }
+}
+
 export interface UseMarkdownEntityEditorOptions<
   TTree extends MarkdownCategoryNode[],
   TSection,
@@ -43,6 +215,7 @@ export interface UseMarkdownEntityEditorReturn<
   handleSplitterMouseDown: (e: React.MouseEvent) => void;
   handleTreeClick: (headingLine: number) => void;
   hasDraft: boolean;
+  insertMarkdown: (kind: MarkdownInsertKind) => void;
   isDirty: boolean;
   isSidebarOpen: boolean;
   loading: boolean;
@@ -271,6 +444,35 @@ export function useMarkdownEntityEditor<
     [updateActiveSection]
   );
 
+  // 挿入操作は Monaco の単一 edit として適用する。onChange 経由で保存・Dirty・ToC・ドラフトが追従する。
+  const insertMarkdown = useCallback((kind: MarkdownInsertKind) => {
+    const ed = editorRef.current;
+    const model = ed?.getModel();
+    if (!ed || !model) {
+      return;
+    }
+    const selection = ed.getSelection();
+    if (!selection) {
+      return;
+    }
+    const value = model.getValue();
+    const start = model.getOffsetAt(selection.getStartPosition());
+    const end = model.getOffsetAt(selection.getEndPosition());
+    const applied = applyMarkdownInsert(value, start, end, kind);
+    ed.executeEdits("markdown-insert", [
+      { range: model.getFullModelRange(), text: applied.text },
+    ]);
+    const anchor = model.getPositionAt(applied.selectionStart);
+    const cursor = model.getPositionAt(applied.selectionEnd);
+    ed.setSelection({
+      positionColumn: cursor.column,
+      positionLineNumber: cursor.lineNumber,
+      selectionStartColumn: anchor.column,
+      selectionStartLineNumber: anchor.lineNumber,
+    });
+    ed.focus();
+  }, []);
+
   const handleTreeClick = useCallback(
     (headingLine: number) => {
       const ed = editorRef.current;
@@ -319,6 +521,7 @@ export function useMarkdownEntityEditor<
     handleDiscard,
     handleEditorMount,
     handleTreeClick,
+    insertMarkdown,
     handleSplitterMouseDown,
     selectedText,
     handleSelectionChange,

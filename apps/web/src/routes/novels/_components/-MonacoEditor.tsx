@@ -8,10 +8,14 @@ const Editor = lazy(() =>
 );
 
 interface MonacoEditorProps {
+  /** エディタ文字サイズ。既定 15（従来表示を維持）。 */
+  fontSize?: number;
   onChange: (value: string) => void;
   onMount?: OnMount;
   onSelectionChange?: (selectedText: string) => void;
   value: string;
+  /** 行折返し。既定 "on"（従来表示を維持）。 */
+  wordWrap?: "on" | "off";
 }
 
 export function MonacoEditor({
@@ -19,6 +23,8 @@ export function MonacoEditor({
   onChange,
   onMount,
   onSelectionChange,
+  fontSize = 15,
+  wordWrap = "on",
 }: MonacoEditorProps) {
   const { resolvedTheme } = useTheme();
 
@@ -55,14 +61,20 @@ export function MonacoEditor({
         onChange={(v) => onChange(v ?? "")}
         onMount={handleMount}
         options={{
-          wordWrap: "on",
+          wordWrap,
           minimap: { enabled: false },
           lineNumbers: "on",
-          fontSize: 15,
+          fontSize,
           fontFamily:
             '"Hiragino Kaku Gothic ProN", "Noto Sans JP", system-ui, sans-serif',
           padding: { top: 16, bottom: 240 },
           smoothScrolling: true,
+          // 標準の検索・置換ウィジェットを明示的に有効化する（Ctrl+F / Ctrl+H）。
+          find: {
+            addExtraSpaceOnTop: false,
+            autoFindInSelection: "never",
+            seedSearchStringFromSelection: "selection",
+          },
         }}
         theme={resolvedTheme === "dark" ? "vs-dark" : "light"}
       />
