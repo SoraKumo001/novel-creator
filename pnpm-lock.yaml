@@ -93,9 +93,6 @@ importers:
       '@monaco-editor/react':
         specifier: ^4.7.0
         version: 4.7.0(monaco-editor@0.56.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@novel-creator/api':
-        specifier: workspace:*
-        version: link:../api
       '@novel-creator/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -139,6 +136,9 @@ importers:
         specifier: ^4.3.3
         version: 4.3.3
     devDependencies:
+      '@novel-creator/api':
+        specifier: workspace:*
+        version: link:../api
       '@storybook/addon-docs':
         specifier: 10.5.10
         version: 10.5.10(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(esbuild@0.28.2)(rollup@4.62.5)(storybook@10.5.10(@types/react@19.2.18)(prettier@3.9.6)(react@19.2.8))(vite@8.2.2(@types/node@26.4.0)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.12)(yaml@2.9.0))

@@ -119,21 +119,31 @@ export function useCharacters(novelId: string): UseCharactersReturn {
   });
 
   const editSectionMutation = useMutation({
-    mutationFn: (input: {
+    mutationFn: async (input: {
       category: string;
       name: string;
       description: string;
       traits: string[];
       relationships: string;
       instruction: string;
-    }) => editCharacterSection(novelId, input).then((res) => res.markdown),
+    }): Promise<string> => {
+      const res = await editCharacterSection(novelId, input);
+      return res.markdown;
+    },
   });
 
   const editDocumentMutation = useMutation({
-    mutationFn: (input: { markdown: string; instruction: string }) =>
-      editCharacterDocument(novelId, input.markdown, input.instruction).then(
-        (res) => res.markdown
-      ),
+    mutationFn: async (input: {
+      markdown: string;
+      instruction: string;
+    }): Promise<string> => {
+      const res = await editCharacterDocument(
+        novelId,
+        input.markdown,
+        input.instruction
+      );
+      return res.markdown;
+    },
   });
 
   const fetchMarkdown = useCallback(

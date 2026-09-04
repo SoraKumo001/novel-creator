@@ -10,14 +10,21 @@
  */
 
 import {
+  serializeCategoryDocument,
+  sortEntitiesByCategory,
+} from "./categoryTree.js";
+import {
+  buildDeleteSet,
   buildMarkdownCategoryTree,
   calculateEntityDiff,
   findSectionByLine,
-  formatMarkdownDocument,
+  formatEntityMarkdown,
   type MarkdownCategoryNode,
-  scanMarkdownSections,
+  mergeEntitiesByKey,
+  normalizeCategory as normalizeCategoryName,
+  parseEntitySections,
+  scanEntityRanges,
   trimAndJoinLines,
-  writeMarkdownEntitySections,
 } from "./markdownCore.js";
 
 /** マークダウン解析後の人物セクション。 */
@@ -71,15 +78,14 @@ export function serializeCharactersToMarkdown(
     return "";
   }
 
-  const sorted = [...characters].sort((a, b) => {
-    const ca = (a.category ?? "未分類").trim() || "未分類";
-    const cb = (b.category ?? "未分類").trim() || "未分類";
-    const c = ca.localeCompare(cb, "ja");
-    return c === 0 ? a.name.localeCompare(b.name, "ja") : c;
-  });
+  const sorted = sortEntitiesByCategory(
+    characters,
+    (c) => normalizeCategoryName(c.category, "未分類"),
+    (c) => c.name
+  );
 
-  return writeMarkdownEntitySections(sorted, {
-    categoryOf: (c) => (c.category ?? "未分類").trim() || "未分類",
+  return serializeCategoryDocument(sorted, {
+    categoryOf: (c) => normalizeCategoryName(c.category, "未分類"),
     nameOf: (c) => c.name,
     writeBody: (c, lines) => {
       lines.push("");
@@ -219,19 +225,9 @@ function parseCharacterBody(
 export function parseCharactersMarkdown(
   markdown: string
 ): ParsedCharacterSection[] {
-  const rawSections = scanMarkdownSections(markdown);
-  const sections: ParsedCharacterSection[] = [];
-  const seen = new Set<string>();
-
-  for (const raw of rawSections) {
-    const key = `${raw.category}\u0000${raw.name}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      sections.push(parseCharacterBody(raw.category, raw.name, raw.bodyLines));
-    }
-  }
-
-  return sections;
+  return parseEntitySections(markdown, (raw) =>
+    parseCharacterBody(raw.category, raw.name, raw.bodyLines)
+  );
 }
 
 /**
@@ -242,8 +238,7 @@ export function parseCharactersMarkdown(
 export function getCharacterSections(
   markdown: string
 ): CharacterSectionRange[] {
-  const rawSections = scanMarkdownSections(markdown);
-  return rawSections.map((raw) => {
+  return scanEntityRanges(markdown, (raw) => {
     const parsed = parseCharacterBody(raw.category, raw.name, raw.bodyLines);
     return {
       category: raw.category,
@@ -347,36 +342,28 @@ export function applyCharactersToMarkdown(
   deleteNames?: string[]
 ): string {
   const existing = parseCharactersMarkdown(currentMarkdown);
-  const deleteSet = new Set(
-    (deleteNames ?? []).map((n) => n.trim()).filter((n) => n.length > 0)
-  );
-  const map = new Map<string, ParsedCharacterSection>();
-  for (const c of existing) {
-    const name = typeof c.name === "string" ? c.name.trim() : "";
-    if (name && !deleteSet.has(name)) {
-      map.set(name, c);
-    }
-  }
-  for (const nc of newCharacters) {
-    const rawName =
-      nc.name ??
-      (nc as { title?: string }).title ??
-      (nc.description ? nc.description.slice(0, 30) : "") ??
-      "無題の登場人物";
-    const trimmed =
-      typeof rawName === "string" && rawName.trim()
+  const merged = mergeEntitiesByKey(existing, newCharacters, {
+    deleteKeys: buildDeleteSet(deleteNames),
+    keyOfNew: (nc) => {
+      const rawName =
+        nc.name ??
+        (nc as { title?: string }).title ??
+        (nc.description ? nc.description.slice(0, 30) : "") ??
+        "無題の登場人物";
+      return typeof rawName === "string" && rawName.trim()
         ? rawName.trim()
         : "無題の登場人物";
-    const prev = map.get(trimmed);
-    map.set(trimmed, {
+    },
+    keyOfParsed: (c) => (typeof c.name === "string" ? c.name.trim() : ""),
+    merge: (prev, nc, trimmed) => ({
       category: nc.category || prev?.category || "未分類",
-      name: trimmed,
       description: nc.description ?? prev?.description ?? "",
-      traits: nc.traits ?? prev?.traits ?? [],
+      name: trimmed,
       relationships: nc.relationships ?? prev?.relationships ?? "",
-    });
-  }
-  return serializeCharactersToMarkdown(Array.from(map.values()));
+      traits: nc.traits ?? prev?.traits ?? [],
+    }),
+  });
+  return serializeCharactersToMarkdown(merged);
 }
 
 /**
@@ -393,9 +380,9 @@ export function deleteCharactersFromMarkdown(
  * 人物マークダウンをパースし、正規化・ソートして改行や空行を適切に整形（フォーマット）したマークダウンを返す。
  */
 export function formatCharactersMarkdown(markdown: string): string {
-  const parsed = parseCharactersMarkdown(markdown);
-  if (parsed.length === 0) {
-    return formatMarkdownDocument(markdown);
-  }
-  return formatMarkdownDocument(serializeCharactersToMarkdown(parsed));
+  return formatEntityMarkdown(
+    markdown,
+    parseCharactersMarkdown,
+    serializeCharactersToMarkdown
+  );
 }

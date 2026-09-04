@@ -47,17 +47,18 @@ export class AnalysisDomainService {
     // 消費されない rejection による unhandled rejection を防止する。
     llmPromise.catch(() => {});
 
-    const settled: Promise<RaceOutcome<T>> = llmPromise.then(
-      (value): RaceOutcome<T> => ({
-        beat: false,
-        value,
-      })
-    );
-    const beat: Promise<RaceOutcome<T>> = sleep(HEARTBEAT_INTERVAL_MS).then(
-      (): RaceOutcome<T> => ({
-        beat: true,
-      })
-    );
+    const settled: Promise<RaceOutcome<T>> = (async (): Promise<
+      RaceOutcome<T>
+    > => {
+      const value = await llmPromise;
+      return { beat: false, value };
+    })();
+    const beat: Promise<RaceOutcome<T>> = (async (): Promise<
+      RaceOutcome<T>
+    > => {
+      await sleep(HEARTBEAT_INTERVAL_MS);
+      return { beat: true };
+    })();
 
     let outcome = await Promise.race([settled, beat]);
     while (outcome.beat) {

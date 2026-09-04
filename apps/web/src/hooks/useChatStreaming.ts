@@ -8,6 +8,14 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  loadActiveSessionId,
+  loadCachedMessages,
+  loadChatModelId,
+  saveActiveSessionId,
+  saveCachedMessages,
+  saveChatModelId,
+} from "@/lib/chat-storage.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import { updateChatSession } from "@/lib/services/index.js";
 import {
@@ -17,11 +25,7 @@ import {
   messageCreatedAt,
   textOf,
 } from "./chatStreamingTypes.js";
-import {
-  loadCachedMessages,
-  saveCachedMessages,
-  useChatTransport,
-} from "./chatTransport.js";
+import { useChatTransport } from "./chatTransport.js";
 import { useChatActions } from "./useChatActions.js";
 import { useChatProgress } from "./useChatProgress.js";
 
@@ -53,26 +57,33 @@ export interface UseChatStreamingInput {
  *
  * セッション一覧の取得自体は ChatContext 側の useQuery が行うため、
  * selectedNovelIdRef と refreshSessions を注入して連携する。
+ *
+ * 永続化の責務分担:
+ * - セッション復元（アクティブセッションID・モデル選択）は `@/lib/chat-storage`
+ *   の load/save ヘルパーに集約する。
+ * - リトライ（最終プロンプト）・キャッシュ（セッションごとのメッセージ）は
+ *   それぞれ useChatActions / 下記のキャッシュ同期 effect が担当し、
+ *   実体は同じく `@/lib/chat-storage` に集約されている。
  */
-const ACTIVE_SESSION_STORAGE_KEY = "novel-creator:active-session";
 
 export function useChatStreaming({
   selectedNovelIdRef,
   refreshSessions,
 }: UseChatStreamingInput) {
+  // セッション復元: リロード後に保存されていたアクティブセッションを初期値にする
   const [currentSessionId, setCurrentSessionIdState] = useState<string | null>(
     () => {
       if (typeof window === "undefined") {
         return null;
       }
-      return localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY);
+      return loadActiveSessionId();
     }
   );
   const currentSessionIdRef = useRef<string | null>(currentSessionId);
   currentSessionIdRef.current = currentSessionId;
   const [selectedModelConfigId, setSelectedModelConfigId] = useState<
     string | null
-  >(() => localStorage.getItem("novel-creator:chat-model") || null);
+  >(loadChatModelId);
   const selectedModelConfigIdRef = useRef<string | null>(selectedModelConfigId);
   selectedModelConfigIdRef.current = selectedModelConfigId;
 
@@ -105,28 +116,19 @@ export function useChatStreaming({
     }
   }, []);
 
-  // state の currentSessionId を同期更新するラッパー
+  // 送信/セッション選択状態: state と ref を同期更新し、復元用保存も更新する
   const setCurrentSessionId = useCallback((id: string | null) => {
     currentSessionIdRef.current = id;
     sessionIdRef.current = id;
     setCurrentSessionIdState(id);
-    if (typeof window !== "undefined") {
-      if (id) {
-        localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, id);
-      } else {
-        localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY);
-      }
-    }
+    saveActiveSessionId(id);
   }, []);
 
+  // モデル選択状態: state と ref を同期更新し、復元用保存も更新する
   const handleSetSelectedModelConfigId = useCallback((id: string | null) => {
     setSelectedModelConfigId(id);
     selectedModelConfigIdRef.current = id;
-    if (id) {
-      localStorage.setItem("novel-creator:chat-model", id);
-    } else {
-      localStorage.removeItem("novel-creator:chat-model");
-    }
+    saveChatModelId(id);
   }, []);
 
   // 進捗状態（バックエンドの data-progress パーツ由来）は useChatProgress に委譲する
@@ -191,10 +193,9 @@ export function useChatStreaming({
     },
   });
 
-  // マウント時に sessionStorage にキャッシュされたメッセージがあれば即座に初期表示
-  // する（楽観表示）。DB の正式な履歴は ChatContext の loadSessionMessages が
-  // sessionId 一致確認後に上書き確定するため、キャッシュ→DB の順序を守る。
-  // 一致しないセッションのDB応答は破棄され、キャッシュが別セッションを汚さない。
+  // キャッシュ責務: マウント時に sessionStorage の楽観表示を復元する。
+  // DB の正式な履歴は ChatContext の loadSessionMessages が sessionId 一致確認後に
+  // 上書き確定するため、キャッシュ→DB の順序を守る（挙動は変更しない）。
   const cacheLoadedRef = useRef(false);
   useEffect(() => {
     if (cacheLoadedRef.current || !currentSessionId) {
@@ -207,15 +208,24 @@ export function useChatStreaming({
     }
   }, [currentSessionId, setUiMessages]);
 
-  // メッセージ更新時にローカルキャッシュへ即時同期（直近のみに軽量化）。
-  // 保存失敗（QuotaExceededError 等）はリロード後復元用のベストエフォートのため
-  // error state には波及させず静かに破棄する。
+  // キャッシュ責務: メッセージ更新時にローカルキャッシュへ即時同期する
+  // （直近のみに軽量化）。保存失敗（QuotaExceededError 等）は握り潰さず
+  // error state へ反映し、リトライ表示でユーザーに通知する。
+  // ストリーミング自体は継続する（送信結果には影響しない）。
   useEffect(() => {
     if (!currentSessionId || typeof window === "undefined") {
       return;
     }
     if (uiMessages.length > 0) {
-      saveCachedMessages(currentSessionId, uiMessages);
+      try {
+        saveCachedMessages(currentSessionId, uiMessages);
+      } catch (error_) {
+        setError(
+          error_ instanceof Error
+            ? error_.message
+            : "メッセージキャッシュの保存に失敗しました"
+        );
+      }
     }
   }, [currentSessionId, uiMessages]);
 

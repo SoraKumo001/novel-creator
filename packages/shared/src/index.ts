@@ -1,10 +1,13 @@
 export {
   buildCategoryTree,
+  type CategoryDocumentOptions,
   type CategorySortOption,
   type CategoryTreeNode,
   flattenCategoryTree,
   formatCategoryPath,
   parseCategoryPath,
+  serializeCategoryDocument,
+  sortEntitiesByCategory,
 } from "./categoryTree.js";
 export {
   type CharacterGraphNode,
@@ -62,10 +65,20 @@ export type {
   RawMarkdownSection,
 } from "./markdownCore.js";
 export {
+  buildDeleteSet,
   buildMarkdownCategoryTree,
   calculateEntityDiff,
+  cleanBodyLines,
   findSectionByLine,
+  formatEntityMarkdown,
   formatMarkdownDocument,
+  isMetaCommentLine,
+  joinCleanBody,
+  mergeEntitiesByKey,
+  normalizeCategory,
+  parseEntitySections,
+  parseMetaPairs,
+  scanEntityRanges,
   scanMarkdownSections,
   trimAndJoinLines,
   writeMarkdownEntitySections,

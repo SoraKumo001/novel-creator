@@ -15,16 +15,24 @@ import {
 import { useNovels } from "@/hooks/useNovels.js";
 import { usePinnedSessions } from "@/hooks/usePinnedSessions.js";
 import { useToast } from "@/hooks/useToast.js";
+import {
+  chatDraftKey,
+  clearChatDraft,
+  loadChatDraft,
+  loadChatDrawerWidth,
+  loadChatLayoutMode,
+  saveChatDraft,
+  saveChatDrawerWidth,
+  saveChatLayoutMode,
+} from "@/lib/chat-storage.js";
 import { buildChatPromptWithFocus } from "./chatPrompt.js";
 
 export type DrawerWidth = "normal" | "wide" | "full";
 export type ChatLayoutMode = "overlay" | "docked";
 
-const DRAFT_PREFIX = "novel-creator:chat-draft:";
-
-function draftKeyFor(sessionId: string | null): string {
-  return `${DRAFT_PREFIX}${sessionId ?? "new"}`;
-}
+// 下書き・表示設定の永続化は `@/lib/chat-storage` に集約する。
+// セッションごとの下書きキーは `chatDraftKey(sessionId)` を使う
+// （null は新規相談用の "new" に正規化される）。
 
 interface UseChatDrawerResult {
   abortStream: () => void;
@@ -129,17 +137,10 @@ export function useChatDrawer(): UseChatDrawerResult {
   const { novels } = useNovels();
   const toast = useToast();
 
-  const [drawerWidth, setDrawerWidth] = useState<DrawerWidth>(
-    () =>
-      (localStorage.getItem("novel-creator:chat-width") as DrawerWidth) ||
-      "normal"
-  );
-  const [layoutMode, setLayoutMode] = useState<ChatLayoutMode>(
-    () =>
-      (localStorage.getItem(
-        "novel-creator:chat-layout-mode"
-      ) as ChatLayoutMode) || "docked"
-  );
+  const [drawerWidth, setDrawerWidth] =
+    useState<DrawerWidth>(loadChatDrawerWidth);
+  const [layoutMode, setLayoutMode] =
+    useState<ChatLayoutMode>(loadChatLayoutMode);
   const { pinnedIds, togglePin } = usePinnedSessions();
 
   const [input, setInput] = useState("");
@@ -164,12 +165,12 @@ export function useChatDrawer(): UseChatDrawerResult {
 
   const handleWidthChange = useCallback((width: DrawerWidth) => {
     setDrawerWidth(width);
-    localStorage.setItem("novel-creator:chat-width", width);
+    saveChatDrawerWidth(width);
   }, []);
 
   const handleLayoutModeChange = useCallback((mode: ChatLayoutMode) => {
     setLayoutMode(mode);
-    localStorage.setItem("novel-creator:chat-layout-mode", mode);
+    saveChatLayoutMode(mode);
   }, []);
 
   const scrollToBottom = useCallback(() => {
@@ -282,8 +283,9 @@ export function useChatDrawer(): UseChatDrawerResult {
     }
   }, [isOpen]);
 
-  // セッションごとの下書き復元（セッションIDキー）
-  const draftKey = draftKeyFor(currentSessionId);
+  // 下書き責務: セッションごとの下書き復元（セッションIDキー）。
+  // 実体は `@/lib/chat-storage`。復元順序・ガード条件は変更しない。
+  const draftKey = chatDraftKey(currentSessionId);
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -293,16 +295,16 @@ export function useChatDrawer(): UseChatDrawerResult {
     }
     loadedDraftForRef.current = draftKey;
     try {
-      const saved = localStorage.getItem(draftKey);
+      const saved = loadChatDraft(currentSessionId);
       setInput(saved ?? "");
       setFailedDraft(null);
     } catch {
       // 下書きの読み込み失敗は入力欄を空のままにして続行する
       setInput("");
     }
-  }, [draftKey]);
+  }, [draftKey, currentSessionId]);
 
-  // 下書きのデバウンス保存（300ms）
+  // 下書き責務: 下書きのデバウンス保存（300ms）。タイマー管理は変更しない。
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -314,15 +316,7 @@ export function useChatDrawer(): UseChatDrawerResult {
       window.clearTimeout(draftSaveTimerRef.current);
     }
     draftSaveTimerRef.current = window.setTimeout(() => {
-      try {
-        if (input) {
-          localStorage.setItem(draftKey, input);
-        } else {
-          localStorage.removeItem(draftKey);
-        }
-      } catch {
-        // 保存失敗時は無視する（下書きなしとして続行）
-      }
+      saveChatDraft(currentSessionId, input);
       draftSaveTimerRef.current = null;
     }, 300);
     return () => {
@@ -331,7 +325,7 @@ export function useChatDrawer(): UseChatDrawerResult {
         draftSaveTimerRef.current = null;
       }
     };
-  }, [input, draftKey]);
+  }, [input, draftKey, currentSessionId]);
 
   // 送信失敗の検出時は入力復元用に下書きを残す
   useEffect(() => {
@@ -383,7 +377,7 @@ export function useChatDrawer(): UseChatDrawerResult {
       }
       try {
         if (typeof window !== "undefined") {
-          localStorage.removeItem(draftKeyFor(currentSessionId));
+          clearChatDraft(currentSessionId);
         }
       } catch {
         // 下書きの削除失敗は無視する
@@ -451,21 +445,10 @@ export function useChatDrawer(): UseChatDrawerResult {
     []
   );
 
+  // 下書き責務: 切り替え前の入力を同期保存する（確認ダイアログ後の破棄防止用）
   const persistDraftSync = useCallback(
     (sessionId: string | null, value: string) => {
-      try {
-        if (typeof window === "undefined") {
-          return;
-        }
-        const key = draftKeyFor(sessionId);
-        if (value) {
-          localStorage.setItem(key, value);
-        } else {
-          localStorage.removeItem(key);
-        }
-      } catch {
-        // 同期保存の失敗は無視する
-      }
+      saveChatDraft(sessionId, value);
     },
     []
   );
@@ -482,7 +465,7 @@ export function useChatDrawer(): UseChatDrawerResult {
     persistDraftSync(currentSessionId, input);
     setShowHistoryView(false);
     setInput("");
-    loadedDraftForRef.current = draftKeyFor(null);
+    loadedDraftForRef.current = chatDraftKey(null);
     setFailedDraft(null);
     lastSentRef.current = null;
     if (textareaRef.current) {

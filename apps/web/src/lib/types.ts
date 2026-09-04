@@ -1,36 +1,61 @@
 // フロント用の型定義。
-// エンティティ型は @novel-creator/shared/schemas を単一情報源とし、
-// ここではビューモデルと入力型のみを定義する。
+// エンティティ型およびチャット提案・抽出DTOは @novel-creator/shared/schemas を
+// 単一情報源とし、ここでは再エクスポートとビューモデル・入力型のみを定義する。
+// なお apps/web は @novel-creator/api への実行時依存を持たない方針とし、
+// api との型結合は hono RPC の型注釈（api-client.ts の import type）に限定する。
+// そのため @novel-creator/api は devDependencies 側で管理する。
 import type { LLMProviderType } from "@novel-creator/shared";
 import type {
+  BulkCharacterItem,
+  BulkForeshadowingItem,
+  BulkSettingItem,
+  BulkTimelineItem,
   Chapter,
   Character,
   ChatMessageItem,
   ChatSession,
   Content,
   CustomPrompt,
+  ExtractedCharacterItem,
+  ExtractedChatForeshadowingItem,
+  ExtractedChatPlotItem,
+  ExtractedChatTimelineItem,
+  ExtractedSettingItem,
+  ExtractedTimelineItem,
   Foreshadowing,
   ForeshadowingStatus,
   LlmInstruction,
   Novel,
   Section,
   Setting,
+  StoryOutlineMode,
   Timeline,
 } from "@novel-creator/shared/schemas";
 
 export type {
+  BulkCharacterItem,
+  BulkForeshadowingItem,
+  BulkSettingItem,
+  BulkTimelineItem,
   Chapter,
   Character,
   ChatMessageItem,
   ChatSession,
   Content,
   CustomPrompt,
+  ExtractedCharacterItem,
+  ExtractedChatForeshadowingItem,
+  ExtractedChatPlotItem,
+  ExtractedChatTimelineItem,
+  ExtractedSettingItem,
+  ExtractedTimelineItem,
   Foreshadowing,
   ForeshadowingStatus,
   LlmInstruction,
   Novel,
   Section,
   Setting,
+  StoryOutlineMode,
   Timeline,
 };
 
@@ -192,20 +217,6 @@ export interface GeneratedSummary {
   title: string;
 }
 
-export interface ExtractedTimelineItem {
-  event: string;
-  id?: string;
-  order: number;
-  timestamp?: string | null;
-}
-
-export interface ExtractedSettingItem {
-  category: string;
-  description?: string | null;
-  id?: string;
-  name: string;
-}
-
 export interface ExtractResult {
   settings: ExtractedSettingItem[];
   timelines: ExtractedTimelineItem[];
@@ -262,29 +273,7 @@ export interface UpdateChatSessionInput {
   title: string;
 }
 
-// チャットからのエンティティ抽出型
-export interface ExtractedCharacterItem {
-  category: string;
-  description: string;
-  name: string;
-  traits: string[];
-}
-
-export interface ExtractedChatForeshadowingItem {
-  description: string;
-  status: "unresolved" | "resolved" | "abandoned";
-  title: string;
-}
-
-export interface ExtractedChatTimelineItem {
-  event: string;
-  timestamp?: string | null;
-}
-
-export interface ExtractedChatPlotItem {
-  summary: string;
-  title: string;
-}
+// チャットからのエンティティ抽出型（単一定義は @novel-creator/shared/schemas）
 
 export interface ExtractedChatEntities {
   characters: ExtractedCharacterItem[];

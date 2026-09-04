@@ -274,9 +274,168 @@ export function writeMarkdownEntitySections<T>(
 }
 
 /**
+ * カテゴリ名を正規化する。空・空白のみの場合は fallback を返す。
+ */
+export function normalizeCategory(
+  value: string | null | undefined,
+  fallback: string
+): string {
+  const trimmed = (value ?? "").trim();
+  return trimmed || fallback;
+}
+
+/**
+ * 汎用 parseSection: `# カテゴリ` / `## 名前` 走査＋重複除去（先勝ち）を共通化する。
+ *
+ * 各パーサの差異は `parseBody` スキーマ宣言（RawMarkdownSection → TParsed 変換）のみに縮小する。
+ * `rawIndex` は重複除去前の走査順（0 始まり）を渡す。年表のような autoOrder 採番を保つため、
+ * 重複セクションもカウントに含める（従来の autoOrder++ と等価）。
+ */
+export function parseEntitySections<TParsed>(
+  markdown: string,
+  parseBody: (raw: RawMarkdownSection, rawIndex: number) => TParsed
+): TParsed[] {
+  const rawSections = scanMarkdownSections(markdown);
+  const result: TParsed[] = [];
+  const seen = new Set<string>();
+  for (let index = 0; index < rawSections.length; index++) {
+    const raw = rawSections[index];
+    const key = `${raw.category}\u0000${raw.name}`;
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(parseBody(raw, index));
+  }
+  return result;
+}
+
+/**
+ * 汎用 section-range 走査: 行範囲付きセクション配列の構築を共通化する。
+ * 重複除去は行わない（フォーカストラッキングは文書順の全セクションを返す）。
+ */
+export function scanEntityRanges<TRange>(
+  markdown: string,
+  toRange: (raw: RawMarkdownSection, rawIndex: number) => TRange
+): TRange[] {
+  return scanMarkdownSections(markdown).map((raw, index) =>
+    toRange(raw, index)
+  );
+}
+
+/**
+ * 本文行の前後の空行を除去したコピーを返す。
+ */
+export function cleanBodyLines(lines: readonly string[]): string[] {
+  const cloned = [...lines];
+  while (cloned.length > 0 && cloned[0].trim() === "") {
+    cloned.shift();
+  }
+  while (cloned.length > 0 && cloned.at(-1)?.trim() === "") {
+    cloned.pop();
+  }
+  return cloned;
+}
+
+/**
+ * 本文行の前後の空行を除去して結合する。
+ */
+export function joinCleanBody(lines: readonly string[]): string {
+  return cleanBodyLines(lines).join("\n");
+}
+
+/**
+ * HTML コメント行かどうかを判定する。
+ */
+export function isMetaCommentLine(line: string): boolean {
+  return /^\s*<!--.*?-->\s*$/.test(line);
+}
+
+/**
+ * HTML メタコメント（`<!-- k: v, k2: v2 -->`）を key/value マップとしてパースする。
+ * `:` を含まない断片は無視する。値は最初の `:` の右側全体（`:` を含み得る）。
+ */
+export function parseMetaPairs(line: string): Record<string, string> {
+  const match = /<!--\s*(.*?)\s*-->/.exec(line);
+  if (!match) {
+    return {};
+  }
+  const result: Record<string, string> = {};
+  const parts = match[1].split(",");
+  for (const part of parts) {
+    const idx = part.indexOf(":");
+    if (idx < 0) {
+      continue;
+    }
+    const key = part.slice(0, idx).trim();
+    const value = part.slice(idx + 1).trim();
+    if (key) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/**
+ * 削除名集合を構築する（トリム＋空除去）。
+ */
+export function buildDeleteSet(
+  deleteNames: readonly string[] | undefined
+): Set<string> {
+  return new Set(
+    (deleteNames ?? []).map((n) => n.trim()).filter((n) => n.length > 0)
+  );
+}
+
+/**
+ * 既存エンティティと新規エンティティを名前キーでマージする。
+ * 削除集合に含まれる既存キーは除外し、新規は `merge` スキーマ宣言に委譲する。
+ * 返値はマージ後のエンティティ配列（既存順＋新規追加順）。
+ */
+export function mergeEntitiesByKey<TParsed, TNew>(
+  existing: readonly TParsed[],
+  incoming: readonly TNew[],
+  options: {
+    deleteKeys?: ReadonlySet<string>;
+    keyOfNew: (item: TNew) => string;
+    keyOfParsed: (item: TParsed) => string;
+    merge: (previous: TParsed | undefined, next: TNew, key: string) => TParsed;
+  }
+): TParsed[] {
+  const map = new Map<string, TParsed>();
+  for (const item of existing) {
+    const key = options.keyOfParsed(item);
+    if (key && !(options.deleteKeys?.has(key) ?? false)) {
+      map.set(key, item);
+    }
+  }
+  for (const next of incoming) {
+    const key = options.keyOfNew(next);
+    map.set(key, options.merge(map.get(key), next, key));
+  }
+  return [...map.values()];
+}
+
+/**
+ * 汎用フォーマッタ: parse → serialize → formatMarkdownDocument を共通化する。
+ * パース結果が空の場合は原文を formatMarkdownDocument に委譲する。
+ */
+export function formatEntityMarkdown<TParsed>(
+  markdown: string,
+  parse: (md: string) => TParsed[],
+  serialize: (items: TParsed[]) => string
+): string {
+  const parsed = parse(markdown);
+  if (parsed.length === 0) {
+    return formatMarkdownDocument(markdown);
+  }
+  return formatMarkdownDocument(serialize(parsed));
+}
+
+/**
  * 行配列の前後の空行を除去してテキストを結合するヘルパー
  */
-export function trimAndJoinLines(lines: string[]): string {
+export function trimAndJoinLines(lines: readonly string[]): string {
   const cloned = [...lines];
   while (cloned.length > 0 && cloned.at(-1)?.trim() === "") {
     cloned.pop();

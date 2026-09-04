@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { rowToUIMessage, useChatStreaming } from "@/hooks/useChatStreaming.js";
+import { loadChatOpen, saveChatOpen } from "@/lib/chat-storage.js";
 import { chatKeys } from "@/lib/queryKeys.js";
 import {
   fetchChatSession,
@@ -46,20 +47,19 @@ export {
  */
 export function ChatProvider({ children }: { children: ReactNode }) {
   // --- 低頻度: 開閉・フォーカス・小説選択 ---
-  const [isOpen, setIsOpenState] = useState(() => {
+  // 開閉状態の永続化は `@/lib/chat-storage` に集約（load/save のみ使い分ける）。
+  const [isOpen, setIsOpenState] = useState<boolean>(() => {
     if (typeof window === "undefined") {
       return false;
     }
-    return localStorage.getItem("novel-creator:chat-open") === "true";
+    return loadChatOpen();
   });
 
   const setIsOpen = useCallback(
     (open: boolean | ((prev: boolean) => boolean)) => {
       setIsOpenState((prev) => {
         const next = typeof open === "function" ? open(prev) : open;
-        if (typeof window !== "undefined") {
-          localStorage.setItem("novel-creator:chat-open", String(next));
-        }
+        saveChatOpen(next);
         return next;
       });
     },
@@ -164,7 +164,10 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     [setError, setMessages, currentSessionIdRef]
   );
 
-  // マウント時（リロード時）に保存されていたアクティブセッションのメッセージを最新化
+  // セッション復元責務: マウント時（リロード時）に保存されていた
+  // アクティブセッションのメッセージを最新化する。
+  // 実データの取得は loadSessionMessages が担い、ここでは初回のみの
+  // 発火ガードに専念する（発火順序・ガード条件は変更しない）。
   const initialLoadedRef = useRef(false);
   useEffect(() => {
     if (initialLoadedRef.current) {

@@ -19,6 +19,7 @@ import {
   BackupDomainService,
   ValidationError,
 } from "../src/core/index.js";
+import { createDomainServices } from "../src/core/services.js";
 import { errorHandler } from "../src/middleware/error-handler.js";
 import backupRouter from "../src/routes/backup.js";
 
@@ -50,11 +51,24 @@ function createTestApp(
 ) {
   const app = new Hono<AppContext>();
   app.use("*", async (c, next) => {
-    c.set("env", {} as never);
+    const env = {} as never;
+    const llm = {} as never;
+    const embedding = {} as never;
+    c.set("env", env);
     c.set("db", db as never);
-    c.set("llm", {} as never);
-    c.set("embedding", {} as never);
+    c.set("llm", llm);
+    c.set("embedding", embedding);
     c.set("vectorStore", vectorStore as never);
+    c.set(
+      "services",
+      createDomainServices({
+        db: db as never,
+        embedding,
+        env,
+        llm,
+        vectorStore: vectorStore as never,
+      })
+    );
     await next();
   });
   app.onError(errorHandler);

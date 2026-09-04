@@ -2,6 +2,11 @@
  * カテゴリの複数階層（スラッシュ区切り）パース・ツリー構築ユーティリティ
  */
 
+import {
+  type MarkdownEntitySectionWriterOptions,
+  writeMarkdownEntitySections,
+} from "./markdownCore.js";
+
 export interface CategoryTreeNode<T> {
   /** 子カテゴリノード */
   children: CategoryTreeNode<T>[];
@@ -171,4 +176,41 @@ export function flattenCategoryTree<T>(
   }
 
   return result;
+}
+
+/**
+ * エンティティをカテゴリ昇順・名前昇順（ja ロケール）でソートする。
+ * settings / characters / foreshadowings の serialize 共通スキーマ。
+ */
+export function sortEntitiesByCategory<T>(
+  items: readonly T[],
+  categoryOf: (item: T) => string,
+  nameOf: (item: T) => string
+): T[] {
+  return [...items].sort((a, b) => {
+    const c = categoryOf(a).localeCompare(categoryOf(b), "ja");
+    return c === 0 ? nameOf(a).localeCompare(nameOf(b), "ja") : c;
+  });
+}
+
+/**
+ * 汎用 serializeCategory: カテゴリ文書への直列化を共通化する。
+ *
+ * 各シリアライザの差異はスキーマ宣言（categoryOf / nameOf / writeBody / sort）のみに縮小する。
+ * sort を省略した場合は入力順を保持する。空配列は空文字を返す。
+ */
+export interface CategoryDocumentOptions<T>
+  extends MarkdownEntitySectionWriterOptions<T> {
+  sort?: (a: T, b: T) => number;
+}
+
+export function serializeCategoryDocument<T>(
+  items: readonly T[],
+  options: CategoryDocumentOptions<T>
+): string {
+  if (items.length === 0) {
+    return "";
+  }
+  const sorted = options.sort ? [...items].sort(options.sort) : [...items];
+  return writeMarkdownEntitySections(sorted, options);
 }

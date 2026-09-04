@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppContext } from "../src/context.js";
+import { createDomainServices } from "../src/core/services.js";
 import { errorHandler } from "../src/middleware/error-handler.js";
 import novelsRouter from "../src/routes/novels.js";
 
@@ -31,11 +32,25 @@ function createMockDb(): MockDb {
 function createTestApp(db: MockDb) {
   const app = new Hono<AppContext>();
   app.use("*", async (c, next) => {
-    c.set("env", {} as never);
+    const env = {} as never;
+    const llm = {} as never;
+    const embedding = {} as never;
+    const vectorStore = {} as never;
+    c.set("env", env);
     c.set("db", db as never);
-    c.set("llm", {} as never);
-    c.set("embedding", {} as never);
-    c.set("vectorStore", {} as never);
+    c.set("llm", llm);
+    c.set("embedding", embedding);
+    c.set("vectorStore", vectorStore);
+    c.set(
+      "services",
+      createDomainServices({
+        db: db as never,
+        embedding,
+        env,
+        llm,
+        vectorStore,
+      })
+    );
     await next();
   });
   app.onError(errorHandler);

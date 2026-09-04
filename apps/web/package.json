@@ -16,7 +16,6 @@
   "dependencies": {
     "@ai-sdk/react": "4.0.87",
     "@monaco-editor/react": "^4.7.0",
-    "@novel-creator/api": "workspace:*",
     "@novel-creator/shared": "workspace:*",
     "@tailwindcss/typography": "0.5.20",
     "@tanstack/react-query": "5.102.8",
@@ -33,6 +32,7 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
+    "@novel-creator/api": "workspace:*",
     "@storybook/addon-docs": "10.5.10",
     "@storybook/addon-mcp": "0.7.0",
     "@storybook/react-vite": "10.5.10",

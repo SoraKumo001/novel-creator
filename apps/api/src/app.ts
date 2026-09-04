@@ -76,6 +76,7 @@ export function createApp(context: AppContext["Variables"]) {
     c.set("llm", context.llm);
     c.set("embedding", context.embedding);
     c.set("vectorStore", context.vectorStore);
+    c.set("services", context.services);
     await next();
   });
   app.onError(errorHandler);

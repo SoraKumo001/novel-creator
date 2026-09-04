@@ -11,9 +11,9 @@
 
 import {
   buildMarkdownCategoryTree,
-  formatMarkdownDocument,
+  formatEntityMarkdown,
   type MarkdownCategoryNode,
-  scanMarkdownSections,
+  scanEntityRanges,
 } from "./markdownCore.js";
 
 /** マークダウン解析後の節情報 */
@@ -189,8 +189,7 @@ export function parsePlotMarkdown(markdown: string): ParsedPlotChapterItem[] {
  * マークダウン文書を走査し、行範囲情報を含むセクション配列を返す。
  */
 export function scanPlotSectionRanges(markdown: string): PlotSectionRange[] {
-  const rawSections = scanMarkdownSections(markdown);
-  return rawSections.map((raw) => ({
+  return scanEntityRanges(markdown, (raw) => ({
     category: raw.category,
     endLine: raw.endLine,
     headingLine: raw.headingLine,
@@ -450,9 +449,9 @@ export function deletePlotFromMarkdown(
  * プロットマークダウンをパースし、正規化・ソートして整形したマークダウンを返す。
  */
 export function formatPlotMarkdown(markdown: string): string {
-  const parsed = parsePlotMarkdown(markdown);
-  if (parsed.length === 0) {
-    return formatMarkdownDocument(markdown);
-  }
-  return formatMarkdownDocument(serializePlotToMarkdown(parsed));
+  return formatEntityMarkdown(
+    markdown,
+    parsePlotMarkdown,
+    serializePlotToMarkdown
+  );
 }

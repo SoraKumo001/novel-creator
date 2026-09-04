@@ -8,14 +8,22 @@
  * - 本文 = 出来事の補足・詳細
  */
 
+import { serializeCategoryDocument } from "./categoryTree.js";
 import {
+  buildDeleteSet,
   buildMarkdownCategoryTree,
   calculateEntityDiff,
   findSectionByLine,
-  formatMarkdownDocument,
+  formatEntityMarkdown,
+  isMetaCommentLine,
+  joinCleanBody,
   type MarkdownCategoryNode,
-  scanMarkdownSections,
-  writeMarkdownEntitySections,
+  mergeEntitiesByKey,
+  normalizeCategory,
+  parseEntitySections,
+  parseMetaPairs,
+  type RawMarkdownSection,
+  scanEntityRanges,
 } from "./markdownCore.js";
 
 /** マークダウン解析後の年表セクション。 */
@@ -63,8 +71,8 @@ export function serializeTimelinesToMarkdown(
   // order 順（未指定時は 0）で安定ソート
   const sorted = [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-  return writeMarkdownEntitySections(sorted, {
-    categoryOf: (item) => (item.timestamp ?? "").trim() || "年表",
+  return serializeCategoryDocument(sorted, {
+    categoryOf: (item) => normalizeCategory(item.timestamp, "年表"),
     nameOf: (item) => item.event.trim(),
     writeBody: (item, lines) => {
       const metaParts: string[] = [];
@@ -94,34 +102,72 @@ function parseMetaComment(line: string): {
   sectionId?: string;
   timestamp?: string;
 } {
-  const match = /<!--\s*(.*?)\s*-->/.exec(line);
-  if (!match) {
-    return {};
-  }
-
-  const content = match[1];
-  const parts = content.split(",").map((p) => p.trim());
+  const pairs = parseMetaPairs(line);
   const result: {
     order?: number;
     sectionId?: string;
     timestamp?: string;
   } = {};
 
-  for (const part of parts) {
-    const [key, val] = part.split(":").map((s) => s.trim());
-    if (key === "order" && val) {
-      const num = Number.parseInt(val, 10);
-      if (!Number.isNaN(num)) {
-        result.order = num;
-      }
-    } else if (key === "timestamp" && val) {
-      result.timestamp = val;
-    } else if (key === "sectionId" && val) {
-      result.sectionId = val;
+  const orderRaw = pairs["order"];
+  if (orderRaw) {
+    const num = Number.parseInt(orderRaw, 10);
+    if (!Number.isNaN(num)) {
+      result.order = num;
     }
+  }
+  if (pairs["timestamp"]) {
+    result.timestamp = pairs["timestamp"];
+  }
+  if (pairs["sectionId"]) {
+    result.sectionId = pairs["sectionId"];
   }
 
   return result;
+}
+
+/**
+ * 年表セクション本文をメタコメントとクリーンな本文に分離するスキーマ宣言。
+ * rawIndex は重複除去前の走査順（autoOrder 採番用）。
+ */
+function splitTimelineBody(
+  raw: RawMarkdownSection,
+  rawIndex: number
+): {
+  description: string;
+  order: number;
+  sectionId: string | null;
+  timestamp: string | null;
+} {
+  let order = rawIndex + 1;
+  let timestamp: string | null =
+    raw.category !== "年表" && raw.category !== "未分類" ? raw.category : null;
+  let sectionId: string | null = null;
+  const bodyLines: string[] = [];
+
+  for (const line of raw.bodyLines) {
+    if (isMetaCommentLine(line)) {
+      const meta = parseMetaComment(line);
+      if (meta.order !== undefined) {
+        order = meta.order;
+      }
+      if (meta.timestamp !== undefined) {
+        timestamp = meta.timestamp;
+      }
+      if (meta.sectionId !== undefined) {
+        sectionId = meta.sectionId;
+      }
+    } else {
+      bodyLines.push(line);
+    }
+  }
+
+  return {
+    description: joinCleanBody(bodyLines),
+    order,
+    sectionId,
+    timestamp,
+  };
 }
 
 /**
@@ -130,64 +176,17 @@ function parseMetaComment(line: string): {
 export function parseTimelinesMarkdown(
   markdown: string
 ): ParsedTimelineSection[] {
-  const rawSections = scanMarkdownSections(markdown);
-  const sections: ParsedTimelineSection[] = [];
-  const seen = new Set<string>();
-
-  let autoOrder = 0;
-  for (const raw of rawSections) {
-    autoOrder++;
-    const key = `${raw.category}\u0000${raw.name}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-
-      let order = autoOrder;
-      let timestamp: string | null =
-        raw.category !== "年表" && raw.category !== "未分類"
-          ? raw.category
-          : null;
-      let sectionId: string | null = null;
-      const cleanBodyLines: string[] = [];
-
-      for (const line of raw.bodyLines) {
-        if (/^\s*<!--.*?-->\s*$/.test(line)) {
-          const meta = parseMetaComment(line);
-          if (meta.order !== undefined) {
-            order = meta.order;
-          }
-          if (meta.timestamp !== undefined) {
-            timestamp = meta.timestamp;
-          }
-          if (meta.sectionId !== undefined) {
-            sectionId = meta.sectionId;
-          }
-        } else {
-          cleanBodyLines.push(line);
-        }
-      }
-
-      while (cleanBodyLines.length > 0 && cleanBodyLines[0].trim() === "") {
-        cleanBodyLines.shift();
-      }
-      while (
-        cleanBodyLines.length > 0 &&
-        cleanBodyLines.at(-1)?.trim() === ""
-      ) {
-        cleanBodyLines.pop();
-      }
-
-      sections.push({
-        category: raw.category,
-        description: cleanBodyLines.join("\n"),
-        event: raw.name,
-        order,
-        sectionId,
-        timestamp,
-      });
-    }
-  }
-
-  return sections;
+  return parseEntitySections(markdown, (raw, rawIndex) => {
+    const body = splitTimelineBody(raw, rawIndex);
+    return {
+      category: raw.category,
+      description: body.description,
+      event: raw.name,
+      order: body.order,
+      sectionId: body.sectionId,
+      timestamp: body.timestamp,
+    };
+  });
 }
 
 /**
@@ -196,53 +195,19 @@ export function parseTimelinesMarkdown(
 export function scanTimelineSectionRanges(
   markdown: string
 ): TimelineSectionRange[] {
-  const rawSections = scanMarkdownSections(markdown);
-  let autoOrder = 0;
-  return rawSections.map((raw) => {
-    autoOrder++;
-    let order = autoOrder;
-    let timestamp: string | null =
-      raw.category !== "年表" && raw.category !== "未分類"
-        ? raw.category
-        : null;
-    let sectionId: string | null = null;
-    const cleanBodyLines: string[] = [];
-
-    for (const line of raw.bodyLines) {
-      if (/^\s*<!--.*?-->\s*$/.test(line)) {
-        const meta = parseMetaComment(line);
-        if (meta.order !== undefined) {
-          order = meta.order;
-        }
-        if (meta.timestamp !== undefined) {
-          timestamp = meta.timestamp;
-        }
-        if (meta.sectionId !== undefined) {
-          sectionId = meta.sectionId;
-        }
-      } else {
-        cleanBodyLines.push(line);
-      }
-    }
-
-    while (cleanBodyLines.length > 0 && cleanBodyLines[0].trim() === "") {
-      cleanBodyLines.shift();
-    }
-    while (cleanBodyLines.length > 0 && cleanBodyLines.at(-1)?.trim() === "") {
-      cleanBodyLines.pop();
-    }
-
+  return scanEntityRanges(markdown, (raw, rawIndex) => {
+    const body = splitTimelineBody(raw, rawIndex);
     return {
       category: raw.category,
-      description: cleanBodyLines.join("\n"),
+      description: body.description,
       endLine: raw.endLine,
       event: raw.name,
       headingLine: raw.headingLine,
       name: raw.name,
-      order,
-      sectionId,
+      order: body.order,
+      sectionId: body.sectionId,
       startLine: raw.startLine,
-      timestamp,
+      timestamp: body.timestamp,
     };
   });
 }
@@ -358,51 +323,47 @@ export function applyTimelinesToMarkdown(
   deleteEvents?: string[]
 ): string {
   const existing = parseTimelinesMarkdown(currentMarkdown);
-  const deleteSet = new Set(
-    (deleteEvents ?? []).map((t) => t.trim()).filter((t) => t.length > 0)
-  );
-  const map = new Map<string, ParsedTimelineSection>();
+  const deleteKeys = buildDeleteSet(deleteEvents);
+  let maxOrder = 0;
   for (const t of existing) {
     const ev = typeof t.event === "string" ? t.event.trim() : "";
-    if (ev && !deleteSet.has(ev)) {
-      map.set(ev, t);
-    }
-  }
-  let maxOrder = 0;
-  for (const t of map.values()) {
-    if (t.order > maxOrder) {
+    if (ev && !deleteKeys.has(ev) && t.order > maxOrder) {
       maxOrder = t.order;
     }
   }
 
-  for (const item of newItems) {
-    const rawEvent =
-      item.event ?? (item as { title?: string }).title ?? "無題の出来事";
-    const trimmedEvent =
-      typeof rawEvent === "string" && rawEvent.trim()
+  const merged = mergeEntitiesByKey(existing, newItems, {
+    deleteKeys,
+    keyOfNew: (item) => {
+      const rawEvent =
+        item.event ?? (item as { title?: string }).title ?? "無題の出来事";
+      return typeof rawEvent === "string" && rawEvent.trim()
         ? rawEvent.trim()
         : "無題の出来事";
-    const prev = map.get(trimmedEvent);
-    maxOrder++;
-    map.set(trimmedEvent, {
-      category: (item.timestamp ?? "").trim() || prev?.category || "年表",
-      event: trimmedEvent,
-      description: prev?.description ?? "",
-      order:
-        item.order !== undefined && item.order !== null
-          ? item.order
-          : (prev?.order ?? maxOrder),
-      timestamp:
-        item.timestamp !== undefined
-          ? item.timestamp
-          : (prev?.timestamp ?? null),
-      sectionId:
-        item.sectionId !== undefined
-          ? item.sectionId
-          : (prev?.sectionId ?? null),
-    });
-  }
-  return serializeTimelinesToMarkdown(Array.from(map.values()));
+    },
+    keyOfParsed: (t) => (typeof t.event === "string" ? t.event.trim() : ""),
+    merge: (prev, item, trimmedEvent) => {
+      maxOrder++;
+      return {
+        category: (item.timestamp ?? "").trim() || prev?.category || "年表",
+        description: prev?.description ?? "",
+        event: trimmedEvent,
+        order:
+          item.order !== undefined && item.order !== null
+            ? item.order
+            : (prev?.order ?? maxOrder),
+        sectionId:
+          item.sectionId !== undefined
+            ? item.sectionId
+            : (prev?.sectionId ?? null),
+        timestamp:
+          item.timestamp !== undefined
+            ? item.timestamp
+            : (prev?.timestamp ?? null),
+      };
+    },
+  });
+  return serializeTimelinesToMarkdown(merged);
 }
 
 /**
@@ -419,9 +380,9 @@ export function deleteTimelinesFromMarkdown(
  * 年表マークダウンをパースし、正規化・ソートして整形したマークダウンを返す。
  */
 export function formatTimelinesMarkdown(markdown: string): string {
-  const parsed = parseTimelinesMarkdown(markdown);
-  if (parsed.length === 0) {
-    return formatMarkdownDocument(markdown);
-  }
-  return formatMarkdownDocument(serializeTimelinesToMarkdown(parsed));
+  return formatEntityMarkdown(
+    markdown,
+    parseTimelinesMarkdown,
+    serializeTimelinesToMarkdown
+  );
 }

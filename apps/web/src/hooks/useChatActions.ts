@@ -1,23 +1,12 @@
 import type { UIMessage } from "ai";
 import { type RefObject, useCallback, useRef } from "react";
+import { loadLastPrompt, saveLastPrompt } from "@/lib/chat-storage.js";
 import { createChatSession, deleteChatSession } from "@/lib/services/index.js";
 import type { ChatSession } from "@/lib/types.js";
 import type { ChatMessage } from "./chatStreamingTypes.js";
 
-/** retryLastMessage 用の最終プロンプトを永続化する sessionStorage キー */
-const LAST_PROMPT_STORAGE_KEY = "novel-creator:last-prompt";
-
-/** 永続化された最終プロンプトの読み出し（失敗時は null のベストエフォート） */
-function loadPersistedLastPrompt(): string | null {
-  try {
-    if (typeof window === "undefined") {
-      return null;
-    }
-    return sessionStorage.getItem(LAST_PROMPT_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
+// リトライ責務: 最終プロンプトの永続化は `@/lib/chat-storage` に集約。
+// リロード後もリトライできるよう sessionStorage に保存する（ベストエフォート）。
 
 interface UseChatActionsInput {
   autoCreatedSessionRef: RefObject<string | null>;
@@ -183,7 +172,7 @@ export function useChatActions({
 
   // 送信した最後のプロンプトを再試行用に記憶する。
   // リロード後もリトライできるよう sessionStorage に永続化する。
-  const lastPromptRef = useRef<string | null>(loadPersistedLastPrompt());
+  const lastPromptRef = useRef<string | null>(loadLastPrompt());
 
   // 二重送信の同期ガード用フラグ。state（isStreaming）の反映タイミングに
   // 依存せず、createSession と chatSendMessage の間の二重POSTを防ぐ。
@@ -200,13 +189,7 @@ export function useChatActions({
       sendingRef.current = true;
       try {
         lastPromptRef.current = text;
-        try {
-          if (typeof window !== "undefined") {
-            sessionStorage.setItem(LAST_PROMPT_STORAGE_KEY, text);
-          }
-        } catch {
-          // 永続化はベストエフォートのため静かに破棄する
-        }
+        saveLastPrompt(text);
         setError(null);
 
         let activeSessionId = currentSessionIdRef.current;

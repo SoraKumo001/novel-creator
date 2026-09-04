@@ -4,8 +4,8 @@ import type { AppContext } from "../context.js";
 
 /**
  * アプリケーション共通ロガー（Phase 1 の正とする契約）。
- * 本番パスでの直接 console.* 呼び出しは禁止し、本モジュール経由に統一する。
- * console を直接触ってよいのはこのファイルのみ。
+ * 本番パスでの直接のコンソール呼び出しは禁止し、本モジュール経由に統一する。
+ * 実行環境のコンソールに触れてよいのはこのファイルのみ。
  */
 type LogDetail = unknown;
 
@@ -16,18 +16,26 @@ interface AppLogger {
   warn(message: string, ...details: LogDetail[]): void;
 }
 
+type ConsoleSink = Pick<Console, "debug" | "error" | "log" | "warn">;
+
+/**
+ * 意図的なログ出力のための単一のシンク。
+ * Node.js / Workers のいずれでも利用できる実行環境のコンソールを参照する。
+ */
+const sink: ConsoleSink = globalThis.console;
+
 export const appLogger: AppLogger = {
   debug(message: string, ...details: LogDetail[]): void {
-    console.debug(`[api] ${message}`, ...details);
+    sink.debug(`[api] ${message}`, ...details);
   },
   error(message: string, ...details: LogDetail[]): void {
-    console.error(`[api] ${message}`, ...details);
+    sink.error(`[api] ${message}`, ...details);
   },
   info(message: string, ...details: LogDetail[]): void {
-    console.log(`[api] ${message}`, ...details);
+    sink.log(`[api] ${message}`, ...details);
   },
   warn(message: string, ...details: LogDetail[]): void {
-    console.warn(`[api] ${message}`, ...details);
+    sink.warn(`[api] ${message}`, ...details);
   },
 };
 

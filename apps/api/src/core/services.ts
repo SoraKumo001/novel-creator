@@ -64,19 +64,15 @@ export function createDomainServices(ctx: ServiceContext): DomainServices {
 
 /**
  * Hono コンテキストから DomainServices を取得する。
- * c.var.services が未設定の場合は on-demand で生成する。
+ * services はリクエストミドルウェアで生成・注入されることが前提。
+ * 未設定の場合は配線ミスのため例外を投げる（on-demand 生成は行わない）。
  */
 export function getServices(c: {
-  var: Partial<ServiceContext & { services?: DomainServices }>;
+  var: { services: DomainServices };
 }): DomainServices {
-  if (c.var.services) {
-    return c.var.services;
+  const services: DomainServices | undefined = c.var.services;
+  if (!services) {
+    throw new Error("services is not set on request context");
   }
-  return createDomainServices({
-    db: c.var.db!,
-    embedding: c.var.embedding!,
-    env: c.var.env!,
-    llm: c.var.llm!,
-    vectorStore: c.var.vectorStore!,
-  });
+  return services;
 }

@@ -61,60 +61,54 @@ export async function buildChatContextPrompt(
     });
 
   const novelTask: Promise<NovelInfo | undefined> = effectiveNovelId
-    ? ctx.db
-        .select({
-          description: novels.description,
-          styleGuide: novels.styleGuide,
-          title: novels.title,
-        })
-        .from(novels)
-        .where(eq(novels.id, effectiveNovelId))
-        .then(
-          (
-            rows: {
-              title: string;
-              description: string | null;
-              styleGuide: string | null;
-            }[]
-          ): NovelInfo | undefined => {
-            const novel = rows[0];
-            if (!novel) {
-              warnings.push("novel_not_found");
-              return undefined;
-            }
-            return {
-              description: novel.description,
-              styleGuide: novel.styleGuide,
-              title: novel.title,
-            };
+    ? (async (): Promise<NovelInfo | undefined> => {
+        try {
+          const rows = await ctx.db
+            .select({
+              description: novels.description,
+              styleGuide: novels.styleGuide,
+              title: novels.title,
+            })
+            .from(novels)
+            .where(eq(novels.id, effectiveNovelId));
+          const novel = rows[0];
+          if (!novel) {
+            warnings.push("novel_not_found");
+            return undefined;
           }
-        )
-        .catch((err: unknown): undefined => {
+          return {
+            description: novel.description,
+            styleGuide: novel.styleGuide,
+            title: novel.title,
+          };
+        } catch (err: unknown) {
           appLogger.warn("[Chat Context] failed to load novel", err);
           warnings.push("novel_unavailable");
           return undefined;
-        })
+        }
+      })()
     : Promise.resolve(undefined);
 
   const ragTask: Promise<RagContext> = effectiveNovelId
-    ? searchContext(
-        ctx.vectorStore,
-        ctx.embedding,
-        effectiveNovelId,
-        { query: userText },
-        ctx.env
-      )
-        .then(
-          (ragContext: RagContext): RagContext => ({
+    ? (async (): Promise<RagContext> => {
+        try {
+          const ragContext = await searchContext(
+            ctx.vectorStore,
+            ctx.embedding,
+            effectiveNovelId,
+            { query: userText },
+            ctx.env
+          );
+          return {
             characters: ragContext.characters,
             settings: ragContext.settings,
-          })
-        )
-        .catch((err: unknown): RagContext => {
+          };
+        } catch (err: unknown) {
           appLogger.warn("[Chat Context] RAG search failed", err);
           warnings.push("rag_unavailable");
           return { characters: [], settings: [] };
-        })
+        }
+      })()
     : Promise.resolve({ characters: [], settings: [] });
 
   const [history, novelInfo, ragContext] = await Promise.all([

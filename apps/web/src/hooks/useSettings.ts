@@ -122,19 +122,29 @@ export function useSettings(novelId: string): UseSettingsReturn {
   });
 
   const editSectionMutation = useMutation({
-    mutationFn: (input: {
+    mutationFn: async (input: {
       category: string;
       name: string;
       description: string;
       instruction: string;
-    }) => editSettingSection(novelId, input).then((res) => res.markdown),
+    }): Promise<string> => {
+      const res = await editSettingSection(novelId, input);
+      return res.markdown;
+    },
   });
 
   const editDocumentMutation = useMutation({
-    mutationFn: (input: { markdown: string; instruction: string }) =>
-      editSettingDocument(novelId, input.markdown, input.instruction).then(
-        (res) => res.markdown
-      ),
+    mutationFn: async (input: {
+      markdown: string;
+      instruction: string;
+    }): Promise<string> => {
+      const res = await editSettingDocument(
+        novelId,
+        input.markdown,
+        input.instruction
+      );
+      return res.markdown;
+    },
   });
 
   const fetchMarkdown = useCallback(

@@ -145,3 +145,107 @@ export const customPromptSchema = z.object({
   userPrompt: z.string(),
 });
 export type CustomPrompt = z.infer<typeof customPromptSchema>;
+
+// ---- チャット提案・抽出 DTO（単一情報源） ----
+// web の ChatProposalCard（proposalTypes.ts）および lib/types.ts の抽出型と重複していた
+// エンティティ由来 DTO の正規定義。web 側はここからの再エクスポートに寄せる。
+
+export const storyOutlineModeSchema = z.enum([
+  "append",
+  "full_document",
+  "prepend",
+  "replace",
+]);
+export type StoryOutlineMode = z.infer<typeof storyOutlineModeSchema>;
+
+/** 一括登録（bulk）の登場人物アイテム。LLM 出力の title 表記ゆれを許容する防御的形状。 */
+export const bulkCharacterItemSchema = z.object({
+  category: z.string().optional(),
+  description: z.string().optional(),
+  name: z.string().optional(),
+  title: z.string().optional(),
+  traits: z.array(z.string()).optional(),
+});
+export type BulkCharacterItem = z.infer<typeof bulkCharacterItemSchema>;
+
+/** 一括登録（bulk）の世界観・設定アイテム。 */
+export const bulkSettingItemSchema = z.object({
+  category: z.string().optional(),
+  description: z.string().optional(),
+  name: z.string().optional(),
+  title: z.string().optional(),
+});
+export type BulkSettingItem = z.infer<typeof bulkSettingItemSchema>;
+
+/** 一括登録（bulk）の伏線アイテム（title が無く name / description のみのケースを許容）。 */
+export const bulkForeshadowingItemSchema = z.object({
+  category: z.string().optional(),
+  description: z.string().optional(),
+  name: z.string().optional(),
+  status: foreshadowingStatusSchema.optional(),
+  title: z.string().optional(),
+});
+export type BulkForeshadowingItem = z.infer<typeof bulkForeshadowingItemSchema>;
+
+/** 一括登録（bulk）の年表イベントアイテム。 */
+export const bulkTimelineItemSchema = z.object({
+  event: z.string().optional(),
+  timestamp: z.string().nullable().optional(),
+  title: z.string().optional(),
+});
+export type BulkTimelineItem = z.infer<typeof bulkTimelineItemSchema>;
+
+/** チャット抽出の登場人物アイテム（必須フィールドの厳密形状）。 */
+export const extractedCharacterItemSchema = z.object({
+  category: z.string(),
+  description: z.string(),
+  name: z.string(),
+  traits: z.array(z.string()),
+});
+export type ExtractedCharacterItem = z.infer<
+  typeof extractedCharacterItemSchema
+>;
+
+/** チャット抽出の伏線アイテム。 */
+export const extractedChatForeshadowingItemSchema = z.object({
+  description: z.string(),
+  status: foreshadowingStatusSchema,
+  title: z.string(),
+});
+export type ExtractedChatForeshadowingItem = z.infer<
+  typeof extractedChatForeshadowingItemSchema
+>;
+
+/** チャット抽出の年表イベントアイテム。 */
+export const extractedChatTimelineItemSchema = z.object({
+  event: z.string(),
+  timestamp: z.string().nullable().optional(),
+});
+export type ExtractedChatTimelineItem = z.infer<
+  typeof extractedChatTimelineItemSchema
+>;
+
+/** チャット抽出のプロットアイテム。 */
+export const extractedChatPlotItemSchema = z.object({
+  summary: z.string(),
+  title: z.string(),
+});
+export type ExtractedChatPlotItem = z.infer<typeof extractedChatPlotItemSchema>;
+
+/** 設定の抽出アイテム（id 付きの永続化前 DTO）。 */
+export const extractedSettingItemSchema = z.object({
+  category: z.string(),
+  description: z.string().nullable().optional(),
+  id: z.string().optional(),
+  name: z.string(),
+});
+export type ExtractedSettingItem = z.infer<typeof extractedSettingItemSchema>;
+
+/** 年表の抽出アイテム（id・order 付きの永続化前 DTO）。 */
+export const extractedTimelineItemSchema = z.object({
+  event: z.string(),
+  id: z.string().optional(),
+  order: z.number(),
+  timestamp: z.string().nullable().optional(),
+});
+export type ExtractedTimelineItem = z.infer<typeof extractedTimelineItemSchema>;

@@ -8,14 +8,20 @@
  */
 
 import {
+  serializeCategoryDocument,
+  sortEntitiesByCategory,
+} from "./categoryTree.js";
+import {
+  buildDeleteSet,
   buildMarkdownCategoryTree,
   calculateEntityDiff,
   findSectionByLine,
-  formatMarkdownDocument,
+  formatEntityMarkdown,
   type MarkdownCategoryNode,
-  scanMarkdownSections,
+  mergeEntitiesByKey,
+  parseEntitySections,
+  scanEntityRanges,
   trimAndJoinLines,
-  writeMarkdownEntitySections,
 } from "./markdownCore.js";
 
 /** マークダウン解析後の設定セクション。 */
@@ -55,12 +61,13 @@ export function serializeSettingsToMarkdown(
     return "";
   }
 
-  const sorted = [...settings].sort((a, b) => {
-    const c = a.category.localeCompare(b.category, "ja");
-    return c === 0 ? a.name.localeCompare(b.name, "ja") : c;
-  });
+  const sorted = sortEntitiesByCategory(
+    settings,
+    (s) => s.category,
+    (s) => s.name
+  );
 
-  return writeMarkdownEntitySections(sorted, {
+  return serializeCategoryDocument(sorted, {
     categoryOf: (s) => s.category,
     nameOf: (s) => s.name,
     writeBody: (s, lines) => {
@@ -80,23 +87,11 @@ export function serializeSettingsToMarkdown(
 export function parseSettingsMarkdown(
   markdown: string
 ): ParsedSettingSection[] {
-  const rawSections = scanMarkdownSections(markdown);
-  const sections: ParsedSettingSection[] = [];
-  const seen = new Set<string>();
-
-  for (const raw of rawSections) {
-    const key = `${raw.category}\u0000${raw.name}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      sections.push({
-        category: raw.category,
-        description: trimAndJoinLines(raw.bodyLines),
-        name: raw.name,
-      });
-    }
-  }
-
-  return sections;
+  return parseEntitySections(markdown, (raw) => ({
+    category: raw.category,
+    description: trimAndJoinLines(raw.bodyLines),
+    name: raw.name,
+  }));
 }
 
 /**
@@ -105,8 +100,7 @@ export function parseSettingsMarkdown(
  * フォーカストラッキング用: カーソル行を含むセクションを特定するために使う。
  */
 export function getMarkdownSections(markdown: string): SettingSectionRange[] {
-  const rawSections = scanMarkdownSections(markdown);
-  return rawSections.map((raw) => ({
+  return scanEntityRanges(markdown, (raw) => ({
     category: raw.category,
     description: trimAndJoinLines(raw.bodyLines),
     endLine: raw.endLine,
@@ -188,34 +182,26 @@ export function applySettingsToMarkdown(
   deleteNames?: string[]
 ): string {
   const existing = parseSettingsMarkdown(currentMarkdown);
-  const deleteSet = new Set(
-    (deleteNames ?? []).map((n) => n.trim()).filter((n) => n.length > 0)
-  );
-  const map = new Map<string, ParsedSettingSection>();
-  for (const s of existing) {
-    const name = typeof s.name === "string" ? s.name.trim() : "";
-    if (name && !deleteSet.has(name)) {
-      map.set(name, s);
-    }
-  }
-  for (const ns of newSettings) {
-    const rawName =
-      ns.name ??
-      (ns as { title?: string }).title ??
-      (ns.description ? ns.description.slice(0, 30) : "") ??
-      "無題の設定";
-    const trimmed =
-      typeof rawName === "string" && rawName.trim()
+  const merged = mergeEntitiesByKey(existing, newSettings, {
+    deleteKeys: buildDeleteSet(deleteNames),
+    keyOfNew: (ns) => {
+      const rawName =
+        ns.name ??
+        (ns as { title?: string }).title ??
+        (ns.description ? ns.description.slice(0, 30) : "") ??
+        "無題の設定";
+      return typeof rawName === "string" && rawName.trim()
         ? rawName.trim()
         : "無題の設定";
-    const prev = map.get(trimmed);
-    map.set(trimmed, {
+    },
+    keyOfParsed: (s) => (typeof s.name === "string" ? s.name.trim() : ""),
+    merge: (prev, ns, trimmed) => ({
       category: ns.category || prev?.category || "世界観",
-      name: trimmed,
       description: ns.description ?? prev?.description ?? "",
-    });
-  }
-  return serializeSettingsToMarkdown(Array.from(map.values()));
+      name: trimmed,
+    }),
+  });
+  return serializeSettingsToMarkdown(merged);
 }
 
 /**
@@ -232,9 +218,9 @@ export function deleteSettingsFromMarkdown(
  * 設定マークダウンをパースし、正規化・ソートして改行や空行を適切に整形（フォーマット）したマークダウンを返す。
  */
 export function formatSettingsMarkdown(markdown: string): string {
-  const parsed = parseSettingsMarkdown(markdown);
-  if (parsed.length === 0) {
-    return formatMarkdownDocument(markdown);
-  }
-  return formatMarkdownDocument(serializeSettingsToMarkdown(parsed));
+  return formatEntityMarkdown(
+    markdown,
+    parseSettingsMarkdown,
+    serializeSettingsToMarkdown
+  );
 }

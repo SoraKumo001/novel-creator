@@ -3,11 +3,18 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { TimelineTab } from "../src/routes/novels/_components/-TimelineTab.js";
 
-vi.mock("../src/routes/novels/_components/-TimelinesMarkdownEditor.js", () => ({
-  TimelinesMarkdownEditor: () => (
-    <div data-testid="timelines-markdown-editor">マークダウンエディタ</div>
-  ),
-}));
+// TimelineTab は `-PresetEntityMarkdownEditor.js` を描画する。
+// 実エディタは ChatProvider を要求するため、表示切替の検証用にスタブ化する
+//（旧 `-TimelinesMarkdownEditor.js` 宛てのモックは参照先モジュールが
+// 存在しないため無効化されていた）。
+vi.mock(
+  "../src/routes/novels/_components/-PresetEntityMarkdownEditor.js",
+  () => ({
+    PresetEntityMarkdownEditor: () => (
+      <div data-testid="timelines-markdown-editor">マークダウンエディタ</div>
+    ),
+  })
+);
 
 const mockCreateTimeline = vi.fn().mockResolvedValue({ id: "t-new" });
 

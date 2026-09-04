@@ -2,14 +2,24 @@ import type { MarkdownCategoryNode } from "@novel-creator/shared";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { MarkdownText } from "@/components/MarkdownText.js";
+import {
+  usePersistedState,
+  useSidebarResize,
+} from "@/hooks/useEditorSidebar.js";
 import type { MarkdownInsertKind } from "@/hooks/useMarkdownEntityEditor.js";
-import { useToast } from "@/hooks/useToast.js";
+import { useMarkdownExternalSync } from "@/hooks/useMarkdownExternalSync.js";
+import type { MarkdownPreviewMode } from "@/lib/editor-storage.js";
 import { renderRubyLine } from "@/lib/sanitize.js";
 
+export type { MarkdownPreviewMode } from "@/lib/editor-storage.js";
 /**
  * Markdown編集系で重複していたサイドバー/ツールバー/ショートカットの共通コア。
  * routes 配下のみで完結する presentational な集約（API・hooks・context は触らない）。
+ *
+ * 状態系フック（useSidebarResize / usePersistedState / useMarkdownExternalSync）は
+ * `@/hooks` へ移動した。既存の import パスを維持するためここで再エクスポートする。
  */
+export { useMarkdownExternalSync, usePersistedState, useSidebarResize };
 
 export function useOverlapHover(onClose?: () => void) {
   const [isHovered, setIsHovered] = useState(false);
@@ -53,102 +63,6 @@ export function useOverlapHover(onClose?: () => void) {
     handleMouseEnter,
     handleMouseLeave,
   };
-}
-
-/**
- * サイドバー分割幅・リサイズ操作の単一実装。
- * useMarkdownEntityEditor 側の重複実装は廃止し、こちらに寄せている。
- * storageKey 指定時のみ localStorage に永続化する（未指定時は従来通り state のみ）。
- */
-export function useSidebarResize(
-  initialWidth = 256,
-  min = 160,
-  max = 500,
-  options?: { storageKey?: string }
-) {
-  const storageKey = options?.storageKey;
-  const [sidebarWidth, setSidebarWidth] = useState(() => {
-    if (storageKey) {
-      try {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-          return Number.parseInt(saved, 10);
-        }
-      } catch {
-        // storage 利用不可時は初期値
-      }
-    }
-    return initialWidth;
-  });
-  const isDraggingRef = useRef(false);
-  const sidebarWidthRef = useRef(sidebarWidth);
-  sidebarWidthRef.current = sidebarWidth;
-
-  const handleSplitterMouseDown = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault();
-      isDraggingRef.current = true;
-      document.body.style.cursor = "col-resize";
-      document.body.style.userSelect = "none";
-      const startX = e.clientX;
-      const startWidth = sidebarWidthRef.current;
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        if (!isDraggingRef.current) {
-          return;
-        }
-        const delta = moveEvent.clientX - startX;
-        setSidebarWidth(Math.max(min, Math.min(max, startWidth + delta)));
-      };
-      const handleMouseUp = () => {
-        isDraggingRef.current = false;
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-        if (storageKey) {
-          setSidebarWidth((current) => {
-            try {
-              localStorage.setItem(storageKey, String(current));
-            } catch {
-              // storage 利用不可時は state のみ維持
-            }
-            return current;
-          });
-        }
-        window.removeEventListener("mousemove", handleMouseMove);
-        window.removeEventListener("mouseup", handleMouseUp);
-      };
-      window.addEventListener("mousemove", handleMouseMove);
-      window.addEventListener("mouseup", handleMouseUp);
-    },
-    [min, max, storageKey]
-  );
-
-  return { sidebarWidth, setSidebarWidth, handleSplitterMouseDown };
-}
-
-export function usePersistedState<T extends string>(
-  storageKey: string,
-  initialValue: T
-) {
-  const [value, setValue] = useState<T>(() => {
-    try {
-      const saved = localStorage.getItem(storageKey);
-      return (saved as T) || initialValue;
-    } catch {
-      return initialValue;
-    }
-  });
-  const setAndPersist = useCallback(
-    (next: T) => {
-      setValue(next);
-      try {
-        localStorage.setItem(storageKey, next);
-      } catch {
-        // storage 利用不可時は state のみ更新
-      }
-    },
-    [storageKey]
-  );
-  return [value, setAndPersist] as const;
 }
 
 export function useEditorSaveShortcut(options: {
@@ -482,8 +396,10 @@ export function TocHeader({
  * エディタ横の最小プレビュードック（開閉式）。
  * 横=GFMフルレンダ（MarkdownText 再利用）、縦=行分割+ルビ（VerticalPreviewModal 相当の既定値流用）。
  * サニタイズは共通 sanitize（renderRubyLine / MarkdownText 内蔵）を維持する。モーダルは削除しない。
+ *
+ * 表示モード型（MarkdownPreviewMode）は `@/lib/editor-storage` に集約し、
+ * ここでは再エクスポートする（既存の import パスを維持）。
  */
-export type MarkdownPreviewMode = "horizontal" | "vertical";
 
 // VerticalPreviewModal の既定値流用（新規設定画面は作らない）
 const DOCK_VERTICAL_FONT_SIZE = 17;
@@ -642,108 +558,6 @@ export function scrollToElementById(id: string) {
   if (el) {
     el.scrollIntoView({ behavior: "smooth", block: "start" });
   }
-}
-
-export function useMarkdownExternalSync(options: {
-  novelId: string;
-  entityTitle: string;
-  entityType: string;
-  setMarkdown: (markdown: string) => void;
-  setSavedMarkdown: (markdown: string) => void;
-  clearDraft: () => void;
-}) {
-  const {
-    novelId,
-    entityTitle,
-    entityType,
-    setMarkdown,
-    setSavedMarkdown,
-    clearDraft,
-  } = options;
-  const toast = useToast();
-
-  useEffect(() => {
-    const eventNameMap: Record<string, string> = {
-      characters_markdown: "novel-creator:characters-updated",
-      settings_markdown: "novel-creator:settings-updated",
-      foreshadowings_document: "novel-creator:foreshadowings-updated",
-      foreshadowings_markdown: "novel-creator:foreshadowings-updated",
-      story_outline_markdown: "novel-creator:story-outline-updated",
-      timelines_markdown: "novel-creator:timelines-updated",
-      plot_markdown: "novel-creator:plot-updated",
-    };
-    const targetEventName = eventNameMap[entityType];
-    if (!targetEventName) {
-      return;
-    }
-    const handleExternalUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent<{
-        appliedSection?: string;
-        appliedTitle?: string;
-        markdown: string;
-        novelId: string;
-      }>;
-      if (!customEvent.detail || customEvent.detail.novelId !== novelId) {
-        return;
-      }
-      const {
-        markdown: newMarkdown,
-        appliedSection,
-        appliedTitle,
-      } = customEvent.detail;
-      setMarkdown(newMarkdown);
-      setSavedMarkdown(newMarkdown);
-      clearDraft();
-      toast.success(
-        `チャットからの提案（${appliedSection || appliedTitle || entityTitle}）をエディタに同期しました`
-      );
-    };
-    window.addEventListener(targetEventName, handleExternalUpdate);
-    return () => {
-      window.removeEventListener(targetEventName, handleExternalUpdate);
-    };
-  }, [
-    clearDraft,
-    entityTitle,
-    entityType,
-    novelId,
-    setMarkdown,
-    setSavedMarkdown,
-    toast,
-  ]);
-
-  useEffect(() => {
-    const handlePreviewApply = (event: Event) => {
-      const customEvent = event as CustomEvent<{
-        novelId: string;
-        entityType: string;
-        markdown: string;
-        appliedTitle?: string;
-      }>;
-      if (
-        !customEvent.detail ||
-        customEvent.detail.novelId !== novelId ||
-        customEvent.detail.entityType !== entityType
-      ) {
-        return;
-      }
-      const { markdown: newMarkdown, appliedTitle } = customEvent.detail;
-      setMarkdown(newMarkdown);
-      toast.success(
-        `チャットの提案内容（${appliedTitle || entityTitle}）をエディタに読み込みました。差分を確認・調整して保存してください。`
-      );
-    };
-    window.addEventListener(
-      "novel-creator:markdown-preview-apply",
-      handlePreviewApply
-    );
-    return () => {
-      window.removeEventListener(
-        "novel-creator:markdown-preview-apply",
-        handlePreviewApply
-      );
-    };
-  }, [entityTitle, entityType, novelId, setMarkdown, toast]);
 }
 
 export function MarkdownTocNav({

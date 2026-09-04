@@ -13,6 +13,8 @@ import {
 import type { EmbeddingModel, LanguageModel } from "ai";
 import type { Env as HonoEnv } from "hono";
 
+import { createDomainServices, type DomainServices } from "./core/services.js";
+
 /**
  * Hono の Context 変数として注入される DI コンテキスト。
  */
@@ -39,6 +41,7 @@ export interface AppContext extends HonoEnv {
     llm: LanguageModel;
     embedding: EmbeddingModel;
     vectorStore: VectorStore;
+    services: DomainServices;
     user?: AuthUser;
     session?: AuthSession;
   };
@@ -52,7 +55,14 @@ export function createContext(env: Env): AppContext["Variables"] {
   const llm = createLLMProvider(env);
   const embedding = createEmbeddingProvider(env);
   const vectorStore = createVectorStore(env);
-  return { db, embedding, env, llm, vectorStore };
+  const services = createDomainServices({
+    db,
+    embedding,
+    env,
+    llm,
+    vectorStore,
+  });
+  return { db, embedding, env, llm, services, vectorStore };
 }
 
 /**
@@ -69,7 +79,14 @@ export function createContextForWorkers(
   const vectorStore = createVectorStore(env, {
     vectorizeBinding: bindings.vectorize,
   });
-  return { db, embedding, env, llm, vectorStore };
+  const services = createDomainServices({
+    db,
+    embedding,
+    env,
+    llm,
+    vectorStore,
+  });
+  return { db, embedding, env, llm, services, vectorStore };
 }
 
 /**

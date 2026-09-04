@@ -1,36 +1,30 @@
-import {
-  formatCharactersMarkdown,
-  formatForeshadowingsMarkdown,
-  formatPlotMarkdown,
-  formatSettingsMarkdown,
-  formatStoryOutlineMarkdown,
-  formatTimelinesMarkdown,
-  type MarkdownCategoryNode,
-} from "@novel-creator/shared";
-import { useCallback, useEffect, useState } from "react";
+import type { MarkdownCategoryNode } from "@novel-creator/shared";
+import { useCallback, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { HistoryDiffModal } from "@/components/HistoryDiffModal.js";
 import { Loading } from "@/components/Loading.js";
-import { useChatUI } from "@/context/ChatContext.js";
+import { useEntityMarkdownActions } from "@/hooks/useEntityMarkdownActions.js";
 import { useMarkdownEntityEditor } from "@/hooks/useMarkdownEntityEditor.js";
-import { useToast } from "@/hooks/useToast.js";
+import { useMonacoPrefs } from "@/hooks/useMonacoPrefs.js";
+import {
+  loadPreviewMode,
+  type MarkdownPreviewMode,
+  savePreviewMode,
+} from "@/lib/editor-storage.js";
 import {
   EditorSidebarShell,
   MarkdownDraftBanner,
   MarkdownInsertButtons,
   MarkdownPreviewDock,
-  type MarkdownPreviewMode,
   MarkdownTocNav,
   MarkdownToolbarRow,
   SelectionConsultBar,
   TocHeader,
   TocToggleButton,
   useEditorSaveShortcut,
-  useMarkdownExternalSync,
   useMarkdownInsertShortcut,
   useOverlapHover,
-  usePersistedState,
 } from "./-MarkdownEditorCore.js";
 import { MonacoEditor } from "./-MonacoEditor.js";
 
@@ -108,153 +102,53 @@ export function EntityMarkdownEditor<
     findSectionAtLine,
   });
 
-  const { openChat } = useChatUI();
   const [historyOpen, setHistoryOpen] = useState(false);
-  const toast = useToast();
 
   // 最小プレビュードック（開閉式、既定は閉）。表示モードのみ永続化する。
+  // 実体は `@/lib/editor-storage`。
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewMode, setPreviewMode] = usePersistedState<MarkdownPreviewMode>(
-    `${storageKey}:preview-mode`,
-    "horizontal"
+  const [previewMode, setPreviewModeState] = useState<MarkdownPreviewMode>(() =>
+    loadPreviewMode(storageKey)
   );
-
-  // Monaco 最小設定（文字サイズ・折返し）。既定は従来表示（15 / on）のまま。
-  const [editorFontSize, setEditorFontSize] = useState(() => {
-    const saved = Number.parseInt(
-      localStorage.getItem(`${storageKey}:monaco-font-size`) ?? "",
-      10
-    );
-    return Number.isFinite(saved) ? Math.max(10, Math.min(24, saved)) : 15;
-  });
-  const [editorWordWrap, setEditorWordWrap] = useState<"on" | "off">(() =>
-    localStorage.getItem(`${storageKey}:monaco-word-wrap`) === "off"
-      ? "off"
-      : "on"
-  );
-
-  const handleEditorFontSize = useCallback(
-    (delta: number) => {
-      setEditorFontSize((prev) => {
-        const next = Math.max(10, Math.min(24, prev + delta));
-        try {
-          localStorage.setItem(`${storageKey}:monaco-font-size`, String(next));
-        } catch {
-          // storage 利用不可時は state のみ更新
-        }
-        return next;
-      });
+  const setPreviewMode = useCallback(
+    (mode: MarkdownPreviewMode) => {
+      setPreviewModeState(mode);
+      savePreviewMode(storageKey, mode);
     },
     [storageKey]
   );
 
-  const handleToggleWordWrap = useCallback(() => {
-    setEditorWordWrap((prev) => {
-      const next = prev === "on" ? "off" : "on";
-      try {
-        localStorage.setItem(`${storageKey}:monaco-word-wrap`, next);
-      } catch {
-        // storage 利用不可時は state のみ更新
-      }
-      return next;
-    });
-  }, [storageKey]);
+  // Monaco 最小設定（文字サイズ・折返し）は useMonacoPrefs に統一する。
+  // 既定は従来表示（15 / on）のまま。
+  const {
+    editorFontSize,
+    editorWordWrap,
+    handleEditorFontSize,
+    handleToggleWordWrap,
+  } = useMonacoPrefs(storageKey);
 
-  // Monaco 標準の検索ウィジェットを開く（検索・置換）。
-  const handleOpenFind = () => {
-    void editorRef.current?.getAction("actions.find")?.run();
-  };
-
-  // Quota 溢れ時は握り潰さず toast で通知する（保存・Dirty 判定は不変）。
-  useEffect(() => {
-    if (draftError) {
-      toast.error(draftError);
-    }
-  }, [draftError, toast]);
-
-  useMarkdownExternalSync({
-    novelId,
+  // 操作系（整形・保存・チャット相談・検索・差分適用）はカスタムフックへ切り出す。
+  // チャット提案の外部同期購読とドラフトエラーの toast 通知も含む。
+  const {
+    handleFormat,
+    handleOpenChat,
+    handleOpenFind,
+    handleRestoreSuccess,
+    handleSave,
+  } = useEntityMarkdownActions({
+    activeSection,
+    clearDraft,
+    draftError,
+    editorRef,
     entityTitle,
     entityType,
+    markdown,
+    novelId,
+    saveMarkdown,
+    selectedText,
     setMarkdown,
     setSavedMarkdown,
-    clearDraft,
   });
-
-  const handleOpenChat = useCallback(() => {
-    if (selectedText.trim()) {
-      openChat(novelId, {
-        entityType: "selection",
-        title: `${entityTitle}（選択範囲）`,
-        selectedText: selectedText.trim(),
-      });
-      return;
-    }
-
-    if (activeSection) {
-      openChat(novelId, {
-        entityType: "markdown_section",
-        title: `${entityTitle}「${activeSection.name}」`,
-        summary: `カテゴリー: ${activeSection.category}\n名前: ${activeSection.name}`,
-      });
-      return;
-    }
-
-    openChat(novelId, {
-      entityType: "markdown_section",
-      title: `${entityTitle}全体`,
-      summary: markdown.slice(0, 500) + (markdown.length > 500 ? "…" : ""),
-    });
-  }, [activeSection, entityTitle, markdown, novelId, openChat, selectedText]);
-
-  const handleFormat = useCallback(() => {
-    let formatted = markdown;
-    if (entityType === "characters_markdown") {
-      formatted = formatCharactersMarkdown(markdown);
-    } else if (entityType === "settings_markdown") {
-      formatted = formatSettingsMarkdown(markdown);
-    } else if (
-      entityType === "foreshadowings_document" ||
-      entityType === "foreshadowings_markdown"
-    ) {
-      formatted = formatForeshadowingsMarkdown(markdown);
-    } else if (entityType === "story_outline_markdown") {
-      formatted = formatStoryOutlineMarkdown(markdown);
-    } else if (entityType === "plot_markdown") {
-      formatted = formatPlotMarkdown(markdown);
-    } else if (entityType === "timelines_markdown") {
-      formatted = formatTimelinesMarkdown(markdown);
-    }
-
-    if (formatted === markdown) {
-      toast.success("マークダウンはすでに整形されています");
-      return;
-    }
-
-    setMarkdown(formatted);
-    toast.success("マークダウンを整形しました");
-  }, [entityType, markdown, setMarkdown, toast]);
-
-  const handleSave = useCallback(async () => {
-    try {
-      const res = await saveMarkdown(markdown);
-      setSavedMarkdown(markdown);
-      clearDraft();
-      if (
-        res?.created !== undefined ||
-        res?.updated !== undefined ||
-        res?.deleted !== undefined
-      ) {
-        toast.success(
-          `保存しました (作成: ${res.created ?? 0}件, 更新: ${res.updated ?? 0}件, 削除: ${res.deleted ?? 0}件)`
-        );
-      } else {
-        toast.success("保存しました");
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "保存に失敗しました");
-    }
-  }, [clearDraft, markdown, saveMarkdown, setSavedMarkdown, toast]);
 
   const isBusy = savingMarkdown;
 
@@ -483,10 +377,7 @@ export function EntityMarkdownEditor<
         entityId={novelId}
         currentContent={markdown}
         title={`${entityTitle}マークダウン全体`}
-        onRestoreSuccess={(restored) => {
-          setMarkdown(restored);
-          setSavedMarkdown(restored);
-        }}
+        onRestoreSuccess={handleRestoreSuccess}
       />
     </div>
   );

@@ -6,8 +6,9 @@ import {
   buildMarkdownCategoryTree,
   findSectionByLine,
   formatMarkdownDocument,
+  joinCleanBody,
   type MarkdownCategoryNode,
-  scanMarkdownSections,
+  scanEntityRanges,
 } from "./markdownCore.js";
 
 /** フォーカストラッキング用のストーリー構想セクション情報（行範囲付き）。 */
@@ -34,26 +35,15 @@ export type StoryOutlineCategoryNode = MarkdownCategoryNode;
 export function scanStoryOutlineSectionRanges(
   markdown: string
 ): StoryOutlineSectionRange[] {
-  const rawSections = scanMarkdownSections(markdown);
-  return rawSections.map((raw) => {
-    const cleanBodyLines = [...raw.bodyLines];
-    while (cleanBodyLines.length > 0 && cleanBodyLines[0].trim() === "") {
-      cleanBodyLines.shift();
-    }
-    while (cleanBodyLines.length > 0 && cleanBodyLines.at(-1)?.trim() === "") {
-      cleanBodyLines.pop();
-    }
-
-    return {
-      category: raw.category,
-      content: cleanBodyLines.join("\n"),
-      endLine: raw.endLine,
-      headingLine: raw.headingLine,
-      name: raw.name,
-      startLine: raw.startLine,
-      title: raw.name,
-    };
-  });
+  return scanEntityRanges(markdown, (raw) => ({
+    category: raw.category,
+    content: joinCleanBody(raw.bodyLines),
+    endLine: raw.endLine,
+    headingLine: raw.headingLine,
+    name: raw.name,
+    startLine: raw.startLine,
+    title: raw.name,
+  }));
 }
 
 /**

@@ -12,6 +12,11 @@ import { SettingDomainService } from "../setting.service.js";
 import { TimelineDomainService } from "../timeline.service.js";
 import type { ServiceContext } from "../types.js";
 import { createNovelScope, createTool } from "./scopedTool.js";
+import {
+  foreshadowingStatusValue,
+  novelIdParam,
+  type ScopedToolDefinition,
+} from "./toolSchemas.js";
 
 // ===== トークン爆発防止のための truncation ヘルパー（pure function） =====
 
@@ -98,46 +103,151 @@ export function isSectionInScope(
   return chapter?.novelId === boundNovelId;
 }
 
+// ===== 入力スキーマ（テーブル化・単一定義） =====
+
+export const getCharactersInputSchema = z.object({
+  category: z
+    .string()
+    .optional()
+    .describe("キャラクターカテゴリ（主要人物、敵役など）"),
+  name: z
+    .string()
+    .optional()
+    .describe("検索するキャラクター名またはキーワード（部分一致）"),
+  novelId: novelIdParam,
+});
+export type GetCharactersParams = z.output<typeof getCharactersInputSchema>;
+
+export const getForeshadowingsInputSchema = z.object({
+  novelId: novelIdParam,
+  status: foreshadowingStatusValue
+    .optional()
+    .describe(
+      "伏線のステータスで絞り込み（unresolved: 未回収, resolved: 回収済, abandoned: 破棄）"
+    ),
+});
+export type GetForeshadowingsParams = z.output<
+  typeof getForeshadowingsInputSchema
+>;
+
+export const novelScopedInputSchema = z.object({
+  novelId: novelIdParam,
+});
+export type NovelScopedParams = z.output<typeof novelScopedInputSchema>;
+
+export const getSettingsInputSchema = z.object({
+  category: z
+    .string()
+    .optional()
+    .describe("設定カテゴリ（世界観、地理、魔法体系など）"),
+  name: z
+    .string()
+    .optional()
+    .describe("検索する設定名またはキーワード（部分一致）"),
+  novelId: novelIdParam,
+});
+export type GetSettingsParams = z.output<typeof getSettingsInputSchema>;
+
+export const getSectionContentInputSchema = z.object({
+  sectionId: z.string().describe("取得対象の節ID（Section ID）"),
+});
+export type GetSectionContentParams = z.output<
+  typeof getSectionContentInputSchema
+>;
+
+export const searchNovelKnowledgeInputSchema = z.object({
+  novelId: novelIdParam,
+  query: z.string().describe("検索キーワードまたは質問文"),
+});
+export type SearchNovelKnowledgeParams = z.output<
+  typeof searchNovelKnowledgeInputSchema
+>;
+
+// ===== ハンドラ用サービス束（明示型） =====
+
+export interface ReadToolServices {
+  chapterService: ChapterDomainService;
+  characterService: CharacterDomainService;
+  foreshadowingService: ForeshadowingDomainService;
+  novelService: NovelDomainService;
+  sectionService: SectionDomainService;
+  settingService: SettingDomainService;
+  timelineService: TimelineDomainService;
+}
+
+export interface TruncationNoticeFields {
+  truncated?: string;
+  [key: string]: unknown;
+}
+
 /**
  * 創作相談チャット用の小説データ読み取りツール群を作成する。
  * 各ツールは AI SDK の tool() 形式で定義され、LLM による自律的な小説情報参照を可能にする。
+ *
+ * 入力スキーマはモジュール頂部の単一定義、ハンドラは createReadToolTable の
+ * テーブルに集約し、createReadTools ではスコープ解決のみを付与する。
+ * 公開シグネチャ・ツール名・入出力形状・実行結果は従来通り。
  */
-
-export function createReadTools(
+function createReadToolTable(
   ctx: ServiceContext,
-  defaultNovelId?: string | null
-): ToolSet {
-  const novelService = new NovelDomainService(ctx);
-  const characterService = new CharacterDomainService(ctx);
-  const settingService = new SettingDomainService(ctx);
-  const chapterService = new ChapterDomainService(ctx);
-  const sectionService = new SectionDomainService(ctx);
-  const foreshadowingService = new ForeshadowingDomainService(ctx);
-  const timelineService = new TimelineDomainService(ctx);
-
-  const novelScope = createNovelScope(defaultNovelId);
+  services: ReadToolServices
+): {
+  getCharacters: ScopedToolDefinition<
+    typeof getCharactersInputSchema,
+    Record<string, unknown>
+  >;
+  getForeshadowings: ScopedToolDefinition<
+    typeof getForeshadowingsInputSchema,
+    Record<string, unknown>
+  >;
+  getNovelInfo: ScopedToolDefinition<
+    typeof novelScopedInputSchema,
+    Record<string, unknown>
+  >;
+  getPlotAndChapters: ScopedToolDefinition<
+    typeof novelScopedInputSchema,
+    Record<string, unknown>
+  >;
+  getSectionContent: ScopedToolDefinition<
+    typeof getSectionContentInputSchema,
+    Record<string, unknown>
+  >;
+  getSettings: ScopedToolDefinition<
+    typeof getSettingsInputSchema,
+    Record<string, unknown>
+  >;
+  getStoryOutline: ScopedToolDefinition<
+    typeof novelScopedInputSchema,
+    Record<string, unknown>
+  >;
+  getTimelines: ScopedToolDefinition<
+    typeof novelScopedInputSchema,
+    Record<string, unknown>
+  >;
+  searchNovelKnowledge: ScopedToolDefinition<
+    typeof searchNovelKnowledgeInputSchema,
+    Record<string, unknown>
+  >;
+} {
+  const {
+    novelService,
+    characterService,
+    settingService,
+    chapterService,
+    sectionService,
+    foreshadowingService,
+    timelineService,
+  } = services;
 
   return {
-    getCharacters: createTool({
+    getCharacters: {
       description:
         "小説に登場するキャラクター一覧または特定のキャラクターの詳細を取得します。名前やカテゴリで絞り込み可能です。",
       errorMessage: "キャラクター情報の取得に失敗しました。",
-      inputSchema: z.object({
-        category: z
-          .string()
-          .optional()
-          .describe("キャラクターカテゴリ（主要人物、敵役など）"),
-        name: z
-          .string()
-          .optional()
-          .describe("検索するキャラクター名またはキーワード（部分一致）"),
-        novelId: z
-          .string()
-          .optional()
-          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
-      }),
-      scope: novelScope.fromParam,
-      handler: async (targetId, { name, category }) => {
+      handler: async (
+        targetId: string,
+        { name, category }: GetCharactersParams
+      ): Promise<Record<string, unknown>> => {
         let list = await characterService.listCharacters(targetId);
         if (name) {
           const query = name.toLowerCase();
@@ -164,26 +274,16 @@ export function createReadTools(
           })),
         };
       },
-    }),
-
-    getForeshadowings: createTool({
+      inputSchema: getCharactersInputSchema,
+    },
+    getForeshadowings: {
       description:
         "小説に登録されている伏線の一覧、進捗状況（未回収/回収済/破棄）、詳細説明を取得します。",
       errorMessage: "伏線情報の取得に失敗しました。",
-      inputSchema: z.object({
-        novelId: z
-          .string()
-          .optional()
-          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
-        status: z
-          .enum(["unresolved", "resolved", "abandoned"])
-          .optional()
-          .describe(
-            "伏線のステータスで絞り込み（unresolved: 未回収, resolved: 回収済, abandoned: 破棄）"
-          ),
-      }),
-      scope: novelScope.fromParam,
-      handler: async (targetId, { status }) => {
+      handler: async (
+        targetId: string,
+        { status }: GetForeshadowingsParams
+      ): Promise<Record<string, unknown>> => {
         let list =
           await foreshadowingService.getForeshadowingsByNovel(targetId);
         if (status) {
@@ -207,18 +307,12 @@ export function createReadTools(
           })),
         };
       },
-    }),
-    getNovelInfo: createTool({
+      inputSchema: getForeshadowingsInputSchema,
+    },
+    getNovelInfo: {
       description: "小説の基本情報（タイトル、あらすじ、概要）を取得します。",
       errorMessage: "指定された小説が見つかりませんでした。",
-      inputSchema: z.object({
-        novelId: z
-          .string()
-          .optional()
-          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
-      }),
-      scope: novelScope.fromParam,
-      handler: async (targetId) => {
+      handler: async (targetId: string): Promise<Record<string, unknown>> => {
         const detail = await novelService.getNovelDetail(targetId);
         return {
           chapterCount: detail.chapters.length,
@@ -238,20 +332,13 @@ export function createReadTools(
               : (detail.novel.updatedAt ?? null),
         };
       },
-    }),
-
-    getPlotAndChapters: createTool({
+      inputSchema: novelScopedInputSchema,
+    },
+    getPlotAndChapters: {
       description:
         "小説の全章（Chapter）および各節（Section）の構成、プロット・あらすじ一覧を取得します。",
       errorMessage: "章・プロット情報の取得に失敗しました。",
-      inputSchema: z.object({
-        novelId: z
-          .string()
-          .optional()
-          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
-      }),
-      scope: novelScope.fromParam,
-      handler: async (targetId) => {
+      handler: async (targetId: string): Promise<Record<string, unknown>> => {
         const chapterRows = await chapterService.listChapters(targetId);
         const chapterTrunc = truncateList(chapterRows, MAX_STRUCTURE_ITEMS);
         const chaptersWithSections = await Promise.all(
@@ -281,17 +368,15 @@ export function createReadTools(
           chapters: chaptersWithSections,
         };
       },
-    }),
-
-    getSectionContent: createTool({
+      inputSchema: novelScopedInputSchema,
+    },
+    getSectionContent: {
       description: "指定された節（Section）の本文テキストを取得します。",
       errorMessage: "指定された節または本文が見つかりませんでした。",
-      inputSchema: z.object({
-        sectionId: z.string().describe("取得対象の節ID（Section ID）"),
-      }),
-      // バインドされた novelId にスコープを限定する（LLM による指定は受け付けない）。
-      scope: novelScope.boundOnly,
-      handler: async (scopedNovelId, { sectionId }) => {
+      handler: async (
+        scopedNovelId: string,
+        { sectionId }: GetSectionContentParams
+      ): Promise<Record<string, unknown>> => {
         const { section, content } =
           await sectionService.getSectionWithContent(sectionId);
         // novelId スコープ判定: sections テーブルに novelId カラムはないため、
@@ -315,28 +400,16 @@ export function createReadTools(
           title: section.title,
         };
       },
-    }),
-
-    getSettings: createTool({
+      inputSchema: getSectionContentInputSchema,
+    },
+    getSettings: {
       description:
         "小説の世界観・設定（用語、地理、魔法、組織、アイテム等）の一覧または特定設定の詳細を取得します。",
       errorMessage: "設定情報の取得に失敗しました。",
-      inputSchema: z.object({
-        category: z
-          .string()
-          .optional()
-          .describe("設定カテゴリ（世界観、地理、魔法体系など）"),
-        name: z
-          .string()
-          .optional()
-          .describe("検索する設定名またはキーワード（部分一致）"),
-        novelId: z
-          .string()
-          .optional()
-          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
-      }),
-      scope: novelScope.fromParam,
-      handler: async (targetId, { name, category }) => {
+      handler: async (
+        targetId: string,
+        { name, category }: GetSettingsParams
+      ): Promise<Record<string, unknown>> => {
         let list = await settingService.listSettings(targetId);
         if (name) {
           const query = name.toLowerCase();
@@ -362,20 +435,13 @@ export function createReadTools(
           })),
         };
       },
-    }),
-
-    getStoryOutline: createTool({
+      inputSchema: getSettingsInputSchema,
+    },
+    getStoryOutline: {
       description:
         "小説のストーリー構想（全体のあらすじ、序盤・中盤・今後の展開候補、結末、構想メモ）のマークダウン内容を取得します。構成や今後の展開・結末の相談時に参照してください。",
       errorMessage: "ストーリー構想の取得に失敗しました。",
-      inputSchema: z.object({
-        novelId: z
-          .string()
-          .optional()
-          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
-      }),
-      scope: novelScope.fromParam,
-      handler: async (targetId) => {
+      handler: async (targetId: string): Promise<Record<string, unknown>> => {
         const detail = await novelService.getNovelDetail(targetId);
         return {
           storyOutline:
@@ -384,19 +450,12 @@ export function createReadTools(
           title: detail.novel.title,
         };
       },
-    }),
-
-    getTimelines: createTool({
+      inputSchema: novelScopedInputSchema,
+    },
+    getTimelines: {
       description: "作中の時系列・年表イベントの一覧を取得します。",
       errorMessage: "タイムライン情報の取得に失敗しました。",
-      inputSchema: z.object({
-        novelId: z
-          .string()
-          .optional()
-          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
-      }),
-      scope: novelScope.fromParam,
-      handler: async (targetId) => {
+      handler: async (targetId: string): Promise<Record<string, unknown>> => {
         const list = await timelineService.listTimelines(targetId);
         const trunc = truncateList(list, MAX_STRUCTURE_ITEMS);
         return {
@@ -411,21 +470,16 @@ export function createReadTools(
           })),
         };
       },
-    }),
-
-    searchNovelKnowledge: createTool({
+      inputSchema: novelScopedInputSchema,
+    },
+    searchNovelKnowledge: {
       description:
         "質問やキーワードに関連する小説情報（設定・人物・本文等）をセマンティック検索（ベクトル検索）します。",
       errorMessage: "関連ナレッジの検索に失敗しました。",
-      inputSchema: z.object({
-        novelId: z
-          .string()
-          .optional()
-          .describe("対象の小説ID（省略時は現在の相談対象小説）"),
-        query: z.string().describe("検索キーワードまたは質問文"),
-      }),
-      scope: novelScope.fromParam,
-      handler: async (targetId, { query }) => {
+      handler: async (
+        targetId: string,
+        { query }: SearchNovelKnowledgeParams
+      ): Promise<Record<string, unknown>> => {
         const ragResult = await searchContext(
           ctx.vectorStore,
           ctx.embedding,
@@ -449,6 +503,83 @@ export function createReadTools(
           settings: settingTrunc.items.map((s) => truncateText(s)),
         };
       },
+      inputSchema: searchNovelKnowledgeInputSchema,
+    },
+  };
+}
+
+export type ReadToolName =
+  | "getCharacters"
+  | "getForeshadowings"
+  | "getNovelInfo"
+  | "getPlotAndChapters"
+  | "getSectionContent"
+  | "getSettings"
+  | "getStoryOutline"
+  | "getTimelines"
+  | "searchNovelKnowledge";
+
+export function createReadTools(
+  ctx: ServiceContext,
+  defaultNovelId?: string | null
+): ToolSet {
+  const novelService = new NovelDomainService(ctx);
+  const characterService = new CharacterDomainService(ctx);
+  const settingService = new SettingDomainService(ctx);
+  const chapterService = new ChapterDomainService(ctx);
+  const sectionService = new SectionDomainService(ctx);
+  const foreshadowingService = new ForeshadowingDomainService(ctx);
+  const timelineService = new TimelineDomainService(ctx);
+
+  const novelScope = createNovelScope(defaultNovelId);
+
+  const table = createReadToolTable(ctx, {
+    chapterService,
+    characterService,
+    foreshadowingService,
+    novelService,
+    sectionService,
+    settingService,
+    timelineService,
+  });
+
+  return {
+    getCharacters: createTool({
+      ...table.getCharacters,
+      scope: novelScope.fromParam,
+    }),
+    getForeshadowings: createTool({
+      ...table.getForeshadowings,
+      scope: novelScope.fromParam,
+    }),
+    getNovelInfo: createTool({
+      ...table.getNovelInfo,
+      scope: novelScope.fromParam,
+    }),
+    getPlotAndChapters: createTool({
+      ...table.getPlotAndChapters,
+      scope: novelScope.fromParam,
+    }),
+    // バインドされた novelId にスコープを限定する（LLM による指定は受け付けない）。
+    getSectionContent: createTool({
+      ...table.getSectionContent,
+      scope: novelScope.boundOnly,
+    }),
+    getSettings: createTool({
+      ...table.getSettings,
+      scope: novelScope.fromParam,
+    }),
+    getStoryOutline: createTool({
+      ...table.getStoryOutline,
+      scope: novelScope.fromParam,
+    }),
+    getTimelines: createTool({
+      ...table.getTimelines,
+      scope: novelScope.fromParam,
+    }),
+    searchNovelKnowledge: createTool({
+      ...table.searchNovelKnowledge,
+      scope: novelScope.fromParam,
     }),
   };
 }

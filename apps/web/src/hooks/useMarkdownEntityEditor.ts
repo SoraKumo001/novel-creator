@@ -2,6 +2,7 @@ import type { MarkdownCategoryNode } from "@novel-creator/shared";
 import type { editor } from "monaco-editor";
 import {
   type MutableRefObject,
+  type RefObject,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -9,8 +10,19 @@ import {
   useRef,
   useState,
 } from "react";
+import { useSidebarResize } from "@/hooks/useEditorSidebar.js";
 import { useMarkdownDraft } from "@/hooks/useMarkdownDraft.js";
-import { useSidebarResize } from "@/routes/novels/_components/-MarkdownEditorCore.js";
+import {
+  type OutlineEditorHandle,
+  useMarkdownOutline,
+} from "@/hooks/useMarkdownOutline.js";
+import {
+  type EditorSidebarMode,
+  loadSidebarMode,
+  loadSidebarOpen,
+  saveSidebarMode,
+  saveSidebarOpen,
+} from "@/lib/editor-storage.js";
 
 export type MonacoEditorInstance = editor.IStandaloneCodeEditor;
 
@@ -258,30 +270,26 @@ export function useMarkdownEntityEditor<
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<TSection | null>(null);
   const [savedMarkdown, setSavedMarkdown] = useState("");
   const [discardOpen, setDiscardOpen] = useState(false);
   const [selectedText, setSelectedText] = useState("");
-  // 分割幅・リサイズ操作は -MarkdownEditorCore.tsx の useSidebarResize に一本化する。
+  // 分割幅・リサイズ操作は useEditorSidebar の useSidebarResize に一本化する。
   const { sidebarWidth, setSidebarWidth, handleSplitterMouseDown } =
     useSidebarResize(256, 160, 600, {
       storageKey: `${storageKey}:sidebar-width`,
     });
-  const [sidebarMode, setSidebarModeState] = useState<"pinned" | "overlap">(
-    () => {
-      const saved = localStorage.getItem(`${storageKey}:sidebar-mode`);
-      return saved === "overlap" ? "overlap" : "pinned";
-    }
+  // サイドバー表示設定の永続化は `@/lib/editor-storage` に集約する。
+  const [sidebarMode, setSidebarModeState] = useState<EditorSidebarMode>(() =>
+    loadSidebarMode(storageKey)
   );
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() => {
-    const saved = localStorage.getItem(`${storageKey}:sidebar-open`);
-    return saved !== null ? saved === "true" : true;
-  });
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(() =>
+    loadSidebarOpen(storageKey)
+  );
 
   const setSidebarMode = useCallback(
-    (mode: "pinned" | "overlap") => {
+    (mode: EditorSidebarMode) => {
       setSidebarModeState(mode);
-      localStorage.setItem(`${storageKey}:sidebar-mode`, mode);
+      saveSidebarMode(storageKey, mode);
       if (mode === "overlap") {
         setIsSidebarOpen(false);
       }
@@ -296,7 +304,7 @@ export function useMarkdownEntityEditor<
   const toggleSidebar = useCallback(() => {
     setIsSidebarOpen((prev) => {
       const next = !prev;
-      localStorage.setItem(`${storageKey}:sidebar-open`, String(next));
+      saveSidebarOpen(storageKey, next);
       return next;
     });
   }, [storageKey]);
@@ -308,8 +316,19 @@ export function useMarkdownEntityEditor<
   const editorRef = useRef<MonacoEditorInstance | null>(null);
   const markdownRef = useRef(markdown);
   markdownRef.current = markdown;
-  const findSectionAtLineRef = useRef(findSectionAtLine);
-  findSectionAtLineRef.current = findSectionAtLine;
+
+  // アウトライン責務: カーソル追従・目次ジャンプは useMarkdownOutline に分離する。
+  // MonacoEditorInstance は OutlineEditorHandle を構造的に満たす。
+  const {
+    activeSection,
+    setActiveSection,
+    updateActiveSection,
+    handleTreeClick,
+  } = useMarkdownOutline<TSection>({
+    editorRef: editorRef as RefObject<OutlineEditorHandle | null>,
+    findSectionAtLine,
+    markdownRef,
+  });
 
   const {
     hasDraft,
@@ -331,28 +350,6 @@ export function useMarkdownEntityEditor<
     [buildTree, deferredMarkdown]
   );
   const isDirty = markdown !== savedMarkdown;
-
-  const updateActiveSection = useCallback(
-    (currentMarkdown?: string, lineNumber?: number) => {
-      const ed = editorRef.current;
-      const text = currentMarkdown ?? markdownRef.current;
-      const line =
-        lineNumber !== undefined
-          ? lineNumber
-          : ed
-            ? ed.getPosition()?.lineNumber
-            : undefined;
-      if (line === undefined || !text) {
-        setActiveSection(null);
-        return;
-      }
-      // Monaco の lineNumber は 1-indexed、findSectionAtLine は 0-indexed 行番号を受け取るため - 1 する
-      const zeroIndexedLine = Math.max(0, line - 1);
-      const section = findSectionAtLineRef.current(text, zeroIndexedLine);
-      setActiveSection(section);
-    },
-    []
-  );
 
   const fetchMarkdownRef = useRef(fetchMarkdown);
   fetchMarkdownRef.current = fetchMarkdown;
@@ -472,21 +469,6 @@ export function useMarkdownEntityEditor<
     });
     ed.focus();
   }, []);
-
-  const handleTreeClick = useCallback(
-    (headingLine: number) => {
-      const ed = editorRef.current;
-      if (!ed) {
-        return;
-      }
-      const lineNumber = headingLine + 1;
-      ed.revealLineInCenter(lineNumber);
-      ed.setPosition({ lineNumber, column: 1 });
-      ed.focus();
-      updateActiveSection(markdownRef.current, lineNumber);
-    },
-    [updateActiveSection]
-  );
 
   return {
     markdown,
