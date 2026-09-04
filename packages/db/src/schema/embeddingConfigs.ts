@@ -9,6 +9,9 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const embeddingConfigs = pgTable("embedding_configs", {
+  // NOTE(S0-1): api_key は AES-GCM 暗号文 ("enc:v1:...") またはレガシー平文を格納する。
+  // カラム型は text のまま。復号はサーバ内 (secret-crypto 経由の Embedding クライアント構築時) のみで行い、
+  // 生のキーを API 応答に含めてはならない。
   apiKey: text("api_key"),
   baseUrl: text("base_url"),
   createdAt: timestamp("created_at").defaultNow(),

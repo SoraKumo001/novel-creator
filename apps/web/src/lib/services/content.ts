@@ -28,6 +28,7 @@ export async function updateContent(
     param: { id: sectionId },
     json: {
       body: input.body,
+      ...(input.updatedAt ? { updatedAt: input.updatedAt } : {}),
     },
   });
   if (!res.ok) {

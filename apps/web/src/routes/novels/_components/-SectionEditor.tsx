@@ -60,6 +60,8 @@ export function SectionEditor({
     cancelGeneration,
     streamError,
     resetStreamError,
+    retry: retryGenerate,
+    canRetry: canRetryGenerate,
   } = useGenerate();
   const {
     running,
@@ -174,6 +176,17 @@ export function SectionEditor({
       },
       selectedModelConfigId
     );
+    await updateContent(accumulated);
+    setSavedBody(accumulated);
+  }
+
+  async function handleRetryGenerate() {
+    resetStreamError();
+    let accumulated = localBody;
+    await retryGenerate((chunk) => {
+      accumulated += chunk;
+      setLocalBody(accumulated);
+    });
     await updateContent(accumulated);
     setSavedBody(accumulated);
   }
@@ -319,6 +332,8 @@ export function SectionEditor({
       onGenerate={() => void handleGenerate()}
       onExtract={() => void handleExtract()}
       onCancelGeneration={cancelGeneration}
+      onRetryGeneration={() => void handleRetryGenerate()}
+      canRetryGeneration={canRetryGenerate}
       onOpenHistory={historyModal.open}
       onOpenVerticalPreview={verticalPreviewModal.open}
       onOpenVoiceChecker={() => void handleOpenVoiceChecker()}

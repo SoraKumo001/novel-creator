@@ -110,13 +110,18 @@ export class ChatDomainService {
 
     const tools = this.buildChatTools(effectiveNovelId);
 
-    return this.streamAssistantResponse(
+    const response = await this.streamAssistantResponse(
       sessionId,
       resolvedModel,
       prompt,
       tools,
       providerOptions
     );
+    // warnings は既存ストリーム形式を変えず、レスポンスヘッダでクライアントに返す
+    if (context.warnings.length > 0) {
+      response.headers.set("X-Context-Warnings", context.warnings.join(","));
+    }
+    return response;
   }
 
   private async ensureSession(sessionId: string) {

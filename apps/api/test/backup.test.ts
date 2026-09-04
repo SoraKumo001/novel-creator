@@ -20,6 +20,7 @@ import {
   ValidationError,
 } from "../src/core/index.js";
 import { createDomainServices } from "../src/core/services.js";
+import { TEST_ONLY_AUTH_SECRET } from "../src/lib/auth.js";
 import { errorHandler } from "../src/middleware/error-handler.js";
 import backupRouter from "../src/routes/backup.js";
 
@@ -51,7 +52,8 @@ function createTestApp(
 ) {
   const app = new Hono<AppContext>();
   app.use("*", async (c, next) => {
-    const env = {} as never;
+    // テスト専用 secret を明示設定し、認証設定済み扱いにする。
+    const env = { BETTER_AUTH_SECRET: TEST_ONLY_AUTH_SECRET } as never;
     const llm = {} as never;
     const embedding = {} as never;
     c.set("env", env);

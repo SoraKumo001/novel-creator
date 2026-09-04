@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toErrorMessage } from "@/lib/errors.js";
 import {
   analyzeSettingImpact,
@@ -40,6 +40,7 @@ interface UseGenerateReturn {
   ) => Promise<SettingImpactResult>;
   analyzingImpact: boolean;
   cancelGeneration: () => void;
+  canRetry: boolean;
   extract: (sectionId: string, signal?: AbortSignal) => Promise<ExtractResult>;
   extracting: boolean;
   generateChapterSummary: (
@@ -77,6 +78,7 @@ interface UseGenerateReturn {
   resetGeneratedPlot: () => void;
   resetGeneratedSummary: () => void;
   resetStreamError: () => void;
+  retry: (onChunk?: (text: string) => void) => Promise<void>;
   startedAt: number | null;
   streamError: string | null;
 }
@@ -100,6 +102,21 @@ export function useGenerate(): UseGenerateReturn {
   const [streamError, setStreamError] = useState<string | null>(null);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+  const lastContentRequestRef = useRef<{
+    modelConfigId?: string | null;
+    onChunk: (text: string) => void;
+    sectionId: string;
+  } | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
+
+  // unmount 時に進行中の生成を中断する
+  useEffect(() => {
+    const ref = abortControllerRef;
+    return () => {
+      ref.current?.abort();
+      ref.current = null;
+    };
+  }, []);
 
   const createSignal = useCallback(
     (externalSignal?: AbortSignal): AbortSignal => {
@@ -197,6 +214,8 @@ export function useGenerate(): UseGenerateReturn {
       setStartedAt(Date.now());
       setGeneratedChars(0);
       setStreamError(null);
+      lastContentRequestRef.current = { modelConfigId, onChunk, sectionId };
+      setCanRetry(true);
       const sig = createSignal(signal);
 
       const countingOnChunk = (text: string) => {
@@ -319,6 +338,7 @@ export function useGenerate(): UseGenerateReturn {
     generatedPlot,
     generatedSummary,
     streamError,
+    canRetry,
     generatePlot: handleGeneratePlot,
     generateChapterSummary: handleGenerateChapterSummary,
     generateSectionSummary: handleGenerateSectionSummary,
@@ -327,6 +347,17 @@ export function useGenerate(): UseGenerateReturn {
     analyzeImpact,
     extract,
     cancelGeneration,
+    retry: async (onChunk?: (text: string) => void) => {
+      const last = lastContentRequestRef.current;
+      if (!last) {
+        return;
+      }
+      await generateContent(
+        last.sectionId,
+        onChunk ?? last.onChunk,
+        last.modelConfigId
+      );
+    },
     resetGeneratedPlot: () => setGeneratedPlot(null),
     resetGeneratedSummary: () => setGeneratedSummary(null),
     resetStreamError: () => setStreamError(null),

@@ -28,7 +28,11 @@ export function useContent(sectionId: string): UseContentReturn {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (body: string) => updateContent(sectionId, { body }),
+    mutationFn: (body: string) =>
+      updateContent(sectionId, {
+        body,
+        updatedAt: content?.updatedAt ?? undefined,
+      }),
     onSuccess: () =>
       queryClient.invalidateQueries({
         queryKey: sectionKeys.content(sectionId),

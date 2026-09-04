@@ -17,18 +17,31 @@ export function sseStream(
   c.header("Cache-Control", "no-cache");
   c.header("Connection", "keep-alive");
   return stream(c, async (s) => {
-    for await (const chunk of chunks) {
-      if (typeof chunk === "string") {
+    try {
+      for await (const chunk of chunks) {
+        if (typeof chunk === "string") {
+          await s.write(
+            `data: ${JSON.stringify({ text: chunk, variant: 0 })}\n\n`
+          );
+        } else {
+          await s.write(
+            `data: ${JSON.stringify({ text: chunk.text, variant: chunk.variant ?? 0 })}\n\n`
+          );
+        }
+      }
+      await s.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        return;
+      }
+      try {
         await s.write(
-          `data: ${JSON.stringify({ text: chunk, variant: 0 })}\n\n`
+          `event: error\ndata: ${JSON.stringify({ message: formatErrorMessage(err) })}\n\n`
         );
-      } else {
-        await s.write(
-          `data: ${JSON.stringify({ text: chunk.text, variant: chunk.variant ?? 0 })}\n\n`
-        );
+      } catch {
+        // クライアント切断時などの書き込み失敗は無視する
       }
     }
-    await s.write(`data: ${JSON.stringify({ done: true })}\n\n`);
   });
 }
 

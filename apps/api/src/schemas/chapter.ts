@@ -29,4 +29,6 @@ export const updateSectionSchema = z.object({
 // ---- contents ----
 export const updateContentSchema = z.object({
   body: z.string(),
+  // 楽観ロック用。未指定時は従来どおり上書きする。
+  updatedAt: z.string().optional(),
 });

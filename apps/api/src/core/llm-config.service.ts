@@ -6,28 +6,17 @@ import {
 import { type LLMConfigInput, testLLMConnection } from "@novel-creator/llm";
 import type { LanguageModel } from "ai";
 import { desc, eq } from "drizzle-orm";
+import {
+  decryptApiKey,
+  encryptApiKey,
+  maskApiKeyForDisplay,
+} from "../lib/secret-crypto.js";
 import { resolveLLMModel as resolveLLMModelShared } from "./model-resolver.js";
 import { assertFound, type ServiceContext, ValidationError } from "./types.js";
 
 export interface MaskedLLMConfig extends Omit<LLMConfig, "apiKey"> {
   apiKeyMasked: string | null;
   hasApiKey: boolean;
-}
-
-function maskApiKey(key?: string | null): {
-  apiKeyMasked: string | null;
-  hasApiKey: boolean;
-} {
-  if (!key?.trim()) {
-    return { apiKeyMasked: null, hasApiKey: false };
-  }
-  const trimmed = key.trim();
-  if (trimmed.length <= 8) {
-    return { apiKeyMasked: "********", hasApiKey: true };
-  }
-  const prefix = trimmed.slice(0, 4);
-  const suffix = trimmed.slice(-4);
-  return { apiKeyMasked: `${prefix}....${suffix}`, hasApiKey: true };
 }
 
 /**
@@ -71,30 +60,52 @@ function assertValidBaseUrl(baseUrl?: string | null): void {
 export class LlmConfigDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
-  async listConfigs(): Promise<MaskedLLMConfig[]> {
-    const rows = await this.ctx.db
-      .select()
-      .from(llmConfigs)
-      .orderBy(desc(llmConfigs.isDefault), desc(llmConfigs.createdAt));
-
-    return rows.map((row) => {
-      const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
-      const { apiKey: _, ...rest } = row;
-      return {
-        ...rest,
-        apiKeyMasked,
-        hasApiKey,
-      };
-    });
+  private get secretKeyValue(): string | undefined {
+    return this.ctx.env.SECRET_ENCRYPTION_KEY;
   }
 
-  async getConfig(id: string): Promise<LLMConfig> {
+  /**
+   * DB 行をマスク済み表現に変換する。保存値 (暗号文の可能性あり) をサーバ内で復号してから
+   * マスクし、生のキーを呼び出し側に返さない。
+   */
+  private async toMasked(row: LLMConfig): Promise<MaskedLLMConfig> {
+    const apiKey = await decryptApiKey(row.apiKey, this.secretKeyValue);
+    const { apiKeyMasked, hasApiKey } = maskApiKeyForDisplay(apiKey);
+    const { apiKey: _, ...rest } = row;
+    return {
+      ...rest,
+      apiKeyMasked,
+      hasApiKey,
+    };
+  }
+
+  /**
+   * 内部利用向けの生行取得。返却値の apiKey は暗号文の可能性があり、
+   * HTTP 応答に含めてはならない。
+   */
+  private async findRawById(id: string): Promise<LLMConfig> {
     const [row] = await this.ctx.db
       .select()
       .from(llmConfigs)
       .where(eq(llmConfigs.id, id));
     assertFound(row, "LLM Config not found");
     return row;
+  }
+
+  async listConfigs(): Promise<MaskedLLMConfig[]> {
+    const rows = await this.ctx.db
+      .select()
+      .from(llmConfigs)
+      .orderBy(desc(llmConfigs.isDefault), desc(llmConfigs.createdAt));
+
+    return Promise.all(rows.map((row) => this.toMasked(row)));
+  }
+
+  /**
+   * マスク済み設定を返す。生の apiKey は含まない (S0-1)。
+   */
+  async getConfig(id: string): Promise<MaskedLLMConfig> {
+    return this.toMasked(await this.findRawById(id));
   }
 
   async createConfig(
@@ -115,31 +126,38 @@ export class LlmConfigDomainService {
       await this.ctx.db.update(llmConfigs).set({ isDefault: false });
     }
 
+    // apiKey は保存前に必ず暗号化する。鍵未設定時はここで明示エラーになる。
+    const apiKey = await encryptApiKey(data.apiKey, this.secretKeyValue);
+
     const [row] = await this.ctx.db
       .insert(llmConfigs)
       .values({
         ...data,
+        apiKey,
         isDefault: shouldBeDefault,
       })
       .returning();
 
-    const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
-    const { apiKey: _, ...rest } = row;
-    return { ...rest, apiKeyMasked, hasApiKey };
+    assertFound(row, "LLM Config not found");
+    return this.toMasked(row);
   }
 
   async updateConfig(
     id: string,
     data: Partial<Omit<NewLLMConfig, "id" | "createdAt" | "updatedAt">>
   ): Promise<MaskedLLMConfig> {
-    const current = await this.getConfig(id);
+    const current = await this.findRawById(id);
 
     if (data.isDefault) {
       await this.ctx.db.update(llmConfigs).set({ isDefault: false });
     }
 
-    // apiKey が空文字列ではなく undefined で渡された場合（変更なし）は既存のキーを維持
-    const apiKey = data.apiKey === undefined ? current.apiKey : data.apiKey;
+    // apiKey が undefined で渡された場合（変更なし）は既存の保存値を維持する。
+    // 明示的に指定された場合は暗号化して保存する (null / 空文字はキー削除)。
+    const apiKey =
+      data.apiKey === undefined
+        ? current.apiKey
+        : await encryptApiKey(data.apiKey, this.secretKeyValue);
 
     const [row] = await this.ctx.db
       .update(llmConfigs)
@@ -152,14 +170,11 @@ export class LlmConfigDomainService {
       .returning();
 
     assertFound(row, "LLM Config not found");
-    const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
-
-    const { apiKey: _, ...rest } = row;
-    return { ...rest, apiKeyMasked, hasApiKey };
+    return this.toMasked(row);
   }
 
   async deleteConfig(id: string): Promise<void> {
-    const current = await this.getConfig(id);
+    const current = await this.findRawById(id);
     const [deleted] = await this.ctx.db
       .delete(llmConfigs)
       .where(eq(llmConfigs.id, id))
@@ -182,7 +197,7 @@ export class LlmConfigDomainService {
   }
 
   async setDefault(id: string): Promise<MaskedLLMConfig> {
-    await this.getConfig(id);
+    await this.findRawById(id);
     await this.ctx.db.update(llmConfigs).set({ isDefault: false });
     const [row] = await this.ctx.db
       .update(llmConfigs)
@@ -191,10 +206,7 @@ export class LlmConfigDomainService {
       .returning();
     assertFound(row, "LLM Config not found");
 
-    const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
-
-    const { apiKey: _, ...rest } = row;
-    return { ...rest, apiKeyMasked, hasApiKey };
+    return this.toMasked(row);
   }
 
   async testConfig(input: LLMConfigInput) {

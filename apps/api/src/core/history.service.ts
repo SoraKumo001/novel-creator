@@ -12,7 +12,8 @@ import {
   parseCharactersMarkdown,
   parseSettingsMarkdown,
 } from "@novel-creator/shared";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import { appLogger } from "../middleware/logger.js";
 import { upsertEntityEmbedding } from "../rag.js";
 import { assertFound, type ServiceContext } from "./types.js";
 
@@ -26,13 +27,69 @@ export interface RecordHistoryInput {
   wordCount?: number;
 }
 
+/** entity あたりに保持する履歴の上限件数 */
+export const HISTORY_RETENTION_LIMIT = 100;
+
+/** 履歴本文の比較用ハッシュ（簡易ハッシュ、全文比較の前段用） */
+export function hashHistoryContent(content: string): string {
+  let hash = 5381;
+  for (let i = 0; i < content.length; i++) {
+    hash = (hash * 33 + content.charCodeAt(i)) % 4_294_967_296;
+  }
+  return hash.toString(16);
+}
+
+/** 復元記録用の description を組み立てる */
+export function buildRestoreDescription(sourceCreatedAt: Date): string {
+  return `過去のバージョン(${new Date(sourceCreatedAt).toLocaleString("ja-JP")})から復元`;
+}
+
 /** insert に必要な最小限の構造を持つ db またはトランザクション */
 type EditHistoryDb = Pick<Database, "insert">;
+
+/** select 可能（フル DB）な場合のみ Database として扱う */
+function asFullDatabase(db: EditHistoryDb): Database | undefined {
+  const candidate = db as Partial<Database>;
+  if (typeof candidate.select !== "function") {
+    return undefined;
+  }
+  return db as Database;
+}
 
 export async function insertEditHistory(
   db: EditHistoryDb,
   input: RecordHistoryInput
 ) {
+  // 同一内容の連続保存は履歴を増やさない（直近1件のハッシュ比較）
+  const fullDb = asFullDatabase(db);
+  if (fullDb) {
+    try {
+      const [latest] = await fullDb
+        .select()
+        .from(editHistories)
+        .where(
+          and(
+            eq(editHistories.novelId, input.novelId),
+            eq(editHistories.entityType, input.entityType),
+            eq(editHistories.entityId, input.entityId)
+          )
+        )
+        .orderBy(desc(editHistories.createdAt))
+        .limit(1);
+      if (
+        latest &&
+        hashHistoryContent(latest.content) === hashHistoryContent(input.content)
+      ) {
+        return latest;
+      }
+    } catch (error) {
+      appLogger.warn("failed to check duplicate history, recording anyway", {
+        entityId: input.entityId,
+        entityType: input.entityType,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
   const newEntry: NewEditHistory = {
     content: input.content,
     description: input.description,
@@ -46,11 +103,59 @@ export async function insertEditHistory(
   return created;
 }
 
+export interface PurgeHistoriesInput {
+  entityId: string;
+  entityType: string;
+  keep?: number;
+  novelId: string;
+}
+
+/** 上限を超えた古い履歴を削除する。削除件数を返す。 */
+export async function purgeOldHistories(
+  db: Database,
+  input: PurgeHistoriesInput
+): Promise<number> {
+  const keep = input.keep ?? HISTORY_RETENTION_LIMIT;
+  const rows = await db
+    .select({ id: editHistories.id })
+    .from(editHistories)
+    .where(
+      and(
+        eq(editHistories.novelId, input.novelId),
+        eq(editHistories.entityType, input.entityType),
+        eq(editHistories.entityId, input.entityId)
+      )
+    )
+    .orderBy(desc(editHistories.createdAt));
+  if (rows.length <= keep) {
+    return 0;
+  }
+  const staleIds = rows.slice(keep).map((row) => row.id);
+  await db.delete(editHistories).where(inArray(editHistories.id, staleIds));
+  return staleIds.length;
+}
+
 export class HistoryDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
   async recordHistory(input: RecordHistoryInput) {
-    return insertEditHistory(this.ctx.db, input);
+    const created = await insertEditHistory(this.ctx.db, input);
+    // 上限超過分を整理する（fire-and-forget にせず await する）
+    try {
+      await purgeOldHistories(this.ctx.db, {
+        entityId: input.entityId,
+        entityType: input.entityType,
+        novelId: input.novelId,
+      });
+    } catch (error) {
+      appLogger.warn("failed to purge old histories", {
+        entityId: input.entityId,
+        entityType: input.entityType,
+        error: error instanceof Error ? error.message : String(error),
+        novelId: input.novelId,
+      });
+    }
+    return created;
   }
 
   async listHistories(
@@ -70,7 +175,7 @@ export class HistoryDomainService {
       conditions.push(eq(editHistories.entityId, options.entityId));
     }
 
-    const limit = options?.limit ?? 50;
+    const limit = Math.min(options?.limit ?? 50, HISTORY_RETENTION_LIMIT);
 
     return this.ctx.db
       .select()
@@ -123,7 +228,7 @@ export class HistoryDomainService {
       // 復元したこと自体の履歴も記録
       await this.recordHistory({
         content: history.content,
-        description: `過去のバージョン(${new Date(history.createdAt).toLocaleString("ja-JP")})から復元`,
+        description: buildRestoreDescription(history.createdAt),
         entityId: sectionId,
         entityType: "content",
         novelId: history.novelId,
@@ -170,7 +275,7 @@ export class HistoryDomainService {
 
       await this.recordHistory({
         content: history.content,
-        description: `過去のバージョン(${new Date(history.createdAt).toLocaleString("ja-JP")})から復元`,
+        description: buildRestoreDescription(history.createdAt),
         entityId: settingId,
         entityType: "setting",
         novelId: history.novelId,
@@ -213,7 +318,7 @@ export class HistoryDomainService {
 
       await this.recordHistory({
         content: history.content,
-        description: `過去のバージョン(${new Date(history.createdAt).toLocaleString("ja-JP")})から復元`,
+        description: buildRestoreDescription(history.createdAt),
         entityId: characterId,
         entityType: "character",
         novelId: history.novelId,
@@ -243,7 +348,7 @@ export class HistoryDomainService {
 
       await this.recordHistory({
         content: history.content,
-        description: `過去のバージョン(${new Date(history.createdAt).toLocaleString("ja-JP")})から復元`,
+        description: buildRestoreDescription(history.createdAt),
         entityId: history.novelId,
         entityType: "characters_markdown",
         novelId: history.novelId,
@@ -272,7 +377,7 @@ export class HistoryDomainService {
 
       await this.recordHistory({
         content: history.content,
-        description: `過去のバージョン(${new Date(history.createdAt).toLocaleString("ja-JP")})から復元`,
+        description: buildRestoreDescription(history.createdAt),
         entityId: history.novelId,
         entityType: "settings_markdown",
         novelId: history.novelId,
@@ -294,7 +399,7 @@ export class HistoryDomainService {
 
       await this.recordHistory({
         content: history.content,
-        description: `過去のバージョン(${new Date(history.createdAt).toLocaleString("ja-JP")})から復元`,
+        description: buildRestoreDescription(history.createdAt),
         entityId: history.novelId,
         entityType: "story_outline_markdown",
         novelId: history.novelId,

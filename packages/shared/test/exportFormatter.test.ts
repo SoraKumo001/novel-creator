@@ -75,4 +75,113 @@ describe("exportFormatter", () => {
     expect(output).toContain("【始まりの町】");
     expect(output).toContain("召喚の儀式");
   });
+
+  it("デフォルトではルビ記法を保持すること", () => {
+    const novel: NovelExportData = {
+      ...mockNovel,
+      chapters: [
+        {
+          order: 1,
+          sections: [
+            {
+              content: "｜漢字《かんじ》のテスト。",
+              order: 1,
+              title: null,
+            },
+          ],
+          title: "章",
+        },
+      ],
+    };
+    const output = formatNovelText(novel, "plain");
+    expect(output).toContain("｜漢字《かんじ》");
+  });
+
+  it("strip指定でルビ記法を除去すること", () => {
+    const novel: NovelExportData = {
+      ...mockNovel,
+      chapters: [
+        {
+          order: 1,
+          sections: [
+            {
+              content: "｜漢字《かんじ》のテスト。",
+              order: 1,
+              title: null,
+            },
+          ],
+          title: "章",
+        },
+      ],
+    };
+    const output = formatNovelText(novel, "plain", { ruby: "strip" });
+    expect(output).toContain("漢字のテスト。");
+    expect(output).not.toContain("《かんじ》");
+  });
+
+  it("html指定でルビを<ruby>に変換すること", () => {
+    const novel: NovelExportData = {
+      ...mockNovel,
+      chapters: [
+        {
+          order: 1,
+          sections: [
+            {
+              content: "｜漢字《かんじ》のテスト。",
+              order: 1,
+              title: null,
+            },
+          ],
+          title: "章",
+        },
+      ],
+    };
+    const output = formatNovelText(novel, "markdown", { ruby: "html" });
+    expect(output).toContain("<ruby>漢字<rt>かんじ</rt></ruby>");
+  });
+
+  it("なろう形式で3連空行を2連に正規化し前後をtrimすること", () => {
+    const novel: NovelExportData = {
+      ...mockNovel,
+      chapters: [
+        {
+          order: 1,
+          sections: [
+            {
+              content: "一行目\n\n\n\n二行目",
+              order: 1,
+              title: null,
+            },
+          ],
+          title: "章",
+        },
+      ],
+    };
+    const output = formatNovelText(novel, "narou");
+    expect(output).not.toMatch(/\n{3,}/);
+    expect(output).toContain("一行目\n\n二行目");
+    expect(output).not.toMatch(/^\n|\n$/);
+  });
+
+  it("カクヨム形式で3連空行を2連に正規化すること", () => {
+    const novel: NovelExportData = {
+      ...mockNovel,
+      chapters: [
+        {
+          order: 1,
+          sections: [
+            {
+              content: "  前後空白あり\n\n\n本文  ",
+              order: 1,
+              title: null,
+            },
+          ],
+          title: "章",
+        },
+      ],
+    };
+    const output = formatNovelText(novel, "kakuyomu");
+    expect(output).not.toMatch(/\n{3,}/);
+    expect(output).toContain("前後空白あり\n\n本文");
+  });
 });

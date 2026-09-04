@@ -1,3 +1,4 @@
+import { desc } from "drizzle-orm";
 import {
   index,
   integer,
@@ -23,7 +24,15 @@ export const editHistories = pgTable(
     title: text("title").notNull().default(""),
     wordCount: integer("word_count"),
   },
-  (t) => [index("edit_histories_novel_id_idx").on(t.novelId)]
+  (t) => [
+    index("edit_histories_novel_id_idx").on(t.novelId),
+    index("edit_histories_entity_created_idx").on(
+      t.novelId,
+      t.entityType,
+      t.entityId,
+      desc(t.createdAt)
+    ),
+  ]
 );
 
 export type EditHistory = typeof editHistories.$inferSelect;

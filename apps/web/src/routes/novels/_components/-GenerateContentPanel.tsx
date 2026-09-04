@@ -3,9 +3,11 @@ import { formatElapsed } from "@/components/AIProgressIndicator.js";
 import { formatCharCount } from "@/lib/format.js";
 
 interface GenerateContentPanelProps {
+  canRetry?: boolean;
   generatedChars?: number;
   generatingContent: boolean;
   onCancel?: () => void;
+  onRetry?: () => void;
   startedAt?: number | null;
   streamError: string | null;
 }
@@ -16,6 +18,8 @@ export function GenerateContentPanel({
   startedAt,
   generatedChars = 0,
   onCancel,
+  onRetry,
+  canRetry = false,
 }: GenerateContentPanelProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -61,8 +65,17 @@ export function GenerateContentPanel({
         </div>
       )}
       {streamError && (
-        <div className="shrink-0 border-danger/20 border-t bg-danger/10 px-5 py-2 text-danger text-xs">
-          {streamError}
+        <div className="flex shrink-0 items-center justify-between border-danger/20 border-t bg-danger/10 px-5 py-2 text-danger text-xs">
+          <span>{streamError}</span>
+          {onRetry && canRetry && !generatingContent && (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="cursor-pointer rounded px-2.5 py-1 font-semibold text-xs transition hover:bg-danger/10"
+            >
+              ↻ 直前の入力で再試行
+            </button>
+          )}
         </div>
       )}
     </>

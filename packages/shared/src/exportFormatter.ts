@@ -1,4 +1,12 @@
+import { parseRubyToHtml, stripRuby } from "./ruby.js";
+
 export type ExportFormat = "markdown" | "plain" | "narou" | "kakuyomu";
+
+export type ExportRubyMode = "keep" | "strip" | "html";
+
+export interface ExportFormatOptions {
+  ruby?: ExportRubyMode;
+}
 
 export interface NovelExportSection {
   content: string | null;
@@ -23,30 +31,47 @@ export interface NovelExportData {
  */
 export function formatNovelText(
   data: NovelExportData,
-  format: ExportFormat
+  format: ExportFormat,
+  options: ExportFormatOptions = {}
 ): string {
+  const ruby: ExportRubyMode = options.ruby ?? "keep";
   switch (format) {
     case "markdown":
-      return formatAsMarkdown(data);
+      return formatAsMarkdown(data, ruby);
     case "plain":
-      return formatAsPlain(data);
+      return formatAsPlain(data, ruby);
     case "narou":
-      return formatAsNarou(data);
+      return formatAsNarou(data, ruby);
     case "kakuyomu":
-      return formatAsKakuyomu(data);
+      return formatAsKakuyomu(data, ruby);
     default:
-      return formatAsPlain(data);
+      return formatAsPlain(data, ruby);
   }
 }
 
-function formatAsMarkdown(data: NovelExportData): string {
+function processBodyText(content: string, ruby: ExportRubyMode): string {
+  const trimmed = content.trim();
+  if (ruby === "strip") {
+    return stripRuby(trimmed);
+  }
+  if (ruby === "html") {
+    return parseRubyToHtml(trimmed);
+  }
+  return trimmed;
+}
+
+function normalizeBlankLines(text: string): string {
+  return text.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function formatAsMarkdown(data: NovelExportData, ruby: ExportRubyMode): string {
   const lines: string[] = [];
 
   lines.push(`# ${data.title}`);
   lines.push("");
 
   if (data.description) {
-    lines.push(data.description.trim());
+    lines.push(processBodyText(data.description, ruby));
     lines.push("");
   }
 
@@ -68,7 +93,7 @@ function formatAsMarkdown(data: NovelExportData): string {
         lines.push("");
       }
       if (section.content) {
-        lines.push(section.content.trim());
+        lines.push(processBodyText(section.content, ruby));
         lines.push("");
       }
     }
@@ -77,14 +102,14 @@ function formatAsMarkdown(data: NovelExportData): string {
   return lines.join("\n");
 }
 
-function formatAsPlain(data: NovelExportData): string {
+function formatAsPlain(data: NovelExportData, ruby: ExportRubyMode): string {
   const lines: string[] = [];
 
   lines.push(`■ ${data.title}`);
   lines.push("");
 
   if (data.description) {
-    lines.push(data.description.trim());
+    lines.push(processBodyText(data.description, ruby));
     lines.push("");
   }
 
@@ -106,7 +131,7 @@ function formatAsPlain(data: NovelExportData): string {
         lines.push("");
       }
       if (section.content) {
-        lines.push(section.content.trim());
+        lines.push(processBodyText(section.content, ruby));
         lines.push("");
       }
     }
@@ -115,14 +140,14 @@ function formatAsPlain(data: NovelExportData): string {
   return lines.join("\n");
 }
 
-function formatAsNarou(data: NovelExportData): string {
+function formatAsNarou(data: NovelExportData, ruby: ExportRubyMode): string {
   const lines: string[] = [];
 
   lines.push(data.title);
   lines.push("");
 
   if (data.description) {
-    lines.push(data.description.trim());
+    lines.push(processBodyText(data.description, ruby));
     lines.push("----------------");
     lines.push("");
   }
@@ -142,24 +167,24 @@ function formatAsNarou(data: NovelExportData): string {
         lines.push("");
       }
       if (section.content) {
-        lines.push(section.content.trim());
+        lines.push(processBodyText(section.content, ruby));
         lines.push("");
       }
       lines.push("");
     }
   }
 
-  return lines.join("\n");
+  return normalizeBlankLines(lines.join("\n"));
 }
 
-function formatAsKakuyomu(data: NovelExportData): string {
+function formatAsKakuyomu(data: NovelExportData, ruby: ExportRubyMode): string {
   const lines: string[] = [];
 
   lines.push(data.title);
   lines.push("");
 
   if (data.description) {
-    lines.push(data.description.trim());
+    lines.push(processBodyText(data.description, ruby));
     lines.push("");
     lines.push("================");
     lines.push("");
@@ -180,12 +205,12 @@ function formatAsKakuyomu(data: NovelExportData): string {
         lines.push("");
       }
       if (section.content) {
-        lines.push(section.content.trim());
+        lines.push(processBodyText(section.content, ruby));
         lines.push("");
       }
       lines.push("");
     }
   }
 
-  return lines.join("\n");
+  return normalizeBlankLines(lines.join("\n"));
 }

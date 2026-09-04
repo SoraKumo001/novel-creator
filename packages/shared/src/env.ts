@@ -28,6 +28,11 @@ export const envSchema = z.object({
     .enum(["development", "production", "test"])
     .default("development"),
 
+  // --- Secret Encryption (S0-1) ---
+  // llm_configs / embedding_configs の api_key を AES-GCM で暗号化保存するための 32 バイト鍵
+  // (base64 または hex)。未設定の場合、保存・復号を伴う操作は明示エラーになる。
+  SECRET_ENCRYPTION_KEY: z.string().optional(),
+
   VECTOR_STORE_PROVIDER: z.enum(["pgvector", "vectorize"]).default("pgvector"),
   WEB_ORIGIN: z.string().default("http://localhost:5173"),
 });

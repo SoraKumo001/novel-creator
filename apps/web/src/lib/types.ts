@@ -134,6 +134,8 @@ export interface UpdateSectionInput {
 
 export interface UpdateContentInput {
   body: string;
+  // 楽観ロック用。サーバが保持する updatedAt と不一致なら 409 になる。
+  updatedAt?: string | null;
 }
 
 export interface CreateCharacterInput {

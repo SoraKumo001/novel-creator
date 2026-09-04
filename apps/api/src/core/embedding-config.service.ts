@@ -9,6 +9,11 @@ import {
 } from "@novel-creator/llm";
 import { desc, eq } from "drizzle-orm";
 import {
+  decryptApiKey,
+  encryptApiKey,
+  maskApiKeyForDisplay,
+} from "../lib/secret-crypto.js";
+import {
   type ResolvedEmbeddingModel,
   resolveEmbeddingModel as resolveEmbeddingModelShared,
 } from "./model-resolver.js";
@@ -19,24 +24,40 @@ export interface MaskedEmbeddingConfig extends Omit<EmbeddingConfig, "apiKey"> {
   hasApiKey: boolean;
 }
 
-function maskApiKey(key?: string | null): {
-  apiKeyMasked: string | null;
-  hasApiKey: boolean;
-} {
-  if (!key?.trim()) {
-    return { apiKeyMasked: null, hasApiKey: false };
-  }
-  const trimmed = key.trim();
-  if (trimmed.length <= 8) {
-    return { apiKeyMasked: "********", hasApiKey: true };
-  }
-  const prefix = trimmed.slice(0, 4);
-  const suffix = trimmed.slice(-4);
-  return { apiKeyMasked: `${prefix}....${suffix}`, hasApiKey: true };
-}
-
 export class EmbeddingConfigDomainService {
   constructor(private readonly ctx: ServiceContext) {}
+
+  private get secretKeyValue(): string | undefined {
+    return this.ctx.env.SECRET_ENCRYPTION_KEY;
+  }
+
+  /**
+   * DB 行をマスク済み表現に変換する。保存値 (暗号文の可能性あり) をサーバ内で復号してから
+   * マスクし、生のキーを呼び出し側に返さない。
+   */
+  private async toMasked(row: EmbeddingConfig): Promise<MaskedEmbeddingConfig> {
+    const apiKey = await decryptApiKey(row.apiKey, this.secretKeyValue);
+    const { apiKeyMasked, hasApiKey } = maskApiKeyForDisplay(apiKey);
+    const { apiKey: _, ...rest } = row;
+    return {
+      ...rest,
+      apiKeyMasked,
+      hasApiKey,
+    };
+  }
+
+  /**
+   * 内部利用向けの生行取得。返却値の apiKey は暗号文の可能性があり、
+   * HTTP 応答に含めてはならない。
+   */
+  private async findRawById(id: string): Promise<EmbeddingConfig> {
+    const [row] = await this.ctx.db
+      .select()
+      .from(embeddingConfigs)
+      .where(eq(embeddingConfigs.id, id));
+    assertFound(row, "Embedding Config not found");
+    return row;
+  }
 
   async listConfigs(): Promise<MaskedEmbeddingConfig[]> {
     const rows = await this.ctx.db
@@ -47,24 +68,14 @@ export class EmbeddingConfigDomainService {
         desc(embeddingConfigs.createdAt)
       );
 
-    return rows.map((row) => {
-      const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
-      const { apiKey: _, ...rest } = row;
-      return {
-        ...rest,
-        apiKeyMasked,
-        hasApiKey,
-      };
-    });
+    return Promise.all(rows.map((row) => this.toMasked(row)));
   }
 
-  async getConfig(id: string): Promise<EmbeddingConfig> {
-    const [row] = await this.ctx.db
-      .select()
-      .from(embeddingConfigs)
-      .where(eq(embeddingConfigs.id, id));
-    assertFound(row, "Embedding Config not found");
-    return row;
+  /**
+   * マスク済み設定を返す。生の apiKey は含まない (S0-1)。
+   */
+  async getConfig(id: string): Promise<MaskedEmbeddingConfig> {
+    return this.toMasked(await this.findRawById(id));
   }
 
   async createConfig(
@@ -84,31 +95,39 @@ export class EmbeddingConfigDomainService {
       await this.ctx.db.update(embeddingConfigs).set({ isDefault: false });
     }
 
+    // apiKey は保存前に必ず暗号化する。鍵未設定時はここで明示エラーになる。
+    const apiKey = await encryptApiKey(data.apiKey, this.secretKeyValue);
+
     const [row] = await this.ctx.db
       .insert(embeddingConfigs)
       .values({
         ...data,
+        apiKey,
         dimensions: data.dimensions ?? 1536,
         isDefault: shouldBeDefault,
       })
       .returning();
 
-    const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
-    const { apiKey: _, ...rest } = row;
-    return { ...rest, apiKeyMasked, hasApiKey };
+    assertFound(row, "Embedding Config not found");
+    return this.toMasked(row);
   }
 
   async updateConfig(
     id: string,
     data: Partial<Omit<NewEmbeddingConfig, "id" | "createdAt" | "updatedAt">>
   ): Promise<MaskedEmbeddingConfig> {
-    const current = await this.getConfig(id);
+    const current = await this.findRawById(id);
 
     if (data.isDefault) {
       await this.ctx.db.update(embeddingConfigs).set({ isDefault: false });
     }
 
-    const apiKey = data.apiKey === undefined ? current.apiKey : data.apiKey;
+    // apiKey が undefined で渡された場合（変更なし）は既存の保存値を維持する。
+    // 明示的に指定された場合は暗号化して保存する (null / 空文字はキー削除)。
+    const apiKey =
+      data.apiKey === undefined
+        ? current.apiKey
+        : await encryptApiKey(data.apiKey, this.secretKeyValue);
 
     const [row] = await this.ctx.db
       .update(embeddingConfigs)
@@ -121,14 +140,11 @@ export class EmbeddingConfigDomainService {
       .returning();
 
     assertFound(row, "Embedding Config not found");
-    const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
-
-    const { apiKey: _, ...rest } = row;
-    return { ...rest, apiKeyMasked, hasApiKey };
+    return this.toMasked(row);
   }
 
   async deleteConfig(id: string): Promise<void> {
-    const current = await this.getConfig(id);
+    const current = await this.findRawById(id);
     const [deleted] = await this.ctx.db
       .delete(embeddingConfigs)
       .where(eq(embeddingConfigs.id, id))
@@ -150,7 +166,7 @@ export class EmbeddingConfigDomainService {
   }
 
   async setDefault(id: string): Promise<MaskedEmbeddingConfig> {
-    await this.getConfig(id);
+    await this.findRawById(id);
     await this.ctx.db.update(embeddingConfigs).set({ isDefault: false });
     const [row] = await this.ctx.db
       .update(embeddingConfigs)
@@ -159,10 +175,7 @@ export class EmbeddingConfigDomainService {
       .returning();
     assertFound(row, "Embedding Config not found");
 
-    const { apiKeyMasked, hasApiKey } = maskApiKey(row.apiKey);
-
-    const { apiKey: _, ...rest } = row;
-    return { ...rest, apiKeyMasked, hasApiKey };
+    return this.toMasked(row);
   }
 
   async testConfig(input: EmbeddingConfigInput) {

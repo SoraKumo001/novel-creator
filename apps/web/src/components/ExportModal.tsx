@@ -1,5 +1,6 @@
 import {
   type ExportFormat,
+  type ExportRubyMode,
   formatNovelText,
   type NovelExportData,
 } from "@novel-creator/shared";
@@ -49,11 +50,15 @@ const FORMAT_OPTIONS: {
 
 export function ExportModal({ isOpen, onClose, novel }: ExportModalProps) {
   const [format, setFormat] = useState<ExportFormat>("markdown");
+  const [ruby, setRuby] = useState<ExportRubyMode>("keep");
+  const [htmlPreview, setHtmlPreview] = useState(false);
   const toast = useToast();
 
+  const isHtml = ruby === "html";
+
   const formattedText = useMemo(
-    () => formatNovelText(novel, format),
-    [novel, format]
+    () => formatNovelText(novel, format, { ruby }),
+    [novel, format, ruby]
   );
 
   const selectedFormatOption = useMemo(
@@ -74,14 +79,18 @@ export function ExportModal({ isOpen, onClose, novel }: ExportModalProps) {
 
   const handleDownload = () => {
     try {
+      const mime = isHtml
+        ? "text/html;charset=utf-8"
+        : "text/plain;charset=utf-8";
       const blob = new Blob([formattedText], {
-        type: "text/plain;charset=utf-8",
+        type: mime,
       });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
       const safeTitle = novel.title.replace(/[\\/:*?"<>|]/g, "_");
-      a.download = `${safeTitle}.${selectedFormatOption.ext}`;
+      const ext = isHtml ? "html" : selectedFormatOption.ext;
+      a.download = `${safeTitle}.${ext}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -142,6 +151,47 @@ export function ExportModal({ isOpen, onClose, novel }: ExportModalProps) {
           </div>
         </div>
 
+        {/* ルビ処理選択 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <label
+            htmlFor="export-ruby-mode"
+            className="font-semibold text-muted-foreground text-xs"
+          >
+            ルビ処理
+          </label>
+          <select
+            id="export-ruby-mode"
+            value={ruby}
+            onChange={(e) => {
+              setRuby(e.target.value as ExportRubyMode);
+              setHtmlPreview(false);
+            }}
+            className="rounded-lg border border-border bg-surface-raised px-2 py-1.5 text-foreground text-xs focus:outline-none"
+          >
+            <option value="keep">保持 (｜漢字《よみ》)</option>
+            <option value="strip">除去 (本文のみ)</option>
+            <option value="html">HTML (&lt;ruby&gt;変換)</option>
+          </select>
+          {isHtml && (
+            <div className="ml-auto flex overflow-hidden rounded-lg border border-border text-xs">
+              <button
+                type="button"
+                onClick={() => setHtmlPreview(false)}
+                className={`cursor-pointer px-2.5 py-1.5 ${htmlPreview ? "bg-surface text-muted-foreground" : "bg-primary/10 font-bold text-primary"}`}
+              >
+                テキスト
+              </button>
+              <button
+                type="button"
+                onClick={() => setHtmlPreview(true)}
+                className={`cursor-pointer px-2.5 py-1.5 ${htmlPreview ? "bg-primary/10 font-bold text-primary" : "bg-surface text-muted-foreground"}`}
+              >
+                HTMLプレビュー
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* プレビュー情報ヘッダー */}
         <div className="flex items-center justify-between text-muted-foreground text-xs">
           <span>プレビュー ({formatCharCount(characterCount)})</span>
@@ -150,12 +200,20 @@ export function ExportModal({ isOpen, onClose, novel }: ExportModalProps) {
 
         {/* プレビューテキストエリア */}
         <div className="relative">
-          <textarea
-            readOnly
-            value={formattedText}
-            rows={14}
-            className="w-full select-all rounded-lg border border-border bg-surface-raised p-3 font-mono text-foreground text-xs leading-relaxed focus:outline-none"
-          />
+          {isHtml && htmlPreview ? (
+            <div
+              className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-surface-raised p-3 text-foreground text-xs leading-relaxed"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: プレビュー用途で自前の整形済みテキストのみ表示する
+              dangerouslySetInnerHTML={{ __html: formattedText }}
+            />
+          ) : (
+            <textarea
+              readOnly
+              value={formattedText}
+              rows={14}
+              className="w-full select-all rounded-lg border border-border bg-surface-raised p-3 font-mono text-foreground text-xs leading-relaxed focus:outline-none"
+            />
+          )}
         </div>
       </div>
     </Modal>

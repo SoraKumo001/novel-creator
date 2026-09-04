@@ -11,7 +11,10 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import type { AppContext } from "../../context.js";
-import { isAuthConfigured } from "../../lib/auth.js";
+import {
+  isAuthConfigured,
+  isInsecureAuthBypassAllowed,
+} from "../../lib/auth.js";
 import { assertNovelAccess } from "../../middleware/auth.js";
 
 const novelIdParamSchema = z.object({
@@ -50,9 +53,18 @@ function forbidden(c: Context<AppContext>, message: string) {
   return c.json({ error: { code: "FORBIDDEN", message } }, 403);
 }
 
+function unauthorized(c: Context<AppContext>) {
+  return c.json(
+    { error: { code: "UNAUTHORIZED", message: "Authentication required" } },
+    401
+  );
+}
+
 /**
  * メンバー管理権限を要求する（admin または当該 novel の owner のみ）。
- * 認証未設定時・ユーザー未格納時（ルーター単体テスト）は素通りする。
+ * 認証未設定時は fail-closed: 明示的なテストバイパス
+ * （ALLOW_INSECURE_AUTH_FOR_TESTS=true）が無い限り 401 で拒否する。
+ * ユーザー未格納時（ルーター単体テスト）は素通りする。
  * 違反時は 403 応答を返す。許可時は null を返す。
  */
 async function assertMemberManage(
@@ -61,7 +73,10 @@ async function assertMemberManage(
 ): Promise<Response | null> {
   const env = c.get("env");
   if (!isAuthConfigured(env)) {
-    return null;
+    if (isInsecureAuthBypassAllowed()) {
+      return null;
+    }
+    return unauthorized(c);
   }
   const current = c.get("user");
   if (!current) {

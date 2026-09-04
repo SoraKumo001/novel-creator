@@ -19,7 +19,11 @@ import { and, eq } from "drizzle-orm";
 import type { Context, Next } from "hono";
 
 import type { AppContext, AuthSession, AuthUser } from "../context.js";
-import { createAuth, isAuthConfigured } from "../lib/auth.js";
+import {
+  createAuth,
+  isAuthConfigured,
+  isInsecureAuthBypassAllowed,
+} from "../lib/auth.js";
 
 /** 小説への解決が可能なリソース種別。 */
 export type NovelResource =
@@ -136,9 +140,23 @@ function forbidden(c: Context<AppContext>, message = "Forbidden") {
   return c.json({ error: { code: "FORBIDDEN", message } }, 403);
 }
 
+function authMisconfigured(c: Context<AppContext>) {
+  return c.json(
+    {
+      error: {
+        code: "AUTH_NOT_CONFIGURED",
+        message: "Authentication is not configured",
+      },
+    },
+    500
+  );
+}
+
 /**
  * セッションを読み込んでコンテキストに格納する。
- * BETTER_AUTH_SECRET 未設定（開発・テスト）では素通りして false を返す。
+ * BETTER_AUTH_SECRET 未設定時は fail-closed: 明示的なテストバイパス
+ * （ALLOW_INSECURE_AUTH_FOR_TESTS=true）が無い限り 500 応答を返し、
+ * 素通りによる default-deny 無効化を防ぐ。
  * セッションなしの場合は 401 応答を返す。
  */
 async function loadSession(
@@ -146,7 +164,10 @@ async function loadSession(
 ): Promise<{ response?: Response; user?: AuthUser } | null> {
   const env = c.get("env");
   if (!isAuthConfigured(env)) {
-    return null;
+    if (isInsecureAuthBypassAllowed()) {
+      return null;
+    }
+    return { response: authMisconfigured(c) };
   }
   const existing = c.get("user");
   if (existing) {
@@ -200,7 +221,8 @@ export async function requireAdmin(c: Context<AppContext>, next: Next) {
 /**
  * 所有小説へのアクセスを要求する（初版は owner-or-admin の二値判定）。
  * novelId が null の行（全体共有・未所属）は admin のみ許可する。
- * 認証未設定時・ユーザー未格納時（ルーター単体テスト）は素通りする。
+ * 認証未設定時は fail-closed: 明示的なテストバイパスが無い限り 401 で拒否する。
+ * ユーザー未格納時（ルーター単体テスト）は素通りする。
  * 違反時は 403 応答を返す。許可時は null を返す。
  */
 export async function assertNovelAccess(
@@ -209,7 +231,10 @@ export async function assertNovelAccess(
 ): Promise<Response | null> {
   const env = c.get("env");
   if (!isAuthConfigured(env)) {
-    return null;
+    if (isInsecureAuthBypassAllowed()) {
+      return null;
+    }
+    return unauthorized(c);
   }
   const current = c.get("user");
   if (!current) {

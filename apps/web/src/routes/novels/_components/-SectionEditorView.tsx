@@ -67,6 +67,7 @@ export interface SectionEditorViewProps {
   activeVariantIndex: number;
   analysisProgress: AnalysisProgress | null;
   analysisRunning: string | null;
+  canRetryGeneration?: boolean;
   extracting: boolean;
   generatedChars: number;
   generateStartedAt: number | null;
@@ -109,6 +110,7 @@ export interface SectionEditorViewProps {
   onOpenStyleGuide: () => void;
   onOpenVerticalPreview: () => void;
   onOpenVoiceChecker: () => void;
+  onRetryGeneration?: () => void;
   onSave: () => void;
   onSaveStyleGuide: (newGuide: string) => Promise<void>;
   onSelectInlineVariant: (index: number) => void;
@@ -243,6 +245,8 @@ export function SectionEditorView(props: SectionEditorViewProps) {
         startedAt={props.generateStartedAt}
         generatedChars={props.generatedChars}
         onCancel={props.onCancelGeneration}
+        onRetry={props.onRetryGeneration}
+        canRetry={props.canRetryGeneration}
       />
 
       <ExtractResultModal

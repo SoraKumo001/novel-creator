@@ -1,10 +1,20 @@
 import { parseEnv } from "@novel-creator/shared/env";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createApp } from "../src/app.js";
 import { createContext } from "../src/context.js";
+import { generateEncryptionKeyBase64 } from "../src/lib/secret-crypto.js";
+
+// createApp は BETTER_AUTH_SECRET 未設定で起動時 throw する（fail-closed）。
+// 結合テストの素通りは明示的なテストバイパスでのみ許可する。
+// describe 本体は収集時に実行されるため、モジュール評価時に設定する。
+vi.stubEnv("ALLOW_INSECURE_AUTH_FOR_TESTS", "true");
 
 describe("Embedding Configs API", () => {
-  const env = parseEnv();
+  // S0-1: api_key 保存に暗号化鍵が必須のため、テスト専用鍵をハーネス内で生成する。
+  const env = parseEnv({
+    ...process.env,
+    SECRET_ENCRYPTION_KEY: generateEncryptionKeyBase64(),
+  });
   const context = createContext(env);
   const app = createApp(context);
 

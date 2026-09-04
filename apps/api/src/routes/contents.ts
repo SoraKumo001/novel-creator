@@ -20,7 +20,12 @@ const contentsRouter = new Hono<AppContext>()
     async (c) => {
       const { id } = c.req.valid("param");
       const body = c.req.valid("json");
-      const row = await getServices(c).content.updateContent(id, body.body);
+      const row = await getServices(c).content.updateContent(
+        id,
+        body.body,
+        "手動保存",
+        { expectedUpdatedAt: body.updatedAt }
+      );
       return c.json(row);
     }
   );

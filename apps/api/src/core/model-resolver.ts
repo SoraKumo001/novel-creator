@@ -11,6 +11,7 @@ import {
 import type { LLMProviderType } from "@novel-creator/shared";
 import type { EmbeddingModel, LanguageModel } from "ai";
 import { eq } from "drizzle-orm";
+import { decryptApiKey } from "../lib/secret-crypto.js";
 import { NotFoundError, type ServiceContext } from "./types.js";
 
 /**
@@ -33,7 +34,7 @@ interface ModelResolutionSpec<TConfig, TResult> {
   /** デフォルト設定行を取得する。見つからなければ undefined。 */
   findDefault(ctx: ServiceContext): Promise<TConfig | undefined>;
   /** 設定行からモデル（または解決結果）を生成する。 */
-  toResult(config: TConfig, ctx: ServiceContext): TResult;
+  toResult(config: TConfig, ctx: ServiceContext): TResult | Promise<TResult>;
 }
 
 /**
@@ -49,7 +50,7 @@ async function resolveFromConfigTable<TConfig, TResult>(
   if (configId) {
     const config = await spec.findById(ctx, configId);
     if (config) {
-      return spec.toResult(config, ctx);
+      return await spec.toResult(config, ctx);
     }
     if (onMissing === "throw") {
       throw new NotFoundError(spec.configLabel, configId);
@@ -58,7 +59,7 @@ async function resolveFromConfigTable<TConfig, TResult>(
 
   const defaultConfig = await spec.findDefault(ctx);
   if (defaultConfig) {
-    return spec.toResult(defaultConfig, ctx);
+    return await spec.toResult(defaultConfig, ctx);
   }
   return spec.fallback(ctx);
 }
@@ -111,11 +112,20 @@ export async function resolveLLMModelWithInfo(
           .where(eq(llmConfigs.isDefault, true));
         return config;
       },
-      toResult: (config, context) => ({
-        model: createLanguageModelFromConfig(config, context.env),
-        modelId: config.modelId,
-        provider: config.provider,
-      }),
+      toResult: async (config, context) => {
+        // 保存値 (暗号文の可能性あり) をサーバ内でのみ復号してクライアントを構築する。
+        // 復号前後で同一参照の場合は元の設定をそのまま渡す。
+        const apiKey = await decryptApiKey(
+          config.apiKey,
+          context.env.SECRET_ENCRYPTION_KEY
+        );
+        const input = apiKey === config.apiKey ? config : { ...config, apiKey };
+        return {
+          model: createLanguageModelFromConfig(input, context.env),
+          modelId: config.modelId,
+          provider: config.provider,
+        };
+      },
     }
   );
 }
@@ -181,11 +191,20 @@ export async function resolveEmbeddingModel(
           .where(eq(embeddingConfigs.isDefault, true));
         return config;
       },
-      toResult: (config, context) => ({
-        config,
-        dimensions: config.dimensions,
-        model: createEmbeddingModelFromConfig(config, context.env),
-      }),
+      toResult: async (config, context) => {
+        // 保存値 (暗号文の可能性あり) をサーバ内でのみ復号してクライアントを構築する。
+        // config 自体は DB 行をそのまま返す (apiKey は暗号文の可能性があり、HTTP 返却禁止)。
+        const apiKey = await decryptApiKey(
+          config.apiKey,
+          context.env.SECRET_ENCRYPTION_KEY
+        );
+        const input = apiKey === config.apiKey ? config : { ...config, apiKey };
+        return {
+          config,
+          dimensions: config.dimensions,
+          model: createEmbeddingModelFromConfig(input, context.env),
+        };
+      },
     }
   );
 }

@@ -2,8 +2,8 @@ import { chapters, contents, sections } from "@novel-creator/db";
 import { eq } from "drizzle-orm";
 import { appLogger } from "../middleware/logger.js";
 import { upsertEntityEmbedding } from "../rag.js";
-import { insertEditHistory } from "./history.service.js";
-import { assertFound, type ServiceContext } from "./types.js";
+import { insertEditHistory, purgeOldHistories } from "./history.service.js";
+import { AppError, assertFound, type ServiceContext } from "./types.js";
 
 export function countWords(text: string): number {
   const trimmed = text.trim();
@@ -33,8 +33,28 @@ export class ContentDomainService {
   async updateContent(
     sectionId: string,
     body: string,
-    description = "手動保存"
+    description = "手動保存",
+    options: { expectedUpdatedAt?: string | Date } = {}
   ) {
+    // 楽観ロック: クライアントが保持していた updatedAt と不一致なら 409 を返す。
+    // expectedUpdatedAt 未指定時は従来どおり上書きする（API 互換性維持）。
+    if (options.expectedUpdatedAt !== undefined) {
+      const [existing] = await this.ctx.db
+        .select()
+        .from(contents)
+        .where(eq(contents.sectionId, sectionId));
+      if (existing?.updatedAt) {
+        const expected = new Date(options.expectedUpdatedAt).getTime();
+        const actual = new Date(existing.updatedAt).getTime();
+        if (!Number.isNaN(expected) && expected !== actual) {
+          throw new AppError(
+            "本文が他の端末で更新されています。最新の内容を確認してから保存してください。",
+            { code: "CONFLICT", status: 409 }
+          );
+        }
+      }
+    }
+
     const wordCount = countWords(body);
     const [row] = await this.ctx.db
       .insert(contents)
@@ -68,10 +88,30 @@ export class ContentDomainService {
             title: sec.title || `節 ${sec.order}`,
             wordCount,
           });
+          try {
+            await purgeOldHistories(this.ctx.db, {
+              entityId: sectionId,
+              entityType: "content",
+              novelId: ch.novelId,
+            });
+          } catch (purgeError) {
+            appLogger.warn("failed to purge old content histories", {
+              error:
+                purgeError instanceof Error
+                  ? purgeError.message
+                  : String(purgeError),
+              sectionId,
+            });
+          }
         }
       }
     } catch (e) {
-      appLogger.warn("failed to record content history", e);
+      // 履歴記録の失敗は本文保存の成功に影響させないが、原因追跡のため error で残す
+      appLogger.error("failed to record content history", {
+        error: e instanceof Error ? e.message : String(e),
+        novelId,
+        sectionId,
+      });
     }
 
     // 本文のベクトルを更新（失敗しても本文保存は成功させる）

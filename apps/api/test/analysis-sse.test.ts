@@ -1,5 +1,13 @@
 import { Hono } from "hono";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
 import type { AppContext } from "../src/context.js";
 import { errorHandler } from "../src/middleware/error-handler.js";
@@ -26,6 +34,16 @@ vi.mock("../src/core/services.js", () => ({
 }));
 
 const NOVEL_ID = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d";
+
+// vector ルーターの requireAdmin 素通りは明示的なテストバイパスでのみ許可する。
+// fail-closed 化により、フラグ無しでは 500 になる。
+beforeAll(() => {
+  vi.stubEnv("ALLOW_INSECURE_AUTH_FOR_TESTS", "true");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
 
 /**
  * テスト用の Hono アプリを構築する（analysis / vector ルーターをマウント）。

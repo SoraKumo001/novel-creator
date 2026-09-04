@@ -98,6 +98,8 @@ export async function* generateSectionContent(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let validChunks = 0;
+  let invalidLines = 0;
 
   try {
     while (true) {
@@ -114,20 +116,34 @@ export async function* generateSectionContent(
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (trimmed.startsWith("data: ")) {
-          try {
-            const data = JSON.parse(trimmed.slice(6));
-            if (data.done) {
-              return;
-            }
-            if (data.text) {
-              yield data.text;
-            }
-          } catch {
-            // ignore JSON parse error
+        if (!trimmed) {
+          continue;
+        }
+        if (!trimmed.startsWith("data: ")) {
+          continue;
+        }
+        const payload = trimmed.slice(6).trim();
+        if (!payload || payload === "[DONE]") {
+          continue;
+        }
+        try {
+          const data = JSON.parse(payload);
+          if (data.done) {
+            return;
           }
+          if (data.text) {
+            validChunks += 1;
+            yield data.text;
+          }
+        } catch {
+          invalidLines += 1;
         }
       }
+    }
+    if (!signal?.aborted && validChunks === 0 && invalidLines > 0) {
+      throw new Error(
+        `本文生成ストリームの解析に失敗しました（不正行: ${invalidLines}件）`
+      );
     }
   } finally {
     reader.releaseLock();
@@ -232,6 +248,8 @@ export async function* inlineAssistSectionContent(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let validChunks = 0;
+  let invalidLines = 0;
 
   try {
     while (true) {
@@ -248,20 +266,34 @@ export async function* inlineAssistSectionContent(
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (trimmed.startsWith("data: ")) {
-          try {
-            const data = JSON.parse(trimmed.slice(6));
-            if (data.done) {
-              return;
-            }
-            if (data.text) {
-              yield { text: data.text, variant: data.variant ?? 0 };
-            }
-          } catch {
-            // ignore JSON parse error
+        if (!trimmed) {
+          continue;
+        }
+        if (!trimmed.startsWith("data: ")) {
+          continue;
+        }
+        const payload = trimmed.slice(6).trim();
+        if (!payload || payload === "[DONE]") {
+          continue;
+        }
+        try {
+          const data = JSON.parse(payload);
+          if (data.done) {
+            return;
           }
+          if (data.text) {
+            validChunks += 1;
+            yield { text: data.text, variant: data.variant ?? 0 };
+          }
+        } catch {
+          invalidLines += 1;
         }
       }
+    }
+    if (!signal?.aborted && validChunks === 0 && invalidLines > 0) {
+      throw new Error(
+        `AIアシスト生成ストリームの解析に失敗しました（不正行: ${invalidLines}件）`
+      );
     }
   } finally {
     reader.releaseLock();

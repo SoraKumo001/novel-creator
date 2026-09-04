@@ -39,6 +39,8 @@ export {
 export type { Env } from "./env.js";
 export {
   type ExportFormat,
+  type ExportFormatOptions,
+  type ExportRubyMode,
   formatNovelText,
   type NovelExportChapter,
   type NovelExportData,

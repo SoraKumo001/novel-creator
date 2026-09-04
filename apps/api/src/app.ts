@@ -4,7 +4,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 
 import type { AppContext } from "./context.js";
-import { createAuth } from "./lib/auth.js";
+import { assertAuthConfigured, createAuth } from "./lib/auth.js";
 import { requireAuth } from "./middleware/auth.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { logger } from "./middleware/logger.js";
@@ -57,6 +57,9 @@ export type AppType = ApiType;
  * Node.js（index.ts）と Cloudflare Workers（worker.ts）の両方から利用する。
  */
 export function createApp(context: AppContext["Variables"]) {
+  // BETTER_AUTH_SECRET 未設定時は起動させない（fail-closed）。
+  // テストのみ ALLOW_INSECURE_AUTH_FOR_TESTS=true で明示的にバイパスできる。
+  assertAuthConfigured(context.env);
   const app = new Hono<AppContext>();
 
   // ミドルウェア
