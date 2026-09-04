@@ -1,4 +1,5 @@
 export * from "./analysisResults.js";
+export * from "./auth.js";
 export * from "./chapters.js";
 export * from "./characters.js";
 export * from "./chatSessions.js";
@@ -9,6 +10,7 @@ export * from "./embeddingConfigs.js";
 export * from "./foreshadowings.js";
 export * from "./llmConfigs.js";
 export * from "./llmInstructions.js";
+export * from "./novel-members.js";
 export * from "./novels.js";
 export * from "./sections.js";
 export * from "./settings.js";

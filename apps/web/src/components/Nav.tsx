@@ -1,7 +1,10 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useChatUI } from "@/context/ChatContext.js";
+import { useAuth } from "@/hooks/useAuth.js";
 import { type ThemeMode, useTheme } from "@/hooks/useTheme.js";
+import { useToast } from "@/hooks/useToast.js";
+import { toErrorMessage } from "@/lib/errors.js";
 
 const themeOptions: { mode: ThemeMode; label: string; icon: string }[] = [
   { mode: "light", label: "ライト", icon: "☀️" },
@@ -18,6 +21,9 @@ interface NavPanelProps {
 function NavPanel({ collapsed, onNavigate, onToggleCollapsed }: NavPanelProps) {
   const { toggleChat, isOpen } = useChatUI();
   const { theme, setTheme } = useTheme();
+  const { user, isAdmin, isAuthenticated, signOut } = useAuth();
+  const toast = useToast();
+  const navigate = useNavigate();
 
   const cycleTheme = (): void => {
     const nextMode: ThemeMode =
@@ -28,6 +34,17 @@ function NavPanel({ collapsed, onNavigate, onToggleCollapsed }: NavPanelProps) {
   const handleChatClick = (): void => {
     toggleChat();
     onNavigate?.();
+  };
+
+  const handleSignOut = async (): Promise<void> => {
+    try {
+      await signOut();
+      toast.success("ログアウトしました");
+      onNavigate?.();
+      await navigate({ to: "/login" });
+    } catch (e) {
+      toast.error(toErrorMessage(e));
+    }
   };
 
   return (
@@ -247,10 +264,75 @@ function NavPanel({ collapsed, onNavigate, onToggleCollapsed }: NavPanelProps) {
           </svg>
           {!collapsed && <span className="truncate">バックアップ</span>}
         </Link>
+
+        {isAdmin && (
+          <Link
+            to="/users"
+            onClick={onNavigate}
+            className={`group flex items-center rounded-lg font-medium text-foreground-secondary text-sm transition hover:bg-surface-hover hover:text-foreground ${
+              collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
+            }`}
+            activeProps={{
+              className: "bg-primary-subtle text-primary-subtle-fg",
+            }}
+            title="ユーザー管理"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+              stroke="currentColor"
+              className="h-5 w-5 shrink-0 text-muted transition group-hover:text-foreground"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"
+              />
+            </svg>
+            {!collapsed && <span className="truncate">ユーザー管理</span>}
+          </Link>
+        )}
       </nav>
 
       {/* テーマ切り替え & フッター */}
       <div className="space-y-2 border-border border-t p-2">
+        {!collapsed && (
+          <div className="rounded-lg border border-border bg-surface-raised px-2.5 py-2">
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-foreground text-xs">
+                    {user?.name || user?.email || "ログイン中"}
+                  </p>
+                  {user?.name && (
+                    <p className="truncate text-[11px] text-muted">
+                      {user.email}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleSignOut()}
+                  className="shrink-0 cursor-pointer rounded-md px-2 py-1 text-muted-foreground text-xs transition hover:bg-surface-hover hover:text-foreground"
+                  title="ログアウト"
+                >
+                  ログアウト
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                onClick={onNavigate}
+                className="block rounded-md px-2 py-1 text-center text-muted-foreground text-xs transition hover:bg-surface-hover hover:text-foreground"
+                title="ログイン"
+              >
+                ログイン
+              </Link>
+            )}
+          </div>
+        )}
         {collapsed ? (
           <div className="flex justify-center">
             <button

@@ -50,6 +50,21 @@ export const llmConfigKeys = {
   detail: (id: string) => ["llmConfigs", id] as const,
 };
 
+export const authKeys = {
+  all: ["auth"] as const,
+  status: ["auth", "status"] as const,
+  session: ["auth", "session"] as const,
+};
+
+export const userKeys = {
+  all: ["users"] as const,
+};
+
+export const novelMemberKeys = {
+  all: ["novelMembers"] as const,
+  list: (novelId: string) => ["novelMembers", novelId] as const,
+};
+
 export const embeddingConfigKeys = {
   all: ["embeddingConfigs"] as const,
   detail: (id: string) => ["embeddingConfigs", id] as const,

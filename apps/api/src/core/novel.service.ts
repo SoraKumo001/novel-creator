@@ -1,4 +1,10 @@
-import { chapters, characters, novels, settings } from "@novel-creator/db";
+import {
+  chapters,
+  characters,
+  novelMembers,
+  novels,
+  settings,
+} from "@novel-creator/db";
 import {
   editStoryOutlineDocument,
   editStoryOutlineSection,
@@ -15,8 +21,28 @@ import { assertFound, type ServiceContext, ValidationError } from "./types.js";
 export class NovelDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
-  async listNovels() {
-    return this.ctx.db.select().from(novels).orderBy(desc(novels.createdAt));
+  /**
+   * 小説一覧。本人（members 所属）または admin のみに対象を絞り込む。
+   * userId 未指定時（内部利用・後方互換）は全件を返す。
+   */
+  async listNovels(userId?: string, isAdmin?: boolean) {
+    if (!userId || isAdmin) {
+      return this.ctx.db.select().from(novels).orderBy(desc(novels.createdAt));
+    }
+    return this.ctx.db
+      .select({
+        createdAt: novels.createdAt,
+        description: novels.description,
+        id: novels.id,
+        storyOutline: novels.storyOutline,
+        styleGuide: novels.styleGuide,
+        title: novels.title,
+        updatedAt: novels.updatedAt,
+      })
+      .from(novels)
+      .innerJoin(novelMembers, eq(novelMembers.novelId, novels.id))
+      .where(eq(novelMembers.userId, userId))
+      .orderBy(desc(novels.createdAt));
   }
 
   async getNovelDetail(id: string) {
@@ -44,14 +70,37 @@ export class NovelDomainService {
     };
   }
 
-  async createNovel(data: {
-    title: string;
-    description?: string | null;
-    styleGuide?: string | null;
-    storyOutline?: string | null;
-  }) {
+  async createNovel(
+    data: {
+      title: string;
+      description?: string | null;
+      styleGuide?: string | null;
+      storyOutline?: string | null;
+    },
+    ownerId?: string
+  ) {
     if (!data.title?.trim()) {
       throw new ValidationError("Title is required");
+    }
+    // 作成者の owner 付与は同一トランザクションで行う。
+    if (ownerId) {
+      return this.ctx.db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(novels)
+          .values({
+            description: data.description ?? null,
+            storyOutline: data.storyOutline ?? null,
+            styleGuide: data.styleGuide ?? null,
+            title: data.title,
+          })
+          .returning();
+        await tx.insert(novelMembers).values({
+          novelId: row.id,
+          role: "owner",
+          userId: ownerId,
+        });
+        return row;
+      });
     }
     const [row] = await this.ctx.db
       .insert(novels)

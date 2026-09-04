@@ -1,4 +1,5 @@
 export * from "./analysis.js";
+export * from "./auth.js";
 export * from "./backup.js";
 export * from "./chapter.js";
 export * from "./character.js";

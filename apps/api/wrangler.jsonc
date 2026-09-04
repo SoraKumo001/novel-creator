@@ -20,6 +20,9 @@
     "LLM_PROVIDER": "openai",
     "LLM_MODEL": "gpt-4o-mini",
     "EMBEDDING_MODEL": "text-embedding-3-small",
-    "VECTOR_STORE_PROVIDER": "vectorize"
+    "VECTOR_STORE_PROVIDER": "vectorize",
+    "BETTER_AUTH_URL": "https://api.example.com",
+    "WEB_ORIGIN": "https://web.example.com"
+    // NOTE: BETTER_AUTH_SECRET は secrets 運用 (`wrangler secret put BETTER_AUTH_SECRET`)。
   }
 }

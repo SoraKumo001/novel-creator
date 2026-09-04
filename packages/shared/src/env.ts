@@ -6,6 +6,8 @@ import { llmProviders } from "./constants.js";
 const DATABASE_URL_FALLBACK = "postgres://novel:novel@localhost:5433/novel";
 
 export const envSchema = z.object({
+  BETTER_AUTH_SECRET: z.string().optional(),
+  BETTER_AUTH_URL: z.string().optional(),
   DATABASE_URL: z.string().default(DATABASE_URL_FALLBACK),
   EMBEDDING_API_KEY: z.string().optional(),
   EMBEDDING_BASE_URL: z.string().optional(),
@@ -27,6 +29,7 @@ export const envSchema = z.object({
     .default("development"),
 
   VECTOR_STORE_PROVIDER: z.enum(["pgvector", "vectorize"]).default("pgvector"),
+  WEB_ORIGIN: z.string().default("http://localhost:5173"),
 });
 
 export type Env = z.infer<typeof envSchema>;

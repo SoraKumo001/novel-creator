@@ -544,6 +544,58 @@ export interface MultiPersonaReviewResult {
   reviews: ReaderPersonaReview[];
 }
 
+// ---- 認証・ユーザー・メンバー ----
+export type UserRole = "admin" | "user";
+
+export type NovelMemberRole = "owner" | "admin" | "editor" | "viewer";
+
+/** 初版メンバーUIの二値表示 (owner / admin) */
+export type NovelMemberDisplayRole = "owner" | "admin";
+
+export interface AuthUser {
+  disabled?: boolean | null;
+  email: string;
+  id: string;
+  name?: string | null;
+  role: UserRole;
+}
+
+export interface AuthSession {
+  user: AuthUser | null;
+}
+
+export interface AuthStatus {
+  initialized: boolean;
+}
+
+export interface AdminUser extends AuthUser {
+  createdAt?: string | null;
+}
+
+export interface CreateUserInput {
+  email: string;
+  name?: string;
+  password: string;
+  role?: UserRole;
+}
+
+export interface UpdateUserInput {
+  disabled?: boolean;
+  role?: UserRole;
+}
+
+export interface NovelMember {
+  email?: string | null;
+  role: NovelMemberRole;
+  userId: string;
+}
+
+export interface AddNovelMemberInput {
+  email?: string;
+  role: NovelMemberDisplayRole;
+  userId?: string;
+}
+
 // ---- AI分析（ストーリーアーク / 口調チェック / ペルソナレビュー）----
 export type AnalysisType = "story-arc" | "check-voice" | "persona-review";
 

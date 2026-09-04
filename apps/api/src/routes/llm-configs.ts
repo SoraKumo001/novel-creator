@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import type { AppContext } from "../context.js";
 import { getServices } from "../core/services.js";
+import { requireAdmin } from "../middleware/auth.js";
 import {
   createLlmConfigSchema,
   idParamSchema,
@@ -9,7 +10,9 @@ import {
   updateLlmConfigSchema,
 } from "../schemas/index.js";
 
+// LLM 設定の読み書きは admin 限定とする。
 const llmConfigsRouter = new Hono<AppContext>()
+  .use(requireAdmin)
   // GET /api/llm-configs - 設定一覧取得
   .get("/", async (c) => {
     const rows = await getServices(c).llmConfig.listConfigs();

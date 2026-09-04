@@ -20,6 +20,7 @@ vi.mock("@tanstack/react-router", () => ({
       {children}
     </a>
   ),
+  useNavigate: () => vi.fn(),
 }));
 
 // mock ChatContext
@@ -35,6 +36,24 @@ vi.mock("@/hooks/useTheme.js", () => ({
   useTheme: () => ({
     theme: "light",
     setTheme: vi.fn(),
+  }),
+}));
+
+// mock useAuth（未ログイン状態）
+vi.mock("@/hooks/useAuth.js", () => ({
+  useAuth: () => ({
+    user: null,
+    isAdmin: false,
+    isAuthenticated: false,
+    signOut: vi.fn(),
+  }),
+}));
+
+// mock useToast
+vi.mock("@/hooks/useToast.js", () => ({
+  useToast: () => ({
+    success: vi.fn(),
+    error: vi.fn(),
   }),
 }));
 

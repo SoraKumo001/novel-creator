@@ -2,10 +2,13 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import type { AppContext } from "../context.js";
 import { getServices } from "../core/services.js";
+import { requireAdmin } from "../middleware/auth.js";
 import { reindexBodySchema } from "../schemas/index.js";
 import { streamEvents } from "../sse.js";
 
+// ベクトル再構築は admin 限定とする。
 const vectorRouter = new Hono<AppContext>()
+  .use(requireAdmin)
   // POST /api/vector/reindex - インデックス全再構築 (SSE ストリーミング)
   .post("/reindex", zValidator("json", reindexBodySchema), async (c) => {
     const body = c.req.valid("json");

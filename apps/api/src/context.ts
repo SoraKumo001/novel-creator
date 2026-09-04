@@ -16,6 +16,22 @@ import type { Env as HonoEnv } from "hono";
 /**
  * Hono の Context 変数として注入される DI コンテキスト。
  */
+export interface AuthUser {
+  email: string;
+  emailVerified: boolean;
+  id: string;
+  image?: string | null;
+  name: string;
+  role?: string | null;
+}
+
+export interface AuthSession {
+  expiresAt: Date;
+  id: string;
+  token: string;
+  userId: string;
+}
+
 export interface AppContext extends HonoEnv {
   Variables: {
     env: Env;
@@ -23,6 +39,8 @@ export interface AppContext extends HonoEnv {
     llm: LanguageModel;
     embedding: EmbeddingModel;
     vectorStore: VectorStore;
+    user?: AuthUser;
+    session?: AuthSession;
   };
 }
 

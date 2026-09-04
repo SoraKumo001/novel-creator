@@ -15,6 +15,7 @@ import {
   type NewSection,
   type NewSetting,
   type NewTimeline,
+  novelMembers,
   novels,
   sections,
   settings,
@@ -201,7 +202,7 @@ export class BackupDomainService {
     };
   }
 
-  async importNovel(body: BackupBody) {
+  async importNovel(body: BackupBody, ownerId?: string) {
     if (
       !body ||
       typeof body !== "object" ||
@@ -266,6 +267,14 @@ export class BackupDomainService {
         await tx
           .insert(chatMessages)
           .values(normalizeRows(body.rdb.chatMessages, chatMessages));
+      }
+      // インポート作成者の owner 付与は同一トランザクションで行う。
+      if (ownerId) {
+        await tx.insert(novelMembers).values({
+          novelId,
+          role: "owner",
+          userId: ownerId,
+        });
       }
     });
 
