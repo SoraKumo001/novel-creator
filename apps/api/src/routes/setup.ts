@@ -40,7 +40,7 @@ export function registerSetupRoute(app: Hono<AppContext>) {
       );
     }
     const { email, name, password } = c.req.valid("json");
-    const auth = createAuth(c.get("env"), db);
+    const auth = await createAuth(c.get("env"), db);
     try {
       // セッション Cookie を受け取るため returnHeaders 付きで呼ぶ。
       // Set-Cookie を転送しないとブラウザにセッションが残らず、直後の画面遷移で

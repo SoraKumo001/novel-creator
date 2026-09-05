@@ -6,7 +6,6 @@ import { llmProviders } from "./constants.js";
 const DATABASE_URL_FALLBACK = "postgres://novel:novel@localhost:5433/novel";
 
 export const envSchema = z.object({
-  BETTER_AUTH_SECRET: z.string().optional(),
   BETTER_AUTH_URL: z.string().optional(),
   DATABASE_URL: z.string().default(DATABASE_URL_FALLBACK),
   EMBEDDING_API_KEY: z.string().optional(),
@@ -24,14 +23,14 @@ export const envSchema = z.object({
   // --- LLM (テキスト生成) ---
   // プロバイダ選択肢は constants.ts の llmProviders に統一（custom_openai を含む）
   LLM_PROVIDER: z.enum(llmProviders).default("openai"),
+
+  // --- Master Secret ---
+  // 認証 (better-auth) と API キー暗号化保存の双方を HKDF(SHA-256) で導出する単一マスター鍵。
+  // 必須。未設定の場合、API は起動しない (fail-closed)。
+  MASTER_SECRET: z.string().min(16),
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
-
-  // --- Secret Encryption (S0-1) ---
-  // llm_configs / embedding_configs の api_key を AES-GCM で暗号化保存するための 32 バイト鍵
-  // (base64 または hex)。未設定の場合、保存・復号を伴う操作は明示エラーになる。
-  SECRET_ENCRYPTION_KEY: z.string().optional(),
 
   VECTOR_STORE_PROVIDER: z.enum(["pgvector", "vectorize"]).default("pgvector"),
   WEB_ORIGIN: z.string().default("http://localhost:5173"),

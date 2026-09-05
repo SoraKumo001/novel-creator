@@ -1,1 +1,1 @@
-CREATE INDEX "edit_histories_entity_created_idx" ON "edit_histories" USING btree ("novel_id","entity_type","entity_id","created_at" desc);
+CREATE INDEX IF NOT EXISTS "edit_histories_entity_created_idx" ON "edit_histories" USING btree ("novel_id","entity_type","entity_id","created_at" desc);

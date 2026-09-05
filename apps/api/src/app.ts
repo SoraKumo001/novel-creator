@@ -57,8 +57,7 @@ export type AppType = ApiType;
  * Node.js（index.ts）と Cloudflare Workers（worker.ts）の両方から利用する。
  */
 export function createApp(context: AppContext["Variables"]) {
-  // BETTER_AUTH_SECRET 未設定時は起動させない（fail-closed）。
-  // テストのみ ALLOW_INSECURE_AUTH_FOR_TESTS=true で明示的にバイパスできる。
+  // MASTER_SECRET 未設定時は起動させない（fail-closed）。
   assertAuthConfigured(context.env);
   const app = new Hono<AppContext>();
 
@@ -114,7 +113,7 @@ export function createApp(context: AppContext["Variables"]) {
         // 件数取得に失敗した場合は handler 側の判定に任せる。
       }
     }
-    const auth = createAuth(c.get("env"), c.get("db"));
+    const auth = await createAuth(c.get("env"), c.get("db"));
     return auth.handler(c.req.raw);
   });
 

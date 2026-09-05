@@ -1,21 +1,11 @@
 import { Hono } from "hono";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { AppContext } from "../src/context.js";
 import { errorHandler } from "../src/middleware/error-handler.js";
 import { novelMembersRouter } from "../src/routes/novels/members.js";
 
-const BYPASS_FLAG = "ALLOW_INSECURE_AUTH_FOR_TESTS";
 const NOVEL_ID = "11111111-1111-4111-8111-111111111111";
-
-function clearBypassFlag(): void {
-  delete process.env[BYPASS_FLAG];
-}
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-  clearBypassFlag();
-});
 
 interface MockDb {
   select: ReturnType<typeof vi.fn>;
@@ -43,10 +33,10 @@ function createMockDb(targetRows: unknown[]): MockDb {
   return db;
 }
 
-function createTestApp(db: MockDb) {
+function createTestApp(db: MockDb, env: unknown) {
   const app = new Hono<AppContext>();
   app.use("*", async (c, next) => {
-    c.set("env", {} as never);
+    c.set("env", env as never);
     c.set("db", db as never);
     c.set("llm", {} as never);
     c.set("embedding", {} as never);
@@ -59,9 +49,8 @@ function createTestApp(db: MockDb) {
 }
 
 describe("novel members assertMemberManage fail-closed", () => {
-  it("未設定・フラグ無しでは素通りせず 401 を返すこと", async () => {
-    clearBypassFlag();
-    const app = createTestApp(createMockDb([]));
+  it("未設定では素通りせず 401 を返すこと", async () => {
+    const app = createTestApp(createMockDb([]), {});
     const res = await app.request(`/api/novels/${NOVEL_ID}/members`, {
       body: JSON.stringify({ role: "editor", userId: "user-1" }),
       headers: { "Content-Type": "application/json" },
@@ -74,9 +63,10 @@ describe("novel members assertMemberManage fail-closed", () => {
     expect(body.error.code).toBe("UNAUTHORIZED");
   });
 
-  it("明示バイパス時は素通りし、後段の判定に進むこと", async () => {
-    vi.stubEnv(BYPASS_FLAG, "true");
-    const app = createTestApp(createMockDb([]));
+  it("MASTER 設定時は素通りし、後段の判定に進むこと", async () => {
+    const app = createTestApp(createMockDb([]), {
+      MASTER_SECRET: "test-master-secret-0123456789",
+    });
     const res = await app.request(`/api/novels/${NOVEL_ID}/members`, {
       body: JSON.stringify({ role: "editor", userId: "user-1" }),
       headers: { "Content-Type": "application/json" },

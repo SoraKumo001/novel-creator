@@ -74,7 +74,7 @@ const usersRouter = new Hono<AppContext>()
   .post("/", zValidator("json", createUserSchema), async (c) => {
     const body = c.req.valid("json");
     const db = c.get("db");
-    const auth = createAuth(c.get("env"), db);
+    const auth = await createAuth(c.get("env"), db);
     const createUser = auth.api.createUser as unknown as (args: {
       body: { email: string; name: string; password: string; role?: string };
       headers: Headers;

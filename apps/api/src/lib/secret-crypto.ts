@@ -1,9 +1,10 @@
+import { deriveEncryptionKeyBase64 } from "./master-secret.js";
 /**
  * API キー等の機微情報を AES-GCM で暗号化して保存するためのユーティリティ (S0-1)。
  *
  * - Node.js 18+ と Cloudflare Workers の双方で動作するよう WebCrypto SubtleCrypto のみを使用する
  *   (node:crypto は使わない)。
- * - 暗号化鍵は環境変数 SECRET_ENCRYPTION_KEY 由来の 32 バイト鍵 (base64 または hex 形式)。
+ * - 暗号化鍵は MASTER_SECRET から HKDF 導出された 32 バイト鍵 (base64 または hex 形式)。
  * - DB カラムは text のまま保持し、暗号文は `enc:v1:<base64(iv || ciphertext)>` 形式で格納する。
  *   プレフィックスを持たない既存値は平文 (レガシー) として扱い、読み取りは維持するが、
  *   保存時には必ず暗号化する (平文互換の新規書き込みは行わない)。
@@ -108,6 +109,7 @@ export async function decryptApiKey(
 
 /**
  * 平文を AES-GCM で暗号化し、プレフィックス付き base64 暗号文を返す。
+ * secretKeyValue には MASTER_SECRET から導出した鍵値のみを受け付ける。
  */
 export async function encryptSecret(
   plaintext: string,
@@ -178,7 +180,7 @@ async function importEncryptionKey(
 ): Promise<CryptoKey> {
   if (!secretKeyValue?.trim()) {
     throw new SecretCryptoError(
-      "SECRET_ENCRYPTION_KEY is not configured. Set a 32-byte base64 or hex key."
+      "MASTER_SECRET is not configured. Set MASTER_SECRET to a 32-byte base64 or hex key."
     );
   }
   const raw = parseKeyBytes(secretKeyValue);
@@ -192,7 +194,7 @@ async function importEncryptionKey(
     );
   } catch (cause) {
     throw new SecretCryptoError(
-      "SECRET_ENCRYPTION_KEY could not be imported as an AES-GCM key.",
+      "MASTER_SECRET could not be imported as an AES-GCM key.",
       { cause }
     );
   }
@@ -208,7 +210,7 @@ function parseKeyBytes(secretKeyValue: string): Uint8Array<ArrayBuffer> {
     : decodeBase64ToBytes(trimmed);
   if (bytes.length !== ENCRYPTION_KEY_LENGTH_BYTES) {
     throw new SecretCryptoError(
-      "SECRET_ENCRYPTION_KEY must decode to exactly 32 bytes."
+      "MASTER_SECRET must decode to exactly 32 bytes."
     );
   }
   return bytes;
@@ -245,14 +247,26 @@ function decodeBase64ToBytes(value: string): Uint8Array<ArrayBuffer> {
   try {
     binary = atob(normalized + "=".repeat(paddingLength));
   } catch (cause) {
-    throw new SecretCryptoError(
-      "SECRET_ENCRYPTION_KEY is not valid base64 or hex.",
-      { cause }
-    );
+    throw new SecretCryptoError("MASTER_SECRET is not valid base64 or hex.", {
+      cause,
+    });
   }
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+}
+
+/**
+ * 暗号化鍵の実値を解決する。MASTER_SECRET から HKDF 導出した base64 鍵を返す。
+ * MASTER_SECRET 未設定時は undefined を返す。
+ */
+export async function getSecretEncryptionKeyValue(env: {
+  MASTER_SECRET?: string | null;
+}): Promise<string | undefined> {
+  if (env.MASTER_SECRET?.trim()) {
+    return deriveEncryptionKeyBase64(env.MASTER_SECRET);
+  }
+  return undefined;
 }

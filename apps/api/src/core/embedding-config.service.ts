@@ -11,6 +11,7 @@ import { desc, eq } from "drizzle-orm";
 import {
   decryptApiKey,
   encryptApiKey,
+  getSecretEncryptionKeyValue,
   maskApiKeyForDisplay,
 } from "../lib/secret-crypto.js";
 import {
@@ -27,8 +28,8 @@ export interface MaskedEmbeddingConfig extends Omit<EmbeddingConfig, "apiKey"> {
 export class EmbeddingConfigDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
-  private get secretKeyValue(): string | undefined {
-    return this.ctx.env.SECRET_ENCRYPTION_KEY;
+  private getSecretKeyValue(): Promise<string | undefined> {
+    return getSecretEncryptionKeyValue(this.ctx.env);
   }
 
   /**
@@ -36,7 +37,10 @@ export class EmbeddingConfigDomainService {
    * マスクし、生のキーを呼び出し側に返さない。
    */
   private async toMasked(row: EmbeddingConfig): Promise<MaskedEmbeddingConfig> {
-    const apiKey = await decryptApiKey(row.apiKey, this.secretKeyValue);
+    const apiKey = await decryptApiKey(
+      row.apiKey,
+      await this.getSecretKeyValue()
+    );
     const { apiKeyMasked, hasApiKey } = maskApiKeyForDisplay(apiKey);
     const { apiKey: _, ...rest } = row;
     return {
@@ -96,7 +100,10 @@ export class EmbeddingConfigDomainService {
     }
 
     // apiKey は保存前に必ず暗号化する。鍵未設定時はここで明示エラーになる。
-    const apiKey = await encryptApiKey(data.apiKey, this.secretKeyValue);
+    const apiKey = await encryptApiKey(
+      data.apiKey,
+      await this.getSecretKeyValue()
+    );
 
     const [row] = await this.ctx.db
       .insert(embeddingConfigs)
@@ -127,7 +134,7 @@ export class EmbeddingConfigDomainService {
     const apiKey =
       data.apiKey === undefined
         ? current.apiKey
-        : await encryptApiKey(data.apiKey, this.secretKeyValue);
+        : await encryptApiKey(data.apiKey, await this.getSecretKeyValue());
 
     const [row] = await this.ctx.db
       .update(embeddingConfigs)

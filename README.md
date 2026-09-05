@@ -184,15 +184,16 @@ http://localhost:5173 にアクセス。
 
 ### 初期設定・DB
 
-| コマンド           | 内容                           |
-| ------------------ | ------------------------------ |
-| `pnpm setup:db`    | DB 起動 + マイグレーション     |
-| `pnpm db:up`       | Docker で PostgreSQL 起動      |
-| `pnpm db:down`     | Docker で PostgreSQL 停止      |
-| `pnpm db:push`     | DB スキーマ反映                |
-| `pnpm db:generate` | マイグレーション生成           |
-| `pnpm db:migrate`  | マイグレーションスクリプト実行 |
-| `pnpm db:studio`   | Drizzle Studio 起動            |
+| コマンド              | 内容                                                  |
+| --------------------- | ----------------------------------------------------- |
+| `pnpm db:setup`       | DB 起動 + マイグレーション実行                        |
+| `pnpm db:setup:fresh` | DB 起動 + スキーマ反映（使い捨て試作用）              |
+| `pnpm db:up`          | Docker で PostgreSQL 起動                             |
+| `pnpm db:down`        | Docker で PostgreSQL 停止                             |
+| `pnpm db:push`        | DB スキーマ反映（使い捨て試作専用。migrate 済み DB には実行禁止） |
+| `pnpm db:generate`    | マイグレーション生成                                  |
+| `pnpm db:migrate`     | マイグレーションスクリプト実行                        |
+| `pnpm db:studio`      | Drizzle Studio 起動                                   |
 
 ### 開発・UI確認
 

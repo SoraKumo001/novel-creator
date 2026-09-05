@@ -65,9 +65,7 @@ describe("secret-crypto", () => {
       (error: unknown) => error
     );
     expect(failure).toBeInstanceOf(SecretCryptoError);
-    expect(String((failure as Error).message)).toContain(
-      "SECRET_ENCRYPTION_KEY"
-    );
+    expect(String((failure as Error).message)).toContain("MASTER_SECRET");
     expect(String((failure as Error).message)).not.toContain("sk-super-secret");
   });
 

@@ -13,8 +13,8 @@ import { createContextForWorkers } from "./context.js";
 export type WorkerEnv = {
   HYPERDRIVE: { connectionString: string };
   VECTORIZE_INDEX: unknown;
-  BETTER_AUTH_SECRET?: string;
   BETTER_AUTH_URL?: string;
+  MASTER_SECRET?: string;
   WEB_ORIGIN?: string;
   LLM_PROVIDER?: string;
   LLM_API_KEY?: string;

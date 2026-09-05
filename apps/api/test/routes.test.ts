@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppContext } from "../src/context.js";
 import { createDomainServices } from "../src/core/services.js";
-import { TEST_ONLY_AUTH_SECRET } from "../src/lib/auth.js";
 import { errorHandler } from "../src/middleware/error-handler.js";
 import novelsRouter from "../src/routes/novels.js";
 
@@ -33,10 +32,10 @@ function createMockDb(): MockDb {
 function createTestApp(db: MockDb) {
   const app = new Hono<AppContext>();
   app.use("*", async (c, next) => {
-    // テスト専用 secret を明示設定し、認証設定済み扱いにする。
+    // MASTER_SECRET を明示設定し、認証設定済み扱いにする。
     // ユーザー未格納のルーター単体テストは assertNovelAccess の
     // !current 分岐で素通りする（期待仕様は変更しない）。
-    const env = { BETTER_AUTH_SECRET: TEST_ONLY_AUTH_SECRET } as never;
+    const env = { MASTER_SECRET: "test-master-secret-0123456789" } as never;
     const llm = {} as never;
     const embedding = {} as never;
     const vectorStore = {} as never;

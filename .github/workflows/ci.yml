@@ -55,7 +55,7 @@ jobs:
       - name: Prepare test database
         run: |
           psql "$DATABASE_URL" -c "CREATE EXTENSION IF NOT EXISTS vector;"
-          pnpm db:push
+          pnpm db:migrate
 
       - name: Test
         run: pnpm test

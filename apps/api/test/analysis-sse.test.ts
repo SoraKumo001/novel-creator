@@ -1,13 +1,5 @@
 import { Hono } from "hono";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AppContext } from "../src/context.js";
 import { errorHandler } from "../src/middleware/error-handler.js";
@@ -35,14 +27,15 @@ vi.mock("../src/core/services.js", () => ({
 
 const NOVEL_ID = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d";
 
-// vector ルーターの requireAdmin 素通りは明示的なテストバイパスでのみ許可する。
-// fail-closed 化により、フラグ無しでは 500 になる。
-beforeAll(() => {
-  vi.stubEnv("ALLOW_INSECURE_AUTH_FOR_TESTS", "true");
-});
-
-afterAll(() => {
-  vi.unstubAllEnvs();
+// vector ルーターの requireAdmin はテストでは素通りさせる。
+// fail-closed の検証は auth-fail-closed.test.ts で行う。
+vi.mock("../src/middleware/auth.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../src/middleware/auth.js")>();
+  return {
+    ...actual,
+    requireAdmin: (_c: unknown, next: () => Promise<void>) => next(),
+  };
 });
 
 /**

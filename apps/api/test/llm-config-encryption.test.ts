@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { EmbeddingConfigDomainService } from "../src/core/embedding-config.service.js";
 import { LlmConfigDomainService } from "../src/core/llm-config.service.js";
 import type { ServiceContext } from "../src/core/types.js";
+import { deriveEncryptionKeyBase64 } from "../src/lib/master-secret.js";
 import {
   decryptApiKey,
   ENCRYPTED_SECRET_PREFIX,
@@ -73,14 +74,25 @@ function createFakeDb() {
   return { db, rows };
 }
 
+/**
+ * テスト用の MASTER_SECRET と、サービスが導出する暗号化鍵のペアを生成する。
+ * ServiceContext の env には master を渡し、decryptApiKey の直接呼び出しには
+ * 導出鍵 key を使う（サービス内部の導出と同一値）。
+ */
+async function createMasterKeys(): Promise<{ key: string; master: string }> {
+  const master = generateEncryptionKeyBase64();
+  const key = await deriveEncryptionKeyBase64(master);
+  return { key, master };
+}
+
 function createServiceContext(
   db: unknown,
-  keyValue: string | undefined
+  masterValue: string | undefined
 ): ServiceContext {
   return {
     db: db as never,
     embedding: {} as never,
-    env: { SECRET_ENCRYPTION_KEY: keyValue } as never,
+    env: { MASTER_SECRET: masterValue } as never,
     llm: {} as never,
     vectorStore: {} as never,
   };
@@ -97,9 +109,11 @@ const llmBase = {
 
 describe("LLM config API key encryption (S0-1)", () => {
   it("createConfig は暗号文を保存しマスクのみ返すこと", async () => {
-    const key = generateEncryptionKeyBase64();
+    const { key, master } = await createMasterKeys();
     const { db, rows } = createFakeDb();
-    const service = new LlmConfigDomainService(createServiceContext(db, key));
+    const service = new LlmConfigDomainService(
+      createServiceContext(db, master)
+    );
 
     const created = await service.createConfig({
       ...llmBase,
@@ -120,9 +134,11 @@ describe("LLM config API key encryption (S0-1)", () => {
   });
 
   it("getConfig は生 apiKey を返さないこと", async () => {
-    const key = generateEncryptionKeyBase64();
+    const { master } = await createMasterKeys();
     const { db } = createFakeDb();
-    const service = new LlmConfigDomainService(createServiceContext(db, key));
+    const service = new LlmConfigDomainService(
+      createServiceContext(db, master)
+    );
     const created = await service.createConfig({
       ...llmBase,
       apiKey: "sk-test-secret-12345678",
@@ -135,7 +151,7 @@ describe("LLM config API key encryption (S0-1)", () => {
   });
 
   it("レガシー平文もマスク一覧で読めること (遅延移行)", async () => {
-    const key = generateEncryptionKeyBase64();
+    const { master } = await createMasterKeys();
     const { db, rows } = createFakeDb();
     rows.push({
       ...llmBase,
@@ -144,7 +160,9 @@ describe("LLM config API key encryption (S0-1)", () => {
       id: randomUUID(),
       updatedAt: new Date(),
     });
-    const service = new LlmConfigDomainService(createServiceContext(db, key));
+    const service = new LlmConfigDomainService(
+      createServiceContext(db, master)
+    );
 
     const listed = await service.listConfigs();
     expect(listed).toHaveLength(1);
@@ -154,9 +172,11 @@ describe("LLM config API key encryption (S0-1)", () => {
   });
 
   it("updateConfig で apiKey 未指定時は保存値を維持すること", async () => {
-    const key = generateEncryptionKeyBase64();
+    const { master } = await createMasterKeys();
     const { db, rows } = createFakeDb();
-    const service = new LlmConfigDomainService(createServiceContext(db, key));
+    const service = new LlmConfigDomainService(
+      createServiceContext(db, master)
+    );
     const created = await service.createConfig({
       ...llmBase,
       apiKey: "sk-original-key-12345678",
@@ -172,9 +192,11 @@ describe("LLM config API key encryption (S0-1)", () => {
   });
 
   it("updateConfig で新しい apiKey は再暗号化されること", async () => {
-    const key = generateEncryptionKeyBase64();
+    const { key, master } = await createMasterKeys();
     const { db, rows } = createFakeDb();
-    const service = new LlmConfigDomainService(createServiceContext(db, key));
+    const service = new LlmConfigDomainService(
+      createServiceContext(db, master)
+    );
     const created = await service.createConfig({
       ...llmBase,
       apiKey: "sk-original-key-12345678",
@@ -196,17 +218,17 @@ describe("LLM config API key encryption (S0-1)", () => {
     );
     await expect(
       service.createConfig({ ...llmBase, apiKey: "sk-test-secret" })
-    ).rejects.toThrow("SECRET_ENCRYPTION_KEY");
+    ).rejects.toThrow("MASTER_SECRET");
     expect(rows).toHaveLength(0);
   });
 });
 
 describe("Embedding config API key encryption (S0-1)", () => {
   it("createConfig は暗号文を保存しマスクのみ返すこと", async () => {
-    const key = generateEncryptionKeyBase64();
+    const { key, master } = await createMasterKeys();
     const { db, rows } = createFakeDb();
     const service = new EmbeddingConfigDomainService(
-      createServiceContext(db, key)
+      createServiceContext(db, master)
     );
 
     const created = await service.createConfig({

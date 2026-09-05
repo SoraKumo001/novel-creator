@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseEnv, parseEnvFromBindings } from "../src/env.js";
 
 const LOCAL_FALLBACK_URL = "postgres://novel:novel@localhost:5433/novel";
+const TEST_MASTER_SECRET = "test-master-secret-0123456789";
 
 const warnSpies: Array<ReturnType<typeof vi.spyOn>> = [];
 
@@ -34,6 +35,7 @@ describe("parseEnvFromBindings", () => {
     const env = parseEnvFromBindings({
       DATABASE_URL: "postgres://example:5432/novel",
       LLM_PROVIDER: "openai",
+      MASTER_SECRET: TEST_MASTER_SECRET,
     });
     expect(env.DATABASE_URL).toBe("postgres://example:5432/novel");
     expect(env.LLM_PROVIDER).toBe("openai");
@@ -43,6 +45,7 @@ describe("parseEnvFromBindings", () => {
     const env = parseEnvFromBindings({
       DATABASE_URL: "postgres://example:5432/novel",
       HYPERDRIVE: { connectionString: "postgres://hyperdrive/db" },
+      MASTER_SECRET: TEST_MASTER_SECRET,
     });
     expect(env.DATABASE_URL).toBe("postgres://example:5432/novel");
   });
@@ -52,11 +55,14 @@ describe("parseEnv DATABASE_URL fallback", () => {
   it("NODE_ENV=production で DATABASE_URL 未設定なら一度だけ警告してローカル既定値を使うこと", () => {
     const warn = spyOnConsoleWarn();
 
-    const env = parseEnv({ NODE_ENV: "production" });
+    const env = parseEnv({
+      MASTER_SECRET: TEST_MASTER_SECRET,
+      NODE_ENV: "production",
+    });
     expect(env.DATABASE_URL).toBe(LOCAL_FALLBACK_URL);
 
     // 2 回目以降は警告しない（one-time）
-    parseEnv({ NODE_ENV: "production" });
+    parseEnv({ MASTER_SECRET: TEST_MASTER_SECRET, NODE_ENV: "production" });
     expect(warn).toHaveBeenCalledTimes(1);
   });
 
@@ -65,6 +71,7 @@ describe("parseEnv DATABASE_URL fallback", () => {
 
     const env = parseEnv({
       DATABASE_URL: "postgres://example:5432/novel",
+      MASTER_SECRET: TEST_MASTER_SECRET,
       NODE_ENV: "production",
     });
     expect(env.DATABASE_URL).toBe("postgres://example:5432/novel");
@@ -74,7 +81,7 @@ describe("parseEnv DATABASE_URL fallback", () => {
   it("開発環境では DATABASE_URL 未設定でも警告せずローカル既定値を使うこと", () => {
     const warn = spyOnConsoleWarn();
 
-    const env = parseEnv({});
+    const env = parseEnv({ MASTER_SECRET: TEST_MASTER_SECRET });
     expect(env.DATABASE_URL).toBe(LOCAL_FALLBACK_URL);
     expect(warn).not.toHaveBeenCalled();
   });

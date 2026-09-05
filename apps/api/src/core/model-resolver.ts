@@ -11,7 +11,10 @@ import {
 import type { LLMProviderType } from "@novel-creator/shared";
 import type { EmbeddingModel, LanguageModel } from "ai";
 import { eq } from "drizzle-orm";
-import { decryptApiKey } from "../lib/secret-crypto.js";
+import {
+  decryptApiKey,
+  getSecretEncryptionKeyValue,
+} from "../lib/secret-crypto.js";
 import { NotFoundError, type ServiceContext } from "./types.js";
 
 /**
@@ -117,7 +120,7 @@ export async function resolveLLMModelWithInfo(
         // 復号前後で同一参照の場合は元の設定をそのまま渡す。
         const apiKey = await decryptApiKey(
           config.apiKey,
-          context.env.SECRET_ENCRYPTION_KEY
+          await getSecretEncryptionKeyValue(context.env)
         );
         const input = apiKey === config.apiKey ? config : { ...config, apiKey };
         return {
@@ -196,7 +199,7 @@ export async function resolveEmbeddingModel(
         // config 自体は DB 行をそのまま返す (apiKey は暗号文の可能性があり、HTTP 返却禁止)。
         const apiKey = await decryptApiKey(
           config.apiKey,
-          context.env.SECRET_ENCRYPTION_KEY
+          await getSecretEncryptionKeyValue(context.env)
         );
         const input = apiKey === config.apiKey ? config : { ...config, apiKey };
         return {

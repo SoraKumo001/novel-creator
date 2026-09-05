@@ -4,16 +4,26 @@ import { createApp } from "../src/app.js";
 import { createContext } from "../src/context.js";
 import { generateEncryptionKeyBase64 } from "../src/lib/secret-crypto.js";
 
-// createApp は BETTER_AUTH_SECRET 未設定で起動時 throw する（fail-closed）。
-// 結合テストの素通りは明示的なテストバイパスでのみ許可する。
-// describe 本体は収集時に実行されるため、モジュール評価時に設定する。
-vi.stubEnv("ALLOW_INSECURE_AUTH_FOR_TESTS", "true");
+// 結合テストでは認証ミドルウェアを素通りさせる。
+// fail-closed の検証は auth-fail-closed.test.ts で行う。
+vi.mock("../src/middleware/auth.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../src/middleware/auth.js")>();
+  return {
+    ...actual,
+    assertNovelAccess: () => Promise.resolve(null),
+    requireAdmin: (_c: unknown, next: () => Promise<void>) => next(),
+    requireAuth: (_c: unknown, next: () => Promise<void>) => next(),
+    requireNovelAccess: () => (_c: unknown, next: () => Promise<void>) =>
+      next(),
+  };
+});
 
 describe("Embedding Configs API", () => {
-  // S0-1: api_key 保存に暗号化鍵が必須のため、テスト専用鍵をハーネス内で生成する。
+  // S0-1: api_key 保存に暗号化鍵が必須のため、テスト専用 MASTER_SECRET をハーネス内で生成する。
   const env = parseEnv({
     ...process.env,
-    SECRET_ENCRYPTION_KEY: generateEncryptionKeyBase64(),
+    MASTER_SECRET: generateEncryptionKeyBase64(),
   });
   const context = createContext(env);
   const app = createApp(context);

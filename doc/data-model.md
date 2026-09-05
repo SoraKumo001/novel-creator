@@ -234,8 +234,7 @@ export interface VectorRecord {
   **マイグレーション済みの DB に対して `db:push` を実行してはならない**（例: 後から `db:migrate` を実行すると `relation "xxx_idx" already exists` で失敗する）。
 - スキーマ変更の標準フロー: `db:generate` でマイグレーションファイルを生成 → `db:migrate` で適用。
 
-### 既知の不整合（要見直し）
+### 運用の統一（対応済み）
 
-現在の `db:setup` は `docker compose up -d && pnpm --filter @novel-creator/db db:push` であり、**`db:push` を使用している**。
-これは上記方針（`db:migrate` を正とする）と矛盾するため、今後 `db:setup` をマイグレーションベースへ変更することを検討する。
-（本決定の時点ではスクリプトの挙動は変更せず、方針の統一は本ドキュメントのみで行う。）
+`db:setup` は migrate ベースに統一済み（`docker compose up -d && pnpm --filter @novel-creator/db db:migrate`）。
+`db:push` は `db:setup:fresh` に分離し、破棄可能な使い捨て試作専用とする。migrate 済み DB には実行禁止。

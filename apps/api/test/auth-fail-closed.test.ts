@@ -1,69 +1,55 @@
 import { Hono } from "hono";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import { createApp } from "../src/app.js";
 import type { AppContext } from "../src/context.js";
 import {
   assertAuthConfigured,
   createAuth,
-  isInsecureAuthBypassAllowed,
+  isAuthConfigured,
   resolveAuthSecret,
-  TEST_ONLY_AUTH_SECRET,
 } from "../src/lib/auth.js";
+import { deriveAuthSecret } from "../src/lib/master-secret.js";
 import { assertNovelAccess, requireAuth } from "../src/middleware/auth.js";
 
-const BYPASS_FLAG = "ALLOW_INSECURE_AUTH_FOR_TESTS";
+const TEST_MASTER_SECRET = "test-master-secret-0123456789";
 
-function clearBypassFlag(): void {
-  delete process.env[BYPASS_FLAG];
+function masterEnv() {
+  return {
+    MASTER_SECRET: TEST_MASTER_SECRET,
+  } as AppContext["Variables"]["env"];
 }
 
-afterEach(() => {
-  vi.unstubAllEnvs();
-  clearBypassFlag();
-});
-
-describe("auth fail-closed (S0-2)", () => {
-  it("resolveAuthSecret は secret 設定時にその値を返すこと", () => {
-    clearBypassFlag();
-    expect(
-      resolveAuthSecret({
-        BETTER_AUTH_SECRET: "test-secret-value",
-      } as AppContext["Variables"]["env"])
-    ).toBe("test-secret-value");
+describe("auth fail-closed (MASTER_SECRET)", () => {
+  it("isAuthConfigured は MASTER 有無のみで判定すること", () => {
+    expect(isAuthConfigured(masterEnv())).toBe(true);
+    expect(isAuthConfigured({} as AppContext["Variables"]["env"])).toBe(false);
   });
 
-  it("resolveAuthSecret は未設定・フラグ無しで throw すること", () => {
-    clearBypassFlag();
-    expect(() =>
+  it("resolveAuthSecret は MASTER から導出した値を返すこと", async () => {
+    const expected = await deriveAuthSecret(TEST_MASTER_SECRET);
+    await expect(resolveAuthSecret(masterEnv())).resolves.toBe(expected);
+  });
+
+  it("resolveAuthSecret は未設定で throw すること", async () => {
+    await expect(
       resolveAuthSecret({} as AppContext["Variables"]["env"])
-    ).toThrow(/BETTER_AUTH_SECRET is not configured/);
+    ).rejects.toThrow(/MASTER_SECRET is not configured/);
   });
 
-  it("resolveAuthSecret は未設定でも明示バイパス時はテスト専用 secret を返すこと", () => {
-    vi.stubEnv(BYPASS_FLAG, "true");
-    expect(isInsecureAuthBypassAllowed()).toBe(true);
-    expect(resolveAuthSecret({} as AppContext["Variables"]["env"])).toBe(
-      TEST_ONLY_AUTH_SECRET
-    );
-  });
-
-  it("createAuth は未設定・フラグ無しで throw すること", () => {
-    clearBypassFlag();
-    expect(() =>
+  it("createAuth は未設定で throw すること", async () => {
+    await expect(
       createAuth({} as AppContext["Variables"]["env"], {} as never)
-    ).toThrow(/BETTER_AUTH_SECRET is not configured/);
+    ).rejects.toThrow(/MASTER_SECRET is not configured/);
   });
 
-  it("assertAuthConfigured は未設定・フラグ無しで throw すること", () => {
-    clearBypassFlag();
+  it("assertAuthConfigured は未設定で throw すること", () => {
     expect(() =>
       assertAuthConfigured({} as AppContext["Variables"]["env"])
-    ).toThrow(/BETTER_AUTH_SECRET is not configured/);
+    ).toThrow(/MASTER_SECRET is not configured/);
   });
 
-  it("createApp は未設定・フラグ無しで起動時 throw すること", () => {
-    clearBypassFlag();
+  it("createApp は未設定で起動時 throw すること", () => {
     const context = {
       db: {},
       embedding: {},
@@ -72,13 +58,10 @@ describe("auth fail-closed (S0-2)", () => {
       services: {},
       vectorStore: {},
     } as never;
-    expect(() => createApp(context)).toThrow(
-      /BETTER_AUTH_SECRET is not configured/
-    );
+    expect(() => createApp(context)).toThrow(/MASTER_SECRET is not configured/);
   });
 
-  it("requireAuth は未設定・フラグ無しで素通りせず 500 を返すこと", async () => {
-    clearBypassFlag();
+  it("requireAuth は未設定で素通りせず 500 を返すこと", async () => {
     const app = new Hono<AppContext>();
     app.use("*", async (c, next) => {
       c.set("env", {} as never);
@@ -95,22 +78,7 @@ describe("auth fail-closed (S0-2)", () => {
     expect(body.error.code).toBe("AUTH_NOT_CONFIGURED");
   });
 
-  it("requireAuth は明示バイパス時に素通りすること", async () => {
-    vi.stubEnv(BYPASS_FLAG, "true");
-    const app = new Hono<AppContext>();
-    app.use("*", async (c, next) => {
-      c.set("env", {} as never);
-      c.set("db", {} as never);
-      await next();
-    });
-    app.use("/api/*", requireAuth);
-    app.get("/api/novels", (c) => c.json([]));
-    const res = await app.request("/api/novels");
-    expect(res.status).toBe(200);
-  });
-
-  it("assertNovelAccess は未設定・フラグ無しで 401 を返すこと", async () => {
-    clearBypassFlag();
+  it("assertNovelAccess は未設定で 401 を返すこと", async () => {
     const app = new Hono<AppContext>();
     app.use("*", async (c, next) => {
       c.set("env", {} as never);
@@ -130,11 +98,10 @@ describe("auth fail-closed (S0-2)", () => {
     expect(res.status).toBe(401);
   });
 
-  it("assertNovelAccess は明示バイパス時に素通りすること", async () => {
-    vi.stubEnv(BYPASS_FLAG, "true");
+  it("assertNovelAccess は MASTER 設定・ユーザー未格納時に素通りすること", async () => {
     const app = new Hono<AppContext>();
     app.use("*", async (c, next) => {
-      c.set("env", {} as never);
+      c.set("env", masterEnv() as never);
       c.set("db", {} as never);
       await next();
     });

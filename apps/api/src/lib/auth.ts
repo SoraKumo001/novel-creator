@@ -13,6 +13,7 @@ import { admin } from "better-auth/plugins";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 import type { NeonDatabase } from "drizzle-orm/neon-serverless";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { deriveAuthSecret, isMasterConfigured } from "./master-secret.js";
 
 /**
  * better-auth に渡す認証テーブル群。
@@ -31,43 +32,24 @@ export type WorkerAuthDb =
   | NeonHttpDatabase<AuthTables>;
 export type AnyAuthDb = NodeAuthDb | WorkerAuthDb;
 
-/** BETTER_AUTH_SECRET が secrets 運用で設定済みかどうか。 */
+/** MASTER_SECRET で設定済みかどうか。 */
 export function isAuthConfigured(env: Env): boolean {
-  return !!env.BETTER_AUTH_SECRET;
+  return isMasterConfigured(env);
 }
 
-/**
- * テスト専用のフォールバック secret。
- * ALLOW_INSECURE_AUTH_FOR_TESTS=true の場合にのみ使用される。
- * 本番・開発の通常起動では絶対に使ってはならない。
- */
-export const TEST_ONLY_AUTH_SECRET =
-  "test-only-insecure-secret-do-not-use-in-production";
-
-/** 明示的なテスト用バイパスフラグが有効かどうか。 */
-export function isInsecureAuthBypassAllowed(): boolean {
-  const holder = globalThis as {
-    process?: { env?: Record<string, string | undefined> };
-  };
-  return holder.process?.env?.ALLOW_INSECURE_AUTH_FOR_TESTS === "true";
-}
-
-const AUTH_SECRET_MISSING_MESSAGE =
-  "BETTER_AUTH_SECRET is not configured. Set BETTER_AUTH_SECRET via secrets management before starting the API. For automated tests only, set ALLOW_INSECURE_AUTH_FOR_TESTS=true to allow startup without a secret.";
+const AUTH_SECRET_MISSING_MESSAGE = "MASTER_SECRET is not configured.";
 
 /**
  * better-auth に渡す secret を解決する。
- * 未設定時は fail-closed: 明示的なテストバイパスが無い限りエラーを投げる。
+ * MASTER_SECRET から HKDF 導出値を返す。
+ * 未設定時は fail-closed: エラーを投げる。
  * 開発用の暗黙フォールバック secret は存在しない。
  */
-export function resolveAuthSecret(env: Env): string {
-  if (env.BETTER_AUTH_SECRET) {
-    return env.BETTER_AUTH_SECRET;
+export async function resolveAuthSecret(env: Env): Promise<string> {
+  if (!env.MASTER_SECRET?.trim()) {
+    throw new Error(AUTH_SECRET_MISSING_MESSAGE);
   }
-  if (isInsecureAuthBypassAllowed()) {
-    return TEST_ONLY_AUTH_SECRET;
-  }
-  throw new Error(AUTH_SECRET_MISSING_MESSAGE);
+  return deriveAuthSecret(env.MASTER_SECRET);
 }
 
 /**
@@ -76,16 +58,21 @@ export function resolveAuthSecret(env: Env): string {
  * 起動することを防ぐ。
  */
 export function assertAuthConfigured(env: Env): void {
-  resolveAuthSecret(env);
+  if (isAuthConfigured(env)) {
+    return;
+  }
+  throw new Error(AUTH_SECRET_MISSING_MESSAGE);
 }
 
 /**
  * リクエストごとに認証インスタンスを生成するファクトリ。
  * Node 用 pg Pool と Worker 用 Neon HTTP のどちらも受け付ける。
- * BETTER_AUTH_SECRET は secrets 運用前提のため、未設定時は
- * 明示的なテストバイパスが無い限りエラーを投げる（fail-closed）。
  */
-export function createAuth(env: Env, db: Database | AnyAuthDb) {
+export async function createAuth(env: Env, db: Database | AnyAuthDb) {
+  return buildAuth(env, db, await resolveAuthSecret(env));
+}
+
+function buildAuth(env: Env, db: Database | AnyAuthDb, secret: string) {
   return betterAuth({
     baseURL: env.BETTER_AUTH_URL,
     database: drizzleAdapter(db, {
@@ -100,7 +87,7 @@ export function createAuth(env: Env, db: Database | AnyAuthDb) {
       requireEmailVerification: false,
     },
     plugins: [admin()],
-    secret: resolveAuthSecret(env),
+    secret,
     trustedOrigins: [env.WEB_ORIGIN],
     // role はクライアントから書き込ませない（admin プラグイン経由の管理のみ）。
     user: {
@@ -109,4 +96,4 @@ export function createAuth(env: Env, db: Database | AnyAuthDb) {
   });
 }
 
-export type Auth = ReturnType<typeof createAuth>;
+export type Auth = Awaited<ReturnType<typeof createAuth>>;
