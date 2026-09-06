@@ -220,7 +220,7 @@ export async function requireAdmin(c: Context<AppContext>, next: Next) {
 export async function assertNovelAccess(
   c: Context<AppContext>,
   novelId: string | null | undefined
-): Promise<Response | null> {
+) {
   const env = c.get("env");
   if (!isAuthConfigured(env)) {
     return unauthorized(c);
