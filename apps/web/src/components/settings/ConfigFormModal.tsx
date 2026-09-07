@@ -3,8 +3,10 @@ import type { FormEvent } from "react";
 import { useEffect, useId, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { Combobox } from "@/components/Combobox.js";
+import { FormCheckRow } from "@/components/FormCheckRow.js";
 import { Input } from "@/components/Input.js";
 import { Modal } from "@/components/Modal.js";
+import { ModalFooter } from "@/components/ModalFooter.js";
 import { Select } from "@/components/Select.js";
 import { Textarea } from "@/components/Textarea.js";
 import { useToast } from "@/hooks/useToast.js";
@@ -22,6 +24,8 @@ import type {
   UpdateEmbeddingConfigInput,
   UpdateLLMConfigInput,
 } from "@/lib/types.js";
+import { ConnectionTestResult } from "./ConnectionTestResult.js";
+import { PresetChipGroup } from "./PresetChipGroup.js";
 import {
   EMBEDDING_PRESETS,
   type EmbeddingPreset,
@@ -341,23 +345,7 @@ export function ConfigFormModal(props: ConfigFormModalProps) {
     >
       <form onSubmit={handleSubmit} autoComplete="off" className="space-y-3">
         {!editingConfig && (
-          <details className="rounded-lg border border-border bg-surface-raised/40 px-3 py-2">
-            <summary className="cursor-pointer select-none font-medium text-foreground-secondary text-xs marker:text-muted hover:text-foreground">
-              プリセットから素早く入力
-            </summary>
-            <div className="flex flex-wrap gap-1.5 pt-2">
-              {presets.map((preset) => (
-                <button
-                  key={preset.label}
-                  type="button"
-                  onClick={() => applyPreset(preset)}
-                  className="rounded-md border border-border bg-surface-raised px-2 py-1 text-foreground text-xs transition hover:border-primary hover:text-primary"
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </details>
+          <PresetChipGroup presets={presets} onSelect={applyPreset} />
         )}
 
         <Input
@@ -370,22 +358,17 @@ export function ConfigFormModal(props: ConfigFormModalProps) {
           autoComplete="off"
         />
 
-        <div>
-          <label className="mb-1.5 block font-medium text-foreground-secondary text-sm">
-            プロバイダ種別
-          </label>
-          <Select
-            value={provider}
-            onChange={(e) => setProvider(e.target.value as LLMProviderType)}
-            className="w-full px-3 py-2 text-sm focus:border-primary focus:outline-hidden focus:ring-1 focus:ring-primary"
-          >
-            {config.providerOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-        </div>
+        <Select
+          label="プロバイダ種別"
+          value={provider}
+          onChange={(e) => setProvider(e.target.value as LLMProviderType)}
+        >
+          {config.providerOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </Select>
 
         <div className="space-y-3 rounded-lg border border-border-subtle bg-surface-raised/30 p-3">
           <div>
@@ -480,21 +463,12 @@ export function ConfigFormModal(props: ConfigFormModalProps) {
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            id={config.defaultCheckboxId}
-            type="checkbox"
-            checked={isDefault}
-            onChange={(e) => setIsDefault(e.target.checked)}
-            className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
-          />
-          <label
-            htmlFor={config.defaultCheckboxId}
-            className="select-none text-foreground text-sm"
-          >
-            {config.defaultCheckboxLabel}
-          </label>
-        </div>
+        <FormCheckRow
+          id={config.defaultCheckboxId}
+          checked={isDefault}
+          onChange={setIsDefault}
+          label={config.defaultCheckboxLabel}
+        />
 
         <Textarea
           label="備考・説明 (任意)"
@@ -505,38 +479,35 @@ export function ConfigFormModal(props: ConfigFormModalProps) {
         />
 
         {testResult && (
-          <div
-            className={`rounded-lg border p-3 text-xs ${
-              testResult.success
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                : "border-danger/30 bg-danger/10 text-danger"
-            }`}
-          >
-            <div className="font-semibold">
-              {testResult.success ? "✓ 接続成功" : "✗ 接続失敗"} (
-              {testResult.latencyMs}ms)
-            </div>
-            <div className="mt-1 break-all">{testResult.message}</div>
-          </div>
+          <ConnectionTestResult
+            success={testResult.success}
+            message={testResult.message}
+            latencyMs={testResult.latencyMs}
+          />
         )}
 
-        <div className="flex items-center justify-between border-border border-t pt-3">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={handleTest}
-            isLoading={testingInline}
-          >
-            接続テスト
-          </Button>
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="secondary" onClick={onClose}>
-              キャンセル
-            </Button>
-            <Button type="submit" isLoading={isSubmitting}>
-              {editingConfig ? "保存する" : "追加する"}
-            </Button>
-          </div>
+        <div className="border-border border-t pt-3">
+          <ModalFooter
+            align="between"
+            bordered={false}
+            size="md"
+            leading={
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleTest}
+                isLoading={testingInline}
+              >
+                接続テスト
+              </Button>
+            }
+            secondary={{ label: "キャンセル", onClick: onClose }}
+            primary={{
+              label: editingConfig ? "保存する" : "追加する",
+              type: "submit",
+              isLoading: isSubmitting,
+            }}
+          />
         </div>
       </form>
     </Modal>

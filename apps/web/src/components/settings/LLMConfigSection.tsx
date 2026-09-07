@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { Button } from "@/components/Button.js";
-import { Card, interactiveCardHover } from "@/components/Card.js";
+import { Card } from "@/components/Card.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
-import { getProviderBadge } from "@/components/LLMModelSelector.js";
 import { Loading } from "@/components/Loading.js";
-import { Tag } from "@/components/Tag.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import type {
@@ -12,6 +10,7 @@ import type {
   TestConnectionInput,
   TestConnectionResult,
 } from "@/lib/types.js";
+import { ConfigCard } from "./ConfigCard.js";
 
 interface LLMConfigSectionProps {
   configs: LLMConfig[];
@@ -85,56 +84,24 @@ export function LLMConfigSection({
     <>
       <div className="grid gap-4">
         {configs.map((cfg) => {
-          const badge = getProviderBadge(cfg.provider);
           const isRowTesting = testingId === cfg.id;
 
           return (
-            <Card key={cfg.id} className={interactiveCardHover}>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="min-w-0 space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate font-semibold text-foreground text-lg">
-                      {cfg.name}
-                    </span>
-                    <span
-                      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-medium text-xs ${badge.bg}`}
-                    >
-                      {badge.icon} {badge.label}
-                    </span>
-                    {cfg.isDefault && <Tag>★ デフォルト</Tag>}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-foreground-secondary text-xs">
-                    <div>
-                      <span className="text-muted">Model ID:</span>{" "}
-                      <code className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-foreground">
-                        {cfg.modelId}
-                      </code>
-                    </div>
-                    {cfg.baseUrl && (
-                      <div>
-                        <span className="text-muted">Base URL:</span>{" "}
-                        <span className="max-w-xs truncate font-mono">
-                          {cfg.baseUrl}
-                        </span>
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-muted">API Key:</span>{" "}
-                      <span>
-                        {cfg.hasApiKey
-                          ? (cfg.apiKeyMasked ?? "登録済み")
-                          : "環境変数をフォールバック利用"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {cfg.description && (
-                    <p className="mt-1 text-muted text-xs">{cfg.description}</p>
-                  )}
-                </div>
-
-                <div className="flex shrink-0 items-center gap-2">
+            <ConfigCard
+              key={cfg.id}
+              name={cfg.name}
+              provider={cfg.provider}
+              isDefault={cfg.isDefault}
+              modelId={cfg.modelId}
+              baseUrl={cfg.baseUrl}
+              apiKeyDisplay={
+                cfg.hasApiKey
+                  ? (cfg.apiKeyMasked ?? "登録済み")
+                  : "環境変数をフォールバック利用"
+              }
+              description={cfg.description}
+              actions={
+                <>
                   <Button
                     variant="secondary"
                     size="sm"
@@ -187,9 +154,9 @@ export function LLMConfigSection({
                   >
                     削除
                   </Button>
-                </div>
-              </div>
-            </Card>
+                </>
+              }
+            />
           );
         })}
       </div>

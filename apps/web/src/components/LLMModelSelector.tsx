@@ -1,4 +1,7 @@
 import { useLLMConfigs } from "@/hooks/useLLMConfigs.js";
+import { getProviderBadge } from "./settings/ProviderBadge.js";
+
+export { getProviderBadge };
 
 interface LLMModelSelectorProps {
   allowDefault?: boolean;
@@ -7,41 +10,6 @@ interface LLMModelSelectorProps {
   onChange: (id: string | null) => void;
   size?: "sm" | "md";
   value?: string | null;
-}
-
-export function getProviderBadge(provider: string) {
-  switch (provider) {
-    case "openai":
-      return {
-        icon: "🟢",
-        label: "OpenAI",
-        bg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-      };
-    case "anthropic":
-      return {
-        icon: "🟠",
-        label: "Anthropic",
-        bg: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-      };
-    case "google":
-      return {
-        icon: "🔵",
-        label: "Google",
-        bg: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-      };
-    case "ollama":
-      return {
-        icon: "🦙",
-        label: "Ollama",
-        bg: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
-      };
-    default:
-      return {
-        icon: "⚙️",
-        label: "Custom",
-        bg: "bg-slate-500/10 text-slate-600 dark:text-slate-400",
-      };
-  }
 }
 
 export function LLMModelSelector({
@@ -53,7 +21,6 @@ export function LLMModelSelector({
   label,
 }: LLMModelSelectorProps) {
   const { configs, defaultConfig, loading } = useLLMConfigs();
-
   const isSmall = size === "sm";
 
   if (loading) {

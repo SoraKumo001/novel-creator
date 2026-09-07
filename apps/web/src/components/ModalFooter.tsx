@@ -33,7 +33,8 @@ export interface ModalFooterProps {
  * Modal直利用向けの共通フッター。
  * 右寄せ（secondary→primaryの順）を既定とし、leading指定時は
  * 左右分割（例: 左に接続テスト、右にキャンセル/保存）になる。
- * FormModal・ConfirmDialog・ConfigFormModalは現状維持のため対象外。
+ * FormModal・ConfirmDialogは独自フッターのため対象外。
+ * ConfigFormModalは align="between" + leading で本コンポーネントを利用する。
  */
 export function ModalFooter({
   align = "end",

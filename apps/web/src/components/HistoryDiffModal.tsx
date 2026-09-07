@@ -2,6 +2,7 @@ import type { DiffEditorProps } from "@monaco-editor/react";
 import { type ComponentType, lazy, Suspense, useMemo, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
+import { FormCheckRow } from "@/components/FormCheckRow.js";
 import { Loading } from "@/components/Loading.js";
 import { Modal } from "@/components/Modal.js";
 import { useHistories } from "@/hooks/useHistories.js";
@@ -147,15 +148,15 @@ export function HistoryDiffModal({
             </div>
 
             <div className="flex items-center gap-2">
-              <label className="flex cursor-pointer select-none items-center gap-1.5 text-foreground">
-                <input
-                  type="checkbox"
-                  checked={renderSideBySide}
-                  onChange={(e) => setRenderSideBySide(e.target.checked)}
-                  className="rounded text-primary focus:ring-primary"
-                />
-                左右並列で比較（Side-by-Side）
-              </label>
+              <FormCheckRow
+                id="historyDiffSideBySide"
+                checked={renderSideBySide}
+                onChange={setRenderSideBySide}
+                label="左右並列で比較（Side-by-Side）"
+                className="flex cursor-pointer select-none items-center gap-1.5 text-foreground"
+                inputClassName="rounded text-primary focus:ring-primary"
+                labelClassName="cursor-pointer select-none"
+              />
             </div>
           </div>
 

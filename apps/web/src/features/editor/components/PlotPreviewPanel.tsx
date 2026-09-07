@@ -1,4 +1,5 @@
 import { Button } from "@/components/Button.js";
+import { FormCheckRow } from "@/components/FormCheckRow.js";
 import type { GeneratedPlot } from "@/lib/types.js";
 
 export function PlotPreviewPanel({
@@ -47,15 +48,15 @@ export function PlotPreviewPanel({
       </div>
 
       <div className="flex items-center justify-between px-1 text-muted-foreground text-xs">
-        <label className="flex cursor-pointer items-center gap-2 font-medium text-foreground">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            onChange={(e) => onToggleAll(e.target.checked)}
-            className="rounded text-primary focus:ring-primary"
-          />
-          すべて選択 / 解除
-        </label>
+        <FormCheckRow
+          id="plotPreviewToggleAll"
+          checked={allSelected}
+          onChange={onToggleAll}
+          label="すべて選択 / 解除"
+          className="flex cursor-pointer items-center gap-2 font-medium text-foreground"
+          inputClassName="rounded text-primary focus:ring-primary"
+          labelClassName="cursor-pointer font-medium"
+        />
         <span>合計 {plotPreview.chapters.length} 章</span>
       </div>
 

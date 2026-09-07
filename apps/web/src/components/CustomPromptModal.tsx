@@ -5,6 +5,7 @@ import type {
   CustomPrompt,
   UpdateCustomPromptInput,
 } from "@/lib/types.js";
+import { FormCheckRow } from "./FormCheckRow.js";
 import { Modal } from "./Modal.js";
 import { ModalFooter } from "./ModalFooter.js";
 import { Select } from "./Select.js";
@@ -255,21 +256,15 @@ export function CustomPromptModal({
 
         {/* 適用スコープ */}
         {!editingPrompt && (
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-surface p-2 text-xs">
-            <input
-              type="checkbox"
-              id="isGlobal"
-              checked={isGlobal}
-              onChange={(e) => setIsGlobal(e.target.checked)}
-              className="h-4 w-4 rounded text-primary focus:ring-primary"
-            />
-            <label
-              htmlFor="isGlobal"
-              className="cursor-pointer select-none text-foreground"
-            >
-              全作品共通プロンプトにする（オフの場合はこの小説専用）
-            </label>
-          </div>
+          <FormCheckRow
+            id="isGlobal"
+            checked={isGlobal}
+            onChange={setIsGlobal}
+            label="全作品共通プロンプトにする（オフの場合はこの小説専用）"
+            className="flex items-center gap-2 rounded-lg border border-border bg-surface p-2 text-xs"
+            inputClassName="h-4 w-4 rounded text-primary focus:ring-primary"
+            labelClassName="cursor-pointer select-none text-foreground"
+          />
         )}
 
         {/* テンプレート挿入用変数バッジ */}
