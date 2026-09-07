@@ -19,7 +19,7 @@ import {
 async function assertPromptWrite(
   c: Context<AppContext>,
   novelId: string | null | undefined
-) {
+): Promise<Response | null> {
   const current = c.get("user");
   if (!current) {
     return null;
