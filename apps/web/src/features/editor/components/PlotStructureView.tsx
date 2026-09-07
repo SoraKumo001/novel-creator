@@ -10,7 +10,7 @@ import type {
   GeneratedPlot,
   Section,
 } from "@/lib/types.js";
-import { PlotPreviewPanel } from "./-PlotPreviewPanel.js";
+import { PlotPreviewPanel } from "./PlotPreviewPanel.js";
 
 export interface PlotStructureViewProps {
   activeGeneratingId: string | null;

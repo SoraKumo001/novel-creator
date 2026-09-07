@@ -12,18 +12,18 @@ import { ExportModal } from "@/components/ExportModal.js";
 import { KeyboardShortcutsModal } from "@/components/KeyboardShortcutsModal.js";
 import { Loading } from "@/components/Loading.js";
 import { useChatUI } from "@/context/ChatContext.js";
+import { CharactersTab } from "@/features/editor/components/CharactersTab.js";
+import { EditorTab } from "@/features/editor/components/EditorTab.js";
+import { ForeshadowingTab } from "@/features/editor/components/ForeshadowingTab.js";
+import { OverviewTab } from "@/features/editor/components/OverviewTab.js";
+import { PlotTab } from "@/features/editor/components/PlotTab.js";
+import { SettingsTab } from "@/features/editor/components/SettingsTab.js";
+import { StoryOutlineTab } from "@/features/editor/components/StoryOutlineTab.js";
+import { TimelineTab } from "@/features/editor/components/TimelineTab.js";
 import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import { fetchNovelExportData } from "@/lib/services/index.js";
-import { CharactersTab } from "../_components/-CharactersTab.js";
-import { EditorTab } from "../_components/-EditorTab.js";
-import { ForeshadowingTab } from "../_components/-ForeshadowingTab.js";
-import { OverviewTab } from "../_components/-OverviewTab.js";
-import { PlotTab } from "../_components/-PlotTab.js";
-import { SettingsTab } from "../_components/-SettingsTab.js";
-import { StoryOutlineTab } from "../_components/-StoryOutlineTab.js";
-import { TimelineTab } from "../_components/-TimelineTab.js";
 
 /**
  * タブ定義（単一の情報源）。

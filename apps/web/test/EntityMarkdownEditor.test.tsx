@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { EntityMarkdownEditor } from "../src/routes/novels/_components/-EntityMarkdownEditor.js";
+import { EntityMarkdownEditor } from "../src/features/editor/components/EntityMarkdownEditor.js";
 
 vi.mock("../src/components/HistoryDiffModal.js", () => ({
   HistoryDiffModal: () => null,

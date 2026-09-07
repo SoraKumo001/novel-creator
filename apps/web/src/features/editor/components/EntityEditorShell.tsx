@@ -7,8 +7,8 @@ import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { HistoryDiffModal } from "@/components/HistoryDiffModal.js";
 import { Loading } from "@/components/Loading.js";
 import { Textarea } from "@/components/Textarea.js";
+import { PromptHistoryList } from "@/features/editor/components/PromptHistoryList.js";
 import type { LlmInstruction } from "@/lib/types.js";
-import { PromptHistoryList } from "./-PromptHistoryList.js";
 
 interface EntityEditorShellProps {
   // ヘッダー

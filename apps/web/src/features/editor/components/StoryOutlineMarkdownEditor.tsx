@@ -7,6 +7,8 @@ import {
 import { useCallback, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { Modal } from "@/components/Modal.js";
+import { EntityMarkdownEditor } from "@/features/editor/components/EntityMarkdownEditor.js";
+import { PlotPreviewPanel } from "@/features/editor/components/PlotPreviewPanel.js";
 import { useChapters } from "@/hooks/useChapters.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
@@ -15,8 +17,6 @@ import {
   generatePlotFromStoryOutline,
   saveStoryOutline,
 } from "@/lib/services/index.js";
-import { EntityMarkdownEditor } from "./-EntityMarkdownEditor.js";
-import { PlotPreviewPanel } from "./-PlotPreviewPanel.js";
 
 interface StoryOutlineMarkdownEditorProps {
   novelId: string;

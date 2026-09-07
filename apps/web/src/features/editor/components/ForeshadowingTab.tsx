@@ -2,12 +2,12 @@ import { useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { Badge, type BadgeVariant } from "@/components/Badge.js";
 import { MarkdownText } from "@/components/MarkdownText.js";
+import { EntityListTab } from "@/features/editor/components/EntityListTab.js";
+import { PresetEntityMarkdownEditor } from "@/features/editor/components/PresetEntityMarkdownEditor.js";
 import { useChapters } from "@/hooks/useChapters.js";
 import { useForeshadowings } from "@/hooks/useForeshadowings.js";
 import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import type { Foreshadowing, ForeshadowingStatus } from "@/lib/types.js";
-import { EntityListTab } from "./-EntityListTab.js";
-import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
 
 interface ForeshadowingTabProps {
   novel: NonNullable<ReturnType<typeof useNovel>["novel"]>;

@@ -1,7 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { ForeshadowingEditor } from "../src/routes/novels/_components/-ForeshadowingEditor.js";
+import { ForeshadowingEditor } from "../src/features/editor/components/ForeshadowingEditor.js";
 
 const mockNavigate = vi.fn();
 vi.mock("@tanstack/react-router", () => ({

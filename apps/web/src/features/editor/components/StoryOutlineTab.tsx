@@ -1,5 +1,5 @@
+import { StoryOutlineMarkdownEditor } from "@/features/editor/components/StoryOutlineMarkdownEditor.js";
 import type { NovelMutations, useNovel } from "@/hooks/useNovel.js";
-import { StoryOutlineMarkdownEditor } from "./-StoryOutlineMarkdownEditor.js";
 
 export function StoryOutlineTab({
   novel,

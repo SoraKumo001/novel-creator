@@ -16,7 +16,7 @@ import {
   usePersistedState,
   useSidebarResize,
 } from "@/features/editor/components/MarkdownEditorCore.js";
-import { EntityCardGrid, SidebarTreeNode } from "./-EntityListParts.js";
+import { EntityCardGrid, SidebarTreeNode } from "./EntityListParts.js";
 
 export interface EntityListTabConfig<
   T extends {

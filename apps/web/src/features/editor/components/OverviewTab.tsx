@@ -18,7 +18,7 @@ import type {
   MultiPersonaReviewResult,
   StoryArcResult,
 } from "@/lib/types.js";
-import { OverviewView } from "./-OverviewView.js";
+import { OverviewView } from "./OverviewView.js";
 
 export function OverviewTab({
   novel,

@@ -1,5 +1,5 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { SettingEditor } from "../../_components/-SettingEditor.js";
+import { SettingEditor } from "@/features/editor/components/SettingEditor.js";
 
 export const Route = createLazyFileRoute("/novels/$novelId/settings/new")({
   component: NewSettingPage,

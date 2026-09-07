@@ -9,6 +9,8 @@ import { ProofreadModal } from "@/components/ProofreadModal.js";
 import { StyleGuideModal } from "@/components/StyleGuideModal.js";
 import { VerticalPreviewModal } from "@/components/VerticalPreviewModal.js";
 import { EditorToolbar } from "@/features/editor/components/EditorToolbar.js";
+import { ExtractResultModal } from "@/features/editor/components/ExtractResultModal.js";
+import { GenerateContentPanel } from "@/features/editor/components/GenerateContentPanel.js";
 import { MonacoEditor } from "@/features/editor/components/MonacoEditor.js";
 import type {
   AnalysisHistoryEntry,
@@ -20,8 +22,6 @@ import type {
   ProofreadResult,
   Section,
 } from "@/lib/types.js";
-import { ExtractResultModal } from "@/routes/novels/_components/-ExtractResultModal.js";
-import { GenerateContentPanel } from "@/routes/novels/_components/-GenerateContentPanel.js";
 
 export interface SectionEditorModalStates {
   customPrompts: { isOpen: boolean; open: () => void; close: () => void };

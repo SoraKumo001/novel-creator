@@ -1,7 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 
-import { EntityListTab, type EntityListTabConfig } from "./-EntityListTab.js";
+import {
+  EntityListTab,
+  type EntityListTabConfig,
+} from "@/features/editor/components/EntityListTab.js";
 
 interface TestEntity {
   category: string;

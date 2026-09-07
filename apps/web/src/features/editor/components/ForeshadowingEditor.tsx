@@ -12,7 +12,7 @@ import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import { formatCharCount } from "@/lib/format.js";
 import type { ForeshadowingStatus } from "@/lib/types.js";
-import { EntityEditorShell } from "./-EntityEditorShell.js";
+import { EntityEditorShell } from "./EntityEditorShell.js";
 
 interface ForeshadowingEditorProps {
   foreshadowingId?: string;

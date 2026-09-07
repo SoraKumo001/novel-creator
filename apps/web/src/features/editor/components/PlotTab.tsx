@@ -4,15 +4,15 @@ import { PlusIcon, SparklesIcon } from "@/components/Icons.js";
 import { LLMModelSelector } from "@/components/LLMModelSelector.js";
 import { TabHeader } from "@/components/TabHeader.js";
 import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
+import { PresetEntityMarkdownEditor } from "@/features/editor/components/PresetEntityMarkdownEditor.js";
 import { useChapters } from "@/hooks/useChapters.js";
 import { useGenerate } from "@/hooks/useGenerate.js";
 import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import type { Chapter, Section } from "@/lib/types.js";
-import { swapChapterOrder, swapSectionOrder } from "./-PlotMoveUtils.js";
-import { PlotStructureView } from "./-PlotStructureView.js";
-import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
+import { swapChapterOrder, swapSectionOrder } from "./PlotMoveUtils.js";
+import { PlotStructureView } from "./PlotStructureView.js";
 
 export function PlotTab({
   novel,

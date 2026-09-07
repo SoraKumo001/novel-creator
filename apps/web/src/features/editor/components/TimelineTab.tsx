@@ -15,10 +15,10 @@ import { Select } from "@/components/Select.js";
 import { TabHeader } from "@/components/TabHeader.js";
 import { Textarea } from "@/components/Textarea.js";
 import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
+import { PresetEntityMarkdownEditor } from "@/features/editor/components/PresetEntityMarkdownEditor.js";
 import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import { useTimelines } from "@/hooks/useTimelines.js";
 import type { Chapter, Section, Timeline } from "@/lib/types.js";
-import { PresetEntityMarkdownEditor } from "./-PresetEntityMarkdownEditor.js";
 
 export function TimelineTab({
   novel,

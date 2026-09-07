@@ -9,7 +9,7 @@ import { useModalState } from "@/hooks/useModalResultState.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import { formatCharCount } from "@/lib/format.js";
-import { EntityEditorShell } from "./-EntityEditorShell.js";
+import { EntityEditorShell } from "./EntityEditorShell.js";
 
 interface CharacterEditorProps {
   characterId?: string;

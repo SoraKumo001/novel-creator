@@ -11,7 +11,7 @@ import {
   findTimelineSectionByLine,
   type MarkdownCategoryNode,
 } from "@novel-creator/shared";
-import { EntityMarkdownEditor } from "./-EntityMarkdownEditor.js";
+import { EntityMarkdownEditor } from "./EntityMarkdownEditor.js";
 
 export type PresetEntityType =
   | "characters"

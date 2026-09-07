@@ -1,5 +1,5 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { CharacterEditor } from "../../_components/-CharacterEditor.js";
+import { CharacterEditor } from "@/features/editor/components/CharacterEditor.js";
 
 export const Route = createLazyFileRoute(
   "/novels/$novelId/characters/$characterId"

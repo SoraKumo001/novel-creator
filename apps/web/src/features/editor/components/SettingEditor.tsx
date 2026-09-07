@@ -9,7 +9,7 @@ import { useSettings } from "@/hooks/useSettings.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import { formatCharCount } from "@/lib/format.js";
-import { EntityEditorShell } from "./-EntityEditorShell.js";
+import { EntityEditorShell } from "./EntityEditorShell.js";
 
 interface SettingEditorProps {
   novelId: string;

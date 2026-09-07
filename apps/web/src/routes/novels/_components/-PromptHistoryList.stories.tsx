@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
+import { PromptHistoryList } from "@/features/editor/components/PromptHistoryList.js";
 import type { LlmInstruction } from "@/lib/types.js";
-import { PromptHistoryList } from "./-PromptHistoryList.js";
 
 function makeInstruction(
   overrides: Partial<LlmInstruction> = {}

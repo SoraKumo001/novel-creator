@@ -1,5 +1,5 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
-import { ForeshadowingEditor } from "../../_components/-ForeshadowingEditor.js";
+import { ForeshadowingEditor } from "@/features/editor/components/ForeshadowingEditor.js";
 
 export const Route = createLazyFileRoute("/novels/$novelId/foreshadowings/new")(
   {

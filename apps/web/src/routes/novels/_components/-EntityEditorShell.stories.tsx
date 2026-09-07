@@ -10,8 +10,8 @@ import {
 import type { ReactNode } from "react";
 import { fn } from "storybook/test";
 import { ThemeProvider } from "@/context/ThemeContext.js";
+import { EntityEditorShell } from "@/features/editor/components/EntityEditorShell.js";
 import type { LlmInstruction } from "@/lib/types.js";
-import { EntityEditorShell } from "./-EntityEditorShell.js";
 
 // useNavigate を解決するため、Story を描画する最小ルーターを構築する。
 const rootRoute = createRootRoute();

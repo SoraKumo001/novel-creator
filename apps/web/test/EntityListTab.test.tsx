@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   EntityListTab,
   type EntityListTabConfig,
-} from "../src/routes/novels/_components/-EntityListTab.js";
+} from "../src/features/editor/components/EntityListTab.js";
 
 interface TestEntity {
   category: string;
