@@ -203,7 +203,6 @@ export function ExportModal({ isOpen, onClose, novel }: ExportModalProps) {
           {isHtml && htmlPreview ? (
             <div
               className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-surface-raised p-3 text-foreground text-xs leading-relaxed"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: プレビュー用途で自前の整形済みテキストのみ表示する
               dangerouslySetInnerHTML={{ __html: formattedText }}
             />
           ) : (
