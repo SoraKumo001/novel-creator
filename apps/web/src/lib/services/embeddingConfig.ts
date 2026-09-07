@@ -3,6 +3,8 @@ import { parseResponseError } from "../errors.js";
 import type {
   CreateEmbeddingConfigInput,
   EmbeddingConfig,
+  ListModelsInput,
+  ListModelsResult,
   TestConnectionResult,
   TestEmbeddingConnectionInput,
   UpdateEmbeddingConfigInput,
@@ -90,6 +92,22 @@ export async function testEmbeddingConfig(
   });
   if (!res.ok) {
     throw await parseResponseError(res, "埋め込み接続テスト");
+  }
+  const data = await res.json();
+  return data;
+}
+
+export async function listEmbeddingModels(
+  input: ListModelsInput
+): Promise<ListModelsResult> {
+  const res = await apiClient["embedding-configs"].models.$post({
+    json: {
+      baseUrl: input.baseUrl,
+      apiKey: input.apiKey || null,
+    },
+  });
+  if (!res.ok) {
+    throw await parseResponseError(res, "モデル一覧の取得");
   }
   const data = await res.json();
   return data;

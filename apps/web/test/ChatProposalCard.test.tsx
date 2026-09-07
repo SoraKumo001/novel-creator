@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ChatProposalCard,
   type ProposalPayload,
-} from "../src/components/chat/ChatProposalCard.js";
+} from "../src/features/chat/components/ChatProposalCard.js";
 import * as services from "../src/lib/services/index.js";
 
 vi.mock("../src/lib/services/index.js", () => ({

@@ -6,14 +6,14 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ChatFocusContext, QuickPrompt } from "@/context/ChatContext.js";
+import type { ChatFocusContext, QuickPrompt } from "@/context/chatUiTypes.js";
 import {
   chatDraftKey,
   clearChatDraft,
   loadChatDraft,
   saveChatDraft,
 } from "@/lib/chat-storage.js";
-import { buildChatPromptWithFocus } from "./chatPrompt.js";
+import { buildChatPromptWithFocus } from "../lib/chatPrompt.js";
 
 export interface UseChatDrawerInputOptions {
   /** エディタから渡された未消費の相談フォーカス */

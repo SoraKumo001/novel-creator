@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { ChatFocusContext } from "@/context/ChatContext.js";
+import type { ChatFocusContext } from "@/context/chatUiTypes.js";
 import { usePinnedSessions } from "@/hooks/usePinnedSessions.js";
 import { useToast } from "@/hooks/useToast.js";
 

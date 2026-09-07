@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { ChatSessionList } from "../src/components/chat/ChatSessionList.js";
+import { ChatSessionList } from "../src/features/chat/components/ChatSessionList.js";
 import type { ChatSession } from "../src/lib/types.js";
 
 function makeSession(overrides: Partial<ChatSession>): ChatSession {

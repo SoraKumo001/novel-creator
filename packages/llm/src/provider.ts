@@ -26,6 +26,7 @@ export interface EmbeddingConfigInput {
 }
 
 export interface TestConnectionResult {
+  detectedDimensions?: number;
   error?: string;
   latencyMs: number;
   message: string;
@@ -359,7 +360,8 @@ export async function testEmbeddingConnection(
   modelOrConfig: EmbeddingModel | EmbeddingConfigInput,
   fallbackEnv?: Env
 ): Promise<TestConnectionResult> {
-  return testConnection(async () => {
+  const startTime = Date.now();
+  try {
     const model = isConfigInput(modelOrConfig)
       ? createEmbeddingModelFromConfig(modelOrConfig, fallbackEnv)
       : modelOrConfig;
@@ -369,6 +371,29 @@ export async function testEmbeddingConnection(
       value: "ping test for embedding dimension and connection",
     });
 
-    return `接続成功 (検出次元数: ${res.embedding.length})`;
-  });
+    const detected = res.embedding.length;
+    let message = `接続成功 (検出次元数: ${detected})`;
+    const registered =
+      isConfigInput(modelOrConfig) && "dimensions" in modelOrConfig
+        ? (modelOrConfig.dimensions ?? null)
+        : null;
+    if (registered !== null && registered !== detected) {
+      message += ` 警告: 登録次元数(${registered})と検出次元数(${detected})が不一致です。再構築前に dimensions を修正してください`;
+    }
+    return {
+      detectedDimensions: detected,
+      latencyMs: Date.now() - startTime,
+      message,
+      success: true,
+    };
+  } catch (err) {
+    const latencyMs = Date.now() - startTime;
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    return {
+      error: errorMessage,
+      latencyMs,
+      message: `接続失敗: ${errorMessage}`,
+      success: false,
+    };
+  }
 }

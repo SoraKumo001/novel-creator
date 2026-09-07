@@ -1,4 +1,4 @@
-import type { ChatFocusContext } from "@/context/ChatContext.js";
+import type { ChatFocusContext } from "@/context/chatUiTypes.js";
 
 /** focus 情報から相談フォーカス用のプリフィルテキストを生成する（互換用・純関数） */
 export function buildChatPrefill(focus: ChatFocusContext): string {

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/Input.js";
 import { Select } from "@/components/Select.js";
 import { useChatUI } from "@/context/ChatContext.js";
+import { MonacoEditor } from "@/features/editor/components/MonacoEditor.js";
 import { useChapters } from "@/hooks/useChapters.js";
 import { useForeshadowings } from "@/hooks/useForeshadowings.js";
 import { useLlmInstructions } from "@/hooks/useLlmInstructions.js";
@@ -12,7 +13,6 @@ import { toErrorMessage } from "@/lib/errors.js";
 import { formatCharCount } from "@/lib/format.js";
 import type { ForeshadowingStatus } from "@/lib/types.js";
 import { EntityEditorShell } from "./-EntityEditorShell.js";
-import { MonacoEditor } from "./-MonacoEditor.js";
 
 interface ForeshadowingEditorProps {
   foreshadowingId?: string;

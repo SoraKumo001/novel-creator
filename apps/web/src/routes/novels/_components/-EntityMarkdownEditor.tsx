@@ -4,14 +4,6 @@ import { Button } from "@/components/Button.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { HistoryDiffModal } from "@/components/HistoryDiffModal.js";
 import { Loading } from "@/components/Loading.js";
-import { useEntityMarkdownActions } from "@/hooks/useEntityMarkdownActions.js";
-import { useMarkdownEntityEditor } from "@/hooks/useMarkdownEntityEditor.js";
-import { useMonacoPrefs } from "@/hooks/useMonacoPrefs.js";
-import {
-  loadPreviewMode,
-  type MarkdownPreviewMode,
-  savePreviewMode,
-} from "@/lib/editor-storage.js";
 import {
   EditorSidebarShell,
   MarkdownDraftBanner,
@@ -25,8 +17,16 @@ import {
   useEditorSaveShortcut,
   useMarkdownInsertShortcut,
   useOverlapHover,
-} from "./-MarkdownEditorCore.js";
-import { MonacoEditor } from "./-MonacoEditor.js";
+} from "@/features/editor/components/MarkdownEditorCore.js";
+import { MonacoEditor } from "@/features/editor/components/MonacoEditor.js";
+import { useEntityMarkdownActions } from "@/hooks/useEntityMarkdownActions.js";
+import { useMarkdownEntityEditor } from "@/hooks/useMarkdownEntityEditor.js";
+import { useMonacoPrefs } from "@/hooks/useMonacoPrefs.js";
+import {
+  loadPreviewMode,
+  type MarkdownPreviewMode,
+  savePreviewMode,
+} from "@/lib/editor-storage.js";
 
 export interface EntityMarkdownEditorProps<
   TSection extends { category: string; name: string },

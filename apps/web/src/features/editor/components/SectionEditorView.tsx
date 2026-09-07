@@ -8,6 +8,8 @@ import { MultiPersonaReviewModal } from "@/components/MultiPersonaReviewModal.js
 import { ProofreadModal } from "@/components/ProofreadModal.js";
 import { StyleGuideModal } from "@/components/StyleGuideModal.js";
 import { VerticalPreviewModal } from "@/components/VerticalPreviewModal.js";
+import { EditorToolbar } from "@/features/editor/components/EditorToolbar.js";
+import { MonacoEditor } from "@/features/editor/components/MonacoEditor.js";
 import type {
   AnalysisHistoryEntry,
   AnalysisProgress,
@@ -18,10 +20,8 @@ import type {
   ProofreadResult,
   Section,
 } from "@/lib/types.js";
-import { EditorToolbar } from "./-EditorToolbar.js";
-import { ExtractResultModal } from "./-ExtractResultModal.js";
-import { GenerateContentPanel } from "./-GenerateContentPanel.js";
-import { MonacoEditor } from "./-MonacoEditor.js";
+import { ExtractResultModal } from "@/routes/novels/_components/-ExtractResultModal.js";
+import { GenerateContentPanel } from "@/routes/novels/_components/-GenerateContentPanel.js";
 
 export interface SectionEditorModalStates {
   customPrompts: { isOpen: boolean; open: () => void; close: () => void };

@@ -5,7 +5,7 @@ import {
   type ChatStreamingContextValue,
   ChatUIContext,
   type ChatUIContextValue,
-} from "@/context/ChatContext.js";
+} from "@/context/chatUiTypes.js";
 import { ChatFloatingButton } from "./ChatFloatingButton";
 
 function makeUIValue(

@@ -4,7 +4,7 @@ import { PencilIcon, SparklesIcon } from "@/components/Icons.js";
 import { LLMModelSelector } from "@/components/LLMModelSelector.js";
 import { ReadingTime } from "@/components/ReadingTime.js";
 import type { Section } from "@/lib/types.js";
-import { EDITOR_AI_MENU_ACTIONS } from "./-analysisActions.js";
+import { EDITOR_AI_MENU_ACTIONS } from "../lib/analysisActions.js";
 
 interface EditorToolbarProps {
   canExtract: boolean;

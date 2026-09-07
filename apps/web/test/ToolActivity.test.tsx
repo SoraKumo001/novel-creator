@@ -6,7 +6,7 @@ import {
   extractToolInvocations,
   ToolActivity,
   toolLabel,
-} from "../src/components/chat/ToolActivity.js";
+} from "../src/features/chat/components/ToolActivity.js";
 
 describe("extractToolInvocations (AI SDK v7 パーツ形式)", () => {
   it("parts が空 / undefined / null のときは空配列を返す", () => {

@@ -2,14 +2,14 @@ import { AIProgressIndicator } from "@/components/AIProgressIndicator.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { EmptyState } from "@/components/EmptyState.js";
 import { Loading } from "@/components/Loading.js";
+import { ChapterSectionFormModal } from "@/features/editor/components/ChapterSectionFormModal.js";
+import { ChapterTreeItem } from "@/features/editor/components/ChapterTreeItem.js";
 import type {
   Chapter,
   ChapterWithSections,
   GeneratedPlot,
   Section,
 } from "@/lib/types.js";
-import { ChapterSectionFormModal } from "./-ChapterSectionFormModal.js";
-import { ChapterTreeItem } from "./-ChapterTreeItem.js";
 import { PlotPreviewPanel } from "./-PlotPreviewPanel.js";
 
 export interface PlotStructureViewProps {

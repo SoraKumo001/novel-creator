@@ -7,7 +7,8 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["vite/client"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@features/chat/*": ["./src/features/chat/*"]
     }
   },
   "include": ["src"],

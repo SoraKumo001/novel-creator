@@ -77,7 +77,7 @@ vi.mock("@/hooks/useChapters.js", () => ({
   }),
 }));
 
-vi.mock("../src/routes/novels/_components/-MonacoEditor.js", () => ({
+vi.mock("../src/features/editor/components/MonacoEditor.js", () => ({
   MonacoEditor: ({
     value,
     onChange,

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/Button.js";
 import { PlusIcon } from "@/components/Icons.js";
+import { SectionEditor } from "@/features/editor/components/SectionEditor.js";
+import { SectionSidebar } from "@/features/editor/components/SectionSidebar.js";
 import { useChapters } from "@/hooks/useChapters.js";
 import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import type { Section } from "@/lib/types.js";
-import { SectionEditor } from "./-SectionEditor.js";
-import { SectionSidebar } from "./-SectionSidebar.js";
 
 export function EditorTab({
   novel,

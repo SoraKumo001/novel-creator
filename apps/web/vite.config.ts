@@ -19,6 +19,10 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "./src"),
+      "@features/chat": path.resolve(
+        import.meta.dirname,
+        "./src/features/chat"
+      ),
     },
   },
   server: {

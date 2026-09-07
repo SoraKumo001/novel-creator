@@ -1,16 +1,12 @@
-import { useRef } from "react";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import type { AnalysisProgress } from "@/hooks/useAnalysis.js";
 import type {
   AnalysisHistoryEntry,
   CharacterVoiceCheckResult,
 } from "@/lib/types.js";
-import { AnalysisHistoryPanel } from "./AnalysisHistoryPanel.js";
-import { AnalysisProgressPanel } from "./AnalysisProgressPanel.js";
+import { AnalysisModalShell } from "./AnalysisModalShell.js";
 import { Badge, type BadgeVariant } from "./Badge.js";
 import { Button } from "./Button.js";
-import { HistoryViewBanner } from "./HistoryViewBanner.js";
-import { Modal } from "./Modal.js";
 
 interface CharacterVoiceCheckerModalProps {
   error?: string | null;
@@ -71,74 +67,27 @@ export function CharacterVoiceCheckerModal({
   onCancel,
   onApplyFix,
 }: CharacterVoiceCheckerModalProps) {
-  const startTimeRef = useRef<number>(Date.now());
-  const wasRunningRef = useRef(false);
-  if (running && !wasRunningRef.current) {
-    startTimeRef.current = Date.now();
-  }
-  wasRunningRef.current = running;
-
-  const title = running
-    ? "キャラクター口調チェック中…"
-    : "🎭 キャラクター口調・一貫性チェック結果";
-
   return (
-    <Modal
+    <AnalysisModalShell
+      analysisType="check-voice"
+      error={error}
+      historyRefreshKey={historyRefreshKey}
       isOpen={isOpen}
+      note="分析結果は自動保存されます"
+      novelId={novelId}
+      onCancel={onCancel}
       onClose={onClose}
-      title={title}
-      size="xl"
-      footer={
-        running ? (
-          <Button variant="secondary" onClick={onCancel}>
-            キャンセル
-          </Button>
-        ) : (
-          <div className="flex w-full items-center justify-between gap-3">
-            <span className="text-[11px] text-muted-foreground">
-              分析結果は自動保存されます
-            </span>
-            <Button variant="secondary" onClick={onClose}>
-              閉じる
-            </Button>
-          </div>
-        )
-      }
+      onRerun={onRerun}
+      onSelectHistory={onSelectHistory}
+      progress={progress}
+      running={running}
+      runningTitle="キャラクター口調チェック中…"
+      showHistoryBanner={isHistoryView && result !== null}
+      title="🎭 キャラクター口調・一貫性チェック結果"
+      viewedAt={viewedAt}
     >
-      {running ? (
-        <AnalysisProgressPanel
-          progress={progress}
-          startedAt={startTimeRef.current}
-          onCancel={onCancel}
-        />
-      ) : (
-        <div className="space-y-4">
-          {error && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-danger-border bg-danger-subtle px-4 py-3 text-danger-subtle-fg text-sm">
-              <span>{error}</span>
-              <Button size="sm" variant="secondary" onClick={onRerun}>
-                再試行
-              </Button>
-            </div>
-          )}
-
-          {isHistoryView && result && (
-            <HistoryViewBanner createdAt={viewedAt ?? undefined} />
-          )}
-
-          {result && <ResultBody result={result} onApplyFix={onApplyFix} />}
-
-          <AnalysisHistoryPanel
-            novelId={novelId}
-            analysisType="check-voice"
-            isOpen={isOpen}
-            refreshKey={historyRefreshKey}
-            onSelect={onSelectHistory}
-            onRerun={onRerun}
-          />
-        </div>
-      )}
-    </Modal>
+      {result && <ResultBody result={result} onApplyFix={onApplyFix} />}
+    </AnalysisModalShell>
   );
 }
 

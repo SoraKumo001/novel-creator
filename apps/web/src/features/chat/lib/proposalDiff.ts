@@ -16,7 +16,7 @@ import {
   fetchStoryOutline,
   fetchTimelinesMarkdown,
 } from "@/lib/services/index.js";
-import type { DiffTabItem } from "./ProposalDiffModal.js";
+import type { DiffTabItem } from "../components/ProposalDiffModal.js";
 import {
   normalizeProposal,
   type ProposalDiffData,

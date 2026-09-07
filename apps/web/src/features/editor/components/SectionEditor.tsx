@@ -22,9 +22,9 @@ import type {
   ProofreadResult,
   Section,
 } from "@/lib/types.js";
-import { SectionEditorView } from "./-SectionEditorView.js";
-import { useSectionInlineAssist } from "./-useSectionInlineAssist.js";
-import { useSectionProofread } from "./-useSectionProofread.js";
+import { useSectionInlineAssist } from "../hooks/useSectionInlineAssist.js";
+import { useSectionProofread } from "../hooks/useSectionProofread.js";
+import { SectionEditorView } from "./SectionEditorView.js";
 
 interface SectionEditorProps {
   isZenMode: boolean;

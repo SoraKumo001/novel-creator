@@ -363,10 +363,20 @@ export interface TestConnectionInput {
 }
 
 export interface TestConnectionResult {
+  detectedDimensions?: number;
   error?: string;
   latencyMs: number;
   message: string;
   success: boolean;
+}
+
+export interface ListModelsInput {
+  apiKey?: string | null;
+  baseUrl: string;
+}
+
+export interface ListModelsResult {
+  models: string[];
 }
 
 // ---- Embedding 設定 ----
@@ -422,6 +432,12 @@ export interface ReindexProgressEvent {
   percent: number;
   stage: string;
   total: number;
+}
+
+export interface VectorIndexStatus {
+  indexDimensions: number;
+  match: boolean;
+  requiredDimensions: number;
 }
 
 // ---- インラインAIアシスト ----

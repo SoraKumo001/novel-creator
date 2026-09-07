@@ -242,7 +242,7 @@ export function toRouteTab(tab: string): NovelRouteTabId {
 
 /** 差分モーダルへ渡す単一タブ分のデータ */
 export interface ProposalDiffData {
-  diffItems?: import("./ProposalDiffModal.js").DiffTabItem[];
+  diffItems?: import("../components/ProposalDiffModal.js").DiffTabItem[];
   entityType: string;
   originalMarkdown: string;
   targetTab: string;

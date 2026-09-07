@@ -25,18 +25,6 @@ import {
   type ChatUIContextValue,
 } from "./chatUiTypes.js";
 
-// 互換のための再エクスポート（既存の import パスを維持する）
-export type { ChatMessage } from "@/hooks/useChatStreaming.js";
-export {
-  type ChatFocusContext,
-  ChatStreamingContext,
-  type ChatStreamingContextValue,
-  ChatUIContext,
-  type ChatUIContextValue,
-  QUICK_PROMPTS,
-  type QuickPrompt,
-} from "./chatUiTypes.js";
-
 /**
  * ChatProvider: 低頻度（UI操作系）と高頻度（ストリーミング）の2 context を提供する。
  *

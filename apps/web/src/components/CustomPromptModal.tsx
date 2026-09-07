@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
+import { useModalError } from "@/hooks/useModalError.js";
 import type {
   CreateCustomPromptInput,
   CustomPrompt,
   UpdateCustomPromptInput,
 } from "@/lib/types.js";
-import { Button } from "./Button.js";
 import { Modal } from "./Modal.js";
+import { ModalFooter } from "./ModalFooter.js";
 import { Select } from "./Select.js";
 
 interface CustomPromptModalProps {
@@ -76,7 +77,7 @@ export function CustomPromptModal({
   const [userPrompt, setUserPrompt] = useState("");
   const [isGlobal, setIsGlobal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { error, setError, setErrorFrom } = useModalError();
 
   useEffect(() => {
     // open は再実行トリガー（モーダルを開くたびにフォームを再同期する）
@@ -107,7 +108,7 @@ export function CustomPromptModal({
       setIsGlobal(!novelId);
     }
     setError(null);
-  }, [editingPrompt, open, defaultCategory, novelId]);
+  }, [editingPrompt, open, defaultCategory, novelId, setError]);
 
   const handleInsertTag = (tag: string) => {
     setUserPrompt(
@@ -149,7 +150,7 @@ export function CustomPromptModal({
       }
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "保存に失敗しました");
+      setErrorFrom(err, "保存に失敗しました");
     } finally {
       setSaving(false);
     }
@@ -310,24 +311,22 @@ export function CustomPromptModal({
           />
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-border border-t pt-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            onClick={onClose}
-            disabled={saving}
-          >
-            キャンセル
-          </Button>
-          <Button type="submit" variant="primary" size="sm" disabled={saving}>
-            {saving
+        <ModalFooter
+          secondary={{
+            label: "キャンセル",
+            onClick: onClose,
+            disabled: saving,
+          }}
+          primary={{
+            type: "submit",
+            label: saving
               ? "保存中..."
               : editingPrompt
                 ? "変更を保存"
-                : "プロンプトを登録"}
-          </Button>
-        </div>
+                : "プロンプトを登録",
+            disabled: saving,
+          }}
+        />
       </form>
     </Modal>
   );

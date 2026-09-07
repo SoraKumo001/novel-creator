@@ -80,6 +80,14 @@ export function createVectorizeStore(binding: VectorizeBinding): VectorStore {
       await deleteByQuery(binding, undefined, resolveScanVector);
     },
 
+    /**
+     * Vectorize インデックスの次元数を describe() から取得する。
+     * 取得できない場合は 0 を返す（呼び出し側は照合をスキップする）。
+     */
+    async getIndexDimensions(): Promise<number> {
+      return readIndexDimensions(binding);
+    },
+
     async delete(id: string): Promise<void> {
       await binding.deleteByIds([id]);
     },

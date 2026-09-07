@@ -22,6 +22,11 @@ export interface VectorStore {
   delete(id: string): Promise<void>;
   deleteByEntity(entityType: string, entityId: string): Promise<void>;
   deleteByNovel(novelId: string): Promise<void>;
+  /**
+   * インデックスの次元数を取得する。取得できない場合は 0 を返す。
+   * 再構築前の次元照合に使用する（未実装のストアでは照合をスキップする）。
+   */
+  getIndexDimensions?(): Promise<number>;
   recreateSchema?(dimensions: number): Promise<void>;
   search(
     query: number[],

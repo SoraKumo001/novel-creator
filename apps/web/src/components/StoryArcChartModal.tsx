@@ -1,12 +1,8 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import type { AnalysisProgress } from "@/hooks/useAnalysis.js";
 import type { AnalysisHistoryEntry, StoryArcResult } from "@/lib/types.js";
-import { AnalysisHistoryPanel } from "./AnalysisHistoryPanel.js";
-import { AnalysisProgressPanel } from "./AnalysisProgressPanel.js";
-import { Button } from "./Button.js";
-import { HistoryViewBanner } from "./HistoryViewBanner.js";
-import { Modal } from "./Modal.js";
+import { AnalysisModalShell } from "./AnalysisModalShell.js";
 
 interface StoryArcChartModalProps {
   /** 直近の実行で発生したエラーメッセージ。キャンセル時は呼び出し側で null にする。 */
@@ -53,13 +49,6 @@ export function StoryArcChartModal({
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(
     null
   );
-  // 解析開始時刻。running に遷移したタイミングで記録する。
-  const startTimeRef = useRef<number>(Date.now());
-  const wasRunningRef = useRef(false);
-  if (running && !wasRunningRef.current) {
-    startTimeRef.current = Date.now();
-  }
-  wasRunningRef.current = running;
 
   // SVG チャートの計算
   const chartMetrics = useMemo<ChartMetrics | null>(() => {
@@ -112,78 +101,34 @@ export function StoryArcChartModal({
     };
   }, [result]);
 
-  const title = running
-    ? "ストーリーアーク分析中…"
-    : "📈 物語のテンション & 感情アーク（起伏）可視化";
-
   return (
-    <Modal
+    <AnalysisModalShell
+      analysisType="story-arc"
+      error={error}
+      historyRefreshKey={historyRefreshKey}
       isOpen={isOpen}
+      note="分析結果は自動保存されます"
+      novelId={novelId}
+      onCancel={onCancel}
       onClose={onClose}
-      title={title}
-      size="xl"
-      footer={
-        running ? (
-          <Button variant="secondary" onClick={onCancel}>
-            キャンセル
-          </Button>
-        ) : (
-          <div className="flex w-full flex-wrap items-center justify-between gap-3">
-            <span className="text-[11px] text-muted-foreground">
-              分析結果は自動保存されます
-            </span>
-            <Button variant="secondary" onClick={onClose}>
-              閉じる
-            </Button>
-          </div>
-        )
-      }
+      onRerun={onRerun}
+      onSelectHistory={onSelectHistory}
+      progress={progress}
+      running={running}
+      runningTitle="ストーリーアーク分析中…"
+      showHistoryBanner={isHistoryView && result !== null}
+      title="📈 物語のテンション & 感情アーク（起伏）可視化"
+      viewedAt={viewedAt}
     >
-      {running ? (
-        <AnalysisProgressPanel
-          progress={progress}
-          startedAt={startTimeRef.current}
-          onCancel={onCancel}
+      {result && (
+        <ResultBody
+          result={result}
+          chartMetrics={chartMetrics}
+          selectedPointIndex={selectedPointIndex}
+          onSelectPoint={setSelectedPointIndex}
         />
-      ) : (
-        <div className="space-y-4">
-          {/* エラー表示 */}
-          {error && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-danger-border bg-danger-subtle px-4 py-3 text-danger-subtle-fg text-sm">
-              <span>{error}</span>
-              <Button size="sm" variant="secondary" onClick={onRerun}>
-                再試行
-              </Button>
-            </div>
-          )}
-
-          {/* 履歴閲覧バッジ */}
-          {isHistoryView && result && (
-            <HistoryViewBanner createdAt={viewedAt ?? undefined} />
-          )}
-
-          {/* 結果 */}
-          {result && (
-            <ResultBody
-              result={result}
-              chartMetrics={chartMetrics}
-              selectedPointIndex={selectedPointIndex}
-              onSelectPoint={setSelectedPointIndex}
-            />
-          )}
-
-          {/* 履歴 */}
-          <AnalysisHistoryPanel
-            novelId={novelId}
-            analysisType="story-arc"
-            isOpen={isOpen}
-            refreshKey={historyRefreshKey}
-            onSelect={onSelectHistory}
-            onRerun={onRerun}
-          />
-        </div>
       )}
-    </Modal>
+    </AnalysisModalShell>
   );
 }
 

@@ -6,6 +6,7 @@ import { requireAdmin } from "../middleware/auth.js";
 import {
   createLlmConfigSchema,
   idParamSchema,
+  listModelsSchema,
   testLlmConfigSchema,
   updateLlmConfigSchema,
 } from "../schemas/index.js";
@@ -40,6 +41,15 @@ const llmConfigsRouter = new Hono<AppContext>()
       baseUrl: body.baseUrl,
       modelId: body.modelId,
       provider: body.provider,
+    });
+    return c.json(result);
+  })
+  // POST /api/llm-configs/models - モデル一覧取得
+  .post("/models", zValidator("json", listModelsSchema), async (c) => {
+    const body = c.req.valid("json");
+    const result = await getServices(c).llmConfig.listModels({
+      apiKey: body.apiKey,
+      baseUrl: body.baseUrl,
     });
     return c.json(result);
   })

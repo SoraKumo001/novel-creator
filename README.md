@@ -284,6 +284,12 @@ EMBEDDING_MODEL=nomic-embed-text
 
 `EMBEDDING_*` 環境変数が未設定の場合は `LLM_*` の設定をフォールバック使用する。
 
+```bash
+# 例: OpenAI互換ローカルLLM (LM Studio等) を使用: LLM_PROVIDER=custom_openai / LLM_BASE_URL=http://localhost:1234/v1
+```
+
+ブラウザ設定画面からも登録可能であり、指定するURLはサーバから到達可能なURLであること。
+
 ### プロバイダ別の注意点
 
 | プロバイダ  | LLM | Embedding                     | 備考                                                       |

@@ -6,6 +6,7 @@ import { requireAdmin } from "../middleware/auth.js";
 import {
   createEmbeddingConfigSchema,
   idParamSchema,
+  listModelsSchema,
   testEmbeddingConfigSchema,
   updateEmbeddingConfigSchema,
 } from "../schemas/index.js";
@@ -42,6 +43,15 @@ const embeddingConfigsRouter = new Hono<AppContext>()
       dimensions: body.dimensions,
       modelId: body.modelId,
       provider: body.provider,
+    });
+    return c.json(result);
+  })
+  // POST /api/embedding-configs/models - モデル一覧取得
+  .post("/models", zValidator("json", listModelsSchema), async (c) => {
+    const body = c.req.valid("json");
+    const result = await getServices(c).embeddingConfig.listModels({
+      apiKey: body.apiKey,
+      baseUrl: body.baseUrl,
     });
     return c.json(result);
   })

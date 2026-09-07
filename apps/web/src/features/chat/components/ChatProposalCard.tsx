@@ -1,8 +1,8 @@
 import { Button } from "@/components/Button.js";
+import { useProposalApply } from "../hooks/useProposalApply.js";
+import type { ProposalPayload } from "../lib/proposalTypes.js";
 import { ProposalCardBody } from "./ProposalCardView.js";
 import { ProposalDiffModal } from "./ProposalDiffModal.js";
-import type { ProposalPayload } from "./proposalTypes.js";
-import { useProposalApply } from "./useProposalApply.js";
 
 // 互換のための再エクスポート（既存の import パスを維持する）
 export type {
@@ -22,7 +22,7 @@ export type {
   StoryOutlineMode,
   StoryOutlineProposalData,
   TimelineProposalData,
-} from "./proposalTypes.js";
+} from "../lib/proposalTypes.js";
 export {
   canShowProposalDiff,
   normalizeProposal,
@@ -30,7 +30,7 @@ export {
   resolveSafeSectionName,
   resolveTargetNovelId,
   toRouteTab,
-} from "./proposalTypes.js";
+} from "../lib/proposalTypes.js";
 
 interface ChatProposalCardProps {
   proposal: ProposalPayload;

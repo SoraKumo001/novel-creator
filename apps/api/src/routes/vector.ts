@@ -9,6 +9,11 @@ import { streamEvents } from "../sse.js";
 // ベクトル再構築は admin 限定とする。
 const vectorRouter = new Hono<AppContext>()
   .use(requireAdmin)
+  // GET /api/vector/status - インデックス次元と要求次元の照合状態
+  .get("/status", async (c) => {
+    const status = await getServices(c).reindex.getIndexStatus();
+    return c.json(status);
+  })
   // POST /api/vector/reindex - インデックス全再構築 (SSE ストリーミング)
   .post("/reindex", zValidator("json", reindexBodySchema), async (c) => {
     const body = c.req.valid("json");

@@ -5,6 +5,7 @@ import {
 } from "@novel-creator/db";
 import {
   type EmbeddingConfigInput,
+  listModels as fetchOpenAIModels,
   testEmbeddingConnection,
 } from "@novel-creator/llm";
 import { desc, eq } from "drizzle-orm";
@@ -187,6 +188,11 @@ export class EmbeddingConfigDomainService {
 
   async testConfig(input: EmbeddingConfigInput) {
     return testEmbeddingConnection(input, this.ctx.env);
+  }
+
+  async listModels(input: { apiKey?: string | null; baseUrl: string }) {
+    const models = await fetchOpenAIModels(input.baseUrl, input.apiKey);
+    return { models };
   }
 
   /**

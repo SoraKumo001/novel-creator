@@ -1,10 +1,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useContext, useState } from "react";
-import { ChatUIContext } from "@/context/ChatContext.js";
+import { ChatUIContext } from "@/context/chatUiTypes.js";
 import { useToast } from "@/hooks/useToast.js";
-import { applyProposal } from "./proposalApply.js";
-import { buildProposalDiff } from "./proposalDiff.js";
+import { applyProposal } from "../lib/proposalApply.js";
+import { buildProposalDiff } from "../lib/proposalDiff.js";
 import {
   canShowProposalDiff,
   type ProposalDiffData,
@@ -13,7 +13,7 @@ import {
   resolveSafeSectionName,
   resolveTargetNovelId,
   toRouteTab,
-} from "./proposalTypes.js";
+} from "../lib/proposalTypes.js";
 
 export type ProposalStatus = "pending" | "applied" | "dismissed";
 

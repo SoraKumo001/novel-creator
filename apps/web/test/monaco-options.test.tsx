@@ -1,6 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { MonacoEditor } from "../src/routes/novels/_components/-MonacoEditor.js";
+import { MonacoEditor } from "../src/features/editor/components/MonacoEditor.js";
 
 vi.mock("@/hooks/useTheme.js", () => ({
   useTheme: () => ({ resolvedTheme: "light" }),

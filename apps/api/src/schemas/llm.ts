@@ -60,6 +60,16 @@ export const testEmbeddingConfigSchema = z.object({
   provider: z.enum(llmProviders),
 });
 
+export const listModelsSchema = z.object({
+  apiKey: z.string().optional().nullable(),
+  baseUrl: z
+    .string()
+    .min(1)
+    .refine((v) => v.startsWith("http://") || v.startsWith("https://"), {
+      message: "baseUrl must use http or https scheme",
+    }),
+});
+
 export const reindexBodySchema = z.object({
   embeddingConfigId: z.string().uuid().optional().nullable(),
 });

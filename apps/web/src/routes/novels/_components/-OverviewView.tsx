@@ -14,6 +14,7 @@ import { StatCard } from "@/components/StatCard.js";
 import { StoryArcChartModal } from "@/components/StoryArcChartModal.js";
 import { StyleGuideModal } from "@/components/StyleGuideModal.js";
 import { Textarea } from "@/components/Textarea.js";
+import { OVERVIEW_ANALYSIS_ACTIONS } from "@/features/editor/lib/analysisActions.js";
 import type {
   AnalysisHistoryEntry,
   AnalysisProgress,
@@ -23,7 +24,6 @@ import type {
   NovelDetail,
   StoryArcResult,
 } from "@/lib/types.js";
-import { OVERVIEW_ANALYSIS_ACTIONS } from "./-analysisActions.js";
 
 export interface OverviewModalBundle {
   arc: {

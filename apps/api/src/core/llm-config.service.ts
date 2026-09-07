@@ -3,7 +3,11 @@ import {
   llmConfigs,
   type NewLLMConfig,
 } from "@novel-creator/db";
-import { type LLMConfigInput, testLLMConnection } from "@novel-creator/llm";
+import {
+  listModels as fetchOpenAIModels,
+  type LLMConfigInput,
+  testLLMConnection,
+} from "@novel-creator/llm";
 import type { LanguageModel } from "ai";
 import { desc, eq } from "drizzle-orm";
 import {
@@ -219,6 +223,12 @@ export class LlmConfigDomainService {
   async testConfig(input: LLMConfigInput) {
     assertValidBaseUrl(input.baseUrl);
     return testLLMConnection(input, this.ctx.env);
+  }
+
+  async listModels(input: { apiKey?: string | null; baseUrl: string }) {
+    assertValidBaseUrl(input.baseUrl);
+    const models = await fetchOpenAIModels(input.baseUrl, input.apiKey);
+    return { models };
   }
 
   /**

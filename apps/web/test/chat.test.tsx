@@ -3,14 +3,14 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  buildChatPrefill,
-  buildChatPromptWithFocus,
-} from "../src/components/chat/ChatDrawer.js";
-import {
   ChatProvider,
   useChatStreamingState,
   useChatUI,
 } from "../src/context/ChatContext.js";
+import {
+  buildChatPrefill,
+  buildChatPromptWithFocus,
+} from "../src/features/chat/lib/chatPrompt.js";
 import { rowToUIMessage } from "../src/hooks/useChatStreaming.js";
 
 const mockFetch = vi.fn();

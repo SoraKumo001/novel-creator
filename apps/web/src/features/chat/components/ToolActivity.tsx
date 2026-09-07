@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { ChatProposalCard, type ProposalPayload } from "./ChatProposalCard.js";
-import { extractReasoning, ReasoningActivity } from "./ReasoningActivity.js";
 import {
   extractToolInvocations,
   formatArgsSummary,
@@ -9,19 +7,21 @@ import {
   toolIcon,
   toolLabel,
   toPreviewJson,
-} from "./toolParts.js";
+} from "../lib/toolParts.js";
+import { ChatProposalCard, type ProposalPayload } from "./ChatProposalCard.js";
+import { extractReasoning, ReasoningActivity } from "./ReasoningActivity.js";
 
-export {
-  extractReasoning,
-  ReasoningActivity,
-  type ReasoningItem,
-} from "./ReasoningActivity.js";
 // 互換のための再エクスポート（既存の import パスを維持する）
 export {
   extractToolInvocations,
   type ToolInvocationItem,
   toolLabel,
-} from "./toolParts.js";
+} from "../lib/toolParts.js";
+export {
+  extractReasoning,
+  ReasoningActivity,
+  type ReasoningItem,
+} from "./ReasoningActivity.js";
 export type { ProposalPayload };
 
 /**

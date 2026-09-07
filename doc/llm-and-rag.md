@@ -209,3 +209,23 @@ sequenceDiagram
 - LLM / Embedding の API キーはデータベース（`llm_configs` 等）に**平文のまま保存**されます。
 - 読み出し時（一覧・レスポンス）には `apiKeyMasked` としてマスク表示されますが、これは**表示上の対策**であり、保存データ自体は暗号化されていません。
 - 本番環境へデプロイする際はこのリスクを評価し、必要に応じてシークレット管理基盤（KMS / Vault 等）や保存時暗号化の導入を検討してください。
+
+---
+
+## 6. OpenAI互換ローカルLLM (`custom_openai`)
+
+OpenAI互換APIを持つローカルLLMを `custom_openai` プロバイダとして自由に選択可能です。対応先: Ollama / LM Studio / vLLM / llama.cpp。
+
+```bash
+# BaseURL 例
+# LM Studio: http://localhost:1234/v1
+# vLLM: http://localhost:8000/v1
+# llama.cpp: http://localhost:8080/v1
+# Ollama: http://localhost:11434/v1
+LLM_PROVIDER=custom_openai
+LLM_BASE_URL=http://localhost:1234/v1
+EMBEDDING_BASE_URL=http://localhost:1234/v1
+```
+
+- 接続テスト成功時は検出次元数を表示し、登録次元数と不一致の場合は警告を付記します（接続自体は成功扱い）。
+- 埋め込みモデルの次元を変更した場合は、設定画面または `POST /api/vector/reindex` でインデックスを全再構築してください（次元変更 → dimensions 修正 → 再構築の流れ）。

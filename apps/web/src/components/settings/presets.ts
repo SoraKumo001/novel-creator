@@ -57,6 +57,27 @@ export const LLM_PRESETS: LLMPreset[] = [
     modelId: "deepseek/deepseek-r1",
     baseUrl: "https://openrouter.ai/api/v1",
   },
+  {
+    label: "LM Studio",
+    name: "LM Studio (OpenAI互換)",
+    provider: "custom_openai",
+    modelId: "qwen2.5-7b-instruct",
+    baseUrl: "http://localhost:1234/v1",
+  },
+  {
+    label: "vLLM",
+    name: "vLLM (OpenAI互換)",
+    provider: "custom_openai",
+    modelId: "meta-llama/Llama-3.1-8B-Instruct",
+    baseUrl: "http://localhost:8000/v1",
+  },
+  {
+    label: "llama.cpp",
+    name: "llama.cpp server (OpenAI互換)",
+    provider: "custom_openai",
+    modelId: "default",
+    baseUrl: "http://localhost:8080/v1",
+  },
 ];
 
 export interface EmbeddingPreset {
@@ -112,5 +133,29 @@ export const EMBEDDING_PRESETS: EmbeddingPreset[] = [
     modelId: "bge-m3",
     dimensions: 1024,
     baseUrl: "http://localhost:11434/v1",
+  },
+  {
+    label: "LM Studio nomic-embed-text-v1.5 (768次元)",
+    name: "LM Studio text-embedding-nomic-embed-text-v1.5",
+    provider: "custom_openai",
+    modelId: "text-embedding-nomic-embed-text-v1.5",
+    dimensions: 768,
+    baseUrl: "http://localhost:1234/v1",
+  },
+  {
+    label: "vLLM e5-mistral-7b-instruct (4096次元)",
+    name: "vLLM e5-mistral-7b-instruct",
+    provider: "custom_openai",
+    modelId: "e5-mistral-7b-instruct",
+    dimensions: 4096,
+    baseUrl: "http://localhost:8000/v1",
+  },
+  {
+    label: "OpenAI互換 nomic-embed-text-v1.5 (768次元)",
+    name: "OpenAI互換 nomic-embed-text-v1.5",
+    provider: "custom_openai",
+    modelId: "nomic-embed-text-v1.5",
+    dimensions: 768,
+    baseUrl: "http://localhost:8000/v1",
   },
 ];

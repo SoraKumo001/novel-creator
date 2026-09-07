@@ -7,10 +7,12 @@ import { Loading } from "@/components/Loading.js";
 import { Tag } from "@/components/Tag.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
+import { getVectorIndexStatus } from "@/lib/services/vector.js";
 import type {
   EmbeddingConfig,
   TestConnectionResult,
   TestEmbeddingConnectionInput,
+  VectorIndexStatus,
 } from "@/lib/types.js";
 
 interface EmbeddingConfigSectionProps {
@@ -45,6 +47,32 @@ export function EmbeddingConfigSection({
   const toast = useToast();
   const [testingId, setTestingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [statusChecking, setStatusChecking] = useState(false);
+  const [dimensionMismatch, setDimensionMismatch] =
+    useState<VectorIndexStatus | null>(null);
+
+  /**
+   * 再構築モーダルを開く前にインデックス次元を照合する。
+   * 不一致時はバナーを表示してブロックし、作り直し後に再実行させる。
+   * 状態取得自体に失敗した場合は従来どおりモーダルを開く（SSE 側で検出する）。
+   */
+  async function handleOpenReindex(): Promise<void> {
+    setStatusChecking(true);
+    try {
+      const status = await getVectorIndexStatus();
+      if (!status.match) {
+        setDimensionMismatch(status);
+        return;
+      }
+      setDimensionMismatch(null);
+      onOpenReindexModal();
+    } catch (e) {
+      toast.error(toErrorMessage(e));
+      onOpenReindexModal();
+    } finally {
+      setStatusChecking(false);
+    }
+  }
 
   if (loading) {
     return <Loading message="埋め込み設定を読み込み中..." />;
@@ -70,10 +98,42 @@ export function EmbeddingConfigSection({
               小説の登場人物や設定、本文をベクトル化してセマンティック検索（RAG）を行います。モデルを変更した場合は「インデックス全再構築」を行ってください。
             </p>
           </div>
-          <Button size="sm" variant="secondary" onClick={onOpenReindexModal}>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => void handleOpenReindex()}
+            isLoading={statusChecking}
+          >
             ⚡ インデックス全再構築
           </Button>
         </div>
+
+        {dimensionMismatch && !dimensionMismatch.match && (
+          <div className="rounded-xl border border-danger/30 bg-danger/10 p-4 text-danger text-xs">
+            <div className="font-bold">
+              ⚠ ベクトルインデックスの次元が一致しません（必要次元{" "}
+              {dimensionMismatch.requiredDimensions} / 現行{" "}
+              {dimensionMismatch.indexDimensions}）
+            </div>
+            <p className="mt-1 leading-relaxed">
+              Vectorize
+              インデックスの作り直しが必要です。以下のコマンドで作り直した後に「インデックス全再構築」を再実行してください。
+            </p>
+            <pre className="mt-2 overflow-x-auto rounded-lg bg-surface-raised p-2 font-mono text-[11px] text-foreground">
+              {`npx wrangler vectorize delete <index>\nnpx wrangler vectorize create <index> --dimensions ${dimensionMismatch.requiredDimensions} --metric cosine`}
+            </pre>
+            <div className="mt-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => void handleOpenReindex()}
+                isLoading={statusChecking}
+              >
+                再確認する
+              </Button>
+            </div>
+          </div>
+        )}
 
         {configs.length === 0 ? (
           <Card>

@@ -42,6 +42,35 @@ export class VectorStoreResetError extends Error {
   }
 }
 
+/**
+ * ベクトルインデックスの次元と要求次元が不一致の場合に投げられるエラー。
+ * Vectorize は次元変更時にインデックスの作り直しが必要なため、
+ * 破壊的操作（clearAll）の前に検出して再作成手順を明示する。
+ */
+export class VectorIndexDimensionMismatchError extends Error {
+  readonly actual: number;
+  readonly required: number;
+
+  constructor(required: number, actual: number) {
+    super(
+      `Vectorize インデックスの次元（${actual}）が必要な次元（${required}）と一致しません。` +
+        "Vectorize インデックスの作り直しが必要です。" +
+        "例: npx wrangler vectorize delete <index> → " +
+        `npx wrangler vectorize create <index> --dimensions ${required} --metric cosine → ` +
+        "再構築を再実行"
+    );
+    this.name = "VectorIndexDimensionMismatchError";
+    this.actual = actual;
+    this.required = required;
+  }
+}
+
+export interface VectorIndexStatus {
+  indexDimensions: number;
+  match: boolean;
+  requiredDimensions: number;
+}
+
 export class ReindexDomainService {
   private readonly embeddingConfigService: EmbeddingConfigDomainService;
 
@@ -58,6 +87,9 @@ export class ReindexDomainService {
       await this.embeddingConfigService.resolveEmbeddingModel(
         embeddingConfigId
       );
+
+    // 1.5. インデックス次元と要求次元を照合（破壊的操作の前に検出する）
+    await this.assertIndexDimensionsMatch(dimensions);
 
     onProgress?.({
       current: 0,
@@ -276,5 +308,53 @@ export class ReindexDomainService {
     });
 
     return { dimensions, totalIndexed: total };
+  }
+
+  /**
+   * UI の事前確認用にインデックス次元と要求次元の照合結果を返す。
+   * インデックス次元を取得できない場合（0）は match: true とし、ブロックしない。
+   */
+  async getIndexStatus(
+    embeddingConfigId?: string | null
+  ): Promise<VectorIndexStatus> {
+    const { dimensions } =
+      await this.embeddingConfigService.resolveEmbeddingModel(
+        embeddingConfigId
+      );
+    const indexDimensions = await this.readIndexDimensions();
+    return {
+      indexDimensions,
+      match: indexDimensions <= 0 || indexDimensions === dimensions,
+      requiredDimensions: dimensions,
+    };
+  }
+
+  /**
+   * ベクトルストアが次元取得をサポートし、0 より大きい値を返し、
+   * 要求次元と不一致の場合に VectorIndexDimensionMismatchError を投げる。
+   * pg 側の validate による明示エラーはそのまま通過させる。
+   */
+  private async assertIndexDimensionsMatch(
+    requiredDimensions: number
+  ): Promise<void> {
+    const indexDimensions = await this.readIndexDimensions();
+    if (indexDimensions > 0 && indexDimensions !== requiredDimensions) {
+      throw new VectorIndexDimensionMismatchError(
+        requiredDimensions,
+        indexDimensions
+      );
+    }
+  }
+
+  private async readIndexDimensions(): Promise<number> {
+    if (!this.ctx.vectorStore.getIndexDimensions) {
+      return 0;
+    }
+    try {
+      const dimensions = await this.ctx.vectorStore.getIndexDimensions();
+      return Number.isInteger(dimensions) && dimensions > 0 ? dimensions : 0;
+    } catch {
+      return 0;
+    }
   }
 }

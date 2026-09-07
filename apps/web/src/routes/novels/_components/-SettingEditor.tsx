@@ -2,6 +2,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/Input.js";
 import { useChatUI } from "@/context/ChatContext.js";
+import { MonacoEditor } from "@/features/editor/components/MonacoEditor.js";
 import { useLlmInstructions } from "@/hooks/useLlmInstructions.js";
 import { useModalState } from "@/hooks/useModalResultState.js";
 import { useSettings } from "@/hooks/useSettings.js";
@@ -9,7 +10,6 @@ import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import { formatCharCount } from "@/lib/format.js";
 import { EntityEditorShell } from "./-EntityEditorShell.js";
-import { MonacoEditor } from "./-MonacoEditor.js";
 
 interface SettingEditorProps {
   novelId: string;

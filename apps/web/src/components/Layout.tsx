@@ -1,8 +1,8 @@
 import { useMatches } from "@tanstack/react-router";
 import { type ReactNode, useEffect } from "react";
 import { useChatUI } from "@/context/ChatContext.js";
-import { ChatDrawer } from "./chat/ChatDrawer.js";
-import { ChatFloatingButton } from "./chat/ChatFloatingButton.js";
+import { ChatDrawer } from "@/features/chat/components/ChatDrawer.js";
+import { ChatFloatingButton } from "@/features/chat/components/ChatFloatingButton.js";
 import { Nav } from "./Nav.js";
 
 interface LayoutProps {

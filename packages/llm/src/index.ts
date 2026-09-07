@@ -18,6 +18,7 @@ export {
   streamText,
   streamTextResult,
 } from "./generate.js";
+export { listModels } from "./models.js";
 export {
   type AnalyzeSettingImpactContext,
   type AnalyzeStoryArcContext,

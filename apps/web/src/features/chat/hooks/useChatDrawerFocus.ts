@@ -1,5 +1,5 @@
 import { type RefObject, useEffect, useRef } from "react";
-import type { ChatFocusContext } from "@/context/ChatContext.js";
+import type { ChatFocusContext } from "@/context/chatUiTypes.js";
 
 export interface UseChatDrawerFocusOptions {
   /** エディタから渡された未消費の相談フォーカス */

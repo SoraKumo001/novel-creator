@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import type { AnalysisProgress } from "@/hooks/useAnalysis.js";
 import type {
@@ -6,11 +6,7 @@ import type {
   MultiPersonaReviewResult,
   ReaderPersonaType,
 } from "@/lib/types.js";
-import { AnalysisHistoryPanel } from "./AnalysisHistoryPanel.js";
-import { AnalysisProgressPanel } from "./AnalysisProgressPanel.js";
-import { Button } from "./Button.js";
-import { HistoryViewBanner } from "./HistoryViewBanner.js";
-import { Modal } from "./Modal.js";
+import { AnalysisModalShell } from "./AnalysisModalShell.js";
 
 interface MultiPersonaReviewModalProps {
   error?: string | null;
@@ -75,80 +71,34 @@ export function MultiPersonaReviewModal({
 }: MultiPersonaReviewModalProps) {
   const [selectedPersona, setSelectedPersona] =
     useState<ReaderPersonaType>("editor");
-  const startTimeRef = useRef<number>(Date.now());
-  const wasRunningRef = useRef(false);
-  if (running && !wasRunningRef.current) {
-    startTimeRef.current = Date.now();
-  }
-  wasRunningRef.current = running;
-
-  const title = running
-    ? "模擬読者レビューを生成中…"
-    : "👥 複数ペルソナによる模擬読者・編集部レビュー";
 
   return (
-    <Modal
+    <AnalysisModalShell
+      analysisType="persona-review"
+      error={error}
+      historyRefreshKey={historyRefreshKey}
       isOpen={isOpen}
+      note="分析結果は自動保存されます"
+      novelId={novelId}
+      onCancel={onCancel}
       onClose={onClose}
-      title={title}
-      size="xl"
-      footer={
-        running ? (
-          <Button variant="secondary" onClick={onCancel}>
-            キャンセル
-          </Button>
-        ) : (
-          <div className="flex w-full items-center justify-between gap-3">
-            <span className="text-[11px] text-muted-foreground">
-              分析結果は自動保存されます
-            </span>
-            <Button variant="secondary" onClick={onClose}>
-              閉じる
-            </Button>
-          </div>
-        )
-      }
+      onRerun={onRerun}
+      onSelectHistory={onSelectHistory}
+      progress={progress}
+      running={running}
+      runningTitle="模擬読者レビューを生成中…"
+      showHistoryBanner={isHistoryView && result !== null}
+      title="👥 複数ペルソナによる模擬読者・編集部レビュー"
+      viewedAt={viewedAt}
     >
-      {running ? (
-        <AnalysisProgressPanel
-          progress={progress}
-          startedAt={startTimeRef.current}
-          onCancel={onCancel}
+      {result && (
+        <ResultBody
+          result={result}
+          selectedPersona={selectedPersona}
+          onSelectPersona={setSelectedPersona}
         />
-      ) : (
-        <div className="space-y-4">
-          {error && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-danger-border bg-danger-subtle px-4 py-3 text-danger-subtle-fg text-sm">
-              <span>{error}</span>
-              <Button size="sm" variant="secondary" onClick={onRerun}>
-                再試行
-              </Button>
-            </div>
-          )}
-
-          {isHistoryView && result && (
-            <HistoryViewBanner createdAt={viewedAt ?? undefined} />
-          )}
-
-          {result && (
-            <ResultBody
-              result={result}
-              selectedPersona={selectedPersona}
-              onSelectPersona={setSelectedPersona}
-            />
-          )}
-
-          <AnalysisHistoryPanel
-            novelId={novelId}
-            analysisType="persona-review"
-            isOpen={isOpen}
-            refreshKey={historyRefreshKey}
-            onSelect={onSelectHistory}
-            onRerun={onRerun}
-          />
-        </div>
       )}
-    </Modal>
+    </AnalysisModalShell>
   );
 }
 

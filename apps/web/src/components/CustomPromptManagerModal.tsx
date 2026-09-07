@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useCustomPrompts } from "@/hooks/useCustomPrompts.js";
+import { useModalError } from "@/hooks/useModalError.js";
 import { useToast } from "@/hooks/useToast.js";
 import type {
   CreateCustomPromptInput,
@@ -12,6 +13,7 @@ import { ConfirmDialog } from "./ConfirmDialog.js";
 import { CustomPromptModal } from "./CustomPromptModal.js";
 import { EmptyState } from "./EmptyState.js";
 import { Modal } from "./Modal.js";
+import { ModalFooter } from "./ModalFooter.js";
 
 interface CustomPromptManagerModalProps {
   novelId?: string | null;
@@ -40,6 +42,7 @@ export function CustomPromptManagerModal({
   const [deleteTarget, setDeleteTarget] = useState<CustomPrompt | null>(null);
   const [deleting, setDeleting] = useState(false);
   const toast = useToast();
+  const { notifyError } = useModalError();
 
   const filteredPrompts = prompts.filter((p) => {
     if (selectedCategory === "all") {
@@ -68,7 +71,7 @@ export function CustomPromptManagerModal({
       setDeleteTarget(null);
       toast.success("プロンプトを削除しました");
     } catch {
-      toast.error("削除に失敗しました");
+      notifyError("削除に失敗しました");
     } finally {
       setDeleting(false);
     }
@@ -79,7 +82,7 @@ export function CustomPromptManagerModal({
       await seedPresets();
       toast.success("標準プリセットプロンプトを復元しました");
     } catch {
-      toast.error("プリセットの復元に失敗しました");
+      notifyError("プリセットの復元に失敗しました");
     }
   };
 
@@ -233,11 +236,7 @@ export function CustomPromptManagerModal({
             </div>
           )}
 
-          <div className="flex justify-end border-border border-t pt-2">
-            <Button size="sm" variant="secondary" onClick={onClose}>
-              閉じる
-            </Button>
-          </div>
+          <ModalFooter secondary={{ label: "閉じる", onClick: onClose }} />
         </div>
       </Modal>
 

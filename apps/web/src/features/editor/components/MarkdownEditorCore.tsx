@@ -9,7 +9,7 @@ import type { MarkdownInsertKind } from "@/hooks/useMarkdownEntityEditor.js";
 import { useMarkdownExternalSync } from "@/hooks/useMarkdownExternalSync.js";
 
 export type { MarkdownPreviewMode } from "@/lib/editor-storage.js";
-export { MarkdownPreviewDock } from "./-MarkdownPreviewDock.js";
+export { MarkdownPreviewDock } from "./MarkdownPreviewDock.js";
 /**
  * Markdown編集系で重複していたサイドバー/ツールバー/ショートカットの共通コア。
  * routes 配下のみで完結する presentational な集約（API・hooks・context は触らない）。

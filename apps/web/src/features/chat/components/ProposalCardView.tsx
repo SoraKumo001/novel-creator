@@ -1,4 +1,4 @@
-import type { ProposalPayload } from "./proposalTypes.js";
+import type { ProposalPayload } from "../lib/proposalTypes.js";
 
 /**
  * 提案内容の表示部（presentational）。

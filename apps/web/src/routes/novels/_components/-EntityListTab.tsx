@@ -10,13 +10,13 @@ import { PlusIcon } from "@/components/Icons.js";
 import { Select } from "@/components/Select.js";
 import { TabHeader } from "@/components/TabHeader.js";
 import { ViewModeSwitch } from "@/components/ViewModeSwitch.js";
-import { EntityCardGrid, SidebarTreeNode } from "./-EntityListParts.js";
 import {
   scrollToElementById,
   useOverlapHover,
   usePersistedState,
   useSidebarResize,
-} from "./-MarkdownEditorCore.js";
+} from "@/features/editor/components/MarkdownEditorCore.js";
+import { EntityCardGrid, SidebarTreeNode } from "./-EntityListParts.js";
 
 export interface EntityListTabConfig<
   T extends {

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { StyleGuideModal } from "../src/components/StyleGuideModal.js";
 
 // MonacoEditor のモック
-vi.mock("../src/routes/novels/_components/-MonacoEditor.js", () => ({
+vi.mock("../src/features/editor/components/MonacoEditor.js", () => ({
   MonacoEditor: ({
     value,
     onChange,

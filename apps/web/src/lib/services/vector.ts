@@ -1,5 +1,33 @@
+import { apiClient } from "../api-client.js";
 import { parseResponseError } from "../errors.js";
-import type { ReindexProgressEvent } from "../types.js";
+import type { ReindexProgressEvent, VectorIndexStatus } from "../types.js";
+
+function isVectorIndexStatus(value: unknown): value is VectorIndexStatus {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "indexDimensions" in value &&
+    "requiredDimensions" in value &&
+    "match" in value &&
+    typeof (value as { indexDimensions: unknown }).indexDimensions ===
+      "number" &&
+    typeof (value as { requiredDimensions: unknown }).requiredDimensions ===
+      "number" &&
+    typeof (value as { match: unknown }).match === "boolean"
+  );
+}
+
+export async function getVectorIndexStatus(): Promise<VectorIndexStatus> {
+  const res = await apiClient.vector.status.$get();
+  if (!res.ok) {
+    throw await parseResponseError(res, "ベクトルインデックス状態の確認");
+  }
+  const data: unknown = await res.json();
+  if (!isVectorIndexStatus(data)) {
+    throw new Error("ベクトルインデックス状態の形式が不正です");
+  }
+  return data;
+}
 
 export async function streamReindex(
   options: {

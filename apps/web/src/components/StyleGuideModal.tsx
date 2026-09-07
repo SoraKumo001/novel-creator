@@ -5,15 +5,16 @@ import {
   type StyleGuideTemplate,
 } from "@novel-creator/shared";
 import { useEffect, useState, useTransition } from "react";
+import { MonacoEditor } from "@/features/editor/components/MonacoEditor.js";
+import { useModalError } from "@/hooks/useModalError.js";
 import { useToast } from "@/hooks/useToast.js";
-import { toErrorMessage } from "@/lib/errors.js";
 import { formatCharCount } from "@/lib/format.js";
 import { generateStyleGuideDraft } from "@/lib/services/novel.js";
-import { MonacoEditor } from "../routes/novels/_components/-MonacoEditor.js";
 import { Button } from "./Button.js";
 import { ConfirmDialog } from "./ConfirmDialog.js";
 import { MarkdownText } from "./MarkdownText.js";
 import { Modal } from "./Modal.js";
+import { ModalFooter } from "./ModalFooter.js";
 
 interface StyleGuideModalProps {
   initialStyleGuide?: string | null;
@@ -46,6 +47,7 @@ export function StyleGuideModal({
     useState<StyleGuideTemplate | null>(null);
   const [confirmAIDraft, setConfirmAIDraft] = useState<boolean>(false);
   const toast = useToast();
+  const { notifyError } = useModalError();
 
   // モーダルが開かれた時に初期値を反映
   useEffect(() => {
@@ -97,7 +99,7 @@ export function StyleGuideModal({
         setStyleGuide(draft);
         toast.success("AIによる執筆スタイルガイドの下書きを生成しました");
       } catch (err) {
-        toast.error(toErrorMessage(err));
+        notifyError("下書きの生成に失敗しました", err);
       }
     });
   };
@@ -116,7 +118,7 @@ export function StyleGuideModal({
       toast.success("執筆スタイル・文体ガイドを保存しました");
       onClose();
     } catch (err) {
-      toast.error(toErrorMessage(err));
+      notifyError("保存に失敗しました", err);
     }
   };
 
@@ -142,20 +144,27 @@ export function StyleGuideModal({
         title="📝 執筆スタイル & 文体ガイドライン"
         size="xl"
         footer={
-          <div className="flex w-full items-center justify-between">
-            <div className="text-muted-foreground text-xs">
-              {formatCharCount(styleGuide.length)}
-              （Markdown形式で自由に定義可能）
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="secondary" onClick={onClose} disabled={saving}>
-                キャンセル
-              </Button>
-              <Button variant="primary" onClick={handleSave} isLoading={saving}>
-                保存する
-              </Button>
-            </div>
-          </div>
+          <ModalFooter
+            align="between"
+            bordered={false}
+            size="md"
+            leading={
+              <div className="text-muted-foreground text-xs">
+                {formatCharCount(styleGuide.length)}
+                （Markdown形式で自由に定義可能）
+              </div>
+            }
+            secondary={{
+              label: "キャンセル",
+              onClick: onClose,
+              disabled: saving,
+            }}
+            primary={{
+              label: "保存する",
+              onClick: handleSave,
+              isLoading: saving,
+            }}
+          />
         }
       >
         <div className="flex h-[65vh] min-h-[480px] flex-col gap-4 lg:flex-row">

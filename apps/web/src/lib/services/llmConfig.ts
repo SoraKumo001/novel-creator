@@ -2,6 +2,8 @@ import { apiClient } from "../api-client.js";
 import { parseResponseError } from "../errors.js";
 import type {
   CreateLLMConfigInput,
+  ListModelsInput,
+  ListModelsResult,
   LLMConfig,
   TestConnectionInput,
   TestConnectionResult,
@@ -86,6 +88,22 @@ export async function testLLMConfig(
   });
   if (!res.ok) {
     throw await parseResponseError(res, "LLM接続テスト");
+  }
+  const data = await res.json();
+  return data;
+}
+
+export async function listLLMModels(
+  input: ListModelsInput
+): Promise<ListModelsResult> {
+  const res = await apiClient["llm-configs"].models.$post({
+    json: {
+      baseUrl: input.baseUrl,
+      apiKey: input.apiKey || null,
+    },
+  });
+  if (!res.ok) {
+    throw await parseResponseError(res, "モデル一覧の取得");
   }
   const data = await res.json();
   return data;

@@ -1,6 +1,6 @@
 import type { KeyboardEvent, RefObject } from "react";
 import { Button } from "@/components/Button.js";
-import type { ChatFocusContext, QuickPrompt } from "@/context/ChatContext.js";
+import type { ChatFocusContext, QuickPrompt } from "@/context/chatUiTypes.js";
 
 /** 空状態のウェルカム＋クイックプロンプト */
 export function ChatWelcomePanel({

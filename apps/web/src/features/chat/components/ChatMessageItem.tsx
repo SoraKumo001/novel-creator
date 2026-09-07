@@ -1,6 +1,6 @@
 import { memo } from "react";
 import { MarkdownText } from "@/components/MarkdownText.js";
-import type { ChatMessage } from "@/context/ChatContext.js";
+import type { ChatMessage } from "@/context/chatUiTypes.js";
 import { ChatProposalCard } from "./ChatProposalCard.js";
 import { extractProposalPayloads, ToolActivity } from "./ToolActivity.js";
 
