@@ -29,7 +29,7 @@ export async function importNovelBackup(data: unknown): Promise<ImportResult> {
   if (!res.ok) {
     throw await parseResponseError(res, "バックアップのインポート");
   }
-  const result = await res.json();
+  const result = (await res.json()) as ImportResult;
   return {
     success: true as const,
     novelId: result.novelId,

@@ -4,6 +4,7 @@ import type { DomainServices } from "../core/services.js";
 import type { ServiceContext } from "../core/types.js";
 import { appLogger } from "../middleware/logger.js";
 import { searchContext } from "../rag.js";
+import { assertSectionBelongsToNovel } from "./section-guard.js";
 
 /**
  * MCP ツール群を McpServer インスタンスへ登録する。
@@ -1360,6 +1361,144 @@ export function registerMcpTools(
             {
               type: "text",
               text: `知識検索に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // ==========================================
+  // 9. 読取専用: 章・節の単体取得 / 履歴参照
+  // ==========================================
+
+  server.tool(
+    "get_chapter",
+    "指定した章1件のタイトル・概要と配下の節メタ情報（タイトル・概要・順序）を取得します。本文は含みません。全章の一覧が必要な場合は get_plot_outline を使ってください。",
+    {
+      chapterId: z.string().describe("章ID (UUID)"),
+    },
+    async ({ chapterId }) => {
+      try {
+        const result = await services.chapter.getChapterWithSections(chapterId);
+        return {
+          content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `章の取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "get_section",
+    "指定した節1件のメタ情報（タイトル・概要・順序・所属章ID）を取得します。本文は含みません。本文が必要な場合は get_section_content を使ってください。",
+    {
+      novelId: z
+        .string()
+        .optional()
+        .describe("小説ID (UUID、指定時は所属検証に使用)"),
+      sectionId: z.string().describe("節ID (UUID)"),
+    },
+    async ({ sectionId, novelId }) => {
+      try {
+        if (novelId) {
+          const guarded = await assertSectionBelongsToNovel(
+            services,
+            novelId,
+            sectionId
+          );
+          return {
+            content: [
+              { type: "text", text: JSON.stringify(guarded.section, null, 2) },
+            ],
+          };
+        }
+        const { section } =
+          await services.section.getSectionWithContent(sectionId);
+        return {
+          content: [{ type: "text", text: JSON.stringify(section, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `節の取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "list_histories",
+    "指定した小説の編集履歴一覧を新しい順に取得します。参照専用であり復元は行いません。",
+    {
+      entityId: z
+        .string()
+        .optional()
+        .describe("対象エンティティID（絞り込み用）"),
+      entityType: z
+        .string()
+        .optional()
+        .describe("エンティティ種別（絞り込み用）"),
+      limit: z.number().optional().describe("取得件数上限（省略時は50）"),
+      novelId: z.string().describe("小説ID (UUID)"),
+    },
+    async ({ novelId, entityType, entityId, limit }) => {
+      try {
+        const list = await services.history.listHistories(novelId, {
+          entityId,
+          entityType,
+          limit,
+        });
+        return {
+          content: [{ type: "text", text: JSON.stringify(list, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `履歴一覧の取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "get_history",
+    "指定した編集履歴1件の詳細を取得します。参照専用であり復元は行いません。",
+    {
+      historyId: z.string().describe("履歴ID (UUID)"),
+    },
+    async ({ historyId }) => {
+      try {
+        const history = await services.history.getHistory(historyId);
+        return {
+          content: [{ type: "text", text: JSON.stringify(history, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `履歴の取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,

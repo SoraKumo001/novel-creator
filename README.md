@@ -20,6 +20,7 @@
 | 🗄️ **[データモデル & DB設計](./doc/data-model.md)**                   | ERダイアグラム、PostgreSQL (Drizzle ORM) スキーマ、VectorStore設計         |
 | 🧠 **[LLM連携 & RAGアーキテクチャ](./doc/llm-and-rag.md)**            | マルチプロバイダ抽象化、RAG検索、Agentic Tool Calling、プロンプトエンジン  |
 | ✍️ **[機能詳細 & 創作ワークフロー](./doc/features-and-workflows.md)** | 創作フロー、縦書きビューアー、インライン推敲、バリエーション生成、分析機能 |
+| 📡 **[MCPサーバー](./doc/mcp-server.md)**                            | Tools40・Streamable HTTP・Web発行キー認証の MCP サーバー仕様               |
 
 ## アーキテクチャ
 
@@ -103,6 +104,7 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 | `llm_instructions` | LLM 指示履歴（再利用・プロンプト管理）           |
 | `edit_histories`   | 編集差分履歴（変更前後のテキスト比較・Undo用）   |
 | `custom_prompts`   | カスタムプロンプトテンプレート（推敲/生成/相談） |
+| `mcp_api_keys`     | Web発行のMCP APIキー（ハッシュ＋暗号文保管・失効/期限管理） |
 
 ## 主な機能
 
@@ -151,6 +153,10 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 - **バックアップ & リストア & エクスポート**:
   - 小説全データ・チャット履歴の JSON エクスポート / インポート
   - 小説テキスト（.txt / .md）の整形出力（文字数統計・目次付き）
+- **📡 MCP サーバー（外部エージェント連携）**:
+  - Streamable HTTP（`POST /api/mcp`）のみで Tools40・Resources5・Prompts3 を公開
+  - 認証は Web 発行キーのみ。管理者が設定画面の「MCP APIキー」タブで発行・失効
+  - Claude Code 等の外部エージェントから執筆・整合性レビューを委譲可能。詳細は [MCPサーバー](./doc/mcp-server.md) を参照
 - **モダンな UI / UX**:
   - セマンティックトークンによる完全なライト / ダークモード自動追従
   - トースト通知、確認ダイアログ、ローディングインジケーター
@@ -204,18 +210,18 @@ http://localhost:5173 にアクセス。
 | `pnpm dev:web`         | Web 開発サーバー（Vite、ポート5173）    |
 | `pnpm dev:worker`      | API 開発サーバー（Wrangler / Workers）  |
 | `pnpm storybook`       | Storybook 起動（コンポーネント確認）    |
-| `pnpm build-storybook` | Storybook 静的ビルド                    |
+| `pnpm storybook:build` | Storybook 静的ビルド                    |
 
 ### 品質チェック
 
-| コマンド             | 内容                     |
-| -------------------- | ------------------------ |
-| `pnpm typecheck`     | 全パッケージの型チェック |
-| `pnpm lint`          | ESLint                   |
-| `pnpm test`          | Vitest テスト実行        |
-| `pnpm test:coverage` | テストカバレッジ付き実行 |
-| `pnpm build`         | 全パッケージビルド       |
-| `pnpm format`        | Prettier でフォーマット  |
+| コマンド             | 内容                               |
+| -------------------- | ---------------------------------- |
+| `pnpm typecheck`     | 全パッケージの型チェック           |
+| `pnpm lint:check`    | Ultracite によるリント・体裁チェック |
+| `pnpm lint:fix`      | Ultracite による自動修正           |
+| `pnpm test`          | Vitest テスト実行                  |
+| `pnpm test:coverage` | テストカバレッジ付き実行           |
+| `pnpm build`         | 全パッケージビルド                 |
 
 ### デプロイ
 

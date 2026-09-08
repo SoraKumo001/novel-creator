@@ -40,6 +40,12 @@ Novel Creator は、大規模言語モデル（LLM）とベクトル検索（RAG
    - 章・節の並び替え・移動機能、伏線管理、時系列管理、校正、編集差分履歴（HistoryDiffModal）
    - バックアップ・リストア・整形テキストエクスポート
 
+5. **[MCPサーバー (`mcp-server.md`)](./mcp-server.md)**
+    - Streamable HTTP（`POST /api/mcp`）のみのトランスポート
+   - Tools40・Resources5・Prompts3 の一覧と用途
+   - Web 発行キー（`mcp_api_keys`）による認証・管理者が設定画面で発行・失効
+   - `section-guard` による節→章→小説の novelId 照合（横断参照の遮断）
+
 ---
 
 ## 💡 システムのコアコンセプト

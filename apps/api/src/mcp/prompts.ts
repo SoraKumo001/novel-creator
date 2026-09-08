@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { DomainServices } from "../core/services.js";
 import type { ServiceContext } from "../core/types.js";
+import { assertSectionBelongsToNovel } from "./section-guard.js";
 
 /**
  * MCP プロンプト群を McpServer インスタンスへ登録する。
@@ -29,7 +30,7 @@ export function registerMcpPrompts(
       const [novelDetail, sectionData, characters, settings] =
         await Promise.all([
           services.novel.getNovelDetail(novelId),
-          services.section.getSectionWithContent(sectionId),
+          assertSectionBelongsToNovel(services, novelId, sectionId),
           services.character.listCharacters(novelId),
           services.setting.listSettings(novelId),
         ]);
@@ -95,7 +96,7 @@ ${instructions ? `【追加執筆指示】\n${instructions}\n` : ""}
       const [novelDetail, sectionData, characters, settings, foreshadowings] =
         await Promise.all([
           services.novel.getNovelDetail(novelId),
-          services.section.getSectionWithContent(sectionId),
+          assertSectionBelongsToNovel(services, novelId, sectionId),
           services.character.listCharacters(novelId),
           services.setting.listSettings(novelId),
           services.foreshadowing.getForeshadowingsByNovel(novelId),

@@ -1,5 +1,9 @@
 {
   "servers": {
+    "novel-creator": {
+      "type": "http",
+      "url": "http://localhost:3000/api/mcp"
+    },
     "storybook-mcp": {
       "type": "http",
       "url": "http://localhost:6006/mcp"

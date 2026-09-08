@@ -4,6 +4,7 @@ import {
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { DomainServices } from "../core/services.js";
 import type { ServiceContext } from "../core/types.js";
+import { assertSectionBelongsToNovel } from "./section-guard.js";
 
 /**
  * MCP リソース群を McpServer インスタンスへ登録する。
@@ -95,10 +96,12 @@ export function registerMcpResources(
     new ResourceTemplate("novel://{novelId}/section/{sectionId}", {
       list: undefined,
     }),
-    async (uri, { sectionId }) => {
-      const sId = String(sectionId);
-      const sectionWithContent =
-        await services.section.getSectionWithContent(sId);
+    async (uri, { novelId, sectionId }) => {
+      const sectionWithContent = await assertSectionBelongsToNovel(
+        services,
+        String(novelId),
+        String(sectionId)
+      );
       return {
         contents: [
           {

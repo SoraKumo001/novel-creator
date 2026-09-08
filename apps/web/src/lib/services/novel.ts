@@ -12,7 +12,7 @@ export async function fetchNovels(): Promise<Novel[]> {
   if (!res.ok) {
     throw await parseResponseError(res, "小説一覧の取得");
   }
-  const rows = await res.json();
+  const rows = (await res.json()) as Novel[];
   return rows.map((n) => ({
     id: n.id,
     title: n.title,
@@ -28,7 +28,7 @@ export async function fetchNovelDetail(id: string): Promise<NovelDetail> {
   if (!res.ok) {
     throw await parseResponseError(res, "小説詳細の取得");
   }
-  const n = await res.json();
+  const n = (await res.json()) as NovelDetail;
   return {
     id: n.id,
     title: n.title,
@@ -80,7 +80,7 @@ export async function createNovel(input: CreateNovelInput): Promise<Novel> {
   if (!res.ok) {
     throw await parseResponseError(res, "小説の作成");
   }
-  const row = await res.json();
+  const row = (await res.json()) as Novel;
   return {
     id: row.id,
     title: row.title,
@@ -107,7 +107,7 @@ export async function updateNovel(
   if (!res.ok) {
     throw await parseResponseError(res, "小説の更新");
   }
-  const row = await res.json();
+  const row = (await res.json()) as Novel;
   return {
     id: row.id,
     title: row.title,
@@ -268,7 +268,7 @@ export async function fetchNovelExportData(id: string) {
     throw await parseResponseError(chaptersRes, "章データの取得");
   }
 
-  const novel = await novelRes.json();
+  const novel = (await novelRes.json()) as Novel;
   const rawChapters = await chaptersRes.json();
 
   const chaptersWithSections = await Promise.all(

@@ -2,9 +2,11 @@ import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { EmbeddingConfigSection } from "@/components/settings/EmbeddingConfigSection.js";
 import { LLMConfigSection } from "@/components/settings/LLMConfigSection.js";
+import { McpKeySection } from "@/components/settings/McpKeySection.js";
 import { useCustomPrompts } from "@/hooks/useCustomPrompts.js";
 import { useEmbeddingConfigs } from "@/hooks/useEmbeddingConfigs.js";
 import { useLLMConfigs } from "@/hooks/useLLMConfigs.js";
+import { useMcpKeys } from "@/hooks/useMcpKeys.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import { streamReindex } from "@/lib/services/vector.js";
@@ -71,6 +73,9 @@ export function SettingsPage() {
     deletePrompt,
     seedPresets,
   } = useCustomPrompts({ autoFetch: true });
+
+  // MCP APIキー（件数はタブ表示用。Section本体は自己完結で同クエリを共有する）
+  const { keys: mcpKeys } = useMcpKeys();
 
   const toast = useToast();
 
@@ -229,6 +234,7 @@ export function SettingsPage() {
         llmCount={llmConfigs.length}
         embeddingCount={embeddingConfigs.length}
         promptCount={customPrompts.length}
+        mcpKeyCount={mcpKeys.length}
       />
 
       {/* LLM タブ */}
@@ -275,6 +281,9 @@ export function SettingsPage() {
           onDelete={setDeleteTargetPrompt}
         />
       )}
+
+      {/* MCP APIキー タブ */}
+      {activeTab === "mcp" && <McpKeySection />}
 
       {/* モーダル群 */}
       <SettingsModals

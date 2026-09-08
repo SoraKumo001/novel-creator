@@ -24,7 +24,7 @@ export async function fetchCustomPrompts(
   if (!res.ok) {
     throw await parseResponseError(res, "カスタムプロンプト一覧の取得");
   }
-  const data = await res.json();
+  const data = (await res.json()) as CustomPrompt[];
   return data;
 }
 
@@ -46,7 +46,7 @@ export async function createCustomPrompt(
   if (!res.ok) {
     throw await parseResponseError(res, "カスタムプロンプトの作成");
   }
-  const data = await res.json();
+  const data = (await res.json()) as CustomPrompt;
   return data;
 }
 
@@ -61,7 +61,7 @@ export async function updateCustomPrompt(
   if (!res.ok) {
     throw await parseResponseError(res, "カスタムプロンプトの更新");
   }
-  const data = await res.json();
+  const data = (await res.json()) as CustomPrompt;
   return data;
 }
 
@@ -79,6 +79,6 @@ export async function seedDefaultCustomPrompts(): Promise<CustomPrompt[]> {
   if (!res.ok) {
     throw await parseResponseError(res, "デフォルトプリセットの復元");
   }
-  const data = await res.json();
+  const data = (await res.json()) as CustomPrompt[];
   return data;
 }

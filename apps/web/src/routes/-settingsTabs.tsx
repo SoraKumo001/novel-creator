@@ -1,9 +1,10 @@
-export type SettingsTab = "llm" | "embedding" | "prompt";
+export type SettingsTab = "llm" | "embedding" | "prompt" | "mcp";
 
 export interface SettingsTabsProps {
   activeTab: SettingsTab;
   embeddingCount: number;
   llmCount: number;
+  mcpKeyCount?: number;
   onChange: (tab: SettingsTab) => void;
   promptCount: number;
 }
@@ -17,6 +18,7 @@ export function SettingsTabs({
   llmCount,
   embeddingCount,
   promptCount,
+  mcpKeyCount = 0,
 }: SettingsTabsProps): React.JSX.Element {
   return (
     <nav className="border-border border-b">
@@ -56,6 +58,18 @@ export function SettingsTabs({
         >
           <span aria-hidden="true">🪄</span>
           <span>カスタムプロンプト ({promptCount})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange("mcp")}
+          className={`group flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 font-medium text-sm transition ${
+            activeTab === "mcp"
+              ? "border-primary bg-primary/5 font-semibold text-primary"
+              : "border-transparent text-muted-foreground hover:border-border hover:bg-surface-hover hover:text-foreground"
+          }`}
+        >
+          <span aria-hidden="true">🔑</span>
+          <span>MCP APIキー ({mcpKeyCount})</span>
         </button>
       </div>
     </nav>

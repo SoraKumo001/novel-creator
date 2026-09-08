@@ -1,89 +1,46 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { Hono } from "hono";
 import type { AppContext } from "../context.js";
+import { verifyMcpKey } from "../core/mcp-key.service.js";
 import { getServices } from "../core/services.js";
 import { createNovelCreatorMcpServer } from "../mcp/server.js";
-import { appLogger } from "../middleware/logger.js";
 
 const mcpRouter = new Hono<AppContext>();
 
-// MCP API Key 認証ミドルウェア（MCP_API_KEY が設定されている場合は検証）
+// MCP 認証ミドルウェア（fail-closed）。
+// Web 発行キー（mcp_api_keys）のみを検証する。合致しなければ 401。
 mcpRouter.use("*", async (c, next) => {
-  const env = c.get("env") as Record<string, unknown> | undefined;
-  const mcpApiKey = (env?.MCP_API_KEY || process.env.MCP_API_KEY) as
-    | string
-    | undefined;
+  const authHeader = c.req.header("Authorization");
+  const apiKeyHeader = c.req.header("x-api-key");
+  const token = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7)
+    : apiKeyHeader;
 
-  if (mcpApiKey) {
-    const authHeader = c.req.header("Authorization");
-    const apiKeyHeader = c.req.header("x-api-key");
-    const token = authHeader?.startsWith("Bearer ")
-      ? authHeader.slice(7)
-      : apiKeyHeader;
-    if (token !== mcpApiKey) {
-      return c.json(
-        {
-          error: {
-            code: "UNAUTHORIZED",
-            message: "Invalid or missing MCP API Key",
-          },
-        },
-        401
-      );
+  if (token) {
+    const issued = await verifyMcpKey(c.get("db"), token);
+    if (issued) {
+      await next();
+      return;
     }
   }
-  await next();
+  return c.json(
+    {
+      error: {
+        code: "UNAUTHORIZED",
+        message: "Invalid or missing MCP API Key",
+      },
+    },
+    401
+  );
 });
 
-// アクティブな SSE トランスポートをセッションIDごとに管理
-const sseTransports = new Map<string, SSEServerTransport>();
-
 /**
- * GET /api/mcp/sse
- * SSE 接続を確立し、セッションを開始する。
+ * POST /api/mcp
+ * Streamable HTTP（Web Standard）エンドポイント。ステートレス運用。
+ * リクエストごとにサーバーを生成し、node:http には一切依存しないため
+ * Node.js / Cloudflare Workers の双方で動作する。
  */
-mcpRouter.get("/sse", async (c) => {
-  // @hono/node-server から生の req / res を取得
-  const envAny = c.env as unknown as {
-    incoming?: IncomingMessage;
-    outgoing?: ServerResponse;
-  };
-  const req = envAny.incoming;
-  const res = envAny.outgoing;
-
-  if (!req || !res) {
-    return c.json(
-      {
-        error: {
-          code: "NOT_SUPPORTED",
-          message:
-            "SSE transport is currently only supported in Node.js runtime",
-        },
-      },
-      501
-    );
-  }
-
-  // クエリまたはパス指定のエンドポイントURL（POST先）
-  const endpoint = "/api/mcp/messages";
-  const transport = new SSEServerTransport(endpoint, res);
-  const sessionId = transport.sessionId;
-  sseTransports.set(sessionId, transport);
-
-  transport.onclose = () => {
-    appLogger.info(`[MCP SSE] Connection closed for session ${sessionId}`);
-    sseTransports.delete(sessionId);
-  };
-
-  transport.onerror = (error) => {
-    appLogger.error(
-      `[MCP SSE] Transport error for session ${sessionId}:`,
-      error
-    );
-    sseTransports.delete(sessionId);
-  };
-
+mcpRouter.post("/", async (c) => {
   const services = getServices(c);
   const server = createNovelCreatorMcpServer(services, {
     db: c.get("db"),
@@ -93,64 +50,27 @@ mcpRouter.get("/sse", async (c) => {
     vectorStore: c.get("vectorStore"),
   });
 
+  const transport = new WebStandardStreamableHTTPServerTransport({
+    sessionIdGenerator: undefined,
+  });
   await server.connect(transport);
-  appLogger.info(`[MCP SSE] Client connected with sessionId: ${sessionId}`);
-
-  // Hono のレスポンスは Node の res に直接書き込まれるため空で返却
-  return new Response(null);
-});
-
-/**
- * POST /api/mcp/messages
- * クライアントからの JSON-RPC メッセージを受信・処理する。
- */
-mcpRouter.post("/messages", async (c) => {
-  const envAny = c.env as unknown as {
-    incoming?: IncomingMessage;
-    outgoing?: ServerResponse;
-  };
-  const req = envAny.incoming;
-  const res = envAny.outgoing;
-
-  if (!req || !res) {
-    return c.json(
-      {
-        error: {
-          code: "NOT_SUPPORTED",
-          message:
-            "SSE transport is currently only supported in Node.js runtime",
-        },
-      },
-      501
-    );
-  }
-
-  const sessionId = c.req.query("sessionId");
-  if (!sessionId) {
-    return c.json(
-      {
-        error: {
-          code: "BAD_REQUEST",
-          message: "sessionId query parameter is required",
-        },
-      },
-      400
-    );
-  }
-
-  const transport = sseTransports.get(sessionId);
-  if (!transport) {
-    return c.json(
-      {
-        error: { code: "NOT_FOUND", message: `Session ${sessionId} not found` },
-      },
-      404
-    );
-  }
 
   const parsedBody = await c.req.json().catch(() => undefined);
-  await transport.handlePostMessage(req, res, parsedBody);
-  return new Response(null);
+  return transport.handleRequest(c.req.raw, { parsedBody });
 });
+
+// Streamable HTTP では GET / DELETE によるストリーム確立・セッション終了は
+// ステートレス運用の対象外のため 405 を返す。
+mcpRouter.on(["GET", "DELETE"], "/", (c) =>
+  c.json(
+    {
+      error: {
+        code: "METHOD_NOT_ALLOWED",
+        message: "Use POST /api/mcp for Streamable HTTP requests",
+      },
+    },
+    405
+  )
+);
 
 export default mcpRouter;

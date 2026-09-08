@@ -69,3 +69,8 @@ export const embeddingConfigKeys = {
   all: ["embeddingConfigs"] as const,
   detail: (id: string) => ["embeddingConfigs", id] as const,
 };
+
+export const mcpKeyKeys = {
+  all: ["mcpKeys"] as const,
+  detail: (id: string) => ["mcpKeys", id] as const,
+};

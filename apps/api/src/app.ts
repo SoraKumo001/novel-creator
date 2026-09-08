@@ -21,6 +21,7 @@ import historiesRouter from "./routes/histories.js";
 import llmConfigsRouter from "./routes/llm-configs.js";
 import llmInstructionsRouter from "./routes/llm-instructions.js";
 import mcpRouter from "./routes/mcp.js";
+import mcpKeysRouter from "./routes/mcp-keys.js";
 import novelsRouter from "./routes/novels.js";
 import sectionsRouter from "./routes/sections.js";
 import settingsRouter from "./routes/settings.js";
@@ -47,6 +48,7 @@ export const api = new Hono<AppContext>()
   .route("/backup", backupRouter)
   .route("/histories", historiesRouter)
   .route("/custom-prompts", customPromptsRouter)
+  .route("/mcp-keys", mcpKeysRouter)
   .route("/users", usersRouter);
 
 // Hono RPC 用のアプリケーション型定義

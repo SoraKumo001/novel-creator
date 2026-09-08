@@ -10,6 +10,7 @@ export * from "./embeddingConfigs.js";
 export * from "./foreshadowings.js";
 export * from "./llmConfigs.js";
 export * from "./llmInstructions.js";
+export * from "./mcpApiKeys.js";
 export * from "./novel-members.js";
 export * from "./novels.js";
 export * from "./sections.js";

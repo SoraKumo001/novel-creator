@@ -12,6 +12,7 @@ export * from "./generate.js";
 export * from "./history.js";
 export * from "./llmConfig.js";
 export * from "./llmInstruction.js";
+export * from "./mcpKey.js";
 export * from "./novel.js";
 export * from "./section.js";
 export * from "./setting.js";

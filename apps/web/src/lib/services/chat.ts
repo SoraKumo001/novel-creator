@@ -17,7 +17,7 @@ export async function fetchChatSessions(
   if (!res.ok) {
     throw await parseResponseError(res, "チャットセッション一覧の取得");
   }
-  const rows = await res.json();
+  const rows = (await res.json()) as ChatSession[];
   return rows.map((s) => ({
     id: s.id,
     novelId: s.novelId || null,
@@ -32,7 +32,7 @@ export async function fetchChatSession(id: string): Promise<ChatSessionDetail> {
   if (!res.ok) {
     throw await parseResponseError(res, "チャットセッション詳細の取得");
   }
-  const s = await res.json();
+  const s = (await res.json()) as ChatSessionDetail;
   return {
     id: s.id,
     novelId: s.novelId || null,
@@ -63,7 +63,7 @@ export async function createChatSession(
   if (!res.ok) {
     throw await parseResponseError(res, "チャットセッションの作成");
   }
-  const s = await res.json();
+  const s = (await res.json()) as ChatSession;
   return {
     id: s.id,
     novelId: s.novelId || null,
@@ -86,7 +86,7 @@ export async function updateChatSession(
   if (!res.ok) {
     throw await parseResponseError(res, "チャットセッションの更新");
   }
-  const s = await res.json();
+  const s = (await res.json()) as ChatSession;
   return {
     id: s.id,
     novelId: s.novelId || null,

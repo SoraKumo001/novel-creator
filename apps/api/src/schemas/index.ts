@@ -6,6 +6,7 @@ export * from "./customPrompt.js";
 export * from "./foreshadowing.js";
 export * from "./history.js";
 export * from "./llm.js";
+export * from "./mcpKey.js";
 export * from "./novel.js";
 export * from "./params.js";
 export * from "./setting.js";
