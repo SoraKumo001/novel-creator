@@ -20,6 +20,7 @@ import foreshadowingsRouter from "./routes/foreshadowings.js";
 import historiesRouter from "./routes/histories.js";
 import llmConfigsRouter from "./routes/llm-configs.js";
 import llmInstructionsRouter from "./routes/llm-instructions.js";
+import mcpRouter from "./routes/mcp.js";
 import novelsRouter from "./routes/novels.js";
 import sectionsRouter from "./routes/sections.js";
 import settingsRouter from "./routes/settings.js";
@@ -117,10 +118,14 @@ export function createApp(context: AppContext["Variables"]) {
     return auth.handler(c.req.raw);
   });
 
-  // /api 配下は default-deny で認証を要求する（/api/auth/** のみ除外）。
+  // /api 配下は default-deny で認証を要求する（/api/auth/** および /api/mcp/** のみ除外）。
   // use は登録順序によらずマッチするため、パスで明示的に除外する。
   app.use("/api/*", async (c, next) => {
     if (c.req.path === "/api/auth" || c.req.path.startsWith("/api/auth/")) {
+      await next();
+      return;
+    }
+    if (c.req.path === "/api/mcp" || c.req.path.startsWith("/api/mcp/")) {
       await next();
       return;
     }
@@ -128,6 +133,7 @@ export function createApp(context: AppContext["Variables"]) {
   });
 
   // ルーター登録
+  app.route("/api/mcp", mcpRouter);
   app.route("/api", api);
   app.get("/health", (c) => c.json({ status: "ok" as const }));
 
