@@ -14,6 +14,7 @@ import type { EmbeddingModel, LanguageModel } from "ai";
 import type { Env as HonoEnv } from "hono";
 
 import { createDomainServices, type DomainServices } from "./core/services.js";
+import type { McpAuth } from "./core/types.js";
 
 /**
  * Hono の Context 変数として注入される DI コンテキスト。
@@ -42,6 +43,7 @@ export interface AppContext extends HonoEnv {
     embedding: EmbeddingModel;
     vectorStore: VectorStore;
     services: DomainServices;
+    mcpAuth?: McpAuth;
     user?: AuthUser;
     session?: AuthSession;
   };

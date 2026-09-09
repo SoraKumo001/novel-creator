@@ -2,16 +2,19 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { DomainServices } from "../core/services.js";
 import type { ServiceContext } from "../core/types.js";
+import { assertNovelScope } from "./scope-guard.js";
 import { assertSectionBelongsToNovel } from "./section-guard.js";
 
 /**
  * MCP プロンプト群を McpServer インスタンスへ登録する。
+ * novelId を受け取る入口では先にスコープガードを適用する。
  */
 export function registerMcpPrompts(
   server: McpServer,
   services: DomainServices,
-  _ctx: ServiceContext
+  ctx: ServiceContext
 ): void {
+  const auth = ctx.mcpAuth;
   // 節本文の執筆プロンプト
   server.prompt(
     "draft_section",
@@ -27,6 +30,7 @@ export function registerMcpPrompts(
       sectionId: z.string().describe("執筆対象の節ID (UUID)"),
     },
     async ({ novelId, sectionId, instructions }) => {
+      assertNovelScope(auth, novelId);
       const [novelDetail, sectionData, characters, settings] =
         await Promise.all([
           services.novel.getNovelDetail(novelId),
@@ -93,6 +97,7 @@ ${instructions ? `【追加執筆指示】\n${instructions}\n` : ""}
       sectionId: z.string().describe("対象の節ID (UUID)"),
     },
     async ({ novelId, sectionId }) => {
+      assertNovelScope(auth, novelId);
       const [novelDetail, sectionData, characters, settings, foreshadowings] =
         await Promise.all([
           services.novel.getNovelDetail(novelId),
@@ -164,6 +169,7 @@ ${foreshadowings.map((f) => `- ${f.title} (${f.status}): ${f.description || ""}`
       novelId: z.string().describe("小説ID (UUID)"),
     },
     async ({ novelId, focusTopic }) => {
+      assertNovelScope(auth, novelId);
       const [novelDetail, outlineMarkdown, unresolvedForeshadowings] =
         await Promise.all([
           services.novel.getNovelDetail(novelId),

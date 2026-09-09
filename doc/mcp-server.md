@@ -90,6 +90,32 @@ curl -X POST http://localhost:3000/api/mcp \
 - 不一致時は `NotFoundError("Section", sectionId)` を投げ、error-handler の 404 変換に載せる（別小説の節 ID 推測による横断参照を 404 で遮断）。
 - 適用箇所: `section-content` リソース、`draft_section` / `review_consistency` プロンプト。
 
+## スコープ強制（MCPキー単位の小説制限）
+
+- 実装: `apps/api/src/mcp/scope-guard.ts` の `assertNovelScope(auth, novelId)`。`verifyMcpKey` の `novelId` を Hono context 経由で `ServiceContext.mcpAuth` として伝搬する。
+- `novelId` 付きキー（スコープキー）は当該小説のみ許可。不一致時は `NotFoundError("Novel", id)` で 404 化する（403 にしないことで他小説の存在を漏らさない）。
+- `novelId` が null の全体キーは全小説にアクセス可。`list_novels` は該当のみ返却、`create_novel` はスコープキー時拒否。
+- ID系入口（章・節・人物・設定・伏線・履歴）は所有者解決ガードで同等に制限する。
+
+## 監査ログ
+
+- 実装: `apps/api/src/mcp/audit.ts`（`logMcpAuthFailure` / `logMcpToolEvent` / `logMcpRequest`）。`appLogger` 経由のみで出力する。
+- 出してよいのは prefix 先頭8文字・keyId・tool名・novelId・duration・status のみ。平文キー・PII・ツール引数は出さない。
+- 401 時に `missing` / `invalid` を warn、POST 成功/失敗時に method・duration を info/error で出す。
+
+## レート制限・タイムアウト
+
+- 実装: `apps/api/src/mcp/rate-limit.ts`（Workers対応インメモリ token-bucket、per-key + per-IP の多層評価）。
+- 既定 60 req/min（burst 10）、高コスト系（`search_novel_knowledge` / `batch_*`）は別バケット 10/min。超過時は 429 `{ error:{code:RATE_LIMITED} }` + `Retry-After`。
+- `transport.handleRequest` は 30s タイムアウトで 504 `{ error:{code:TIMEOUT} }`、Abort 時はキャンセルする。
+
+## ヘルスチェック・メトリクス
+
+- `GET /health` は既存互換（`{status:ok}`）。`GET /healthz` は DB 疎通（`SELECT 1`、失敗時 503）。
+- `GET /api/mcp/health` は認証不要で `{status, mcp:{tools:50,resources:5,prompts:3}, stats}` を返す。
+- `GET /api/mcp/metrics` は認証要（default-deny 維持）で Prometheus 風テキスト（`mcp_tool_events_total` 等）を返す。
+- 集計は `apps/api/src/mcp/stats.ts` のインメモリカウンタ（`recordMcpEvent` / `getMcpStats`）で行う。
+
 ## Workers 注意
 
 - HTTP 系は `WebStandardStreamableHTTPServerTransport`（Web 標準 Request/Response）のため Node.js / Workers 双方で動作する。

@@ -1,19 +1,30 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { DomainServices } from "../core/services.js";
-import type { ServiceContext } from "../core/types.js";
+import { type ServiceContext, ValidationError } from "../core/types.js";
 import { appLogger } from "../middleware/logger.js";
 import { searchContext } from "../rag.js";
+import {
+  assertChapterScope,
+  assertCharacterScope,
+  assertForeshadowingScope,
+  assertHistoryScope,
+  assertNovelScope,
+  assertSectionScope,
+  assertSettingScope,
+} from "./scope-guard.js";
 import { assertSectionBelongsToNovel } from "./section-guard.js";
 
 /**
  * MCP ツール群を McpServer インスタンスへ登録する。
+ * novelId を受け取る入口では先にスコープガードを適用する。
  */
 export function registerMcpTools(
   server: McpServer,
   services: DomainServices,
   ctx: ServiceContext
 ): void {
+  const auth = ctx.mcpAuth;
   // ==========================================
   // 1. 小説管理 (Novels)
   // ==========================================
@@ -21,6 +32,12 @@ export function registerMcpTools(
   server.tool("list_novels", "小説一覧を取得します。", {}, async () => {
     try {
       const novels = await services.novel.listNovels();
+      if (auth?.novelId) {
+        const scoped = novels.filter((n) => n.id === auth.novelId);
+        return {
+          content: [{ type: "text", text: JSON.stringify(scoped, null, 2) }],
+        };
+      }
       return {
         content: [{ type: "text", text: JSON.stringify(novels, null, 2) }],
       };
@@ -45,6 +62,7 @@ export function registerMcpTools(
     },
     async ({ novelId }) => {
       try {
+        assertNovelScope(auth, novelId);
         const detail = await services.novel.getNovelDetail(novelId);
         return {
           content: [{ type: "text", text: JSON.stringify(detail, null, 2) }],
@@ -80,6 +98,9 @@ export function registerMcpTools(
     },
     async ({ title, description, styleGuide, storyOutline }) => {
       try {
+        if (auth?.novelId) {
+          throw new ValidationError("Scoped MCP key cannot create novels");
+        }
         const novel = await services.novel.createNovel({
           description,
           storyOutline,
@@ -126,6 +147,7 @@ export function registerMcpTools(
     },
     async ({ novelId, title, description, styleGuide, storyOutline }) => {
       try {
+        assertNovelScope(auth, novelId);
         const updated = await services.novel.updateNovel(novelId, {
           description,
           storyOutline,
@@ -162,6 +184,7 @@ export function registerMcpTools(
     },
     async ({ novelId }) => {
       try {
+        assertNovelScope(auth, novelId);
         await services.novel.deleteNovel(novelId);
         return {
           content: [
@@ -202,6 +225,7 @@ export function registerMcpTools(
     },
     async ({ novelId, format }) => {
       try {
+        assertNovelScope(auth, novelId);
         if (format === "markdown") {
           const markdown = await services.chapter.getMarkdown(novelId);
           return {
@@ -245,6 +269,7 @@ export function registerMcpTools(
     },
     async ({ novelId, markdown }) => {
       try {
+        assertNovelScope(auth, novelId);
         const result = await services.chapter.saveMarkdown(novelId, markdown);
         return {
           content: [
@@ -279,6 +304,7 @@ export function registerMcpTools(
     },
     async ({ novelId, title, order, summary }) => {
       try {
+        assertNovelScope(auth, novelId);
         const chapter = await services.chapter.createChapter({
           novelId,
           order,
@@ -318,6 +344,7 @@ export function registerMcpTools(
     },
     async ({ chapterId, title, order, summary }) => {
       try {
+        await assertChapterScope(services, auth, chapterId);
         const chapter = await services.chapter.updateChapter(chapterId, {
           order,
           summary,
@@ -353,6 +380,7 @@ export function registerMcpTools(
     },
     async ({ chapterId }) => {
       try {
+        await assertChapterScope(services, auth, chapterId);
         await services.chapter.deleteChapter(chapterId);
         return {
           content: [
@@ -384,6 +412,7 @@ export function registerMcpTools(
     },
     async ({ chapterId, title, order, summary }) => {
       try {
+        await assertChapterScope(services, auth, chapterId);
         const section = await services.section.createSection({
           chapterId,
           order,
@@ -423,6 +452,7 @@ export function registerMcpTools(
     },
     async ({ sectionId, title, order, summary }) => {
       try {
+        await assertSectionScope(services, auth, sectionId);
         const section = await services.section.updateSection(sectionId, {
           order,
           summary,
@@ -458,6 +488,7 @@ export function registerMcpTools(
     },
     async ({ sectionId }) => {
       try {
+        await assertSectionScope(services, auth, sectionId);
         await services.section.deleteSection(sectionId);
         return {
           content: [
@@ -490,6 +521,7 @@ export function registerMcpTools(
     },
     async ({ sectionId }) => {
       try {
+        await assertSectionScope(services, auth, sectionId);
         const sectionWithContent =
           await services.section.getSectionWithContent(sectionId);
         return {
@@ -525,6 +557,7 @@ export function registerMcpTools(
     },
     async ({ sectionId, body, description }) => {
       try {
+        await assertSectionScope(services, auth, sectionId);
         const updated = await services.content.updateContent(
           sectionId,
           body,
@@ -569,6 +602,7 @@ export function registerMcpTools(
     },
     async ({ novelId, category, name }) => {
       try {
+        assertNovelScope(auth, novelId);
         let list = await services.character.listCharacters(novelId);
         if (category) {
           list = list.filter((c) => c.category === category);
@@ -606,6 +640,7 @@ export function registerMcpTools(
     },
     async ({ characterId }) => {
       try {
+        await assertCharacterScope(services, auth, characterId);
         const character = await services.character.getCharacter(characterId);
         return {
           content: [{ type: "text", text: JSON.stringify(character, null, 2) }],
@@ -646,6 +681,7 @@ export function registerMcpTools(
     },
     async ({ novelId, name, category, description, traits }) => {
       try {
+        assertNovelScope(auth, novelId);
         const character = await services.character.createCharacter({
           category,
           description,
@@ -687,6 +723,7 @@ export function registerMcpTools(
     },
     async ({ characterId, name, category, description, traits }) => {
       try {
+        await assertCharacterScope(services, auth, characterId);
         const updated = await services.character.updateCharacter(characterId, {
           category,
           description,
@@ -723,6 +760,7 @@ export function registerMcpTools(
     },
     async ({ characterId }) => {
       try {
+        await assertCharacterScope(services, auth, characterId);
         await services.character.deleteCharacter(characterId);
         return {
           content: [
@@ -755,6 +793,7 @@ export function registerMcpTools(
     },
     async ({ novelId, markdown }) => {
       try {
+        assertNovelScope(auth, novelId);
         const result = await services.character.saveMarkdown(novelId, markdown);
         return {
           content: [
@@ -800,6 +839,7 @@ export function registerMcpTools(
     },
     async ({ novelId, category, name }) => {
       try {
+        assertNovelScope(auth, novelId);
         let list = await services.setting.listSettings(novelId, category);
         if (name) {
           const q = name.toLowerCase();
@@ -834,6 +874,7 @@ export function registerMcpTools(
     },
     async ({ settingId }) => {
       try {
+        await assertSettingScope(services, auth, settingId);
         const setting = await services.setting.getSetting(settingId);
         return {
           content: [{ type: "text", text: JSON.stringify(setting, null, 2) }],
@@ -870,6 +911,7 @@ export function registerMcpTools(
     },
     async ({ novelId, category, name, description }) => {
       try {
+        assertNovelScope(auth, novelId);
         const setting = await services.setting.createSetting({
           category,
           description,
@@ -909,6 +951,7 @@ export function registerMcpTools(
     },
     async ({ settingId, category, name, description }) => {
       try {
+        await assertSettingScope(services, auth, settingId);
         const updated = await services.setting.updateSetting(settingId, {
           category,
           description,
@@ -944,6 +987,7 @@ export function registerMcpTools(
     },
     async ({ settingId }) => {
       try {
+        await assertSettingScope(services, auth, settingId);
         await services.setting.deleteSetting(settingId);
         return {
           content: [
@@ -973,6 +1017,7 @@ export function registerMcpTools(
     },
     async ({ novelId, markdown }) => {
       try {
+        assertNovelScope(auth, novelId);
         const result = await services.setting.saveMarkdown(novelId, markdown);
         return {
           content: [
@@ -1014,6 +1059,7 @@ export function registerMcpTools(
     },
     async ({ novelId, status }) => {
       try {
+        assertNovelScope(auth, novelId);
         let list =
           await services.foreshadowing.getForeshadowingsByNovel(novelId);
         if (status) {
@@ -1066,6 +1112,10 @@ export function registerMcpTools(
       plantSectionId,
     }) => {
       try {
+        assertNovelScope(auth, novelId);
+        if (plantSectionId) {
+          await assertSectionScope(services, auth, plantSectionId);
+        }
         const item = await services.foreshadowing.createForeshadowing(novelId, {
           category,
           description,
@@ -1123,6 +1173,10 @@ export function registerMcpTools(
       resolveSectionId,
     }) => {
       try {
+        await assertForeshadowingScope(services, auth, foreshadowingId);
+        if (resolveSectionId) {
+          await assertSectionScope(services, auth, resolveSectionId);
+        }
         const updated = await services.foreshadowing.updateForeshadowing(
           foreshadowingId,
           {
@@ -1162,6 +1216,7 @@ export function registerMcpTools(
     },
     async ({ foreshadowingId }) => {
       try {
+        await assertForeshadowingScope(services, auth, foreshadowingId);
         await services.foreshadowing.deleteForeshadowing(foreshadowingId);
         return {
           content: [
@@ -1197,6 +1252,7 @@ export function registerMcpTools(
     },
     async ({ novelId }) => {
       try {
+        assertNovelScope(auth, novelId);
         const list = await services.timeline.listTimelines(novelId);
         return {
           content: [{ type: "text", text: JSON.stringify(list, null, 2) }],
@@ -1230,6 +1286,10 @@ export function registerMcpTools(
     },
     async ({ novelId, event, timestamp, order, sectionId }) => {
       try {
+        assertNovelScope(auth, novelId);
+        if (sectionId) {
+          await assertSectionScope(services, auth, sectionId);
+        }
         const item = await services.timeline.createTimeline({
           event,
           novelId,
@@ -1344,6 +1404,7 @@ export function registerMcpTools(
     },
     async ({ novelId, query, topK }) => {
       try {
+        assertNovelScope(auth, novelId);
         const results = await searchContext(
           ctx.vectorStore,
           ctx.embedding,
@@ -1381,6 +1442,7 @@ export function registerMcpTools(
     },
     async ({ chapterId }) => {
       try {
+        await assertChapterScope(services, auth, chapterId);
         const result = await services.chapter.getChapterWithSections(chapterId);
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
@@ -1415,7 +1477,8 @@ export function registerMcpTools(
           const guarded = await assertSectionBelongsToNovel(
             services,
             novelId,
-            sectionId
+            sectionId,
+            auth
           );
           return {
             content: [
@@ -1423,6 +1486,7 @@ export function registerMcpTools(
             ],
           };
         }
+        await assertSectionScope(services, auth, sectionId);
         const { section } =
           await services.section.getSectionWithContent(sectionId);
         return {
@@ -1459,6 +1523,7 @@ export function registerMcpTools(
     },
     async ({ novelId, entityType, entityId, limit }) => {
       try {
+        assertNovelScope(auth, novelId);
         const list = await services.history.listHistories(novelId, {
           entityId,
           entityType,
@@ -1489,6 +1554,7 @@ export function registerMcpTools(
     },
     async ({ historyId }) => {
       try {
+        await assertHistoryScope(services, auth, historyId);
         const history = await services.history.getHistory(historyId);
         return {
           content: [{ type: "text", text: JSON.stringify(history, null, 2) }],
@@ -1524,6 +1590,7 @@ export function registerMcpTools(
     },
     async ({ novelId, sectionIds }) => {
       try {
+        assertNovelScope(auth, novelId);
         const ok: Array<Record<string, unknown>> = [];
         const ng: Array<Record<string, unknown>> = [];
         for (const sectionId of sectionIds) {
@@ -1531,7 +1598,8 @@ export function registerMcpTools(
             const { section, content } = await assertSectionBelongsToNovel(
               services,
               novelId,
-              sectionId
+              sectionId,
+              auth
             );
             ok.push({ content, section, sectionId });
           } catch (error) {
@@ -1586,6 +1654,9 @@ export function registerMcpTools(
     },
     async ({ novelId, items, description }) => {
       try {
+        if (novelId) {
+          assertNovelScope(auth, novelId);
+        }
         const ok: Array<Record<string, unknown>> = [];
         const ng: Array<Record<string, unknown>> = [];
         for (const item of items) {
@@ -1594,8 +1665,11 @@ export function registerMcpTools(
               await assertSectionBelongsToNovel(
                 services,
                 novelId,
-                item.sectionId
+                item.sectionId,
+                auth
               );
+            } else {
+              await assertSectionScope(services, auth, item.sectionId);
             }
             const updated = await services.content.updateContent(
               item.sectionId,
@@ -1670,10 +1744,14 @@ export function registerMcpTools(
     },
     async ({ novelId, items }) => {
       try {
+        assertNovelScope(auth, novelId);
         const ok: Array<Record<string, unknown>> = [];
         const ng: Array<Record<string, unknown>> = [];
         for (const [index, item] of items.entries()) {
           try {
+            if (item.plantSectionId) {
+              await assertSectionScope(services, auth, item.plantSectionId);
+            }
             const created = await services.foreshadowing.createForeshadowing(
               novelId,
               {
@@ -1745,6 +1823,14 @@ export function registerMcpTools(
         const ng: Array<Record<string, unknown>> = [];
         for (const [index, item] of items.entries()) {
           try {
+            await assertForeshadowingScope(
+              services,
+              auth,
+              item.foreshadowingId
+            );
+            if (item.resolveSectionId) {
+              await assertSectionScope(services, auth, item.resolveSectionId);
+            }
             const updated = await services.foreshadowing.updateForeshadowing(
               item.foreshadowingId,
               {
@@ -1805,10 +1891,14 @@ export function registerMcpTools(
     },
     async ({ novelId, items }) => {
       try {
+        assertNovelScope(auth, novelId);
         const ok: Array<Record<string, unknown>> = [];
         const ng: Array<Record<string, unknown>> = [];
         for (const [index, item] of items.entries()) {
           try {
+            if (item.sectionId) {
+              await assertSectionScope(services, auth, item.sectionId);
+            }
             const created = await services.timeline.createTimeline({
               event: item.event,
               novelId,
@@ -1916,6 +2006,7 @@ export function registerMcpTools(
     },
     async ({ novelId }) => {
       try {
+        assertNovelScope(auth, novelId);
         const markdown = await services.foreshadowing.getMarkdown(novelId);
         return {
           content: [{ type: "text", text: markdown }],
@@ -1943,6 +2034,7 @@ export function registerMcpTools(
     },
     async ({ novelId, markdown }) => {
       try {
+        assertNovelScope(auth, novelId);
         const result = await services.foreshadowing.saveMarkdown(
           novelId,
           markdown
@@ -1977,6 +2069,7 @@ export function registerMcpTools(
     },
     async ({ novelId }) => {
       try {
+        assertNovelScope(auth, novelId);
         const markdown = await services.timeline.getMarkdown(novelId);
         return {
           content: [{ type: "text", text: markdown }],
@@ -2004,6 +2097,7 @@ export function registerMcpTools(
     },
     async ({ novelId, markdown }) => {
       try {
+        assertNovelScope(auth, novelId);
         const result = await services.timeline.saveMarkdown(novelId, markdown);
         return {
           content: [

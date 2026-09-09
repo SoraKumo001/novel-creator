@@ -8,7 +8,19 @@ export interface ServiceContext {
   embedding: EmbeddingModel;
   env: Env;
   llm: LanguageModel;
+  mcpAuth?: McpAuth;
   vectorStore: VectorStore;
+}
+
+/**
+ * MCP 認証情報。verifyMcpKey で検証済みのキー情報を保持する。
+ * novelId が null の場合は全体キー（全小説にアクセス可）、
+ * 非 null の場合はスコープキー（当該小説のみアクセス可）。
+ */
+export interface McpAuth {
+  keyId: string;
+  novelId: string | null;
+  userId: string;
 }
 
 export class NotFoundError extends Error {

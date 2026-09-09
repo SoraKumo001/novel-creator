@@ -17,6 +17,7 @@ import contentsRouter from "./routes/contents.js";
 import { customPromptsRouter } from "./routes/custom-prompts.js";
 import embeddingConfigsRouter from "./routes/embedding-configs.js";
 import foreshadowingsRouter from "./routes/foreshadowings.js";
+import healthRouter from "./routes/health.js";
 import historiesRouter from "./routes/histories.js";
 import llmConfigsRouter from "./routes/llm-configs.js";
 import llmInstructionsRouter from "./routes/llm-instructions.js";
@@ -120,14 +121,25 @@ export function createApp(context: AppContext["Variables"]) {
     return auth.handler(c.req.raw);
   });
 
-  // /api 配下は default-deny で認証を要求する（/api/auth/** および /api/mcp/** のみ除外）。
+  // /api 配下は default-deny で認証を要求する。
+  // /api/mcp/health のみ default-deny から除外する。
+  // /api/mcp/metrics は除外せず認証を維持する（mcpRouter 側のキー認証ではなく
+  // セッション認証で保護する）。その他の /api/mcp/** は mcpRouter 側の
+  // キー認証に委ねる。
   // use は登録順序によらずマッチするため、パスで明示的に除外する。
   app.use("/api/*", async (c, next) => {
     if (c.req.path === "/api/auth" || c.req.path.startsWith("/api/auth/")) {
       await next();
       return;
     }
-    if (c.req.path === "/api/mcp" || c.req.path.startsWith("/api/mcp/")) {
+    if (c.req.path === "/api/mcp/metrics") {
+      return requireAuth(c, next);
+    }
+    if (
+      c.req.path === "/api/mcp/health" ||
+      c.req.path === "/api/mcp" ||
+      c.req.path.startsWith("/api/mcp/")
+    ) {
       await next();
       return;
     }
@@ -135,6 +147,7 @@ export function createApp(context: AppContext["Variables"]) {
   });
 
   // ルーター登録
+  app.route("/", healthRouter);
   app.route("/api/mcp", mcpRouter);
   app.route("/api", api);
   app.get("/health", (c) => c.json({ status: "ok" as const }));

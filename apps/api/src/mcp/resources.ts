@@ -4,22 +4,27 @@ import {
 } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { DomainServices } from "../core/services.js";
 import type { ServiceContext } from "../core/types.js";
+import { assertNovelScope } from "./scope-guard.js";
 import { assertSectionBelongsToNovel } from "./section-guard.js";
 
 /**
  * MCP リソース群を McpServer インスタンスへ登録する。
+ * novelId を受け取る入口では先にスコープガードを適用する。
  */
 export function registerMcpResources(
   server: McpServer,
   services: DomainServices,
-  _ctx: ServiceContext
+  ctx: ServiceContext
 ): void {
+  const auth = ctx.mcpAuth;
+
   // 小説サマリリソース: novel://{novelId}
   server.resource(
     "novel-summary",
     new ResourceTemplate("novel://{novelId}", { list: undefined }),
     async (uri, { novelId }) => {
       const id = String(novelId);
+      assertNovelScope(auth, id);
       const detail = await services.novel.getNovelDetail(id);
       return {
         contents: [
@@ -39,6 +44,7 @@ export function registerMcpResources(
     new ResourceTemplate("novel://{novelId}/outline", { list: undefined }),
     async (uri, { novelId }) => {
       const id = String(novelId);
+      assertNovelScope(auth, id);
       const markdown = await services.chapter.getMarkdown(id);
       return {
         contents: [
@@ -58,6 +64,7 @@ export function registerMcpResources(
     new ResourceTemplate("novel://{novelId}/characters", { list: undefined }),
     async (uri, { novelId }) => {
       const id = String(novelId);
+      assertNovelScope(auth, id);
       const characters = await services.character.listCharacters(id);
       return {
         contents: [
@@ -77,6 +84,7 @@ export function registerMcpResources(
     new ResourceTemplate("novel://{novelId}/settings", { list: undefined }),
     async (uri, { novelId }) => {
       const id = String(novelId);
+      assertNovelScope(auth, id);
       const settings = await services.setting.listSettings(id);
       return {
         contents: [
@@ -100,7 +108,8 @@ export function registerMcpResources(
       const sectionWithContent = await assertSectionBelongsToNovel(
         services,
         String(novelId),
-        String(sectionId)
+        String(sectionId),
+        auth
       );
       return {
         contents: [
