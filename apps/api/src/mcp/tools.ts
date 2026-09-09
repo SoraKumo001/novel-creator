@@ -1,7 +1,11 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { DomainServices } from "../core/services.js";
-import { type ServiceContext, ValidationError } from "../core/types.js";
+import {
+  NotFoundError,
+  type ServiceContext,
+  ValidationError,
+} from "../core/types.js";
 import { appLogger } from "../middleware/logger.js";
 import { searchContext } from "../rag.js";
 import {
@@ -2088,6 +2092,246 @@ export function registerMcpTools(
             {
               type: "text",
               text: `タイムラインMarkdownの同期に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  // ==========================================
+  // 11. アイデアストア (Ideas)
+  // ==========================================
+
+  server.tool(
+    "create_idea",
+    "新しいアイデアを登録します。発想プロンプトで出た案の保存先として使います。",
+    {
+      body: z.string().optional().describe("アイデアの詳細・展開メモ"),
+      novelId: z.string().describe("小説ID (UUID)"),
+      source: z
+        .string()
+        .optional()
+        .describe("出どころ（例: twist, what_if, character, seed, manual）"),
+      title: z.string().describe("アイデアのタイトル・概要"),
+    },
+    async ({ novelId, title, body, source }) => {
+      try {
+        assertNovelScope(auth, novelId);
+        const idea = await services.idea.createIdea(novelId, {
+          body,
+          source,
+          title,
+        });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `アイデアを登録しました:\n${JSON.stringify(idea, null, 2)}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `アイデアの登録に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "list_ideas",
+    "小説のアイデア一覧を取得します。status未指定時は却下済みを除外します。",
+    {
+      novelId: z.string().describe("小説ID (UUID)"),
+      status: z
+        .enum(["draft", "adopted", "rejected"])
+        .optional()
+        .describe("ステータス絞り込み（指定時のみ却下済みも返す）"),
+    },
+    async ({ novelId, status }) => {
+      try {
+        assertNovelScope(auth, novelId);
+        const list = await services.idea.listIdeas(novelId, { status });
+        return {
+          content: [{ type: "text", text: JSON.stringify(list, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `アイデア一覧の取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "update_idea",
+    "アイデアのタイトル・詳細を更新します。",
+    {
+      body: z.string().optional().describe("アイデアの詳細・展開メモ"),
+      ideaId: z.string().describe("アイデアID (UUID)"),
+      novelId: z.string().describe("小説ID (UUID、所属検証に使用)"),
+      title: z.string().optional().describe("アイデアのタイトル・概要"),
+    },
+    async ({ novelId, ideaId, title, body }) => {
+      try {
+        assertNovelScope(auth, novelId);
+        const idea = await services.idea.getIdea(ideaId);
+        if (idea.novelId !== novelId) {
+          throw new NotFoundError("Idea", ideaId);
+        }
+        const updated = await services.idea.updateIdea(ideaId, {
+          body,
+          title,
+        });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `アイデアを更新しました:\n${JSON.stringify(updated, null, 2)}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `アイデアの更新に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "set_idea_status",
+    "アイデアのステータスを変更します（draft/adopted/rejected）。",
+    {
+      ideaId: z.string().describe("アイデアID (UUID)"),
+      novelId: z.string().describe("小説ID (UUID、所属検証に使用)"),
+      status: z
+        .enum(["draft", "adopted", "rejected"])
+        .describe("変更後のステータス"),
+    },
+    async ({ novelId, ideaId, status }) => {
+      try {
+        assertNovelScope(auth, novelId);
+        const idea = await services.idea.getIdea(ideaId);
+        if (idea.novelId !== novelId) {
+          throw new NotFoundError("Idea", ideaId);
+        }
+        const updated = await services.idea.setIdeaStatus(ideaId, status);
+        const guide =
+          status === "adopted"
+            ? "\n採用した案はcreate_chapter等で反映してください。"
+            : "";
+        return {
+          content: [
+            {
+              type: "text",
+              text: `アイデア (ID: ${updated.id}) のステータスを${updated.status}に更新しました。${guide}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `アイデアのステータス更新に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "draw_story_seeds",
+    "人物・設定・年表からランダムに要素を抽出して組み合わせ、物語の種を提示します。",
+    {
+      count: z
+        .number()
+        .min(1)
+        .max(10)
+        .optional()
+        .default(3)
+        .describe("提示する種の数（1〜10、省略時は3）"),
+      novelId: z.string().describe("小説ID (UUID)"),
+    },
+    async ({ novelId, count }) => {
+      try {
+        assertNovelScope(auth, novelId);
+        const [characters, settings, timelines] = await Promise.all([
+          services.character.listCharacters(novelId).catch((): never[] => []),
+          services.setting.listSettings(novelId).catch((): never[] => []),
+          services.timeline.listTimelines(novelId).catch((): never[] => []),
+        ]);
+        const pick = <T>(items: T[]): T | null =>
+          items.length > 0
+            ? (items[Math.floor(Math.random() * items.length)] ?? null)
+            : null;
+        const seeds: Array<Record<string, unknown>> = [];
+        for (let i = 0; i < count; i += 1) {
+          const character = pick(characters);
+          const setting = pick(settings);
+          const timeline = pick(timelines);
+          if (!character && !setting && !timeline) {
+            continue;
+          }
+          const parts: string[] = [];
+          if (character) {
+            parts.push(`人物「${character.name}」`);
+          }
+          if (setting) {
+            parts.push(`設定「${setting.name}」`);
+          }
+          if (timeline) {
+            parts.push(`出来事「${timeline.event}」`);
+          }
+          seeds.push({
+            character: character?.name ?? null,
+            prompt: `${parts.join("と")}を掛け合わせた物語の種`,
+            setting: setting?.name ?? null,
+            timeline: timeline?.event ?? null,
+          });
+        }
+        if (seeds.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "まだ種になる要素（人物・設定・年表）が登録されていません。先に人物や設定を登録してください。",
+              },
+            ],
+          };
+        }
+        return {
+          content: [{ type: "text", text: JSON.stringify(seeds, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `物語の種の抽出に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
           isError: true,

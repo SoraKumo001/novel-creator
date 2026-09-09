@@ -15,7 +15,7 @@ interface McpServerInternals {
 /**
  * MCP スモーク契約テスト。
  * server 生成→initialize→tools/list の軽量契約と、
- * tools 50 / resources 5 / prompts 3 の件数固定のみを検証する。
+ * tools 55 / resources 5 / prompts 3 の件数固定のみを検証する。
  * 件数が実装数と乖離したら失敗させる。
  */
 describe("mcp smoke", () => {
@@ -26,9 +26,9 @@ describe("mcp smoke", () => {
     );
     const internals = server as unknown as McpServerInternals;
 
-    expect(Object.keys(internals._registeredTools)).toHaveLength(50);
+    expect(Object.keys(internals._registeredTools)).toHaveLength(55);
     expect(Object.keys(internals._registeredResourceTemplates)).toHaveLength(5);
-    expect(Object.keys(internals._registeredPrompts)).toHaveLength(3);
+    expect(Object.keys(internals._registeredPrompts)).toHaveLength(10);
   });
 
   it("initialize→tools/list が通ること", async () => {
@@ -59,7 +59,7 @@ describe("mcp smoke", () => {
       cursor = page.nextCursor;
     } while (cursor !== undefined);
 
-    expect(names).toHaveLength(50);
+    expect(names).toHaveLength(55);
     expect(names).toContain("get_novel");
     expect(names).toContain("delete_novel");
     await client.close();

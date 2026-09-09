@@ -8,6 +8,7 @@ export * from "./customPrompts.js";
 export * from "./editHistories.js";
 export * from "./embeddingConfigs.js";
 export * from "./foreshadowings.js";
+export * from "./ideas.js";
 export * from "./llmConfigs.js";
 export * from "./llmInstructions.js";
 export * from "./mcpApiKeys.js";

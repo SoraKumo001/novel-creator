@@ -10,3 +10,4 @@
 8. `params._meta.traceparent` を付けると監査ログにそのまま載る（未指定時の生成なし）。
 9. 疎通確認: `GET /api/mcp/health`（認証不要）、`GET /healthz`（DB 疎通）。
 10. 目視確認: `pnpm --filter @novel-creator/api mcp:inspect`。契約回帰: `pnpm --filter @novel-creator/api test:mcp`。
+11. アイデアのガイド付きフロー: 発散（brainstorm系プロンプト/draw_story_seeds）→保存（`create_idea`）→評価（`evaluate_ideas`）→採用（`set_idea_status` adopted）→反映（`idea_to_outline`→`create_chapter`等）。

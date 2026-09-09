@@ -45,7 +45,7 @@ curl -X POST http://localhost:3000/api/mcp \
 - ヘッダは `Authorization: Bearer <KEY>` または `x-api-key`。
 - Web 発行キー: 初回は管理者が設定画面の「MCP APIキー」タブから発行する（`GET/POST /api/mcp-keys`、`DELETE /api/mcp-keys/:id`、いずれも admin 限定）。トークン形式は `mcp_` + 32byte base64url。平文は発行応答でのみ返し、DB には SHA-256 ハッシュ＋ enc:v1 暗号文を保管する。一覧表示のマスクは llm-configs と同型でサーバ内復号して生成する。
 
-## Tools（50）
+## Tools（55）
 
 実装: `apps/api/src/mcp/tools.ts`。
 
@@ -62,6 +62,7 @@ curl -X POST http://localhost:3000/api/mcp \
 - 知識検索: `search_novel_knowledge`
 - 一括読み書き: `batch_get_section_contents`、`batch_save_section_contents`、`batch_create_foreshadowings`、`batch_update_foreshadowings`、`batch_create_timeline_events`、`batch_update_timeline_events`（いずれも最大20件・部分成功形式 `{ ok, ng }` で返却）
 - 伏線・年表Markdown: `get_foreshadowings_markdown`、`save_foreshadowings_markdown`、`get_timelines_markdown`、`save_timelines_markdown`
+- アイデアストア: `create_idea`、`list_ideas`（status未指定時は却下済みを除外）、`update_idea`、`set_idea_status`（adopt時はcreate_chapter等への誘導付き）、`draw_story_seeds`（人物・設定・年表から組み合わせ提示、空要素は除外・全体空なら空seed文面）
 
 ## Resources（5）
 
@@ -81,7 +82,17 @@ curl -X POST http://localhost:3000/api/mcp \
 
 - `draft_section` — 節本文の初稿執筆プロンプト（novelId / sectionId / instructions?）。
 - `review_consistency` — 設定・人物・伏線との整合性レビュープロンプト（novelId / sectionId）。
-- `brainstorm_plot` — 未回収伏線をもとにした展開ブレスト（novelId / focusTopic?）。
+- `brainstorm_plot` — 未回収伏線をもとにした展開ブレスト（novelId / focusTopic?）。人物・時系列の要約つき。
+- `twist_ideas` — 未回収伏線＋人物秘密起点のどんでん返し案2〜3案（novelId / focusTopic?）。
+- `what_if_brainstorm` — 「もしも」前提からの展開分岐3案（novelId / premise）。
+- `character_driven_plot` — 人物の欲求・秘密起点の行動連鎖案（novelId / characterId?、指定時は存在検証あり）。
+- `evaluate_ideas` — 案を新規性/伏線整合/キャラ一貫性/執筆コストで採点し推し案1件を選ぶ（novelId / ideas）。
+- `plan_foreshadowing_payoff` — 未回収伏線×人物×設定×時系列の回収計画表（novelId）。
+- `character_monologue` — 指定人物の一人称独白＋その人物起点のアイデア3案（novelId / characterId / situation?、人物は所属検証あり）。独白文はreview_consistencyの口調ブレ検証に転用可。
+- `idea_to_outline` — 採用済みアイデアの章・節・伏線への落とし込み手順（novelId / ideaId、所有者検証あり）。draft/rejected時は先にset_idea_statusでadoptする誘導文面。
+- ガイド付きフロー: 発散（brainstorm_plot/twist_ideas/what_if_brainstorm/draw_story_seeds）→保存（create_idea）→評価（evaluate_ideas）→採用（set_idea_status adopted）→反映（idea_to_outline→create_chapter等）。
+- 全プロンプト入口で `assertNovelScope(auth, novelId)` を適用する。人物・時系列の取得失敗時は空配列フォールバックで全体を落とさない。
+- 発散→評価→採用の順路：発想プロンプト末尾は「気に入った案はevaluate_ideasで評価し、create_chapter/create_sectionで反映してください。」で統一する。
 
 ## section-guard による novelId 照合
 

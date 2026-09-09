@@ -9,6 +9,7 @@ import { EmbeddingConfigDomainService } from "./embedding-config.service.js";
 import { ForeshadowingDomainService } from "./foreshadowing.service.js";
 import { GenerateDomainService } from "./generate.service.js";
 import { HistoryDomainService } from "./history.service.js";
+import { IdeaDomainService } from "./idea.service.js";
 import { LlmConfigDomainService } from "./llm-config.service.js";
 import { LlmInstructionDomainService } from "./llm-instruction.service.js";
 import { NovelDomainService } from "./novel.service.js";
@@ -30,6 +31,7 @@ export interface DomainServices {
   foreshadowing: ForeshadowingDomainService;
   generate: GenerateDomainService;
   history: HistoryDomainService;
+  idea: IdeaDomainService;
   llmConfig: LlmConfigDomainService;
   llmInstruction: LlmInstructionDomainService;
   novel: NovelDomainService;
@@ -52,6 +54,7 @@ export function createDomainServices(ctx: ServiceContext): DomainServices {
     foreshadowing: new ForeshadowingDomainService(ctx),
     generate: new GenerateDomainService(ctx),
     history: new HistoryDomainService(ctx),
+    idea: new IdeaDomainService(ctx),
     llmConfig: new LlmConfigDomainService(ctx),
     llmInstruction: new LlmInstructionDomainService(ctx),
     novel: new NovelDomainService(ctx),
