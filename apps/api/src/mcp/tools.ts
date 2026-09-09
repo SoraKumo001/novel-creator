@@ -14,6 +14,7 @@ import {
   assertSettingScope,
 } from "./scope-guard.js";
 import { assertSectionBelongsToNovel } from "./section-guard.js";
+import { batchMax20 } from "./validation.js";
 
 /**
  * MCP ツール群を McpServer インスタンスへ登録する。
@@ -1582,11 +1583,9 @@ export function registerMcpTools(
     "複数の節の本文を一括取得します（最大20件）。失敗した節は ng に格納され、全体としては部分成功形式で返します。",
     {
       novelId: z.string().describe("小説ID (UUID、所属検証に使用)"),
-      sectionIds: z
-        .array(z.string())
-        .min(1)
-        .max(20)
-        .describe("節ID (UUID) の配列（最大20件）"),
+      sectionIds: batchMax20(z.string()).describe(
+        "節ID (UUID) の配列（最大20件）"
+      ),
     },
     async ({ novelId, sectionIds }) => {
       try {
@@ -1637,16 +1636,12 @@ export function registerMcpTools(
         .optional()
         .default("MCP外部LLMによる一括執筆・更新")
         .describe("変更理由や履歴の説明"),
-      items: z
-        .array(
-          z.object({
-            body: z.string().describe("保存する小説本文テキスト"),
-            sectionId: z.string().describe("節ID (UUID)"),
-          })
-        )
-        .min(1)
-        .max(20)
-        .describe("保存対象の配列（最大20件）"),
+      items: batchMax20(
+        z.object({
+          body: z.string().describe("保存する小説本文テキスト"),
+          sectionId: z.string().describe("節ID (UUID)"),
+        })
+      ).describe("保存対象の配列（最大20件）"),
       novelId: z
         .string()
         .optional()
@@ -1714,32 +1709,28 @@ export function registerMcpTools(
     "batch_create_foreshadowings",
     "複数の伏線を一括登録します（最大20件）。失敗した件は ng に格納され、全体としては部分成功形式で返します。",
     {
-      items: z
-        .array(
-          z.object({
-            category: z
-              .string()
-              .optional()
-              .default("伏線")
-              .describe("伏線のカテゴリ"),
-            description: z
-              .string()
-              .optional()
-              .describe("伏線の詳細、真相、回収アイデア"),
-            plantSectionId: z
-              .string()
-              .optional()
-              .describe("設置（初出）した節ID"),
-            status: z
-              .enum(["unresolved", "resolved", "abandoned"])
-              .optional()
-              .default("unresolved"),
-            title: z.string().describe("伏線のタイトル・概要"),
-          })
-        )
-        .min(1)
-        .max(20)
-        .describe("登録する伏線の配列（最大20件）"),
+      items: batchMax20(
+        z.object({
+          category: z
+            .string()
+            .optional()
+            .default("伏線")
+            .describe("伏線のカテゴリ"),
+          description: z
+            .string()
+            .optional()
+            .describe("伏線の詳細、真相、回収アイデア"),
+          plantSectionId: z
+            .string()
+            .optional()
+            .describe("設置（初出）した節ID"),
+          status: z
+            .enum(["unresolved", "resolved", "abandoned"])
+            .optional()
+            .default("unresolved"),
+          title: z.string().describe("伏線のタイトル・概要"),
+        })
+      ).describe("登録する伏線の配列（最大20件）"),
       novelId: z.string().describe("小説ID (UUID)"),
     },
     async ({ novelId, items }) => {
@@ -1794,28 +1785,24 @@ export function registerMcpTools(
     "batch_update_foreshadowings",
     "複数の伏線を一括更新します（最大20件）。失敗した件は ng に格納され、全体としては部分成功形式で返します。",
     {
-      items: z
-        .array(
-          z.object({
-            description: z.string().optional().describe("詳細説明"),
-            foreshadowingId: z.string().describe("伏線ID (UUID)"),
-            resolveSectionId: z
-              .string()
-              .optional()
-              .nullable()
-              .describe("回収された節ID"),
-            status: z
-              .enum(["unresolved", "resolved", "abandoned"])
-              .optional()
-              .describe(
-                "ステータス（resolved: 回収済, unresolved: 未回収, abandoned: 破棄）"
-              ),
-            title: z.string().optional().describe("タイトル"),
-          })
-        )
-        .min(1)
-        .max(20)
-        .describe("更新する伏線の配列（最大20件）"),
+      items: batchMax20(
+        z.object({
+          description: z.string().optional().describe("詳細説明"),
+          foreshadowingId: z.string().describe("伏線ID (UUID)"),
+          resolveSectionId: z
+            .string()
+            .optional()
+            .nullable()
+            .describe("回収された節ID"),
+          status: z
+            .enum(["unresolved", "resolved", "abandoned"])
+            .optional()
+            .describe(
+              "ステータス（resolved: 回収済, unresolved: 未回収, abandoned: 破棄）"
+            ),
+          title: z.string().optional().describe("タイトル"),
+        })
+      ).describe("更新する伏線の配列（最大20件）"),
     },
     async ({ items }) => {
       try {
@@ -1872,21 +1859,17 @@ export function registerMcpTools(
     "batch_create_timeline_events",
     "複数のタイムラインイベントを一括追加します（最大20件）。失敗した件は ng に格納され、全体としては部分成功形式で返します。",
     {
-      items: z
-        .array(
-          z.object({
-            event: z.string().describe("出来事の内容"),
-            order: z.number().optional().describe("時系列の順序番号"),
-            sectionId: z.string().optional().describe("紐付ける節ID"),
-            timestamp: z
-              .string()
-              .optional()
-              .describe("作中時期（例: 帝都暦742年、物語開始3年前 等）"),
-          })
-        )
-        .min(1)
-        .max(20)
-        .describe("追加するイベントの配列（最大20件）"),
+      items: batchMax20(
+        z.object({
+          event: z.string().describe("出来事の内容"),
+          order: z.number().optional().describe("時系列の順序番号"),
+          sectionId: z.string().optional().describe("紐付ける節ID"),
+          timestamp: z
+            .string()
+            .optional()
+            .describe("作中時期（例: 帝都暦742年、物語開始3年前 等）"),
+        })
+      ).describe("追加するイベントの配列（最大20件）"),
       novelId: z.string().describe("小説ID (UUID)"),
     },
     async ({ novelId, items }) => {
@@ -1937,23 +1920,15 @@ export function registerMcpTools(
     "batch_update_timeline_events",
     "複数のタイムラインイベントを一括更新します（最大20件）。失敗した件は ng に格納され、全体としては部分成功形式で返します。",
     {
-      items: z
-        .array(
-          z.object({
-            event: z.string().optional().describe("出来事の内容"),
-            order: z.number().optional().describe("時系列の順序番号"),
-            sectionId: z
-              .string()
-              .optional()
-              .nullable()
-              .describe("紐付ける節ID"),
-            timelineId: z.string().describe("タイムラインID (UUID)"),
-            timestamp: z.string().optional().describe("作中時期"),
-          })
-        )
-        .min(1)
-        .max(20)
-        .describe("更新するイベントの配列（最大20件）"),
+      items: batchMax20(
+        z.object({
+          event: z.string().optional().describe("出来事の内容"),
+          order: z.number().optional().describe("時系列の順序番号"),
+          sectionId: z.string().optional().nullable().describe("紐付ける節ID"),
+          timelineId: z.string().describe("タイムラインID (UUID)"),
+          timestamp: z.string().optional().describe("作中時期"),
+        })
+      ).describe("更新するイベントの配列（最大20件）"),
     },
     async ({ items }) => {
       try {

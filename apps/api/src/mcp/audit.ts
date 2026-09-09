@@ -43,6 +43,48 @@ export function redactKeyPrefix(
 export interface McpAuthFailureOptions {
   keyPrefix?: string | null;
   logger?: McpAuditLogger;
+  traceAttrs?: McpTraceAttrs;
+}
+
+/**
+ * OTel 属性の受渡し口。OTel SDK は導入しない。
+ * `_meta.traceparent` があればそのまま運び、なければ生成しない。
+ */
+export interface McpTraceAttrs {
+  traceparent?: string;
+}
+
+/**
+ * JSON-RPC ボディ等から `_meta.traceparent` を取り出す。
+ * なければ undefined を返す（生成はしない）。
+ */
+export function extractTraceAttrs(source: unknown): McpTraceAttrs | undefined {
+  if (typeof source !== "object" || source === null) {
+    return undefined;
+  }
+  const params = (source as Record<string, unknown>)["params"];
+  if (typeof params !== "object" || params === null) {
+    return undefined;
+  }
+  const meta = (params as Record<string, unknown>)["_meta"];
+  if (typeof meta !== "object" || meta === null) {
+    return undefined;
+  }
+  const traceparent = (meta as Record<string, unknown>)["traceparent"];
+  if (typeof traceparent !== "string" || traceparent.length === 0) {
+    return undefined;
+  }
+  return { traceparent };
+}
+
+function withTrace(
+  detail: Record<string, unknown>,
+  traceAttrs: McpTraceAttrs | undefined
+): Record<string, unknown> {
+  if (traceAttrs?.traceparent) {
+    detail["traceparent"] = traceAttrs.traceparent;
+  }
+  return detail;
 }
 
 /**
@@ -54,12 +96,18 @@ export function logMcpAuthFailure(
   options: McpAuthFailureOptions = {}
 ): void {
   const logger: McpAuditLogger = options.logger ?? appLogger;
-  logger.warn("[MCP] auth failure", {
-    keyPrefix: options.keyPrefix ?? null,
-    method: c.req.method,
-    path: c.req.path,
-    reason,
-  });
+  logger.warn(
+    "[MCP] auth failure",
+    withTrace(
+      {
+        keyPrefix: options.keyPrefix ?? null,
+        method: c.req.method,
+        path: c.req.path,
+        reason,
+      },
+      options.traceAttrs
+    )
+  );
 }
 
 export interface McpToolEvent {
@@ -76,15 +124,19 @@ export interface McpToolEvent {
  */
 export function logMcpToolEvent(
   event: McpToolEvent,
-  logger: McpAuditLogger = appLogger
+  logger: McpAuditLogger = appLogger,
+  traceAttrs?: McpTraceAttrs
 ): void {
-  const detail = {
-    durationMs: event.durationMs,
-    keyId: event.keyId ?? null,
-    novelId: event.novelId ?? null,
-    status: event.status,
-    tool: event.tool,
-  };
+  const detail = withTrace(
+    {
+      durationMs: event.durationMs,
+      keyId: event.keyId ?? null,
+      novelId: event.novelId ?? null,
+      status: event.status,
+      tool: event.tool,
+    },
+    traceAttrs
+  );
   if (event.status === "ok") {
     logger.info("[MCP] tool", detail);
   } else {
@@ -104,15 +156,19 @@ export interface McpRequestResult {
 export function logMcpRequest(
   c: Context<AppContext>,
   result: McpRequestResult,
-  logger: McpAuditLogger = appLogger
+  logger: McpAuditLogger = appLogger,
+  traceAttrs?: McpTraceAttrs
 ): void {
-  const detail = {
-    durationMs: result.durationMs,
-    keyId: c.get("mcpAuth")?.keyId ?? null,
-    method: c.req.method,
-    path: c.req.path,
-    status: result.ok ? "ok" : "error",
-  };
+  const detail = withTrace(
+    {
+      durationMs: result.durationMs,
+      keyId: c.get("mcpAuth")?.keyId ?? null,
+      method: c.req.method,
+      path: c.req.path,
+      status: result.ok ? "ok" : "error",
+    },
+    traceAttrs
+  );
   if (result.ok) {
     logger.info("[MCP] request", detail);
   } else {

@@ -128,3 +128,25 @@ curl -X POST http://localhost:3000/api/mcp \
 - histories の記録・復元系、backup（エクスポート/復元）、chat（対話セッション）
 - vector（再インデックス等の運用系）、llm-config / embedding-config（プロバイダ設定）
 - custom-prompt、analysis 系ドメイン
+
+## A: Origin / RBAC / confirm（レーンA）
+
+- POST 入口で `Origin` ヘッダを `WEB_ORIGIN` と照合する（ヘッダがある場合のみ。不一致は 403 `FORBIDDEN` + warn）。
+- `policy.ts` の `isToolAllowed(auth, tool)` は全体キー・スコープ内を基本許可し、`allowedTools` による将来の絞り込み口を持つ。
+- 破壊的 7 ツール（`delete_*`）は `requiresConfirmation` が true。`arguments.confirm !== true` の `tools/call` は 400 `CONFIRMATION_REQUIRED`。
+- `McpServer` の capabilities に `tools/resources/prompts` の `listChanged: true` を付与する（SDK v1.30.0 対応確認済み）。
+- transport に `enableDnsRebindingProtection: true` + `allowedOrigins: [WEB_ORIGIN]` を設定する（実照合は routes 層、SDK 側は二重化）。
+
+## B: errors / validation / listChanged（レーンB）
+
+- `errors.ts` の `toJsonRpcError` 対応表（-32700/-32600/-32601/-32602/-32603/-32020/-32021）と `isRetryable`（transport/-32603/503/timeout のみ true）。
+- ツール実行結果の `isError` とプロトコル層エラーは分離する（混同しないこと）。
+- `validation.ts` の `uuidSchema` / `boundedText(max)` / `batchMax20`（最大20件・最小1件）を batch 系 6 件に適用する。
+- `notifyToolsChanged(server)` は通知対応時のみ `notifications/tools/list_changed` を送り、未対応では noop とする。
+
+## C: breaker / concurrent / latency / trace（レーンC）
+
+- `breaker.ts` の circuit breaker は 5 連続失敗で 30s open、half-open で 1 件試行する。open 中の POST は 503 `CIRCUIT_OPEN`。
+- プロセス内同時実行上限 20、超過時は 429 `CONCURRENT_LIMIT`。
+- `stats.ts` の latency ヒストグラムは method label のみ（tool 名不使用）で p50/p95 を推定し、`mcp_latency_bucket` として出力する。
+- `audit.ts` の `traceAttrs` は `_meta.traceparent` の受渡し口のみ（OTel SDK 導入なし、生成もしない）。

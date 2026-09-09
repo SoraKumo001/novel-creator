@@ -9,6 +9,19 @@ import {
   redactKeyPrefix,
 } from "../mcp/audit.js";
 import {
+  checkBreaker,
+  mcpBreakerKey,
+  recordFailure,
+  recordSuccess,
+  releaseMcpSlot,
+  tryAcquireMcpSlot,
+} from "../mcp/breaker.js";
+import {
+  hasConfirmation,
+  isOriginAllowed,
+  requiresConfirmation,
+} from "../mcp/policy.js";
+import {
   checkMcpRateLimit,
   extractMcpToolName,
   MCP_REQUEST_TIMEOUT_MS,
@@ -70,9 +83,77 @@ mcpRouter.post("/", async (c) => {
   const start = Date.now();
   try {
     const parsedBody = await c.req.json().catch(() => undefined);
+    const auth = c.get("mcpAuth");
+
+    // Origin 検証（DNS rebinding 対策。ヘッダがある場合のみ照合する）。
+    // env 未設定のテスト用人脈でも落ちないよう任意アクセスにする。
+    const env = c.get("env") as AppContext["Variables"]["env"] | undefined;
+    const webOrigin = env?.WEB_ORIGIN;
+    const origin = c.req.header("Origin") ?? c.req.header("origin");
+    if (!isOriginAllowed(origin, webOrigin)) {
+      appLogger.warn("[MCP] origin rejected", {
+        keyId: auth?.keyId ?? null,
+      });
+      recordMcpEvent("error");
+      return c.json(
+        {
+          error: {
+            code: "FORBIDDEN",
+            message: "Origin not allowed",
+          },
+        },
+        403
+      );
+    }
+
+    // 破壊的ツールは arguments.confirm === true を要求する。
+    const callTool = extractMcpToolName(parsedBody);
+    if (
+      callTool &&
+      requiresConfirmation(callTool) &&
+      !hasConfirmation(parsedBody)
+    ) {
+      appLogger.warn("[MCP] confirmation required", {
+        keyId: auth?.keyId ?? null,
+        tool: callTool,
+      });
+      recordMcpEvent("error");
+      return c.json(
+        {
+          error: {
+            code: "CONFIRMATION_REQUIRED",
+            message: `Tool ${callTool} requires confirmation. Pass arguments.confirm=true.`,
+          },
+        },
+        400
+      );
+    }
+
+    // サーキットブレーカー。open 中は即時 503 で遮断する。
+    const breakerKey = mcpBreakerKey(auth?.keyId);
+    const breaker = checkBreaker(breakerKey);
+    if (breaker.open) {
+      const retryAfterSec = breaker.retryAfterSec ?? 30;
+      appLogger.warn("[MCP] circuit open", {
+        keyId: auth?.keyId ?? null,
+        retryAfterSec,
+      });
+      logMcpRequest(c, { durationMs: Date.now() - start, ok: false });
+      recordMcpEvent("error");
+      return c.json(
+        {
+          error: {
+            code: "CIRCUIT_OPEN",
+            message: "Service temporarily unavailable. Please retry later.",
+            retryAfterSec,
+          },
+        },
+        503,
+        { "Retry-After": String(retryAfterSec) }
+      );
+    }
 
     // POST 入口でレート制限を評価する（重い処理の前に拒否する）。
-    const auth = c.get("mcpAuth");
     const forwarded = c.req.header("x-forwarded-for");
     const ip =
       forwarded?.split(",")[0]?.trim() ||
@@ -106,6 +187,24 @@ mcpRouter.post("/", async (c) => {
       );
     }
 
+    // 同時実行制限（プロセス内上限。超過時は 429）。
+    if (!tryAcquireMcpSlot()) {
+      appLogger.warn("[MCP] concurrent limit", {
+        keyId: auth?.keyId ?? null,
+      });
+      logMcpRequest(c, { durationMs: Date.now() - start, ok: false });
+      recordMcpEvent("error");
+      return c.json(
+        {
+          error: {
+            code: "CONCURRENT_LIMIT",
+            message: "Too many concurrent requests. Please retry later.",
+          },
+        },
+        429
+      );
+    }
+
     const services = getServices(c);
     const server = createNovelCreatorMcpServer(services, {
       db: c.get("db"),
@@ -118,20 +217,35 @@ mcpRouter.post("/", async (c) => {
 
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
+      // SDK v1.30.0 が DNS rebinding 保護に対応しているため有効化する。
+      // Origin の実照合は routes 層で行い、ここでは SDK 側の二重化に留める。
+      // Origin ヘッダなしの非ブラウザクライアントは SDK 側で素通しされる。
+      allowedOrigins: webOrigin ? [webOrigin.replace(/\/+$/, "")] : undefined,
+      enableDnsRebindingProtection: true,
     });
     await server.connect(transport);
 
-    const response = await withMcpTimeout(
-      Promise.race([
-        transport.handleRequest(c.req.raw, { parsedBody }),
-        rejectOnAbort(c.req.raw.signal),
-      ]),
-      MCP_REQUEST_TIMEOUT_MS
-    );
+    const response = await (async () => {
+      try {
+        return await withMcpTimeout(
+          Promise.race([
+            transport.handleRequest(c.req.raw, { parsedBody }),
+            rejectOnAbort(c.req.raw.signal),
+          ]),
+          MCP_REQUEST_TIMEOUT_MS
+        );
+      } catch (requestError) {
+        releaseMcpSlot();
+        throw requestError;
+      }
+    })();
+    releaseMcpSlot();
+    recordSuccess(breakerKey);
     logMcpRequest(c, { durationMs: Date.now() - start, ok: true });
     recordMcpEvent("ok");
     return response;
   } catch (error) {
+    recordFailure(mcpBreakerKey(c.get("mcpAuth")?.keyId));
     logMcpRequest(c, { durationMs: Date.now() - start, ok: false });
     if (error instanceof McpRequestTimeoutError) {
       recordMcpEvent("timeout");

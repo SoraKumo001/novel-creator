@@ -18,7 +18,9 @@
     "deploy": "wrangler deploy",
     "dev": "node --import tsx --watch src/index.ts",
     "dev:worker": "wrangler dev",
+    "mcp:inspect": "npx @modelcontextprotocol/inspector --cli http://localhost:3000/api/mcp --transport http",
     "start": "node dist/index.js",
+    "test:mcp": "vitest run --project api --root ../.. mcp-",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "typecheck:worker": "tsc -p tsconfig.worker.json"
   },
