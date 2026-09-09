@@ -1506,4 +1506,524 @@ export function registerMcpTools(
       }
     }
   );
+
+  // ==========================================
+  // 10. 一括読み書き (Batch)
+  // ==========================================
+
+  server.tool(
+    "batch_get_section_contents",
+    "複数の節の本文を一括取得します（最大20件）。失敗した節は ng に格納され、全体としては部分成功形式で返します。",
+    {
+      novelId: z.string().describe("小説ID (UUID、所属検証に使用)"),
+      sectionIds: z
+        .array(z.string())
+        .min(1)
+        .max(20)
+        .describe("節ID (UUID) の配列（最大20件）"),
+    },
+    async ({ novelId, sectionIds }) => {
+      try {
+        const ok: Array<Record<string, unknown>> = [];
+        const ng: Array<Record<string, unknown>> = [];
+        for (const sectionId of sectionIds) {
+          try {
+            const { section, content } = await assertSectionBelongsToNovel(
+              services,
+              novelId,
+              sectionId
+            );
+            ok.push({ content, section, sectionId });
+          } catch (error) {
+            ng.push({
+              error: error instanceof Error ? error.message : String(error),
+              sectionId,
+            });
+          }
+        }
+        return {
+          content: [
+            { type: "text", text: JSON.stringify({ ng, ok }, null, 2) },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `節本文の一括取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "batch_save_section_contents",
+    "複数の節の本文を一括保存・更新します（最大20件）。失敗した節は ng に格納され、全体としては部分成功形式で返します。",
+    {
+      description: z
+        .string()
+        .optional()
+        .default("MCP外部LLMによる一括執筆・更新")
+        .describe("変更理由や履歴の説明"),
+      items: z
+        .array(
+          z.object({
+            body: z.string().describe("保存する小説本文テキスト"),
+            sectionId: z.string().describe("節ID (UUID)"),
+          })
+        )
+        .min(1)
+        .max(20)
+        .describe("保存対象の配列（最大20件）"),
+      novelId: z
+        .string()
+        .optional()
+        .describe("小説ID (UUID、指定時は所属検証に使用)"),
+    },
+    async ({ novelId, items, description }) => {
+      try {
+        const ok: Array<Record<string, unknown>> = [];
+        const ng: Array<Record<string, unknown>> = [];
+        for (const item of items) {
+          try {
+            if (novelId) {
+              await assertSectionBelongsToNovel(
+                services,
+                novelId,
+                item.sectionId
+              );
+            }
+            const updated = await services.content.updateContent(
+              item.sectionId,
+              item.body,
+              description
+            );
+            ok.push({
+              sectionId: item.sectionId,
+              updatedAt:
+                updated.updatedAt instanceof Date
+                  ? updated.updatedAt.toISOString()
+                  : (updated.updatedAt ?? null),
+              wordCount: updated.wordCount,
+            });
+          } catch (error) {
+            ng.push({
+              error: error instanceof Error ? error.message : String(error),
+              sectionId: item.sectionId,
+            });
+          }
+        }
+        return {
+          content: [
+            { type: "text", text: JSON.stringify({ ng, ok }, null, 2) },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `節本文の一括保存に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "batch_create_foreshadowings",
+    "複数の伏線を一括登録します（最大20件）。失敗した件は ng に格納され、全体としては部分成功形式で返します。",
+    {
+      items: z
+        .array(
+          z.object({
+            category: z
+              .string()
+              .optional()
+              .default("伏線")
+              .describe("伏線のカテゴリ"),
+            description: z
+              .string()
+              .optional()
+              .describe("伏線の詳細、真相、回収アイデア"),
+            plantSectionId: z
+              .string()
+              .optional()
+              .describe("設置（初出）した節ID"),
+            status: z
+              .enum(["unresolved", "resolved", "abandoned"])
+              .optional()
+              .default("unresolved"),
+            title: z.string().describe("伏線のタイトル・概要"),
+          })
+        )
+        .min(1)
+        .max(20)
+        .describe("登録する伏線の配列（最大20件）"),
+      novelId: z.string().describe("小説ID (UUID)"),
+    },
+    async ({ novelId, items }) => {
+      try {
+        const ok: Array<Record<string, unknown>> = [];
+        const ng: Array<Record<string, unknown>> = [];
+        for (const [index, item] of items.entries()) {
+          try {
+            const created = await services.foreshadowing.createForeshadowing(
+              novelId,
+              {
+                category: item.category,
+                description: item.description,
+                placedSectionId: item.plantSectionId || null,
+                resolvedSectionId: null,
+                status: item.status,
+                title: item.title,
+              }
+            );
+            ok.push(created as unknown as Record<string, unknown>);
+          } catch (error) {
+            ng.push({
+              error: error instanceof Error ? error.message : String(error),
+              index,
+            });
+          }
+        }
+        return {
+          content: [
+            { type: "text", text: JSON.stringify({ ng, ok }, null, 2) },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `伏線の一括登録に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "batch_update_foreshadowings",
+    "複数の伏線を一括更新します（最大20件）。失敗した件は ng に格納され、全体としては部分成功形式で返します。",
+    {
+      items: z
+        .array(
+          z.object({
+            description: z.string().optional().describe("詳細説明"),
+            foreshadowingId: z.string().describe("伏線ID (UUID)"),
+            resolveSectionId: z
+              .string()
+              .optional()
+              .nullable()
+              .describe("回収された節ID"),
+            status: z
+              .enum(["unresolved", "resolved", "abandoned"])
+              .optional()
+              .describe(
+                "ステータス（resolved: 回収済, unresolved: 未回収, abandoned: 破棄）"
+              ),
+            title: z.string().optional().describe("タイトル"),
+          })
+        )
+        .min(1)
+        .max(20)
+        .describe("更新する伏線の配列（最大20件）"),
+    },
+    async ({ items }) => {
+      try {
+        const ok: Array<Record<string, unknown>> = [];
+        const ng: Array<Record<string, unknown>> = [];
+        for (const [index, item] of items.entries()) {
+          try {
+            const updated = await services.foreshadowing.updateForeshadowing(
+              item.foreshadowingId,
+              {
+                description: item.description,
+                resolvedSectionId: item.resolveSectionId,
+                status: item.status,
+                title: item.title,
+              }
+            );
+            ok.push(updated as unknown as Record<string, unknown>);
+          } catch (error) {
+            ng.push({
+              error: error instanceof Error ? error.message : String(error),
+              foreshadowingId: item.foreshadowingId,
+              index,
+            });
+          }
+        }
+        return {
+          content: [
+            { type: "text", text: JSON.stringify({ ng, ok }, null, 2) },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `伏線の一括更新に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "batch_create_timeline_events",
+    "複数のタイムラインイベントを一括追加します（最大20件）。失敗した件は ng に格納され、全体としては部分成功形式で返します。",
+    {
+      items: z
+        .array(
+          z.object({
+            event: z.string().describe("出来事の内容"),
+            order: z.number().optional().describe("時系列の順序番号"),
+            sectionId: z.string().optional().describe("紐付ける節ID"),
+            timestamp: z
+              .string()
+              .optional()
+              .describe("作中時期（例: 帝都暦742年、物語開始3年前 等）"),
+          })
+        )
+        .min(1)
+        .max(20)
+        .describe("追加するイベントの配列（最大20件）"),
+      novelId: z.string().describe("小説ID (UUID)"),
+    },
+    async ({ novelId, items }) => {
+      try {
+        const ok: Array<Record<string, unknown>> = [];
+        const ng: Array<Record<string, unknown>> = [];
+        for (const [index, item] of items.entries()) {
+          try {
+            const created = await services.timeline.createTimeline({
+              event: item.event,
+              novelId,
+              order: item.order,
+              sectionId: item.sectionId,
+              timestamp: item.timestamp,
+            });
+            ok.push(created as unknown as Record<string, unknown>);
+          } catch (error) {
+            ng.push({
+              error: error instanceof Error ? error.message : String(error),
+              index,
+            });
+          }
+        }
+        return {
+          content: [
+            { type: "text", text: JSON.stringify({ ng, ok }, null, 2) },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `タイムラインイベントの一括作成に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "batch_update_timeline_events",
+    "複数のタイムラインイベントを一括更新します（最大20件）。失敗した件は ng に格納され、全体としては部分成功形式で返します。",
+    {
+      items: z
+        .array(
+          z.object({
+            event: z.string().optional().describe("出来事の内容"),
+            order: z.number().optional().describe("時系列の順序番号"),
+            sectionId: z
+              .string()
+              .optional()
+              .nullable()
+              .describe("紐付ける節ID"),
+            timelineId: z.string().describe("タイムラインID (UUID)"),
+            timestamp: z.string().optional().describe("作中時期"),
+          })
+        )
+        .min(1)
+        .max(20)
+        .describe("更新するイベントの配列（最大20件）"),
+    },
+    async ({ items }) => {
+      try {
+        const ok: Array<Record<string, unknown>> = [];
+        const ng: Array<Record<string, unknown>> = [];
+        for (const [index, item] of items.entries()) {
+          try {
+            const updated = await services.timeline.updateTimeline(
+              item.timelineId,
+              {
+                event: item.event,
+                order: item.order,
+                sectionId: item.sectionId,
+                timestamp: item.timestamp,
+              }
+            );
+            ok.push(updated as unknown as Record<string, unknown>);
+          } catch (error) {
+            ng.push({
+              error: error instanceof Error ? error.message : String(error),
+              index,
+              timelineId: item.timelineId,
+            });
+          }
+        }
+        return {
+          content: [
+            { type: "text", text: JSON.stringify({ ng, ok }, null, 2) },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `タイムラインイベントの一括更新に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "get_foreshadowings_markdown",
+    "小説の伏線一覧をパース用Markdownテキストとして取得します。",
+    {
+      novelId: z.string().describe("小説ID (UUID)"),
+    },
+    async ({ novelId }) => {
+      try {
+        const markdown = await services.foreshadowing.getMarkdown(novelId);
+        return {
+          content: [{ type: "text", text: markdown }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `伏線Markdownの取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "save_foreshadowings_markdown",
+    "伏線全体のMarkdownテキストを一括解析し、既存の伏線リストと同期・更新します。",
+    {
+      markdown: z.string().describe("伏線Markdownテキスト"),
+      novelId: z.string().describe("小説ID (UUID)"),
+    },
+    async ({ novelId, markdown }) => {
+      try {
+        const result = await services.foreshadowing.saveMarkdown(
+          novelId,
+          markdown
+        );
+        return {
+          content: [
+            {
+              type: "text",
+              text: `伏線Markdownを同期しました:\n${JSON.stringify(result, null, 2)}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `伏線Markdownの同期に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "get_timelines_markdown",
+    "小説の作中時系列イベント一覧をパース用Markdownテキストとして取得します。",
+    {
+      novelId: z.string().describe("小説ID (UUID)"),
+    },
+    async ({ novelId }) => {
+      try {
+        const markdown = await services.timeline.getMarkdown(novelId);
+        return {
+          content: [{ type: "text", text: markdown }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `タイムラインMarkdownの取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "save_timelines_markdown",
+    "年表全体のMarkdownテキストを一括解析し、既存のタイムラインリストと同期・更新します。",
+    {
+      markdown: z.string().describe("年表Markdownテキスト"),
+      novelId: z.string().describe("小説ID (UUID)"),
+    },
+    async ({ novelId, markdown }) => {
+      try {
+        const result = await services.timeline.saveMarkdown(novelId, markdown);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `タイムラインMarkdownを同期しました:\n${JSON.stringify(result, null, 2)}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `タイムラインMarkdownの同期に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
 }

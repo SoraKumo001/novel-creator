@@ -45,7 +45,7 @@ curl -X POST http://localhost:3000/api/mcp \
 - ヘッダは `Authorization: Bearer <KEY>` または `x-api-key`。
 - Web 発行キー: 初回は管理者が設定画面の「MCP APIキー」タブから発行する（`GET/POST /api/mcp-keys`、`DELETE /api/mcp-keys/:id`、いずれも admin 限定）。トークン形式は `mcp_` + 32byte base64url。平文は発行応答でのみ返し、DB には SHA-256 ハッシュ＋ enc:v1 暗号文を保管する。一覧表示のマスクは llm-configs と同型でサーバ内復号して生成する。
 
-## Tools（40）
+## Tools（50）
 
 実装: `apps/api/src/mcp/tools.ts`。
 
@@ -60,6 +60,8 @@ curl -X POST http://localhost:3000/api/mcp \
 - 章・節の単体取得: `get_chapter`（配下節メタ含む・本文なし）、`get_section`（メタのみ・本文なし。`get_section_content` と用途分離）
 - 履歴参照: `list_histories`、`get_history`（いずれも参照専用。記録・復元系は未提供）
 - 知識検索: `search_novel_knowledge`
+- 一括読み書き: `batch_get_section_contents`、`batch_save_section_contents`、`batch_create_foreshadowings`、`batch_update_foreshadowings`、`batch_create_timeline_events`、`batch_update_timeline_events`（いずれも最大20件・部分成功形式 `{ ok, ng }` で返却）
+- 伏線・年表Markdown: `get_foreshadowings_markdown`、`save_foreshadowings_markdown`、`get_timelines_markdown`、`save_timelines_markdown`
 
 ## Resources（5）
 
