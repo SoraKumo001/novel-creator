@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyPlotToMarkdown,
   diffPlot,
+  formatPlotMarkdown,
   parsePlotMarkdown,
   serializePlotToMarkdown,
 } from "../src/plotMarkdown.js";
@@ -137,5 +138,139 @@ describe("plotMarkdown", () => {
     expect(parsed.find((c) => c.title === "第2章 帝都へ")).toBeUndefined();
     expect(parsed.find((c) => c.title === "第1章 出会い")).toBeDefined();
     expect(parsed.find((c) => c.title === "第3章 決戦")).toBeDefined();
+  });
+
+  it("serialize→parse の round-trip で chapterId/sectionId が保持されること", () => {
+    const withIds = [
+      {
+        id: "ch-1",
+        order: 1,
+        title: "第1章 出会い",
+        summary: "概要メモ",
+        sections: [
+          { id: "sec-1", order: 1, title: "第1節", summary: "節メモ" },
+        ],
+      },
+    ];
+    const md = serializePlotToMarkdown(withIds);
+    expect(md).toContain("<!-- chapterId: ch-1 -->");
+    expect(md).toContain("<!-- sectionId: sec-1 -->");
+    const parsed = parsePlotMarkdown(md);
+    expect(parsed[0].id).toBe("ch-1");
+    expect(parsed[0].sections[0].id).toBe("sec-1");
+    expect(parsed[0].summary).toBe("概要メモ");
+    expect(parsed[0].sections[0].summary).toBe("節メモ");
+  });
+
+  it("ID なしのレガシー markdown でもパース・差分できること", () => {
+    const md = "# 第1章\n\n概要\n\n## 第1節\n\n節概要\n";
+    const parsed = parsePlotMarkdown(md);
+    expect(parsed[0].id).toBeUndefined();
+    expect(parsed[0].sections[0].id).toBeUndefined();
+    const diff = diffPlot(
+      [
+        {
+          id: "ch-1",
+          title: "第1章",
+          order: 1,
+          summary: "概要",
+          sections: [
+            { id: "sec-1", title: "第1節", order: 1, summary: "節概要" },
+          ],
+        },
+      ],
+      parsed
+    );
+    expect(diff.chaptersToCreate).toHaveLength(0);
+    expect(diff.chaptersToDelete).toHaveLength(0);
+    expect(diff.chaptersToUpdate).toHaveLength(0);
+    expect(diff.sectionsToCreate).toHaveLength(0);
+    expect(diff.sectionsToDelete).toHaveLength(0);
+  });
+
+  it("改名しても ID マッチで更新になり本文が消えないこと", () => {
+    const existing = [
+      {
+        id: "ch-1",
+        title: "旧タイトル",
+        order: 1,
+        summary: "章メモ",
+        sections: [{ id: "sec-1", title: "旧節", order: 1, summary: "節メモ" }],
+      },
+    ];
+    const parsed = [
+      {
+        id: "ch-1",
+        title: "新タイトル",
+        order: 1,
+        summary: "章メモ",
+        sections: [{ id: "sec-1", title: "新節", order: 1, summary: "節メモ" }],
+      },
+    ];
+    const diff = diffPlot(existing, parsed);
+    expect(diff.chaptersToCreate).toHaveLength(0);
+    expect(diff.chaptersToDelete).toHaveLength(0);
+    expect(diff.chaptersToUpdate).toHaveLength(1);
+    expect(diff.chaptersToUpdate[0]).toMatchObject({
+      id: "ch-1",
+      title: "新タイトル",
+      summary: "章メモ",
+    });
+    expect(diff.sectionsToCreate).toHaveLength(0);
+    expect(diff.sectionsToDelete).toHaveLength(0);
+    expect(diff.sectionsToUpdate).toHaveLength(1);
+    expect(diff.sectionsToUpdate[0]).toMatchObject({
+      id: "sec-1",
+      title: "新節",
+      summary: "節メモ",
+    });
+  });
+
+  it("節の章またぎ移動でも ID マッチで更新になること", () => {
+    const existing = [
+      {
+        id: "ch-1",
+        title: "第1章",
+        order: 1,
+        summary: "",
+        sections: [{ id: "sec-1", title: "移動節", order: 1, summary: "本文" }],
+      },
+      { id: "ch-2", title: "第2章", order: 2, summary: "", sections: [] },
+    ];
+    const parsed = [
+      { title: "第1章", order: 1, summary: "", sections: [] },
+      {
+        id: "ch-2",
+        title: "第2章",
+        order: 2,
+        summary: "",
+        sections: [{ id: "sec-1", title: "移動節", order: 1, summary: "本文" }],
+      },
+    ];
+    // 第1章はレガシー fallback で一致させる
+    const diff = diffPlot(existing, parsed);
+    expect(diff.sectionsToDelete).toHaveLength(0);
+    expect(diff.sectionsToCreate).toHaveLength(0);
+    expect(diff.sectionsToUpdate).toHaveLength(1);
+    expect(diff.sectionsToUpdate[0]).toMatchObject({
+      id: "sec-1",
+      chapterId: "ch-2",
+    });
+  });
+
+  it("format 後も ID が保持されること", () => {
+    const md = serializePlotToMarkdown([
+      {
+        id: "ch-1",
+        order: 1,
+        title: "第1章",
+        summary: "概要",
+        sections: [{ id: "sec-1", order: 1, title: "第1節", summary: "メモ" }],
+      },
+    ]);
+    const formatted = formatPlotMarkdown(md);
+    const reparsed = parsePlotMarkdown(formatted);
+    expect(reparsed[0].id).toBe("ch-1");
+    expect(reparsed[0].sections[0].id).toBe("sec-1");
   });
 });

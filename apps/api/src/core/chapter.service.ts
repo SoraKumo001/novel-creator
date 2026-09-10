@@ -112,6 +112,9 @@ export class ChapterDomainService {
         await tx
           .update(sections)
           .set({
+            ...(sec.chapterId === undefined
+              ? {}
+              : { chapterId: sec.chapterId }),
             order: sec.order,
             summary: sec.summary || null,
             title: sec.title || null,

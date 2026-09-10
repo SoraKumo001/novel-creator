@@ -47,6 +47,25 @@ function tryParseApiError(text: string): string | null {
 }
 
 /**
+ * 404（未作成リソース）系のエラーかどうかを判定する。
+ * 本文が未作成のセクションでは contents 行が存在せず API が 404 を返すため、
+ * フロントでは空本文として扱いリトライしない。
+ */
+export function isNotFoundError(e: unknown): boolean {
+  if (!e) {
+    return false;
+  }
+  const message = e instanceof Error ? (e.message ?? "") : String(e);
+  if (message.includes("(404") || message.includes(" 404")) {
+    return true;
+  }
+  return (
+    message.includes("Content not found") ||
+    message.includes("コンテンツが見つかりません")
+  );
+}
+
+/**
  * Fetch Response オブジェクトから適切な日本語エラーメッセージを抽出・構築する。
  */
 export async function parseResponseError(

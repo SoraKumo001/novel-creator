@@ -6,6 +6,17 @@ export async function fetchContent(sectionId: string): Promise<Content> {
   const res = await apiClient.contents[":id"].$get({
     param: { id: sectionId },
   });
+  if (res.status === 404) {
+    // 未作成セクション（contents 行なし）は空本文として扱う。初回保存時に upsert される。
+    return {
+      body: "",
+      createdAt: null,
+      id: "",
+      sectionId,
+      updatedAt: null,
+      wordCount: 0,
+    };
+  }
   if (!res.ok) {
     throw await parseResponseError(res, "本文の取得");
   }

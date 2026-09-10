@@ -12,12 +12,15 @@
 import {
   buildMarkdownCategoryTree,
   formatEntityMarkdown,
+  isMetaCommentLine,
   type MarkdownCategoryNode,
+  parseMetaPairs,
   scanEntityRanges,
 } from "./markdownCore.js";
 
 /** マークダウン解析後の節情報 */
 export interface ParsedPlotSectionItem {
+  id?: string;
   order: number;
   summary: string;
   title: string;
@@ -25,6 +28,7 @@ export interface ParsedPlotSectionItem {
 
 /** マークダウン解析後の章情報（節リスト付き） */
 export interface ParsedPlotChapterItem {
+  id?: string;
   order: number;
   sections: ParsedPlotSectionItem[];
   summary: string;
@@ -52,8 +56,10 @@ export type PlotCategoryNode = MarkdownCategoryNode;
  */
 export function serializePlotToMarkdown(
   chapters: {
+    id?: string | null;
     order?: number | null;
     sections?: {
+      id?: string | null;
       order?: number | null;
       summary?: string | null;
       title?: string | null;
@@ -75,6 +81,10 @@ export function serializePlotToMarkdown(
   for (const ch of sortedChapters) {
     const chTitle = ch.title.trim() || "無題の章";
     lines.push(`# ${chTitle}`);
+    const chapterId = (ch.id ?? "").trim();
+    if (chapterId) {
+      lines.push(`<!-- chapterId: ${chapterId} -->`);
+    }
     lines.push("");
 
     const chSummary = (ch.summary ?? "").trim();
@@ -91,6 +101,10 @@ export function serializePlotToMarkdown(
     for (const sec of sortedSections) {
       const secTitle = sec.title?.trim() || `節 ${sec.order ?? 1}`;
       lines.push(`## ${secTitle}`);
+      const sectionId = (sec.id ?? "").trim();
+      if (sectionId) {
+        lines.push(`<!-- sectionId: ${sectionId} -->`);
+      }
       lines.push("");
 
       const secSummary = (sec.summary ?? "").trim();
@@ -117,6 +131,10 @@ export function parsePlotMarkdown(markdown: string): ParsedPlotChapterItem[] {
   let secOrder = 0;
 
   let bodyBuffer: string[] = [];
+  // 見出し直後のメタコメント (<!-- chapterId/sectionId -->) を検出するための待機状態。
+  // 空行を挟んでも有効とし、本文開始で解除する。
+  let pendingChapterMeta: ParsedPlotChapterItem | null = null;
+  let pendingSectionMeta: ParsedPlotSectionItem | null = null;
 
   function flushBuffer() {
     const text = bodyBuffer.join("\n").trim();
@@ -128,9 +146,46 @@ export function parsePlotMarkdown(markdown: string): ParsedPlotChapterItem[] {
     }
   }
 
+  function consumePendingMeta(line: string): boolean {
+    if (!pendingChapterMeta && !pendingSectionMeta) {
+      return false;
+    }
+    if (line.trim() === "") {
+      return true;
+    }
+    if (isMetaCommentLine(line)) {
+      const pairs = parseMetaPairs(line);
+      if (pendingSectionMeta) {
+        const sid = (pairs["sectionId"] ?? "").trim();
+        if (sid) {
+          pendingSectionMeta.id = sid;
+        }
+        // 節メタ待機中は章メタも消費済み扱いにする
+        pendingSectionMeta = null;
+        pendingChapterMeta = null;
+      } else if (pendingChapterMeta) {
+        const cid = (pairs["chapterId"] ?? "").trim();
+        if (cid) {
+          pendingChapterMeta.id = cid;
+        }
+        if (cid) {
+          pendingChapterMeta = null;
+        }
+        // chapterId を含まない未知コメントは本文扱いにせず捨てるが、
+        // 後続の正しいメタ行を拾えるよう待機は維持する
+      }
+      return true;
+    }
+    pendingChapterMeta = null;
+    pendingSectionMeta = null;
+    return false;
+  }
+
   for (const line of lines) {
     if (/^\s*```/.test(line)) {
       inFence = !inFence;
+      pendingChapterMeta = null;
+      pendingSectionMeta = null;
       bodyBuffer.push(line);
       continue;
     }
@@ -152,6 +207,8 @@ export function parsePlotMarkdown(markdown: string): ParsedPlotChapterItem[] {
         sections: [],
       };
       chapters.push(currentChapter);
+      pendingChapterMeta = currentChapter;
+      pendingSectionMeta = null;
       continue;
     }
 
@@ -168,6 +225,7 @@ export function parsePlotMarkdown(markdown: string): ParsedPlotChapterItem[] {
         };
         chapters.push(currentChapter);
       }
+      pendingChapterMeta = null;
       secOrder++;
       currentSection = {
         title: h2[1].trim(),
@@ -175,9 +233,13 @@ export function parsePlotMarkdown(markdown: string): ParsedPlotChapterItem[] {
         order: secOrder,
       };
       currentChapter.sections.push(currentSection);
+      pendingSectionMeta = currentSection;
       continue;
     }
 
+    if (consumePendingMeta(line)) {
+      continue;
+    }
     bodyBuffer.push(line);
   }
 
@@ -245,6 +307,7 @@ export interface PlotDiff {
   }[];
   sectionsToDelete: string[];
   sectionsToUpdate: {
+    chapterId?: string;
     id: string;
     order: number;
     summary: string;
@@ -277,85 +340,184 @@ export function diffPlot(
   const sectionsToUpdate: PlotDiff["sectionsToUpdate"] = [];
   const sectionsToDelete: string[] = [];
 
-  const existingChapterMap = new Map<
+  const existingChapterById = new Map<
+    string,
+    (typeof existingChapters)[number]
+  >();
+  const existingChapterByTitle = new Map<
     string,
     (typeof existingChapters)[number]
   >();
   for (const ch of existingChapters) {
-    existingChapterMap.set(ch.title.trim(), ch);
+    if (ch.id) {
+      existingChapterById.set(ch.id, ch);
+    }
+    const key = ch.title.trim();
+    if (!existingChapterByTitle.has(key)) {
+      existingChapterByTitle.set(key, ch);
+    }
   }
 
-  const seenChapterTitles = new Set<string>();
-
-  for (const parsedCh of parsedChapters) {
-    const trimmedTitle = parsedCh.title.trim();
-    seenChapterTitles.add(trimmedTitle);
-    const existingCh = existingChapterMap.get(trimmedTitle);
-
-    if (!existingCh) {
-      chaptersToCreate.push(parsedCh);
-    } else {
-      if (
-        (existingCh.summary ?? "").trim() !== parsedCh.summary.trim() ||
-        existingCh.order !== parsedCh.order
-      ) {
-        chaptersToUpdate.push({
-          id: existingCh.id,
-          title: parsedCh.title,
-          summary: parsedCh.summary,
-          order: parsedCh.order,
-        });
-      }
-
-      const existingSectionMap = new Map<
-        string,
-        NonNullable<typeof existingCh.sections>[number]
-      >();
-      for (const sec of existingCh.sections ?? []) {
-        existingSectionMap.set((sec.title ?? "").trim(), sec);
-      }
-
-      const seenSectionTitles = new Set<string>();
-
-      for (const parsedSec of parsedCh.sections) {
-        const secTitle = parsedSec.title.trim();
-        seenSectionTitles.add(secTitle);
-        const existingSec = existingSectionMap.get(secTitle);
-
-        if (!existingSec) {
-          sectionsToCreate.push({
-            chapterId: existingCh.id,
-            title: parsedSec.title,
-            summary: parsedSec.summary,
-            order: parsedSec.order,
-          });
-        } else if (
-          (existingSec.summary ?? "").trim() !== parsedSec.summary.trim() ||
-          existingSec.order !== parsedSec.order
-        ) {
-          sectionsToUpdate.push({
-            id: existingSec.id,
-            title: parsedSec.title,
-            summary: parsedSec.summary,
-            order: parsedSec.order,
-          });
-        }
-      }
-
-      for (const [secTitle, sec] of existingSectionMap) {
-        if (!seenSectionTitles.has(secTitle)) {
-          sectionsToDelete.push(sec.id);
-        }
+  // 節のグローバル照合用 (移動検出のため章をまたいで ID 検索できる)
+  const existingSectionById = new Map<
+    string,
+    {
+      chapterId: string;
+      section: NonNullable<
+        (typeof existingChapters)[number]["sections"]
+      >[number];
+    }
+  >();
+  for (const ch of existingChapters) {
+    for (const sec of ch.sections ?? []) {
+      if (sec.id) {
+        existingSectionById.set(sec.id, { chapterId: ch.id, section: sec });
       }
     }
   }
 
-  for (const [chTitle, ch] of existingChapterMap) {
-    if (!seenChapterTitles.has(chTitle)) {
+  const seenChapterIds = new Set<string>();
+  const seenSectionIds = new Set<string>();
+  // レガシー fallback でタイトル消費済みの既存章・節 (二重マッチ防止)
+  const consumedChapterIds = new Set<string>();
+  const consumedSectionIds = new Set<string>();
+  // parsed 章 → 解決済み existing 章 id (新規は null)
+  const resolvedChapterIdByIndex = new Map<number, string | null>();
+
+  parsedChapters.forEach((parsedCh, parsedIndex) => {
+    const parsedId = (parsedCh.id ?? "").trim();
+    let existingCh: (typeof existingChapters)[number] | undefined;
+    if (parsedId && existingChapterById.has(parsedId)) {
+      existingCh = existingChapterById.get(parsedId);
+      seenChapterIds.add(existingCh?.id ?? parsedId);
+    } else {
+      const fallback = existingChapterByTitle.get(parsedCh.title.trim());
+      if (fallback && !consumedChapterIds.has(fallback.id)) {
+        existingCh = fallback;
+      }
+    }
+
+    if (!existingCh) {
+      chaptersToCreate.push(parsedCh);
+      resolvedChapterIdByIndex.set(parsedIndex, null);
+      return;
+    }
+    consumedChapterIds.add(existingCh.id);
+    seenChapterIds.add(existingCh.id);
+    resolvedChapterIdByIndex.set(parsedIndex, existingCh.id);
+
+    if (
+      existingCh.title.trim() !== parsedCh.title.trim() ||
+      (existingCh.summary ?? "").trim() !== parsedCh.summary.trim() ||
+      existingCh.order !== parsedCh.order
+    ) {
+      chaptersToUpdate.push({
+        id: existingCh.id,
+        title: parsedCh.title,
+        summary: parsedCh.summary,
+        order: parsedCh.order,
+      });
+    }
+  });
+
+  // 節の差分 (章マッチ済みの場合のみ。新規章の節は chaptersToCreate に含まれる)
+  parsedChapters.forEach((parsedCh, parsedIndex) => {
+    const resolvedChapterId = resolvedChapterIdByIndex.get(parsedIndex);
+    if (!resolvedChapterId) {
+      return;
+    }
+    const existingCh = existingChapterById.get(resolvedChapterId);
+    if (!existingCh) {
+      return;
+    }
+    const existingSections = existingCh.sections ?? [];
+    const fallbackMap = new Map<string, (typeof existingSections)[number]>();
+    for (const sec of existingSections) {
+      if (consumedSectionIds.has(sec.id)) {
+        continue;
+      }
+      const key = (sec.title ?? "").trim();
+      if (!fallbackMap.has(key)) {
+        fallbackMap.set(key, sec);
+      }
+    }
+
+    for (const parsedSec of parsedCh.sections) {
+      const parsedSecId = (parsedSec.id ?? "").trim();
+      const globalHit =
+        parsedSecId && existingSectionById.has(parsedSecId)
+          ? existingSectionById.get(parsedSecId)
+          : undefined;
+      if (globalHit && !seenSectionIds.has(globalHit.section.id)) {
+        seenSectionIds.add(globalHit.section.id);
+        consumedSectionIds.add(globalHit.section.id);
+        const moved = globalHit.chapterId !== resolvedChapterId;
+        if (
+          moved ||
+          (globalHit.section.title ?? "").trim() !== parsedSec.title.trim() ||
+          (globalHit.section.summary ?? "").trim() !==
+            parsedSec.summary.trim() ||
+          globalHit.section.order !== parsedSec.order
+        ) {
+          sectionsToUpdate.push({
+            id: globalHit.section.id,
+            title: parsedSec.title,
+            summary: parsedSec.summary,
+            order: parsedSec.order,
+            ...(moved ? { chapterId: resolvedChapterId } : {}),
+          });
+        }
+        fallbackMap.delete((globalHit.section.title ?? "").trim());
+        continue;
+      }
+      if (globalHit) {
+        continue;
+      }
+      const fallback = fallbackMap.get(parsedSec.title.trim());
+      if (fallback && !seenSectionIds.has(fallback.id)) {
+        seenSectionIds.add(fallback.id);
+        consumedSectionIds.add(fallback.id);
+        fallbackMap.delete(parsedSec.title.trim());
+        if (
+          (fallback.summary ?? "").trim() !== parsedSec.summary.trim() ||
+          fallback.order !== parsedSec.order
+        ) {
+          sectionsToUpdate.push({
+            id: fallback.id,
+            title: parsedSec.title,
+            summary: parsedSec.summary,
+            order: parsedSec.order,
+          });
+        }
+        continue;
+      }
+      if (parsedSecId && existingSectionById.has(parsedSecId)) {
+        // 既に他所で消費済みの重複 ID は無視する
+        continue;
+      }
+      sectionsToCreate.push({
+        chapterId: resolvedChapterId,
+        title: parsedSec.title,
+        summary: parsedSec.summary,
+        order: parsedSec.order,
+      });
+    }
+  });
+
+  for (const ch of existingChapters) {
+    if (!seenChapterIds.has(ch.id)) {
       chaptersToDelete.push(ch.id);
       for (const sec of ch.sections ?? []) {
-        sectionsToDelete.push(sec.id);
+        if (!seenSectionIds.has(sec.id)) {
+          sectionsToDelete.push(sec.id);
+          seenSectionIds.add(sec.id);
+        }
       }
+    }
+  }
+  for (const [, entry] of existingSectionById) {
+    if (!seenSectionIds.has(entry.section.id)) {
+      sectionsToDelete.push(entry.section.id);
     }
   }
 
@@ -375,8 +537,10 @@ export function diffPlot(
 export function applyPlotToMarkdown(
   currentMarkdown: string,
   newChapters: {
+    id?: string | null;
     order?: number | null;
     sections?: {
+      id?: string | null;
       order?: number | null;
       summary?: string | null;
       title?: string | null;
@@ -412,6 +576,7 @@ export function applyPlotToMarkdown(
 
     const sections = newCh.sections
       ? newCh.sections.map((s, idx) => ({
+          id: s.id ?? prev?.sections[idx]?.id,
           title: s.title?.trim() || `節 ${idx + 1}`,
           summary: s.summary?.trim() || "",
           order: s.order ?? idx + 1,
@@ -419,6 +584,7 @@ export function applyPlotToMarkdown(
       : (prev?.sections ?? []);
 
     chapterMap.set(trimmedTitle, {
+      id: newCh.id ?? prev?.id,
       title: trimmedTitle,
       summary:
         newCh.summary !== undefined

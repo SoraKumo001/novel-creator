@@ -119,6 +119,34 @@ export async function* generateSectionContent(
         if (!trimmed) {
           continue;
         }
+        if (trimmed.startsWith("event:")) {
+          const eventLines = trimmed.split("\n").map((l) => l.trim());
+          const isErrorEvent = eventLines.some(
+            (l) =>
+              l.toLowerCase().startsWith("event:") &&
+              l.toLowerCase().includes("error")
+          );
+          if (isErrorEvent) {
+            const dataLine = eventLines.find((l) => l.startsWith("data:"));
+            const payload = dataLine ? dataLine.slice(5).trim() : "";
+            if (payload) {
+              try {
+                const data = JSON.parse(payload);
+                if (typeof data.message === "string" && data.message.trim()) {
+                  throw new Error(data.message);
+                }
+              } catch (e) {
+                if (e instanceof SyntaxError) {
+                  invalidLines += 1;
+                  continue;
+                }
+                throw e;
+              }
+            }
+            throw new Error("本文生成中にエラーが発生しました");
+          }
+          continue;
+        }
         if (!trimmed.startsWith("data: ")) {
           continue;
         }
@@ -140,10 +168,13 @@ export async function* generateSectionContent(
         }
       }
     }
-    if (!signal?.aborted && validChunks === 0 && invalidLines > 0) {
-      throw new Error(
-        `本文生成ストリームの解析に失敗しました（不正行: ${invalidLines}件）`
-      );
+    if (!signal?.aborted && validChunks === 0) {
+      if (invalidLines > 0) {
+        throw new Error(
+          `本文生成ストリームの解析に失敗しました（不正行: ${invalidLines}件）`
+        );
+      }
+      throw new Error("本文生成の応答が空でした");
     }
   } finally {
     reader.releaseLock();
@@ -269,6 +300,34 @@ export async function* inlineAssistSectionContent(
         if (!trimmed) {
           continue;
         }
+        if (trimmed.startsWith("event:")) {
+          const eventLines = trimmed.split("\n").map((l) => l.trim());
+          const isErrorEvent = eventLines.some(
+            (l) =>
+              l.toLowerCase().startsWith("event:") &&
+              l.toLowerCase().includes("error")
+          );
+          if (isErrorEvent) {
+            const dataLine = eventLines.find((l) => l.startsWith("data:"));
+            const payload = dataLine ? dataLine.slice(5).trim() : "";
+            if (payload) {
+              try {
+                const data = JSON.parse(payload);
+                if (typeof data.message === "string" && data.message.trim()) {
+                  throw new Error(data.message);
+                }
+              } catch (e) {
+                if (e instanceof SyntaxError) {
+                  invalidLines += 1;
+                  continue;
+                }
+                throw e;
+              }
+            }
+            throw new Error("AIアシスト生成中にエラーが発生しました");
+          }
+          continue;
+        }
         if (!trimmed.startsWith("data: ")) {
           continue;
         }
@@ -290,10 +349,13 @@ export async function* inlineAssistSectionContent(
         }
       }
     }
-    if (!signal?.aborted && validChunks === 0 && invalidLines > 0) {
-      throw new Error(
-        `AIアシスト生成ストリームの解析に失敗しました（不正行: ${invalidLines}件）`
-      );
+    if (!signal?.aborted && validChunks === 0) {
+      if (invalidLines > 0) {
+        throw new Error(
+          `AIアシスト生成ストリームの解析に失敗しました（不正行: ${invalidLines}件）`
+        );
+      }
+      throw new Error("AIアシスト生成の応答が空でした");
     }
   } finally {
     reader.releaseLock();

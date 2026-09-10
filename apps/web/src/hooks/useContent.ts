@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toErrorMessage } from "@/lib/errors.js";
+import { isNotFoundError, toErrorMessage } from "@/lib/errors.js";
 import { sectionKeys } from "@/lib/queryKeys.js";
 import { fetchContent, updateContent } from "@/lib/services/index.js";
 import type { Content } from "@/lib/types.js";
@@ -25,6 +25,12 @@ export function useContent(sectionId: string): UseContentReturn {
     queryKey: sectionKeys.content(sectionId),
     queryFn: () => fetchContent(sectionId),
     enabled: !!sectionId,
+    retry: (failureCount, error) => {
+      if (isNotFoundError(error)) {
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 
   const updateMutation = useMutation({

@@ -263,7 +263,7 @@ export function registerMcpTools(
 
   server.tool(
     "save_plot_outline_markdown",
-    "プロット全体のMarkdownを一括解析し、既存の章・節との差分を検出して自動更新・作成・削除を行います。",
+    "プロット全体のMarkdownを一括解析し、既存の章・節との差分を検出して自動更新・作成・削除を行います。大規模修正時は個別CRUD連打より本ツールを優先。plotは <!-- chapterId/sectionId --> を保持すること。",
     {
       markdown: z
         .string()
@@ -300,7 +300,7 @@ export function registerMcpTools(
 
   server.tool(
     "create_chapter",
-    "小説に新しい章を追加します。",
+    "小説に新しい章を追加します。大規模修正（3件以上/全体再構成）は get_*/save_*_markdown を優先。",
     {
       novelId: z.string().describe("小説ID (UUID)"),
       order: z.number().optional().describe("章の並び順番号（省略時は末尾）"),
@@ -340,7 +340,7 @@ export function registerMcpTools(
 
   server.tool(
     "update_chapter",
-    "指定された章のタイトル、概要、並び順を更新します。",
+    "指定された章のタイトル、概要、並び順を更新します。大規模修正（3件以上/全体再構成）は get_*/save_*_markdown を優先。",
     {
       chapterId: z.string().describe("章ID (UUID)"),
       order: z.number().optional().describe("章の並び順番号"),
@@ -408,7 +408,7 @@ export function registerMcpTools(
 
   server.tool(
     "create_section",
-    "指定した章の中に新しい節（シーン）を追加します。",
+    "指定した章の中に新しい節（シーン）を追加します。大規模修正（3件以上/全体再構成）は get_*/save_*_markdown を優先。",
     {
       chapterId: z.string().describe("親章のID (UUID)"),
       order: z.number().optional().describe("節の並び順番号（省略時は末尾）"),
@@ -448,7 +448,7 @@ export function registerMcpTools(
 
   server.tool(
     "update_section",
-    "節のタイトル、概要、並び順を更新します。",
+    "節のタイトル、概要、並び順を更新します。大規模修正（3件以上/全体再構成）は get_*/save_*_markdown を優先。",
     {
       order: z.number().optional().describe("節の並び順番号"),
       sectionId: z.string().describe("節ID (UUID)"),
@@ -666,7 +666,7 @@ export function registerMcpTools(
 
   server.tool(
     "create_character",
-    "新しい登場人物を登録します。自動でVectorDBへのEmbedding登録が行われます。",
+    "新しい登場人物を登録します。自動でVectorDBへのEmbedding登録が行われます。大規模修正（3件以上/全体再構成）は get_*/save_*_markdown を優先。",
     {
       category: z
         .string()
@@ -718,7 +718,7 @@ export function registerMcpTools(
 
   server.tool(
     "update_character",
-    "登場人物の情報を更新します。VectorDBのEmbeddingも自動更新されます。",
+    "登場人物の情報を更新します。VectorDBのEmbeddingも自動更新されます。大規模修正（3件以上/全体再構成）は get_*/save_*_markdown を優先。",
     {
       category: z.string().optional().describe("役割カテゴリ"),
       characterId: z.string().describe("登場人物ID (UUID)"),
@@ -791,7 +791,7 @@ export function registerMcpTools(
 
   server.tool(
     "save_characters_markdown",
-    "登場人物全体のMarkdownテキストを一括解析し、既存の登場人物リストと同期・更新します。",
+    "登場人物全体のMarkdownテキストを一括解析し、既存の登場人物リストと同期・更新します。大規模修正時は個別CRUD連打より本ツールを優先。",
     {
       markdown: z.string().describe("登場人物Markdownテキスト"),
       novelId: z.string().describe("小説ID (UUID)"),
@@ -900,7 +900,7 @@ export function registerMcpTools(
 
   server.tool(
     "create_setting",
-    "新しい世界観・設定を登録します。VectorDBへのEmbedding登録が自動で行われます。",
+    "新しい世界観・設定を登録します。VectorDBへのEmbedding登録が自動で行われます。大規模修正（3件以上/全体再構成）は get_*/save_*_markdown を優先。",
     {
       category: z
         .string()
@@ -947,7 +947,7 @@ export function registerMcpTools(
 
   server.tool(
     "update_setting",
-    "設定の情報を更新します。VectorDBのEmbeddingも自動更新されます。",
+    "設定の情報を更新します。VectorDBのEmbeddingも自動更新されます。大規模修正（3件以上/全体再構成）は get_*/save_*_markdown を優先。",
     {
       category: z.string().optional().describe("カテゴリ"),
       description: z.string().optional().describe("詳細説明"),
@@ -1015,7 +1015,7 @@ export function registerMcpTools(
 
   server.tool(
     "save_settings_markdown",
-    "設定全体のMarkdownテキストを一括解析し、既存の設定リストと同期・更新します。",
+    "設定全体のMarkdownテキストを一括解析し、既存の設定リストと同期・更新します。大規模修正時は個別CRUD連打より本ツールを優先。",
     {
       markdown: z.string().describe("設定Markdownテキスト"),
       novelId: z.string().describe("小説ID (UUID)"),
@@ -1089,7 +1089,7 @@ export function registerMcpTools(
 
   server.tool(
     "create_foreshadowing",
-    "新しい伏線を登録します。",
+    "新しい伏線を登録します。大規模修正（3件以上/全体再構成）は get_*/save_*_markdown を優先。",
     {
       category: z
         .string()
@@ -1153,7 +1153,7 @@ export function registerMcpTools(
 
   server.tool(
     "update_foreshadowing",
-    "伏線のステータスや回収節、詳細説明を更新します。",
+    "伏線のステータスや回収節、詳細説明を更新します。大規模修正（3件以上/全体再構成）は get_*/save_*_markdown を優先。",
     {
       description: z.string().optional().describe("詳細説明"),
       foreshadowingId: z.string().describe("伏線ID (UUID)"),
@@ -1278,7 +1278,7 @@ export function registerMcpTools(
 
   server.tool(
     "create_timeline_event",
-    "新しいタイムラインイベントを追加します。",
+    "新しいタイムラインイベントを追加します。大規模修正（3件以上/全体再構成）は get_*/save_*_markdown を優先。",
     {
       event: z.string().describe("出来事の内容"),
       novelId: z.string().describe("小説ID (UUID)"),
@@ -1326,7 +1326,7 @@ export function registerMcpTools(
 
   server.tool(
     "update_timeline_event",
-    "タイムラインイベントを更新します。",
+    "タイムラインイベントを更新します。大規模修正（3件以上/全体再構成）は get_*/save_*_markdown を優先。",
     {
       event: z.string().optional().describe("出来事の内容"),
       order: z.number().optional().describe("時系列の順序番号"),
@@ -2006,7 +2006,7 @@ export function registerMcpTools(
 
   server.tool(
     "save_foreshadowings_markdown",
-    "伏線全体のMarkdownテキストを一括解析し、既存の伏線リストと同期・更新します。",
+    "伏線全体のMarkdownテキストを一括解析し、既存の伏線リストと同期・更新します。大規模修正時は個別CRUD連打より本ツールを優先。",
     {
       markdown: z.string().describe("伏線Markdownテキスト"),
       novelId: z.string().describe("小説ID (UUID)"),
@@ -2069,7 +2069,7 @@ export function registerMcpTools(
 
   server.tool(
     "save_timelines_markdown",
-    "年表全体のMarkdownテキストを一括解析し、既存のタイムラインリストと同期・更新します。",
+    "年表全体のMarkdownテキストを一括解析し、既存のタイムラインリストと同期・更新します。大規模修正時は個別CRUD連打より本ツールを優先。",
     {
       markdown: z.string().describe("年表Markdownテキスト"),
       novelId: z.string().describe("小説ID (UUID)"),

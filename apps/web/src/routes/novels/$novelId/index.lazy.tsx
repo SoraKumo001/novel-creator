@@ -1,4 +1,5 @@
 import type { NovelExportData } from "@novel-creator/shared";
+import { useQueryClient } from "@tanstack/react-query";
 import { createLazyFileRoute, useNavigate } from "@tanstack/react-router";
 import {
   type ComponentType,
@@ -23,6 +24,7 @@ import { TimelineTab } from "@/features/editor/components/TimelineTab.js";
 import { type NovelMutations, useNovel } from "@/hooks/useNovel.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
+import { novelKeys } from "@/lib/queryKeys.js";
 import { fetchNovelExportData } from "@/lib/services/index.js";
 
 /**
@@ -102,6 +104,21 @@ export function NovelDetailPage() {
   const [exportLoading, setExportLoading] = useState(false);
   const [exportData, setExportData] = useState<NovelExportData | null>(null);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const [refreshing, setRefreshing] = useState(false);
+
+  // ヘッダーのグローバル更新ボタン用。タブに関わらず ['novels', novelId] 配下を一括無効化して再取得する。
+  const handleGlobalRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await queryClient.invalidateQueries({
+        queryKey: novelKeys.detail(novelId),
+      });
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [novelId, queryClient, refetch]);
 
   const checkTabScroll = useCallback(() => {
     const el = tabListRef.current;
@@ -219,6 +236,14 @@ export function NovelDetailPage() {
               </h1>
             </div>
             <div className="flex min-w-0 flex-wrap items-center gap-2 sm:shrink-0">
+              <Button
+                variant="secondary"
+                onClick={() => void handleGlobalRefresh()}
+                isLoading={refreshing}
+                title="最新の内容を再取得"
+              >
+                🔄 更新
+              </Button>
               <Button
                 variant="secondary"
                 onClick={() => setShortcutsOpen(true)}

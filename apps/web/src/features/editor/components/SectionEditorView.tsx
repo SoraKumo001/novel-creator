@@ -77,6 +77,7 @@ export interface SectionEditorViewProps {
   isDirty: boolean;
   isInlineActive: boolean;
   isZenMode: boolean;
+  loadError?: string | null;
   loading: boolean;
   localBody: string;
   modals: SectionEditorModalStates;
@@ -186,56 +187,63 @@ export function SectionEditorView(props: SectionEditorViewProps) {
       )}
 
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        {props.loading ? (
+        {props.loading && !props.loadError ? (
           <Loading message="本文を読み込み中..." />
         ) : (
-          <div className="relative min-h-0 flex-1 overflow-hidden">
-            <MonacoEditor
-              value={props.localBody}
-              onChange={props.onLocalBodyChange}
-              onSelectionChange={props.onSelectionChange}
-            />
-            {props.selectedText && !props.isInlineActive && (
-              <div className="fade-in slide-in-from-top-1 absolute top-4 right-8 z-30 flex animate-in items-center gap-2 duration-150">
-                <button
-                  type="button"
-                  onClick={props.onActivateInline}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-full border border-primary/20 bg-primary px-3.5 py-1.5 font-bold text-primary-foreground text-xs shadow-lg transition hover:brightness-110"
-                >
-                  <span>
-                    ✨ 選択範囲をAI推敲 ({props.selectedText.length}文字)
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => props.onOpenChat(true)}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3.5 py-1.5 font-bold text-foreground text-xs shadow-lg transition hover:border-primary/50 hover:bg-surface-hover"
-                >
-                  <span>💬 チャットで相談</span>
-                </button>
-              </div>
-            )}
-            {props.isInlineActive && (
-              <div className="absolute top-4 right-8 z-40 w-[30rem] max-w-[calc(100%-4rem)]">
-                <InlineAIAssistant
-                  selectedText={props.selectedText}
-                  novelId={props.novelId}
-                  onApplyReplace={props.onApplyInlineReplace}
-                  onApplyInsertAfter={props.onApplyInlineInsertAfter}
-                  onCancel={props.onCancelInline}
-                  onExecuteAssist={props.onExecuteInlineAssist}
-                  onOpenPromptManager={props.onOpenCustomPrompts}
-                  isLoading={props.inlineAssisting}
-                  startedAt={
-                    props.inlineAssisting ? props.generateStartedAt : null
-                  }
-                  variants={props.inlineVariants}
-                  activeVariantIndex={props.activeVariantIndex}
-                  onSelectVariantIndex={props.onSelectInlineVariant}
-                />
-              </div>
-            )}
-          </div>
+          <>
+            {props.loadError && !props.localBody.trim() ? (
+              <p className="shrink-0 border-border border-b bg-surface px-4 py-1.5 text-muted-foreground text-xs">
+                本文はまだ作成されていません（未作成）。保存すると新規作成されます。
+              </p>
+            ) : null}
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              <MonacoEditor
+                value={props.localBody}
+                onChange={props.onLocalBodyChange}
+                onSelectionChange={props.onSelectionChange}
+              />
+              {props.selectedText && !props.isInlineActive && (
+                <div className="fade-in slide-in-from-top-1 absolute top-4 right-8 z-30 flex animate-in items-center gap-2 duration-150">
+                  <button
+                    type="button"
+                    onClick={props.onActivateInline}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-full border border-primary/20 bg-primary px-3.5 py-1.5 font-bold text-primary-foreground text-xs shadow-lg transition hover:brightness-110"
+                  >
+                    <span>
+                      ✨ 選択範囲をAI推敲 ({props.selectedText.length}文字)
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => props.onOpenChat(true)}
+                    className="flex cursor-pointer items-center gap-1.5 rounded-full border border-border bg-surface-raised px-3.5 py-1.5 font-bold text-foreground text-xs shadow-lg transition hover:border-primary/50 hover:bg-surface-hover"
+                  >
+                    <span>💬 チャットで相談</span>
+                  </button>
+                </div>
+              )}
+              {props.isInlineActive && (
+                <div className="absolute top-4 right-8 z-40 w-[30rem] max-w-[calc(100%-4rem)]">
+                  <InlineAIAssistant
+                    selectedText={props.selectedText}
+                    novelId={props.novelId}
+                    onApplyReplace={props.onApplyInlineReplace}
+                    onApplyInsertAfter={props.onApplyInlineInsertAfter}
+                    onCancel={props.onCancelInline}
+                    onExecuteAssist={props.onExecuteInlineAssist}
+                    onOpenPromptManager={props.onOpenCustomPrompts}
+                    isLoading={props.inlineAssisting}
+                    startedAt={
+                      props.inlineAssisting ? props.generateStartedAt : null
+                    }
+                    variants={props.inlineVariants}
+                    activeVariantIndex={props.activeVariantIndex}
+                    onSelectVariantIndex={props.onSelectInlineVariant}
+                  />
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 

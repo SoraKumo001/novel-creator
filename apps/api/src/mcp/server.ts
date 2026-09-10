@@ -24,6 +24,8 @@ export function createNovelCreatorMcpServer(
         resources: { listChanged: true },
         tools: { listChanged: true },
       },
+      instructions:
+        "人物・設定・プロット・伏線・年表の大規模修正はMarkdown一括同期（get_*_markdown→save_*_markdown）を優先。20件以内の差分のみbatch_*可。単発の改名/移動は個別update。",
     }
   );
 

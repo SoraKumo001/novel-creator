@@ -47,7 +47,13 @@ export function SectionEditor({
   isZenMode,
   onToggleZenMode,
 }: SectionEditorProps) {
-  const { content, loading, saving, updateContent } = useContent(section.id);
+  const {
+    content,
+    error: contentError,
+    loading,
+    saving,
+    updateContent,
+  } = useContent(section.id);
   const {
     generateContent,
     generatingContent,
@@ -167,28 +173,50 @@ export function SectionEditor({
 
   async function handleGenerate() {
     resetStreamError();
-    let accumulated = localBody;
-    await generateContent(
-      section.id,
-      (chunk) => {
-        accumulated += chunk;
-        setLocalBody(accumulated);
-      },
-      selectedModelConfigId
-    );
-    await updateContent(accumulated);
-    setSavedBody(accumulated);
+    const base = localBody;
+    let accumulated = base;
+    try {
+      await generateContent(
+        section.id,
+        (chunk) => {
+          accumulated += chunk;
+          setLocalBody(accumulated);
+        },
+        selectedModelConfigId
+      );
+      if (accumulated.length === base.length) {
+        return;
+      }
+      await updateContent(accumulated);
+      setSavedBody(accumulated);
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") {
+        return;
+      }
+      toast.error(toErrorMessage(e));
+    }
   }
 
   async function handleRetryGenerate() {
     resetStreamError();
-    let accumulated = localBody;
-    await retryGenerate((chunk) => {
-      accumulated += chunk;
-      setLocalBody(accumulated);
-    });
-    await updateContent(accumulated);
-    setSavedBody(accumulated);
+    const base = localBody;
+    let accumulated = base;
+    try {
+      await retryGenerate((chunk) => {
+        accumulated += chunk;
+        setLocalBody(accumulated);
+      });
+      if (accumulated.length === base.length) {
+        return;
+      }
+      await updateContent(accumulated);
+      setSavedBody(accumulated);
+    } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") {
+        return;
+      }
+      toast.error(toErrorMessage(e));
+    }
   }
 
   async function handleExtract() {
@@ -290,6 +318,7 @@ export function SectionEditor({
       updatingNovel={novelMutations.updating}
       isZenMode={isZenMode}
       localBody={localBody}
+      loadError={contentError}
       loading={loading}
       saving={saving}
       isDirty={isDirty}
