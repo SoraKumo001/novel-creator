@@ -48,6 +48,18 @@ function isOpenCodeRoutedEndpoint(baseUrl: string | null | undefined): boolean {
   );
 }
 
+/** TEMP DEBUG 用に baseUrl のホスト部のみを取り出す（キーやパスは出さない）。 */
+function hostOf(baseUrl: string | null | undefined): string | null {
+  if (!baseUrl) {
+    return null;
+  }
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return "(invalid-url)";
+  }
+}
+
 export class ChatDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
@@ -127,11 +139,23 @@ export class ChatDomainService {
     // セッション引継ぎヘッダーを要求する。他プロバイダには送らない。
     // デフォルトLLM（環境変数）では provider が "openai" のまま
     // baseURL だけ Console Go 等を指す構成があり得るため、baseURL も判定する。
+    // 行の baseUrl が空でも transport は env LLM_BASE_URL にフォールバックする
+    // （provider.ts resolveSettings と同一順）ため、判定も実効 URL で行う。
+    const effectiveBaseUrl =
+      resolvedModel.baseUrl ?? this.ctx.env.LLM_BASE_URL ?? null;
     const headers =
       resolvedModel.provider === "custom_openai" ||
-      isOpenCodeRoutedEndpoint(resolvedModel.baseUrl)
+      isOpenCodeRoutedEndpoint(effectiveBaseUrl)
         ? { "x-opencode-session": sessionId }
         : undefined;
+    // TEMP DEBUG: OpenCode ヘッダー付与の判定確認用（確認後に削除する）。
+    // info（stdout）で出す。debug は console.debug（stderr）経由で、
+    // ターミナルによっては見落とされるため。
+    appLogger.info("[TEMP DEBUG] chat headers", {
+      baseUrlHost: hostOf(effectiveBaseUrl),
+      headerAttached: headers !== undefined,
+      provider: resolvedModel.provider,
+    });
 
     const response = await this.streamAssistantResponse(
       sessionId,
