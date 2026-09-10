@@ -66,12 +66,14 @@ export async function streamChatAssistantResponse(
   resolvedModel: ResolvedLLMModel,
   prompt: string,
   tools: ToolSet | undefined,
-  providerOptions: ProviderOptions | undefined
+  providerOptions: ProviderOptions | undefined,
+  headers?: Record<string, string>
 ): Promise<Response> {
   let lastStep = 0;
   let writeProgressPart: ((part: ChatProgressPart) => void) | undefined;
 
   const result = await streamTextResult(resolvedModel.model, prompt, {
+    ...(headers ? { headers } : {}),
     onStep: (progress) => {
       lastStep = progress.step;
       writeProgressPart?.({

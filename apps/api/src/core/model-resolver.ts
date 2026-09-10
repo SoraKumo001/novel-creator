@@ -70,8 +70,10 @@ async function resolveFromConfigTable<TConfig, TResult>(
 /**
  * resolveLLMModelWithInfo の戻り値。解決されたモデルに加えて
  * プロバイダ種別・モデル ID を返す（例: 推論オプションの構築に使用する）。
+ * baseUrl は OpenCode 互換エンドポイント判定などのリクエスト単位の分岐に使用する。
  */
 export interface ResolvedLLMModel {
+  baseUrl?: string | null;
   model: LanguageModel;
   modelId: string;
   provider: LLMProviderType;
@@ -97,6 +99,7 @@ export async function resolveLLMModelWithInfo(
     {
       configLabel: "LLM Config",
       fallback: (context) => ({
+        baseUrl: context.env.LLM_BASE_URL ?? null,
         model: context.llm,
         modelId: context.env.LLM_MODEL,
         provider: context.env.LLM_PROVIDER,
@@ -124,6 +127,7 @@ export async function resolveLLMModelWithInfo(
         );
         const input = apiKey === config.apiKey ? config : { ...config, apiKey };
         return {
+          baseUrl: config.baseUrl ?? null,
           model: createLanguageModelFromConfig(input, context.env),
           modelId: config.modelId,
           provider: config.provider,

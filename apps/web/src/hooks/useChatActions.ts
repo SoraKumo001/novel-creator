@@ -10,6 +10,7 @@ import type { ChatMessage } from "./chatStreamingTypes.js";
 
 interface UseChatActionsInput {
   autoCreatedSessionRef: RefObject<string | null>;
+  chatRegenerate: () => Promise<void>;
   chatSendMessage: (message: { text: string }) => Promise<void>;
   currentSessionIdRef: RefObject<string | null>;
   isStreamingRef: RefObject<boolean>;
@@ -20,6 +21,7 @@ interface UseChatActionsInput {
   setError: React.Dispatch<React.SetStateAction<string | null>>;
   setUiMessages: React.Dispatch<React.SetStateAction<UIMessage[]>>;
   stop: () => Promise<void>;
+  uiMessages: UIMessage[];
 }
 
 interface UseChatActionsResult {
@@ -44,6 +46,7 @@ interface UseChatActionsResult {
  */
 export function useChatActions({
   autoCreatedSessionRef,
+  chatRegenerate,
   chatSendMessage,
   currentSessionIdRef,
   isStreamingRef,
@@ -54,6 +57,7 @@ export function useChatActions({
   setError,
   setUiMessages,
   stop,
+  uiMessages,
 }: UseChatActionsInput): UseChatActionsResult {
   // 新規セッション作成
   const createSession = useCallback(
@@ -226,9 +230,25 @@ export function useChatActions({
     ]
   );
 
-  // 直前のメッセージを再試行する
+  // 直前のメッセージを再試行する。
+  // 失敗したアシスタント応答が末尾に残っている場合は regenerate で破棄して
+  // 再生成する。そのまま sendMessage で追送すると
+  // [user, assistant(失敗), user] が送信され、API スキーマ
+  // （messages は role='user' のみ許可）に違反する。
+  // 末尾が user の場合（失敗前に応答が作られなかった等）は従来どおり再送する。
   const retryLastMessage = useCallback(async () => {
     if (sendingRef.current || isStreamingRef.current) {
+      return;
+    }
+    const lastRaw = uiMessages[uiMessages.length - 1];
+    if (lastRaw && lastRaw.role !== "user" && currentSessionIdRef.current) {
+      sendingRef.current = true;
+      try {
+        setError(null);
+        await chatRegenerate();
+      } finally {
+        sendingRef.current = false;
+      }
       return;
     }
     const lastUserPrompt =
@@ -238,7 +258,15 @@ export function useChatActions({
       return;
     }
     await sendMessage(lastUserPrompt);
-  }, [messages, sendMessage, isStreamingRef]);
+  }, [
+    uiMessages,
+    messages,
+    sendMessage,
+    chatRegenerate,
+    isStreamingRef,
+    setError,
+    currentSessionIdRef,
+  ]);
 
   // エラー表示を消去する
   const clearError = useCallback(() => {

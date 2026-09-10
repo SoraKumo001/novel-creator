@@ -10,6 +10,8 @@ import { withRetry } from "./retry.js";
  * 未指定時は環境変数（LLM_TIMEOUT_MS / LLM_MAX_OUTPUT_TOKENS）または既定値にフォールバックする。
  */
 export interface GenerateTextOptions extends RetryOptions {
+  /** リクエスト単位の追加 HTTP ヘッダー（例: OpenCode セッション引継ぎ）。 */
+  headers?: Record<string, string>;
   /** 最大出力トークン数。未指定時は既定値（8192） */
   maxOutputTokens?: number;
   /** 呼び出し単位のタイムアウト（ms）。未指定時は既定値（120000） */
@@ -27,6 +29,7 @@ export async function generateText(
   options: GenerateTextOptions = {}
 ): Promise<string> {
   const {
+    headers,
     maxOutputTokens = LLM_MAX_OUTPUT_TOKENS,
     timeoutMs = LLM_TIMEOUT_MS,
     ...retryOptions
@@ -35,6 +38,7 @@ export async function generateText(
   return withRetry(async () => {
     const result = await aiGenerateText({
       abortSignal,
+      ...(headers ? { headers } : {}),
       maxOutputTokens,
       model,
       prompt,
@@ -54,6 +58,7 @@ export async function* streamText(
   options: GenerateTextOptions = {}
 ): AsyncGenerator<string> {
   const {
+    headers,
     maxOutputTokens = LLM_MAX_OUTPUT_TOKENS,
     timeoutMs = LLM_TIMEOUT_MS,
     ...retryOptions
@@ -63,6 +68,7 @@ export async function* streamText(
     async () =>
       aiStreamText({
         abortSignal,
+        ...(headers ? { headers } : {}),
         maxOutputTokens,
         model,
         prompt,

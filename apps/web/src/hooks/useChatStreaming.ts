@@ -151,6 +151,7 @@ export function useChatStreaming({
     messages: uiMessages,
     setMessages: setUiMessages,
     sendMessage: chatSendMessage,
+    regenerate: chatRegenerate,
     stop,
     status,
     error: chatError,
@@ -352,6 +353,7 @@ export function useChatStreaming({
     lastPromptRef,
   } = useChatActions({
     autoCreatedSessionRef,
+    chatRegenerate,
     chatSendMessage,
     currentSessionIdRef,
     isStreamingRef,
@@ -362,6 +364,7 @@ export function useChatStreaming({
     setError,
     setUiMessages,
     stop,
+    uiMessages,
   });
 
   // 戻り値は ChatProvider から2つの context value に分配されるため

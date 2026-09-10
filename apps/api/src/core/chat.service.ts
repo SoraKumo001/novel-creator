@@ -35,6 +35,19 @@ import type { ServiceContext } from "./types.js";
 
 export { CHAT_MAX_STEPS, type ChatProgressData, type ChatProgressPart };
 
+/**
+ * OpenCode 互換エンドポイント（Console Go 等）へルーティングされているかを判定する。
+ * provider ラベルが "openai" のまま baseURL だけ Console Go を指す
+ * デフォルトLLM（環境変数）構成でも検出できるよう、baseURL も見る。
+ */
+function isOpenCodeRoutedEndpoint(baseUrl: string | null | undefined): boolean {
+  return (
+    baseUrl !== null &&
+    baseUrl !== undefined &&
+    /opencode|console-?go/i.test(baseUrl)
+  );
+}
+
 export class ChatDomainService {
   constructor(private readonly ctx: ServiceContext) {}
 
@@ -110,12 +123,23 @@ export class ChatDomainService {
 
     const tools = this.buildChatTools(effectiveNovelId);
 
+    // OpenCode 互換エンドポイント（custom_openai）はリクエスト単位で
+    // セッション引継ぎヘッダーを要求する。他プロバイダには送らない。
+    // デフォルトLLM（環境変数）では provider が "openai" のまま
+    // baseURL だけ Console Go 等を指す構成があり得るため、baseURL も判定する。
+    const headers =
+      resolvedModel.provider === "custom_openai" ||
+      isOpenCodeRoutedEndpoint(resolvedModel.baseUrl)
+        ? { "x-opencode-session": sessionId }
+        : undefined;
+
     const response = await this.streamAssistantResponse(
       sessionId,
       resolvedModel,
       prompt,
       tools,
-      providerOptions
+      providerOptions,
+      headers
     );
     // warnings は既存ストリーム形式を変えず、レスポンスヘッダでクライアントに返す
     if (context.warnings.length > 0) {
@@ -161,7 +185,8 @@ export class ChatDomainService {
     resolvedModel: ResolvedLLMModel,
     prompt: string,
     tools: ToolSet | undefined,
-    providerOptions?: ProviderOptions | undefined
+    providerOptions?: ProviderOptions | undefined,
+    headers?: Record<string, string>
   ): Promise<Response> {
     return streamChatAssistantResponse(
       this.ctx,
@@ -169,7 +194,8 @@ export class ChatDomainService {
       resolvedModel,
       prompt,
       tools,
-      providerOptions
+      providerOptions,
+      headers
     );
   }
 }

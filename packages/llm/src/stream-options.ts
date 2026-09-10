@@ -43,6 +43,8 @@ export interface StepProgress {
 }
 
 export interface StreamTextOptions extends RetryOptions {
+  /** リクエスト単位の追加 HTTP ヘッダー（例: OpenCode セッション引継ぎ）。 */
+  headers?: Record<string, string>;
   /** 最大出力トークン数。未指定時は既定値（8192） */
   maxOutputTokens?: number;
   /** 各 LLM ステップの開始・終了時に呼ばれる進捗コールバック */
@@ -116,6 +118,7 @@ export async function streamTextResult<
     async () =>
       aiStreamText({
         abortSignal,
+        ...(options.headers ? { headers: options.headers } : {}),
         maxOutputTokens,
         model,
         prompt,
