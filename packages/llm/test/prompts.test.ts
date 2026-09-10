@@ -81,6 +81,21 @@ describe("contentGeneration", () => {
     expect(prompt).toContain("アリス");
     expect(prompt).toContain("ボブ");
     expect(prompt).toContain("魔法世界");
+    // 読者視点・状況セットアップ指示が含まれること
+    expect(prompt).toContain("セットアップの徹底");
+    expect(prompt).toContain("読者の理解度を意識した情報開示");
+  });
+
+  it("chapter 情報がある場合に章タイトルと章概要が含まれること", () => {
+    const prompt = contentGeneration(
+      { summary: "節の概要", title: "節タイトル" },
+      {
+        chapter: { summary: "章のあらすじ", title: "第一章 旅立ち" },
+      }
+    );
+    expect(prompt).toContain("# 章情報");
+    expect(prompt).toContain("第一章 旅立ち");
+    expect(prompt).toContain("章のあらすじ");
   });
 });
 

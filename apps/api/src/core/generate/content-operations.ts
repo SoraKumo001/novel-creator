@@ -9,7 +9,7 @@ import {
   sectionSummary,
   streamText,
 } from "@novel-creator/llm";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 import { searchContext } from "../../rag.js";
 import {
   buildOpenCodeSessionHeaders,
@@ -155,11 +155,43 @@ export async function* generateSectionContentOp(
   let previousContent: string | undefined;
   if (prevIndex > 0) {
     const prevSection = previousSections[prevIndex - 1];
-    const [prevContent] = await ctx.db
+    if (prevSection) {
+      const [prevContent] = await ctx.db
+        .select()
+        .from(contents)
+        .where(eq(contents.sectionId, prevSection.id));
+      previousContent = prevContent?.body;
+    }
+  } else {
+    // 章の第1節の場合、前章の最終節本文を取得して章またぎの文脈断絶を防ぐ
+    const previousChapters = await ctx.db
       .select()
-      .from(contents)
-      .where(eq(contents.sectionId, prevSection.id));
-    previousContent = prevContent?.body;
+      .from(chapters)
+      .where(
+        and(
+          eq(chapters.novelId, chapter.novelId),
+          lt(chapters.order, chapter.order)
+        )
+      )
+      .orderBy(desc(chapters.order))
+      .limit(1);
+    const prevChapter = previousChapters[0];
+    if (prevChapter) {
+      const prevChapterSections = await ctx.db
+        .select()
+        .from(sections)
+        .where(eq(sections.chapterId, prevChapter.id))
+        .orderBy(desc(sections.order))
+        .limit(1);
+      const lastSection = prevChapterSections[0];
+      if (lastSection) {
+        const [prevContent] = await ctx.db
+          .select()
+          .from(contents)
+          .where(eq(contents.sectionId, lastSection.id));
+        previousContent = prevContent?.body;
+      }
+    }
   }
 
   const ragContext = await searchContext(
@@ -181,6 +213,10 @@ export async function* generateSectionContentOp(
   const prompt = contentGeneration(
     { summary: section.summary ?? "", title: section.title ?? undefined },
     {
+      chapter: {
+        summary: chapter.summary,
+        title: chapter.title,
+      },
       characters: ragContext.characters,
       previousContent: ragContext.previousContent,
       settings: ragContext.settings,
