@@ -21,8 +21,10 @@ import {
   type ChatFocusContext,
   ChatStreamingContext,
   type ChatStreamingContextValue,
+  type ChatTabContext,
   ChatUIContext,
   type ChatUIContextValue,
+  isTabFocus,
 } from "./chatUiTypes.js";
 
 /**
@@ -58,12 +60,23 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     null
   );
   const [chatFocus, setChatFocus] = useState<ChatFocusContext | null>(null);
+  const [tabContext, setTabContextState] = useState<ChatTabContext | null>(
+    null
+  );
   const [loadingMessages, setLoadingMessages] = useState(false);
 
   const queryClient = useQueryClient();
 
   const selectedNovelIdRef = useRef<string | null>(selectedNovelId);
   selectedNovelIdRef.current = selectedNovelId;
+
+  // toggleChatWithTabContext を ref 経由で安定させるための同期参照
+  const chatFocusRef = useRef<ChatFocusContext | null>(chatFocus);
+  chatFocusRef.current = chatFocus;
+  const tabContextRef = useRef<ChatTabContext | null>(tabContext);
+  tabContextRef.current = tabContext;
+  const isOpenRef = useRef(isOpen);
+  isOpenRef.current = isOpen;
 
   // セッション一覧の取得（小説ID変更時はクエリキー変更により自動再取得される）
   const sessionsQuery = useQuery({
@@ -264,6 +277,43 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     setIsOpen((prev) => !prev);
   }, [setIsOpen]);
 
+  const setTabContext = useCallback((ctx: ChatTabContext | null) => {
+    setTabContextState(ctx);
+  }, []);
+
+  // メニュー / Ctrl+J 用の開閉。開くときに未消費フォーカスが無ければ
+  // 登録済みタブ文脈を付与する（エディタの明示フォーカスは上書きしない）。
+  // ref 経由で最新値を読むため同一性は安定し、Ctrl+J リスナーの再登録を起こさない。
+  const toggleChatWithTabContext = useCallback(() => {
+    if (isOpenRef.current) {
+      setIsOpen(false);
+      return;
+    }
+    const currentFocus = chatFocusRef.current;
+    const currentTab = tabContextRef.current;
+    if (!currentFocus && currentTab) {
+      if (currentTab.novelId !== selectedNovelIdRef.current) {
+        setSelectedNovelId(currentTab.novelId);
+      }
+      setChatFocus(currentTab.focus);
+    }
+    setIsOpen(true);
+  }, [setIsOpen, setSelectedNovelId]);
+
+  // ドロワーが開いている間のタブ追従。現在付与中のフォーカスが自動付与の
+  // タブ文脈のときのみ新タブへ更新する（📎バッジ・次回送信に反映される）。
+  // 明示フォーカス（entityType が tab 以外）や手動解除（null）の場合は温存し、
+  // 小説・セッションの切替には触れない。ref 経由で読むため同一性は安定する。
+  const syncTabFocusForOpenDrawer = useCallback((ctx: ChatTabContext) => {
+    if (!isOpenRef.current) {
+      return;
+    }
+    if (!isTabFocus(chatFocusRef.current)) {
+      return;
+    }
+    setChatFocus(ctx.focus);
+  }, []);
+
   const currentSession = useMemo(
     () => sessions.find((s) => s.id === currentSessionId) ?? null,
     [sessions, currentSessionId]
@@ -271,16 +321,21 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   // 低頻度 value: 依存は useState/useRef 由来の値と安定した useCallback のみ。
   // ストリーミング中にチャンクが流れても参照が変わらない。
+  // tabContext はタブ切替時のみ変わる低頻度値としてここに含める。
   const uiValue = useMemo<ChatUIContextValue>(
     () => ({
       isOpen,
       openChat,
       closeChat,
       toggleChat,
+      toggleChatWithTabContext,
       chatFocus,
       consumeFocus,
       selectedNovelId,
       setSelectedNovelId,
+      tabContext,
+      setTabContext,
+      syncTabFocusForOpenDrawer,
 
       sessions,
       currentSessionId,
@@ -303,10 +358,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       openChat,
       closeChat,
       toggleChat,
+      toggleChatWithTabContext,
       chatFocus,
       consumeFocus,
       selectedNovelId,
       setSelectedNovelId,
+      tabContext,
+      setTabContext,
+      syncTabFocusForOpenDrawer,
       sessions,
       currentSessionId,
       currentSession,

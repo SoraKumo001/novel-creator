@@ -27,6 +27,7 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("@/context/ChatContext.js", () => ({
   useChatUI: () => ({
     toggleChat: vi.fn(),
+    toggleChatWithTabContext: vi.fn(),
     isOpen: false,
   }),
 }));

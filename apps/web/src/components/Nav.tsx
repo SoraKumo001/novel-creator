@@ -7,7 +7,7 @@ export function Nav(): React.JSX.Element {
 
   return (
     <>
-      {/* モバイル用ハンバーガーボタン（チャットFABと対称の左下配置） */}
+      {/* モバイル用ハンバーガーボタン（左下配置） */}
       <button
         type="button"
         onClick={openMobileNav}

@@ -15,11 +15,13 @@ export function NavLinks({
   collapsed,
   onNavigate,
 }: NavLinksProps): React.JSX.Element {
-  const { toggleChat, isOpen } = useChatUI();
+  const { toggleChatWithTabContext, isOpen } = useChatUI();
   const { isAdmin } = useAuth();
 
   const handleChatClick = (): void => {
-    toggleChat();
+    // 小説詳細では登録済みタブ文脈を付与して開く（未消費フォーカスがある場合は温存）。
+    // 詳細外では tabContext が null のため従来通り文脈なしで開閉する。
+    toggleChatWithTabContext();
     onNavigate?.();
   };
 

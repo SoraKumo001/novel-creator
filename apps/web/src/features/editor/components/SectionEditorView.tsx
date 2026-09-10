@@ -1,9 +1,11 @@
 import { AIProgressIndicator } from "@/components/AIProgressIndicator.js";
+import { Button } from "@/components/Button.js";
 import { CharacterVoiceCheckerModal } from "@/components/CharacterVoiceCheckerModal.js";
 import { CustomPromptManagerModal } from "@/components/CustomPromptManagerModal.js";
 import { HistoryDiffModal } from "@/components/HistoryDiffModal.js";
 import { InlineAIAssistant } from "@/components/InlineAIAssistant.js";
 import { Loading } from "@/components/Loading.js";
+import { Modal } from "@/components/Modal.js";
 import { MultiPersonaReviewModal } from "@/components/MultiPersonaReviewModal.js";
 import { ProofreadModal } from "@/components/ProofreadModal.js";
 import { StyleGuideModal } from "@/components/StyleGuideModal.js";
@@ -12,6 +14,7 @@ import { EditorToolbar } from "@/features/editor/components/EditorToolbar.js";
 import { ExtractResultModal } from "@/features/editor/components/ExtractResultModal.js";
 import { GenerateContentPanel } from "@/features/editor/components/GenerateContentPanel.js";
 import { MonacoEditor } from "@/features/editor/components/MonacoEditor.js";
+import { SectionMetaPanel } from "@/features/editor/components/SectionMetaPanel.js";
 import type {
   AnalysisHistoryEntry,
   AnalysisProgress,
@@ -70,6 +73,7 @@ export interface SectionEditorViewProps {
   canRetryGeneration?: boolean;
   extracting: boolean;
   generatedChars: number;
+  generateModeOpen: boolean;
   generateStartedAt: number | null;
   generatingContent: boolean;
   inlineAssisting: boolean;
@@ -80,6 +84,7 @@ export interface SectionEditorViewProps {
   loadError?: string | null;
   loading: boolean;
   localBody: string;
+  metaConfirmOpen: boolean;
   modals: SectionEditorModalStates;
   novelId: string;
   novelStyleGuide?: string | null;
@@ -100,8 +105,16 @@ export interface SectionEditorViewProps {
   ) => Promise<void>;
   onExtract: () => void;
   onGenerate: () => void;
+  onGenerateAppend: () => void;
+  onGenerateModeClose: () => void;
+  onGenerateReplace: () => void;
   onHistoryRestore: (restored: string) => void;
   onLocalBodyChange: (value: string) => void;
+  onMetaConfirmClose: () => void;
+  onMetaConfirmGenerateAsIs: () => void;
+  onMetaConfirmSaveAndGenerate: () => void;
+  onMetaDirtyChange: (dirty: boolean) => void;
+  onMetaDraftChange: (draft: { summary: string; title: string }) => void;
   onModelChange: (id: string | null) => void;
   onOpenChat: (useSelected: boolean) => void;
   onOpenCustomPrompts: () => void;
@@ -113,6 +126,10 @@ export interface SectionEditorViewProps {
   onOpenVoiceChecker: () => void;
   onRetryGeneration?: () => void;
   onSave: () => void;
+  onSaveSectionMeta: (input: {
+    summary: string;
+    title: string;
+  }) => Promise<void>;
   onSaveStyleGuide: (newGuide: string) => Promise<void>;
   onSelectInlineVariant: (index: number) => void;
   onSelectionChange: (text: string) => void;
@@ -124,6 +141,7 @@ export interface SectionEditorViewProps {
   progressPercent: number;
   saving: boolean;
   section: Section;
+  sectionMetaSaving: boolean;
   selectedModelConfigId: string | null;
   selectedText: string;
   streamError: string | null;
@@ -163,6 +181,15 @@ export function SectionEditorView(props: SectionEditorViewProps) {
         onOpenStyleGuide={props.onOpenStyleGuide}
         onOpenCustomPrompts={props.onOpenCustomPrompts}
         onSave={props.onSave}
+      />
+
+      <SectionMetaPanel
+        key={section.id}
+        onDirtyChange={props.onMetaDirtyChange}
+        onDraftChange={props.onMetaDraftChange}
+        onSave={props.onSaveSectionMeta}
+        saving={props.sectionMetaSaving}
+        section={section}
       />
 
       <div className="h-1 w-full shrink-0 bg-border">
@@ -256,6 +283,66 @@ export function SectionEditorView(props: SectionEditorViewProps) {
         onRetry={props.onRetryGeneration}
         canRetry={props.canRetryGeneration}
       />
+
+      <Modal
+        footer={
+          <>
+            <Button
+              onClick={props.onMetaConfirmClose}
+              variant="ghost"
+              disabled={props.sectionMetaSaving}
+            >
+              キャンセル
+            </Button>
+            <Button
+              onClick={props.onMetaConfirmGenerateAsIs}
+              variant="secondary"
+              disabled={props.sectionMetaSaving}
+            >
+              そのまま生成
+            </Button>
+            <Button
+              onClick={props.onMetaConfirmSaveAndGenerate}
+              variant="primary"
+              isLoading={props.sectionMetaSaving}
+            >
+              保存して生成
+            </Button>
+          </>
+        }
+        isOpen={props.metaConfirmOpen}
+        onClose={props.onMetaConfirmClose}
+        size="sm"
+        title="概要に未保存の変更があります"
+      >
+        <p className="text-foreground-secondary text-sm">
+          節のタイトル・概要の変更はまだ保存されていません。本文生成は保存済みの概要をもとに行われるため、最新の内容で生成するには先に保存してください。
+        </p>
+      </Modal>
+
+      <Modal
+        footer={
+          <>
+            <Button onClick={props.onGenerateModeClose} variant="ghost">
+              キャンセル
+            </Button>
+            <Button onClick={props.onGenerateAppend} variant="secondary">
+              末尾に追加
+            </Button>
+            <Button onClick={props.onGenerateReplace} variant="primary">
+              置換
+            </Button>
+          </>
+        }
+        isOpen={props.generateModeOpen}
+        onClose={props.onGenerateModeClose}
+        size="sm"
+        title="本文の生成方法を選んでください"
+      >
+        <p className="text-foreground-secondary text-sm">
+          本文生成は全文のドラフトを新しく作ります。今の本文に続け足すか、生成結果と入れ替えるかを選んでください。
+        </p>
+      </Modal>
 
       <ExtractResultModal
         isOpen={modals.extractResult.isOpen}

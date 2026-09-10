@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useChatUI } from "@/context/ChatContext.js";
 import { useAnalysis } from "@/hooks/useAnalysis.js";
 import { useAnalysisRunner } from "@/hooks/useAnalysisRunner.js";
+import { useChapters } from "@/hooks/useChapters.js";
 import { useContent } from "@/hooks/useContent.js";
 import { useGenerate } from "@/hooks/useGenerate.js";
 import {
@@ -101,6 +102,46 @@ export function SectionEditor({
 
   const toast = useToast();
 
+  const { updateSection } = useChapters(novelId);
+  const [metaSaving, setMetaSaving] = useState(false);
+  const [metaDirty, setMetaDirty] = useState(false);
+  const metaDraftRef = useRef<{ summary: string; title: string } | null>(null);
+  const metaConfirmModal = useModalState();
+  const generateModeModal = useModalState();
+
+  const handleMetaDirtyChange = useCallback((dirty: boolean) => {
+    setMetaDirty(dirty);
+  }, []);
+
+  const handleMetaDraftChange = useCallback(
+    (draft: { summary: string; title: string }) => {
+      metaDraftRef.current = draft;
+    },
+    []
+  );
+
+  const handleSaveSectionMeta = useCallback(
+    async (input: { summary: string; title: string }) => {
+      setMetaSaving(true);
+      try {
+        await updateSection(section.id, {
+          order: section.order,
+          summary: input.summary,
+          title: input.title || section.title || `節 ${section.order}`,
+        });
+        await onRefresh();
+        toast.success("節の概要を保存しました");
+        return true;
+      } catch (e) {
+        toast.error(toErrorMessage(e));
+        return false;
+      } finally {
+        setMetaSaving(false);
+      }
+    },
+    [onRefresh, section.id, section.order, section.title, toast, updateSection]
+  );
+
   const [selectedModelConfigId, setSelectedModelConfigId] = useState<
     string | null
   >(() => localStorage.getItem("novel-creator:editor-model") || null);
@@ -171,9 +212,9 @@ export function SectionEditor({
     }
   };
 
-  async function handleGenerate() {
+  async function runGenerate(mode: "append" | "replace") {
     resetStreamError();
-    const base = localBody;
+    const base = mode === "replace" ? "" : localBody;
     let accumulated = base;
     try {
       await generateContent(
@@ -195,6 +236,52 @@ export function SectionEditor({
       }
       toast.error(toErrorMessage(e));
     }
+  }
+
+  function proceedToGenerate() {
+    if (localBody.trim()) {
+      generateModeModal.open();
+      return;
+    }
+    void runGenerate("append");
+  }
+
+  function handleGenerateRequest() {
+    if (generatingContent) {
+      return;
+    }
+    if (metaDirty) {
+      metaConfirmModal.open();
+      return;
+    }
+    proceedToGenerate();
+  }
+
+  function handleGenerateAppend() {
+    generateModeModal.close();
+    void runGenerate("append");
+  }
+
+  function handleGenerateReplace() {
+    generateModeModal.close();
+    void runGenerate("replace");
+  }
+
+  async function handleMetaSaveAndGenerate() {
+    const draft = metaDraftRef.current;
+    if (draft) {
+      const ok = await handleSaveSectionMeta(draft);
+      if (!ok) {
+        return;
+      }
+    }
+    metaConfirmModal.close();
+    proceedToGenerate();
+  }
+
+  function handleMetaGenerateAsIs() {
+    metaConfirmModal.close();
+    proceedToGenerate();
   }
 
   async function handleRetryGenerate() {
@@ -354,11 +441,25 @@ export function SectionEditor({
       onLocalBodyChange={setLocalBody}
       onSelectionChange={handleSelectionChange}
       onSave={() => void handleSave()}
+      onSaveSectionMeta={(input) =>
+        handleSaveSectionMeta(input).then(() => undefined)
+      }
+      sectionMetaSaving={metaSaving}
+      onMetaDirtyChange={handleMetaDirtyChange}
+      onMetaDraftChange={handleMetaDraftChange}
+      metaConfirmOpen={metaConfirmModal.isOpen}
+      onMetaConfirmClose={metaConfirmModal.close}
+      onMetaConfirmSaveAndGenerate={() => void handleMetaSaveAndGenerate()}
+      onMetaConfirmGenerateAsIs={handleMetaGenerateAsIs}
+      generateModeOpen={generateModeModal.isOpen}
+      onGenerateModeClose={generateModeModal.close}
+      onGenerateAppend={handleGenerateAppend}
+      onGenerateReplace={handleGenerateReplace}
       onUpdateTitle={onUpdateTitle}
       onToggleZenMode={onToggleZenMode}
       onTargetWordsChange={handleSaveTargetWords}
       onModelChange={handleModelChange}
-      onGenerate={() => void handleGenerate()}
+      onGenerate={handleGenerateRequest}
       onExtract={() => void handleExtract()}
       onCancelGeneration={cancelGeneration}
       onRetryGeneration={() => void handleRetryGenerate()}

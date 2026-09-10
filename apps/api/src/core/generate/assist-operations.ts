@@ -16,9 +16,14 @@ import {
   streamText,
 } from "@novel-creator/llm";
 import { eq } from "drizzle-orm";
+import { appLogger } from "../../middleware/logger.js";
 import { searchContext } from "../../rag.js";
 import { mergeAsyncIterables } from "../merge-async-iterables.js";
-import { resolveLLMModel } from "../model-resolver.js";
+import {
+  buildOpenCodeSessionHeaders,
+  hostOfBaseUrl,
+  resolveLLMModelWithInfo,
+} from "../model-resolver.js";
 import { fetchNovelStructureWithContents } from "../novel-structure.js";
 import { assertFound, type ServiceContext } from "../types.js";
 import { resolveSectionPromptContext, withVariant } from "./section-context.js";
@@ -55,7 +60,12 @@ export async function proofreadContentOp(
     styleGuide: novel?.styleGuide ?? undefined,
   });
 
-  const llm = await resolveLLMModel(ctx, modelConfigId, "throw");
+  const resolved = await resolveLLMModelWithInfo(ctx, modelConfigId, "throw");
+  const headers = buildOpenCodeSessionHeaders(
+    resolved,
+    sectionId,
+    ctx.env.LLM_BASE_URL
+  );
   const result = await generateJSON<{
     score: number;
     critique: string;
@@ -73,7 +83,9 @@ export async function proofreadContentOp(
       reason: string;
     }>;
     polishedBody: string;
-  }>(llm, prompt);
+  }>(resolved.model, prompt, undefined, {
+    ...(headers ? { headers } : {}),
+  });
 
   return result;
 }
@@ -109,7 +121,25 @@ export async function* inlineAssistOp(
   }
 
   const totalVariants = Math.max(1, Math.min(3, input.variantCount ?? 1));
-  const llm = await resolveLLMModel(ctx, input.modelConfigId, "throw");
+  const resolved = await resolveLLMModelWithInfo(
+    ctx,
+    input.modelConfigId,
+    "throw"
+  );
+  const headers = buildOpenCodeSessionHeaders(
+    resolved,
+    sectionId,
+    ctx.env.LLM_BASE_URL
+  );
+  // TEMP DEBUG: OpenCode ヘッダー付与の判定確認用（確認後に削除する）。
+  appLogger.info("[TEMP DEBUG] generate headers", {
+    baseUrlHost: hostOfBaseUrl(
+      resolved.baseUrl ?? ctx.env.LLM_BASE_URL ?? null
+    ),
+    headerAttached: headers !== undefined,
+    op: "inline-assist",
+    provider: resolved.provider,
+  });
 
   const buildPrompt = (variantIndex: number) =>
     inlineAssistPrompt({
@@ -130,7 +160,9 @@ export async function* inlineAssistOp(
     });
 
   if (totalVariants === 1) {
-    for await (const chunk of streamText(llm, buildPrompt(1))) {
+    for await (const chunk of streamText(resolved.model, buildPrompt(1), {
+      ...(headers ? { headers } : {}),
+    })) {
       yield { text: chunk, variant: 0 };
     }
     return;
@@ -138,7 +170,14 @@ export async function* inlineAssistOp(
 
   const streams: AsyncGenerator<{ text: string; variant: number }>[] = [];
   for (let v = 0; v < totalVariants; v++) {
-    streams.push(withVariant(streamText(llm, buildPrompt(v + 1)), v));
+    streams.push(
+      withVariant(
+        streamText(resolved.model, buildPrompt(v + 1), {
+          ...(headers ? { headers } : {}),
+        }),
+        v
+      )
+    );
   }
 
   yield* mergeAsyncIterables(streams);
@@ -170,8 +209,15 @@ export async function generateStyleGuideDraftOp(
     settings: context.settings,
   });
 
-  const llm = await resolveLLMModel(ctx, modelConfigId, "throw");
-  return generateText(llm, prompt);
+  const resolved = await resolveLLMModelWithInfo(ctx, modelConfigId, "throw");
+  const headers = buildOpenCodeSessionHeaders(
+    resolved,
+    novelId,
+    ctx.env.LLM_BASE_URL
+  );
+  return generateText(resolved.model, prompt, {
+    ...(headers ? { headers } : {}),
+  });
 }
 
 export async function analyzeSettingImpactOp(
@@ -232,7 +278,16 @@ export async function analyzeSettingImpactOp(
     })),
   });
 
-  const llm = await resolveLLMModel(ctx, input.modelConfigId, "throw");
+  const resolved = await resolveLLMModelWithInfo(
+    ctx,
+    input.modelConfigId,
+    "throw"
+  );
+  const headers = buildOpenCodeSessionHeaders(
+    resolved,
+    novelId,
+    ctx.env.LLM_BASE_URL
+  );
   return generateJSON<{
     summary: string;
     impactLevel: "low" | "medium" | "high";
@@ -242,5 +297,7 @@ export async function analyzeSettingImpactOp(
       issue: string;
       suggestedFix: string;
     }>;
-  }>(llm, prompt);
+  }>(resolved.model, prompt, undefined, {
+    ...(headers ? { headers } : {}),
+  });
 }

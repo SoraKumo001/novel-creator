@@ -273,4 +273,45 @@ describe("plotMarkdown", () => {
     expect(reparsed[0].id).toBe("ch-1");
     expect(reparsed[0].sections[0].id).toBe("sec-1");
   });
+
+  it("ID 一致 + 接頭辞付きタイトルは既存章をその場更新し重複しないこと", () => {
+    const md = serializePlotToMarkdown([
+      {
+        id: "ch-1",
+        order: 1,
+        title: "旅立ち",
+        summary: "旧概要",
+        sections: [],
+      },
+    ]);
+    const updatedMd = applyPlotToMarkdown(md, [
+      { id: "ch-1", title: "第1章 旅立ち", summary: "新概要" },
+    ]);
+    const parsed = parsePlotMarkdown(updatedMd);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].id).toBe("ch-1");
+    // 接頭辞の有無だけの差では既存タイトルを保持する
+    expect(parsed[0].title).toBe("旅立ち");
+    expect(parsed[0].summary).toBe("新概要");
+  });
+
+  it("タイトルの接頭辞有無だけの差はフォールバック一致で重複しないこと", () => {
+    const md = serializePlotToMarkdown([
+      {
+        id: "ch-1",
+        order: 1,
+        title: "第1章 旅立ち",
+        summary: "旧概要",
+        sections: [],
+      },
+    ]);
+    const updatedMd = applyPlotToMarkdown(md, [
+      { title: "旅立ち", summary: "新概要" },
+    ]);
+    const parsed = parsePlotMarkdown(updatedMd);
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0].id).toBe("ch-1");
+    expect(parsed[0].title).toBe("第1章 旅立ち");
+    expect(parsed[0].summary).toBe("新概要");
+  });
 });

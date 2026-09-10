@@ -28,13 +28,54 @@ export interface ChatFocusContext {
     | "foreshadowing"
     | "section"
     | "selection"
-    | "markdown_section";
+    | "markdown_section"
+    | "tab";
   /** 選択中のテキスト（ある場合） */
   selectedText?: string;
   /** category / 概要 / セクション本文など */
   summary?: string;
-  /** 例: 設定「大まかなあらすじ」/ 人物「主人公」/ 第1話「プロローグ」/ 選択テキスト */
+  /** 例: 設定「大まかなあらすじ」/ 人物「主人公」/ 第1話「プロローグ」/ 選択テキスト / タブ「人物」 */
   title: string;
+}
+
+/**
+ * 小説詳細で表示中のタブ文脈（メニュー/Ctrl+J からのオープン時に付与用）。
+ * novelId は openChat の対象小説切替に使い、focus は既存の汎用パス
+ * （プロンプト合成・📎バッジ）にそのまま流れる。
+ */
+export interface ChatTabContext {
+  focus: ChatFocusContext;
+  novelId: string;
+}
+
+/**
+ * タブ文脈フォーカスを組み立てる（純関数）。
+ * entityType "tab" の汎用 ChatFocusContext なので、プロンプト合成も
+ * 📎バッジ表示も既存パスがそのまま扱える。
+ */
+export function buildTabChatFocus(
+  tabLabel: string,
+  detail?: string
+): ChatFocusContext {
+  const trimmedDetail = detail?.trim();
+  return {
+    entityType: "tab",
+    title: `タブ「${tabLabel}」`,
+    summary: trimmedDetail
+      ? `現在「${tabLabel}」タブを表示中です。${trimmedDetail}`
+      : `現在「${tabLabel}」タブを表示中です。このタブの内容について相談できます。`,
+  };
+}
+
+/**
+ * 自動付与のタブ文脈フォーカスかどうかを判定する。
+ * エディタの「相談」ボタンが設定する明示フォーカス（character/setting/…
+ * などの entityType）は false になるため、タブ追従ガードに使う。
+ */
+export function isTabFocus(
+  focus: ChatFocusContext | null | undefined
+): focus is ChatFocusContext {
+  return focus?.entityType === "tab";
 }
 
 export const QUICK_PROMPTS: QuickPrompt[] = [
@@ -112,9 +153,24 @@ export interface ChatUIContextValue {
   sessions: ChatSession[];
   setSelectedModelConfigId: (id: string | null) => void;
   setSelectedNovelId: (id: string | null) => void;
-
+  /** 表示中タブ文脈の登録・解除（小説詳細ページが effect で管理する） */
+  setTabContext: (ctx: ChatTabContext | null) => void;
   startNewChat: () => void;
+  /**
+   * ドロワーが開いている間、表示タブの切替に追従して付与済みタブ文脈を更新する。
+   * 現在の chatFocus が自動付与のタブ文脈のときのみ更新し、明示フォーカスや
+   * 手動解除（null）の場合は何もしない。
+   */
+  syncTabFocusForOpenDrawer: (ctx: ChatTabContext) => void;
+  /** 小説詳細で表示中のタブ文脈（詳細外では null） */
+  tabContext: ChatTabContext | null;
   toggleChat: () => void;
+  /**
+   * メニュー「AI創作相談」/ Ctrl+J 用の開閉。
+   * 閉じていれば開き、開くときに未消費フォーカスが無ければ登録済みタブ文脈を付与する。
+   * エディタの「相談」ボタンが設定した明示フォーカスは上書きしない。
+   */
+  toggleChatWithTabContext: () => void;
   updateSessionTitle: (sessionId: string, newTitle: string) => Promise<boolean>;
 }
 

@@ -80,6 +80,57 @@ export interface ResolvedLLMModel {
 }
 
 /**
+ * OpenCode 互換エンドポイント（Console Go 等）へルーティングされているかを判定する。
+ * provider ラベルが "openai" のまま baseURL だけ Console Go を指す
+ * デフォルトLLM（環境変数）構成でも検出できるよう、baseURL も見る。
+ */
+export function isOpenCodeRoutedEndpoint(
+  baseUrl: string | null | undefined
+): boolean {
+  return (
+    baseUrl !== null &&
+    baseUrl !== undefined &&
+    /opencode|console-?go/i.test(baseUrl)
+  );
+}
+
+/** TEMP DEBUG 用に baseUrl のホスト部のみを取り出す（キーやパスは出さない）。確認後に削除する。 */
+export function hostOfBaseUrl(
+  baseUrl: string | null | undefined
+): string | null {
+  if (!baseUrl) {
+    return null;
+  }
+  try {
+    return new URL(baseUrl).host;
+  } catch {
+    return "(invalid-url)";
+  }
+}
+
+/**
+ * OpenCode 互換エンドポイント向けのリクエスト単位ヘッダーを構築する。
+ * sessionId には会話単位で安定した ID（chatSessions.id / sectionId / novelId）を渡す。
+ * 対象外プロバイダでは undefined を返す（他プロバイダには送らない）。
+ * 行の baseUrl が空でも transport は env baseURL にフォールバックするため、
+ * 判定は実効 URL（解決値 ?? env）で行う。envBaseUrl には ctx.env.LLM_BASE_URL を渡す。
+ */
+export function buildOpenCodeSessionHeaders(
+  resolved: Pick<ResolvedLLMModel, "provider" | "baseUrl">,
+  sessionId: string,
+  envBaseUrl?: string | null
+): Record<string, string> | undefined {
+  const effectiveBaseUrl = resolved.baseUrl ?? envBaseUrl ?? null;
+  if (
+    resolved.provider === "custom_openai" ||
+    isOpenCodeRoutedEndpoint(effectiveBaseUrl)
+  ) {
+    return { "x-opencode-session": sessionId };
+  }
+  return undefined;
+}
+
+/**
  * LLM モデルをプロバイダ情報込みで解決する。
  * 解決フローは resolveLLMModel と同一（モデル ID とプロバイダも返す点が異なる）。
  * 1. modelConfigId が指定されていればその設定でモデルを生成

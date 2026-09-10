@@ -13,6 +13,7 @@ import { ExportModal } from "@/components/ExportModal.js";
 import { KeyboardShortcutsModal } from "@/components/KeyboardShortcutsModal.js";
 import { Loading } from "@/components/Loading.js";
 import { useChatUI } from "@/context/ChatContext.js";
+import { buildTabChatFocus } from "@/context/chatUiTypes.js";
 import { CharactersTab } from "@/features/editor/components/CharactersTab.js";
 import { EditorTab } from "@/features/editor/components/EditorTab.js";
 import { ForeshadowingTab } from "@/features/editor/components/ForeshadowingTab.js";
@@ -68,6 +69,18 @@ const TAB_CONTENT: Record<
 /** 本文コンテンツをスクロールラッパーで包むタブ（概要タブのみ。他は各タブ内で高さ100%管理） */
 const SCROLLABLE_TABS: ReadonlySet<TabId> = new Set<TabId>(["overview"]);
 
+/** タブ文脈フォーカス用のタブ別説明（buildTabChatFocus の summary に使う） */
+const TAB_FOCUS_DESCRIPTIONS: Record<TabId, string> = {
+  overview: "小説の概要・あらすじ・全体像に関する相談です。",
+  outline: "物語の構想・テーマ・方向性に関する相談です。",
+  characters: "登場人物一覧に関する相談です。",
+  settings: "世界観・舞台設定に関する相談です。",
+  foreshadowing: "伏線とその回収に関する相談です。",
+  timeline: "時系列・出来事の流れに関する相談です。",
+  plot: "プロット・章立てに関する相談です。",
+  editor: "本文の執筆内容に関する相談です。",
+};
+
 export const Route = createLazyFileRoute("/novels/$novelId/")({
   component: NovelDetailPage,
 });
@@ -93,7 +106,8 @@ export function NovelDetailPage() {
   const { tab } = Route.useSearch();
   const activeTab: TabId = tab ?? "overview";
   const navigate = useNavigate();
-  const { toggleChat } = useChatUI();
+  const { toggleChatWithTabContext, setTabContext, syncTabFocusForOpenDrawer } =
+    useChatUI();
   const toast = useToast();
 
   const tabListRef = useRef<HTMLDivElement>(null);
@@ -167,6 +181,28 @@ export function NovelDetailPage() {
     });
   };
 
+  // 表示中タブをチャット文脈として登録する（メニュー/Ctrl+J からのオープン時に付与用）。
+  // タブ・小説の切替で更新し、詳細を離れたら解除する（詳細外では文脈なしで開く）。
+  // ドロワーが開いていて現在のフォーカスが自動付与のタブ文脈の場合は新タブへ
+  // 追従させる（📎バッジ・次回送信に反映）。明示フォーカスや手動解除は温存する。
+  useEffect(() => {
+    const label = TAB_DEFS.find((t) => t.id === activeTab)?.label ?? activeTab;
+    const nextTabContext = {
+      novelId,
+      focus: buildTabChatFocus(label, TAB_FOCUS_DESCRIPTIONS[activeTab]),
+    };
+    setTabContext(nextTabContext);
+    syncTabFocusForOpenDrawer(nextTabContext);
+  }, [activeTab, novelId, setTabContext, syncTabFocusForOpenDrawer]);
+
+  // 詳細アンマウント時に登録を解除する
+  useEffect(
+    () => () => {
+      setTabContext(null);
+    },
+    [setTabContext]
+  );
+
   const handleOpenExport = useCallback(async () => {
     if (!novelId) {
       return;
@@ -183,13 +219,13 @@ export function NovelDetailPage() {
     }
   }, [novelId, toast]);
 
-  // グローバルショートカット: Alt+1 ~ Alt+{TAB_DEFS.length}（現在 8）でタブ切り替え、Ctrl+J でチャット開閉
+  // グローバルショートカット: Alt+1 ~ Alt+8 でタブ切り替え、Ctrl+J でチャット開閉（表示中タブの文脈付き）
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ctrl+J または Cmd+J でチャット開閉
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "j") {
         e.preventDefault();
-        toggleChat();
+        toggleChatWithTabContext();
         return;
       }
 
@@ -210,7 +246,7 @@ export function NovelDetailPage() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigate, novelId, toggleChat]);
+  }, [navigate, novelId, toggleChatWithTabContext]);
 
   // 描画するタブ本文コンテンツとスクロールラッパーの要否（TAB_CONTENT / SCROLLABLE_TABS から導出）
   const ActiveTabContent = TAB_CONTENT[activeTab];

@@ -1,10 +1,100 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  type RefObject,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/Button.js";
 import { PencilIcon, SparklesIcon } from "@/components/Icons.js";
 import { LLMModelSelector } from "@/components/LLMModelSelector.js";
 import { ReadingTime } from "@/components/ReadingTime.js";
 import type { Section } from "@/lib/types.js";
 import { EDITOR_AI_MENU_ACTIONS } from "../lib/analysisActions.js";
+
+interface AnchorMenuPosition {
+  bottom?: number;
+  right: number;
+  top?: number;
+}
+
+/**
+ * ツールバー dropdown を body ポータル＋fixed 配置で出すための位置決め。
+ * メニューを in-flow の absolute のままにすると、祖先の overflow-hidden
+ *（SectionEditorView / EditorTab の main / タブ wrappers）での切り取りや、
+ * Monaco 内部レイヤー（suggest z-40・overlaymessage z-10000 等）との
+ * ペイント順負けでエディタ面の裏に隠れる。Modal と同じく document.body
+ * 直下・z-50 に描画して両方を回避する。見た目（幅・配色・右端揃え・
+ * ボタンとの 4px ギャップ）は従来と同一。下に収まらないときだけ上向きに反転する。
+ *
+ * 初回ペイントのちらつき対策として、トリガー rect は render 中に同期取得し
+ *（effect 後の setState を待たない）、flip 判定に必要なメニュー高さが
+ * 実測できるまでは visibility:hidden のまま描画する。実測前の中途半端な
+ * 座標で可視ペイントされることがないため、斜め上からの遷移アニメに
+ * 見えることもない。
+ */
+function useAnchorMenu(
+  open: boolean,
+  triggerRef: RefObject<HTMLDivElement | null>
+) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const syncRect =
+    open && typeof window !== "undefined"
+      ? (triggerRef.current?.getBoundingClientRect() ?? null)
+      : null;
+  const syncPosition: AnchorMenuPosition = {
+    right: syncRect ? Math.max(8, window.innerWidth - syncRect.right) : 0,
+    top: syncRect ? syncRect.bottom + 4 : 0,
+  };
+  // マウント後に実測した位置（flip 済み）。null の間は非表示のままにする。
+  const [measuredPosition, setMeasuredPosition] =
+    useState<AnchorMenuPosition | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open) {
+      // null → null の setState は bail out されるためループしない
+      setMeasuredPosition(null);
+      return;
+    }
+    const decide = () => {
+      const trigger = triggerRef.current;
+      if (!trigger || typeof window === "undefined") {
+        return;
+      }
+      const rect = trigger.getBoundingClientRect();
+      const gap = 4;
+      const right = Math.max(8, window.innerWidth - rect.right);
+      const menuHeight = menuRef.current?.offsetHeight ?? 0;
+      if (
+        menuHeight > 0 &&
+        rect.bottom + gap + menuHeight > window.innerHeight &&
+        rect.top - gap - menuHeight > 0
+      ) {
+        setMeasuredPosition({
+          bottom: window.innerHeight - rect.top + gap,
+          right,
+        });
+      } else {
+        setMeasuredPosition({ top: rect.bottom + gap, right });
+      }
+    };
+    decide();
+    window.addEventListener("resize", decide);
+    // エディタ内スクロールでトリガーが動いても追従する
+    window.addEventListener("scroll", decide, true);
+    return () => {
+      window.removeEventListener("resize", decide);
+      window.removeEventListener("scroll", decide, true);
+    };
+  }, [open, triggerRef]);
+
+  return {
+    menuRef,
+    position: measuredPosition ?? syncPosition,
+    ready: measuredPosition !== null,
+  };
+}
 
 interface EditorToolbarProps {
   canExtract: boolean;
@@ -78,27 +168,35 @@ export function EditorToolbar({
   const [viewMenuOpen, setViewMenuOpen] = useState(false);
   const aiMenuRef = useRef<HTMLDivElement>(null);
   const viewMenuRef = useRef<HTMLDivElement>(null);
+  // body ポータル化したメニュー本体の位置決め（トリガーの rect に追従）
+  const aiMenu = useAnchorMenu(aiMenuOpen, aiMenuRef);
+  const viewMenu = useAnchorMenu(viewMenuOpen, viewMenuRef);
+  const canPortal = typeof document !== "undefined";
 
   useEffect(() => {
     setTitleInput(section.title || `節 ${section.order}`);
   }, [section.title, section.order]);
 
-  // 外側クリックでメニューを閉じる
+  // 外側クリックでメニューを閉じる（ポータル化したメニュー本体も内側扱いにする）
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (aiMenuRef.current && !aiMenuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      const inAiMenu =
+        (aiMenuRef.current && aiMenuRef.current.contains(target)) ||
+        (aiMenu.menuRef.current && aiMenu.menuRef.current.contains(target));
+      const inViewMenu =
+        (viewMenuRef.current && viewMenuRef.current.contains(target)) ||
+        (viewMenu.menuRef.current && viewMenu.menuRef.current.contains(target));
+      if (!inAiMenu) {
         setAiMenuOpen(false);
       }
-      if (
-        viewMenuRef.current &&
-        !viewMenuRef.current.contains(e.target as Node)
-      ) {
+      if (!inViewMenu) {
         setViewMenuOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [aiMenu.menuRef, viewMenu.menuRef]);
 
   const handleSaveTitle = async () => {
     if (!titleInput.trim()) {
@@ -260,62 +358,74 @@ export function EditorToolbar({
             ✨ AI推敲・分析
           </Button>
 
-          {aiMenuOpen && (
-            <div className="fade-in zoom-in-95 absolute right-0 z-30 mt-1 w-56 animate-in divide-y divide-border/40 rounded-xl border border-border bg-surface py-1.5 shadow-xl duration-100">
-              <div className="py-1">
-                {EDITOR_AI_MENU_ACTIONS.filter(
-                  (action) =>
-                    action.id !== "extract" &&
-                    aiMenuHandlers[action.id] !== undefined
-                ).map((action) => (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => {
-                      setAiMenuOpen(false);
-                      aiMenuHandlers[action.id]?.();
-                    }}
-                    className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
-                  >
-                    <span className="text-base">{action.icon}</span>
-                    <div>
-                      <div className="font-semibold">{action.label}</div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {action.description}
+          {aiMenuOpen &&
+            canPortal &&
+            createPortal(
+              <div
+                ref={aiMenu.menuRef}
+                style={{
+                  bottom: aiMenu.position.bottom,
+                  right: aiMenu.position.right,
+                  top: aiMenu.position.top,
+                  visibility: aiMenu.ready ? undefined : "hidden",
+                }}
+                className="fade-in zoom-in-95 fixed z-50 w-56 animate-in divide-y divide-border/40 rounded-xl border border-border bg-surface py-1.5 shadow-xl duration-100"
+              >
+                <div className="py-1">
+                  {EDITOR_AI_MENU_ACTIONS.filter(
+                    (action) =>
+                      action.id !== "extract" &&
+                      aiMenuHandlers[action.id] !== undefined
+                  ).map((action) => (
+                    <button
+                      key={action.id}
+                      type="button"
+                      onClick={() => {
+                        setAiMenuOpen(false);
+                        aiMenuHandlers[action.id]?.();
+                      }}
+                      className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
+                    >
+                      <span className="text-base">{action.icon}</span>
+                      <div>
+                        <div className="font-semibold">{action.label}</div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {action.description}
+                        </div>
                       </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
+                    </button>
+                  ))}
+                </div>
 
-              <div className="py-1">
-                {EDITOR_AI_MENU_ACTIONS.filter(
-                  (action) => action.id === "extract"
-                ).map((action) => (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => {
-                      setAiMenuOpen(false);
-                      onExtract();
-                    }}
-                    disabled={!canExtract || extracting}
-                    className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised disabled:opacity-50"
-                  >
-                    <span className="text-base">{action.icon}</span>
-                    <div>
-                      <div className="font-semibold">
-                        {extracting ? "抽出中..." : action.label}
+                <div className="py-1">
+                  {EDITOR_AI_MENU_ACTIONS.filter(
+                    (action) => action.id === "extract"
+                  ).map((action) => (
+                    <button
+                      key={action.id}
+                      type="button"
+                      onClick={() => {
+                        setAiMenuOpen(false);
+                        onExtract();
+                      }}
+                      disabled={!canExtract || extracting}
+                      className="flex w-full cursor-pointer items-center gap-2.5 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised disabled:opacity-50"
+                    >
+                      <span className="text-base">{action.icon}</span>
+                      <div>
+                        <div className="font-semibold">
+                          {extracting ? "抽出中..." : action.label}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground">
+                          {action.description}
+                        </div>
                       </div>
-                      <div className="text-[10px] text-muted-foreground">
-                        {action.description}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+                    </button>
+                  ))}
+                </div>
+              </div>,
+              document.body
+            )}
         </div>
 
         {/* 👁️ 表示・履歴 ドロップダウン */}
@@ -332,61 +442,73 @@ export function EditorToolbar({
             👁️ 表示
           </Button>
 
-          {viewMenuOpen && (
-            <div className="fade-in zoom-in-95 absolute right-0 z-30 mt-1 w-48 animate-in rounded-xl border border-border bg-surface py-1.5 shadow-xl duration-100">
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMenuOpen(false);
-                  onOpenVerticalPreview();
+          {viewMenuOpen &&
+            canPortal &&
+            createPortal(
+              <div
+                ref={viewMenu.menuRef}
+                style={{
+                  bottom: viewMenu.position.bottom,
+                  right: viewMenu.position.right,
+                  top: viewMenu.position.top,
+                  visibility: viewMenu.ready ? undefined : "hidden",
                 }}
-                className="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
+                className="fade-in zoom-in-95 fixed z-50 w-48 animate-in rounded-xl border border-border bg-surface py-1.5 shadow-xl duration-100"
               >
-                <span>📖</span>
-                <span>縦書きプレビュー</span>
-              </button>
-
-              {onOpenStyleGuide && (
                 <button
                   type="button"
                   onClick={() => {
                     setViewMenuOpen(false);
-                    onOpenStyleGuide();
+                    onOpenVerticalPreview();
                   }}
                   className="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
                 >
-                  <span>📝</span>
-                  <span>執筆スタイル・文体ガイド</span>
+                  <span>📖</span>
+                  <span>縦書きプレビュー</span>
                 </button>
-              )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMenuOpen(false);
-                  onOpenHistory();
-                }}
-                className="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
-              >
-                <span>🕒</span>
-                <span>編集履歴・差分比較</span>
-              </button>
+                {onOpenStyleGuide && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setViewMenuOpen(false);
+                      onOpenStyleGuide();
+                    }}
+                    className="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
+                  >
+                    <span>📝</span>
+                    <span>執筆スタイル・文体ガイド</span>
+                  </button>
+                )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setViewMenuOpen(false);
-                  onToggleZenMode();
-                }}
-                className="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
-              >
-                <span>{isZenMode ? "✕" : "⛶"}</span>
-                <span>
-                  {isZenMode ? "集中モード解除 (Esc)" : "全画面集中モード"}
-                </span>
-              </button>
-            </div>
-          )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMenuOpen(false);
+                    onOpenHistory();
+                  }}
+                  className="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
+                >
+                  <span>🕒</span>
+                  <span>編集履歴・差分比較</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewMenuOpen(false);
+                    onToggleZenMode();
+                  }}
+                  className="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
+                >
+                  <span>{isZenMode ? "✕" : "⛶"}</span>
+                  <span>
+                    {isZenMode ? "集中モード解除 (Esc)" : "全画面集中モード"}
+                  </span>
+                </button>
+              </div>,
+              document.body
+            )}
         </div>
 
         {/* 📑 参考資料ペイン開閉トグル */}

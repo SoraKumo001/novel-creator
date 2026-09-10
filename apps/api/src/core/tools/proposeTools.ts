@@ -114,8 +114,20 @@ export type ProposeDeleteCharacterParams = z.output<
 >;
 
 export const proposeUpdatePlotInputSchema = z.object({
+  chapterId: z
+    .string()
+    .optional()
+    .describe(
+      "更新対象の章ID（会話コンテキストに章一覧とIDが提示されている場合はその値をそのまま指定する。IDは絶対に創作・推測しないこと。ID不明の場合は省略し、代わりに oldTitle を指定すること）"
+    ),
   chapterTitle: z.string().describe("章のタイトル（例: 第1章 旅立ち）"),
   novelId: novelIdParam,
+  oldTitle: z
+    .string()
+    .optional()
+    .describe(
+      "更新元の古い章タイトル。既存章の改名・更新で chapterId が不明な場合に指定する（タイトルの「第N章」接頭辞の有無は問わない）"
+    ),
   summary: z.string().describe("提案する章のあらすじ・プロット内容"),
 });
 export type ProposeUpdatePlotParams = z.output<
@@ -356,11 +368,21 @@ function handleProposeDeleteCharacter(
 
 function handleProposeUpdatePlot(
   targetId: string,
-  { chapterTitle, summary }: ProposeUpdatePlotParams
+  { chapterTitle, summary, chapterId, oldTitle }: ProposeUpdatePlotParams
 ): ProposalResult {
+  const resolvedChapterId =
+    typeof chapterId === "string" && chapterId.trim().length > 0
+      ? chapterId.trim()
+      : null;
+  const resolvedOldTitle =
+    typeof oldTitle === "string" && oldTitle.trim().length > 0
+      ? oldTitle.trim()
+      : null;
   return {
     data: {
+      chapterId: resolvedChapterId,
       chapterTitle,
+      oldTitle: resolvedOldTitle,
       summary,
     },
     novelId: targetId,
@@ -557,7 +579,7 @@ const proposeToolTable = {
   >,
   proposeUpdatePlot: {
     description:
-      "章のプロット・あらすじの作成または更新をユーザーに提案します。",
+      "章のプロット・あらすじの作成または更新をユーザーに提案します。既存の章を更新する場合は、会話コンテキストに提示された章IDを chapterId にそのまま指定してください（IDを推測・創作してはいけません）。chapterId が不明な場合は oldTitle に既存の章タイトルを指定してください。新規章の場合は chapterTitle と summary のみを指定します。",
     errorMessage: "プロット反映提案の生成に失敗しました。",
     handler: handleProposeUpdatePlot,
     inputSchema: proposeUpdatePlotInputSchema,

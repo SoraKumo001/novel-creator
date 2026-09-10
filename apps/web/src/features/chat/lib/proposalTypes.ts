@@ -100,10 +100,14 @@ export interface TimelineProposalData extends ProposalDataBase {
 }
 
 export interface PlotProposalData extends ProposalDataBase {
+  /** 更新対象の章ID（ID マッチを優先するために使用。LLM が付与した場合のみ存在） */
+  chapterId?: string | null;
   chapterTitle: string;
+  /** 更新元の古い章タイトル（chapterId 不明時のフォールバック照合キー） */
+  oldTitle?: string | null;
   summary: string;
   /** LLM 出力の表記ゆれ（title）も許容する防御的フィールド */
-  title: string;
+  title?: string;
 }
 
 export interface StoryOutlineProposalData extends ProposalDataBase {

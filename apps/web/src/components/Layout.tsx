@@ -2,7 +2,6 @@ import { useMatches } from "@tanstack/react-router";
 import { type ReactNode, useEffect } from "react";
 import { useChatUI } from "@/context/ChatContext.js";
 import { ChatDrawer } from "@/features/chat/components/ChatDrawer.js";
-import { ChatFloatingButton } from "@/features/chat/components/ChatFloatingButton.js";
 import { Nav } from "./Nav.js";
 
 interface LayoutProps {
@@ -36,10 +35,9 @@ export function Layout({ children }: LayoutProps) {
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
       <NovelRouteSync />
       <Nav />
-      <main className="min-w-0 flex-1 overflow-y-auto p-4 pb-24 sm:p-6 md:p-8">
+      <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
         {children}
       </main>
-      <ChatFloatingButton />
       <ChatDrawer />
     </div>
   );

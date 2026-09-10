@@ -5,6 +5,8 @@ import {
   serializePlotToMarkdown,
 } from "@novel-creator/shared";
 import { asc, eq, inArray } from "drizzle-orm";
+import { appLogger } from "../middleware/logger.js";
+import { insertEditHistory } from "./history.service.js";
 import {
   NotFoundError,
   type ServiceContext,
@@ -44,6 +46,7 @@ export class ChapterDomainService {
     const existingChapters = await this.listChaptersWithSections(novelId);
     const parsed = parsePlotMarkdown(markdown);
     const diff = diffPlot(existingChapters, parsed);
+    const previousMarkdown = serializePlotToMarkdown(existingChapters);
 
     let createdChaptersCount = 0;
     let updatedChaptersCount = 0;
@@ -139,6 +142,22 @@ export class ChapterDomainService {
         deletedChaptersCount += deletedChapters.length;
       }
     });
+
+    if (previousMarkdown !== markdown) {
+      try {
+        await insertEditHistory(this.ctx.db, {
+          content: markdown,
+          description: `マークダウン一括保存 (作成: ${createdChaptersCount}, 更新: ${updatedChaptersCount}, 削除: ${deletedChaptersCount})`,
+          entityId: novelId,
+          entityType: "plot_markdown",
+          novelId,
+          title: "プロットマークダウン",
+          wordCount: markdown.length,
+        });
+      } catch (e) {
+        appLogger.warn("failed to record plot_markdown history", e);
+      }
+    }
 
     return {
       createdCount: createdChaptersCount,

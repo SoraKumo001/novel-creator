@@ -92,6 +92,8 @@ export {
   diffPlot,
   findPlotSectionByLine,
   formatPlotMarkdown,
+  normalizeChapterTitleForMatch,
+  normalizeSectionTitleForMatch,
   type ParsedPlotChapterItem,
   type ParsedPlotSectionItem,
   type PlotCategoryNode,

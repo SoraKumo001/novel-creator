@@ -14,7 +14,10 @@ import {
   type ReaderPersonaType,
 } from "@novel-creator/llm";
 import { and, desc, eq } from "drizzle-orm";
-import { resolveLLMModel } from "./model-resolver.js";
+import {
+  buildOpenCodeSessionHeaders,
+  resolveLLMModelWithInfo,
+} from "./model-resolver.js";
 import { fetchNovelStructureWithContents } from "./novel-structure.js";
 import { assertFound, type ServiceContext } from "./types.js";
 
@@ -162,7 +165,16 @@ export class AnalysisDomainService {
       novelTitle: novel.title,
     });
 
-    const llm = await resolveLLMModel(this.ctx, modelConfigId, "throw");
+    const resolved = await resolveLLMModelWithInfo(
+      this.ctx,
+      modelConfigId,
+      "throw"
+    );
+    const headers = buildOpenCodeSessionHeaders(
+      resolved,
+      novelId,
+      this.ctx.env.LLM_BASE_URL
+    );
     const llmPromise = generateJSON<{
       summary: string;
       pacingCritique: string;
@@ -177,7 +189,9 @@ export class AnalysisDomainService {
         keyEvent: string;
         advice: string;
       }>;
-    }>(llm, prompt);
+    }>(resolved.model, prompt, undefined, {
+      ...(headers ? { headers } : {}),
+    });
     const result = yield* this.runWithHeartbeat(llmPromise);
 
     yield { current: 0, stage: "分析結果を保存中", total: 0, type: "progress" };
@@ -255,7 +269,16 @@ export class AnalysisDomainService {
       novelTitle: novel.title,
     });
 
-    const llm = await resolveLLMModel(this.ctx, modelConfigId, "throw");
+    const resolved = await resolveLLMModelWithInfo(
+      this.ctx,
+      modelConfigId,
+      "throw"
+    );
+    const headers = buildOpenCodeSessionHeaders(
+      resolved,
+      novelId,
+      this.ctx.env.LLM_BASE_URL
+    );
     const llmPromise = generateJSON<{
       summary: string;
       issues: Array<{
@@ -270,7 +293,9 @@ export class AnalysisDomainService {
         reason: string;
         suggestion: string;
       }>;
-    }>(llm, prompt);
+    }>(resolved.model, prompt, undefined, {
+      ...(headers ? { headers } : {}),
+    });
     const result = yield* this.runWithHeartbeat(llmPromise);
 
     yield { current: 0, stage: "分析結果を保存中", total: 0, type: "progress" };
@@ -372,7 +397,16 @@ export class AnalysisDomainService {
       text: bodyText,
     });
 
-    const llm = await resolveLLMModel(this.ctx, input.modelConfigId, "throw");
+    const resolved = await resolveLLMModelWithInfo(
+      this.ctx,
+      input.modelConfigId,
+      "throw"
+    );
+    const headers = buildOpenCodeSessionHeaders(
+      resolved,
+      novelId,
+      this.ctx.env.LLM_BASE_URL
+    );
     const llmPromise = generateJSON<{
       overallImpression: string;
       reviews: Array<{
@@ -384,7 +418,9 @@ export class AnalysisDomainService {
         criticism: string;
         advice: string;
       }>;
-    }>(llm, prompt);
+    }>(resolved.model, prompt, undefined, {
+      ...(headers ? { headers } : {}),
+    });
     const result = yield* this.runWithHeartbeat(llmPromise);
 
     yield { current: 0, stage: "分析結果を保存中", total: 0, type: "progress" };

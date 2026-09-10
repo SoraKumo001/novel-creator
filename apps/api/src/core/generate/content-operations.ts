@@ -10,8 +10,13 @@ import {
   streamText,
 } from "@novel-creator/llm";
 import { eq } from "drizzle-orm";
+import { appLogger } from "../../middleware/logger.js";
 import { searchContext } from "../../rag.js";
-import { resolveLLMModel } from "../model-resolver.js";
+import {
+  buildOpenCodeSessionHeaders,
+  hostOfBaseUrl,
+  resolveLLMModelWithInfo,
+} from "../model-resolver.js";
 import { assertFound, type ServiceContext } from "../types.js";
 
 export async function generatePlotOp(
@@ -40,12 +45,19 @@ export async function generatePlotOp(
     title: novel.title,
   });
 
-  const llm = await resolveLLMModel(ctx, modelConfigId, "throw");
+  const resolved = await resolveLLMModelWithInfo(ctx, modelConfigId, "throw");
+  const headers = buildOpenCodeSessionHeaders(
+    resolved,
+    novelId,
+    ctx.env.LLM_BASE_URL
+  );
   return generateJSON<{
     title: string;
     description: string;
     chapters: { title: string; order: number; summary: string }[];
-  }>(llm, prompt);
+  }>(resolved.model, prompt, undefined, {
+    ...(headers ? { headers } : {}),
+  });
 }
 
 export async function generateChapterSummaryOp(
@@ -178,8 +190,24 @@ export async function* generateSectionContentOp(
     }
   );
 
-  const llm = await resolveLLMModel(ctx, modelConfigId, "throw");
-  for await (const chunk of streamText(llm, prompt)) {
+  const resolved = await resolveLLMModelWithInfo(ctx, modelConfigId, "throw");
+  const headers = buildOpenCodeSessionHeaders(
+    resolved,
+    sectionId,
+    ctx.env.LLM_BASE_URL
+  );
+  // TEMP DEBUG: OpenCode ヘッダー付与の判定確認用（確認後に削除する）。
+  appLogger.info("[TEMP DEBUG] generate headers", {
+    baseUrlHost: hostOfBaseUrl(
+      resolved.baseUrl ?? ctx.env.LLM_BASE_URL ?? null
+    ),
+    headerAttached: headers !== undefined,
+    op: "section-content",
+    provider: resolved.provider,
+  });
+  for await (const chunk of streamText(resolved.model, prompt, {
+    ...(headers ? { headers } : {}),
+  })) {
     yield chunk;
   }
 }

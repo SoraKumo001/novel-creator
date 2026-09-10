@@ -190,9 +190,19 @@ export async function buildProposalDiff(
       markdown: "",
     }));
     const currentMd = res.markdown ?? "";
-    const chapterTitle = data.chapterTitle || data.title;
+    const chapterTitle = data.chapterTitle || data.title || "無題の章";
+    const chapterId =
+      typeof data.chapterId === "string" && data.chapterId.trim()
+        ? data.chapterId.trim()
+        : undefined;
+    const oldTitle =
+      typeof data.oldTitle === "string" && data.oldTitle.trim()
+        ? data.oldTitle.trim()
+        : undefined;
     const updatedMd = applyPlotToMarkdown(currentMd, [
       {
+        id: chapterId,
+        oldTitle,
         title: chapterTitle,
         summary: data.summary,
       },

@@ -532,12 +532,42 @@ export function diffPlot(
 }
 
 /**
+ * 章タイトルの照合用正規化: LLM が付与しがちな "第N章 " 接頭辞を除去して比較する。
+ * マッチング専用であり、保存されるタイトル自体は変更しない。
+ */
+export function normalizeChapterTitleForMatch(title: string): string {
+  return title
+    .trim()
+    .replace(/^第[\d０-９一二三四五六七八九十百千\s　・.-]+章\s*/u, "")
+    .trim();
+}
+
+/**
+ * 節タイトルの照合用正規化 ("第N節 " 接頭辞を除去して比較する。マッチング専用)。
+ */
+export function normalizeSectionTitleForMatch(title: string): string {
+  return title
+    .trim()
+    .replace(/^第[\d０-９一二三四五六七八九十百千\s　・.-]+節\s*/u, "")
+    .trim();
+}
+
+/**
  * 現在のプロットマークダウンに対し、新しい章・節を追加または更新し、指定された章を削除したマークダウンを生成する。
+ *
+ * マージ優先順位:
+ * 1. ID 一致 (newCh.id) が最優先。章タイトルは、接頭辞正規化後の比較で
+ *    差異がある場合のみリネームとして新タイトルを採用し、"第N章 " の有無だけの
+ *    差なら既存タイトルを保持する (LLM の接頭辞付与による重複作成を防ぐ)。
+ * 2. oldTitle (更新元タイトル) による照合。exact → 接頭辞非依存の順。
+ * 3. 新タイトルによる照合。exact → 接頭辞非依存の順。
+ * 4. どれにも当たらなければ末尾に新規追加する。
  */
 export function applyPlotToMarkdown(
   currentMarkdown: string,
   newChapters: {
     id?: string | null;
+    oldTitle?: string | null;
     order?: number | null;
     sections?: {
       id?: string | null;
@@ -551,54 +581,206 @@ export function applyPlotToMarkdown(
   deleteTitles?: string[]
 ): string {
   const existing = parsePlotMarkdown(currentMarkdown);
-  const deleteSet = new Set(
+  const deleteExact = new Set(
     (deleteTitles ?? []).map((t) => t.trim()).filter((t) => t.length > 0)
   );
+  const deleteNormalized = new Set(
+    [...deleteExact].map((t) => normalizeChapterTitleForMatch(t))
+  );
 
-  const chapterMap = new Map<string, ParsedPlotChapterItem>();
-  for (const ch of existing) {
-    if (!deleteSet.has(ch.title.trim())) {
-      chapterMap.set(ch.title.trim(), ch);
+  const working: ParsedPlotChapterItem[] = existing.filter((ch) => {
+    const trimmed = ch.title.trim();
+    if (deleteExact.has(trimmed)) {
+      return false;
+    }
+    return !deleteNormalized.has(normalizeChapterTitleForMatch(trimmed));
+  });
+
+  const chapterById = new Map<string, ParsedPlotChapterItem>();
+  for (const ch of working) {
+    if (ch.id) {
+      chapterById.set(ch.id, ch);
     }
   }
 
+  function findChapterByTitle(
+    title: string
+  ): ParsedPlotChapterItem | undefined {
+    const trimmed = title.trim();
+    const exact = working.find((ch) => ch.title.trim() === trimmed);
+    if (exact) {
+      return exact;
+    }
+    const normalized = normalizeChapterTitleForMatch(trimmed);
+    return working.find(
+      (ch) => normalizeChapterTitleForMatch(ch.title) === normalized
+    );
+  }
+
   let maxOrder = 0;
-  for (const ch of chapterMap.values()) {
+  for (const ch of working) {
     if (ch.order > maxOrder) {
       maxOrder = ch.order;
     }
   }
 
-  for (const newCh of newChapters) {
-    const trimmedTitle = newCh.title.trim();
-    const prev = chapterMap.get(trimmedTitle);
-    maxOrder++;
-
-    const sections = newCh.sections
-      ? newCh.sections.map((s, idx) => ({
-          id: s.id ?? prev?.sections[idx]?.id,
-          title: s.title?.trim() || `節 ${idx + 1}`,
-          summary: s.summary?.trim() || "",
-          order: s.order ?? idx + 1,
-        }))
-      : (prev?.sections ?? []);
-
-    chapterMap.set(trimmedTitle, {
-      id: newCh.id ?? prev?.id,
-      title: trimmedTitle,
-      summary:
-        newCh.summary !== undefined
-          ? (newCh.summary ?? "").trim()
-          : (prev?.summary ?? ""),
-      order:
-        newCh.order !== undefined && newCh.order !== null
-          ? newCh.order
-          : (prev?.order ?? maxOrder),
-      sections,
-    });
+  function mergeSections(
+    target: ParsedPlotChapterItem,
+    incoming:
+      | {
+          id?: string | null;
+          order?: number | null;
+          summary?: string | null;
+          title?: string | null;
+        }[]
+      | undefined
+  ): void {
+    if (!incoming) {
+      return;
+    }
+    const secById = new Map<string, ParsedPlotSectionItem>();
+    for (const sec of target.sections) {
+      if (sec.id) {
+        secById.set(sec.id, sec);
+      }
+    }
+    function findSectionByTitle(
+      title: string
+    ): ParsedPlotSectionItem | undefined {
+      const trimmed = title.trim();
+      const exact = target.sections.find((s) => s.title.trim() === trimmed);
+      if (exact) {
+        return exact;
+      }
+      const normalized = normalizeSectionTitleForMatch(trimmed);
+      return target.sections.find(
+        (s) => normalizeSectionTitleForMatch(s.title) === normalized
+      );
+    }
+    let maxSecOrder = 0;
+    for (const sec of target.sections) {
+      if (sec.order > maxSecOrder) {
+        maxSecOrder = sec.order;
+      }
+    }
+    for (const [idx, s] of incoming.entries()) {
+      const sid = (s.id ?? "").trim();
+      let secTarget: ParsedPlotSectionItem | undefined;
+      if (sid && secById.has(sid)) {
+        secTarget = secById.get(sid);
+      } else if (s.title) {
+        secTarget = findSectionByTitle(s.title);
+      }
+      if (secTarget) {
+        const incomingTitle = (s.title ?? "").trim();
+        if (
+          incomingTitle &&
+          normalizeSectionTitleForMatch(incomingTitle) !==
+            normalizeSectionTitleForMatch(secTarget.title) &&
+          (sid || incomingTitle !== secTarget.title.trim())
+        ) {
+          secTarget.title = incomingTitle;
+        }
+        if (s.summary !== undefined) {
+          secTarget.summary = (s.summary ?? "").trim();
+        }
+        if (s.order !== undefined && s.order !== null) {
+          secTarget.order = s.order;
+        }
+        if (sid && !secTarget.id) {
+          secTarget.id = sid;
+          secById.set(sid, secTarget);
+        }
+      } else {
+        maxSecOrder++;
+        const created: ParsedPlotSectionItem = {
+          id: sid || undefined,
+          title: (s.title ?? "").trim() || `節 ${idx + 1}`,
+          summary: (s.summary ?? "").trim(),
+          order: s.order ?? maxSecOrder,
+        };
+        target.sections.push(created);
+        if (created.id) {
+          secById.set(created.id, created);
+        }
+      }
+    }
   }
 
-  return serializePlotToMarkdown(Array.from(chapterMap.values()));
+  for (const newCh of newChapters) {
+    const trimmedTitle = newCh.title.trim();
+    const incomingId = (newCh.id ?? "").trim();
+    const oldTitle = (newCh.oldTitle ?? "").trim();
+
+    let target: ParsedPlotChapterItem | undefined;
+    if (incomingId && chapterById.has(incomingId)) {
+      target = chapterById.get(incomingId);
+    }
+    if (!target && oldTitle) {
+      target = findChapterByTitle(oldTitle);
+    }
+    if (!target && trimmedTitle) {
+      target = findChapterByTitle(trimmedTitle);
+    }
+
+    if (target) {
+      // ID/oldTitle 経由のマッチで接頭辞正規化後の差異がある場合のみリネーム扱い。
+      // タイトル照合でも同一章に当たる場合は正規化済みで一致しているため
+      // 既存タイトルを保持する ("第N章 " の有無だけの差で重複作成しない)。
+      // ただし新タイトルが別章に一致する場合は重複を避けるため改名しない。
+      const titleHit = trimmedTitle
+        ? findChapterByTitle(trimmedTitle)
+        : undefined;
+      if (!titleHit || titleHit === target) {
+        if (
+          trimmedTitle &&
+          titleHit !== target &&
+          normalizeChapterTitleForMatch(trimmedTitle) !==
+            normalizeChapterTitleForMatch(target.title)
+        ) {
+          target.title = trimmedTitle;
+        }
+      }
+      // titleHit が別章を指す場合は改名せず概要のみ更新する (タイトル重複を避ける)
+      if (newCh.summary !== undefined) {
+        target.summary = (newCh.summary ?? "").trim();
+      }
+      if (newCh.order !== undefined && newCh.order !== null) {
+        target.order = newCh.order;
+      }
+      if (incomingId && !target.id) {
+        target.id = incomingId;
+        chapterById.set(incomingId, target);
+      }
+      mergeSections(target, newCh.sections);
+    } else {
+      maxOrder++;
+      const sections: ParsedPlotSectionItem[] = (newCh.sections ?? []).map(
+        (s, idx) => ({
+          id: (s.id ?? "").trim() || undefined,
+          title: s.title?.trim() || `節 ${idx + 1}`,
+          summary: (s.summary ?? "").trim() || "",
+          order: s.order ?? idx + 1,
+        })
+      );
+      const created: ParsedPlotChapterItem = {
+        id: incomingId || undefined,
+        title: trimmedTitle,
+        summary: (newCh.summary ?? "").trim(),
+        order:
+          newCh.order !== undefined && newCh.order !== null
+            ? newCh.order
+            : maxOrder,
+        sections,
+      };
+      working.push(created);
+      if (created.id) {
+        chapterById.set(created.id, created);
+      }
+    }
+  }
+
+  return serializePlotToMarkdown(working);
 }
 
 /**
