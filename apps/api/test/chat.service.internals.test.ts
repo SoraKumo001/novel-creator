@@ -1,7 +1,16 @@
 import { chatMessages, chatSessions, novels } from "@novel-creator/db";
 import { creativeChatSystemPrompt, streamTextResult } from "@novel-creator/llm";
-import type { LanguageModel, ToolSet } from "ai";
+import type { LanguageModel } from "ai";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { buildChatContextPrompt } from "../src/core/chat/chat-context.js";
+import {
+  ensureChatSession,
+  persistChatUserMessage,
+} from "../src/core/chat/chat-sessions.js";
+import {
+  buildChatTools,
+  streamChatAssistantResponse,
+} from "../src/core/chat/chat-stream.js";
 import { ChatDomainService } from "../src/core/chat.service.js";
 import { resolveLLMModelWithInfo } from "../src/core/model-resolver.js";
 import { createProposeTools } from "../src/core/tools/proposeTools.js";
@@ -13,7 +22,7 @@ import {
 } from "../src/core/types.js";
 import { searchContext } from "../src/rag.js";
 
-// searchContext をモック（buildChatContext の RAG 検索部分を分離して検証する）
+// searchContext をモック（buildChatContextPrompt の RAG 検索部分を分離して検証する）
 vi.mock("../src/rag.js", () => ({
   searchContext: vi.fn(),
 }));
@@ -27,9 +36,14 @@ vi.mock("../src/core/tools/proposeTools.js", () => ({
 }));
 
 // モデル解決をモック（streamCreativeChat の並列実行タイミング検証用）
-vi.mock("../src/core/model-resolver.js", () => ({
-  resolveLLMModelWithInfo: vi.fn(),
-}));
+vi.mock("../src/core/model-resolver.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../src/core/model-resolver.js")>();
+  return {
+    ...actual,
+    resolveLLMModelWithInfo: vi.fn(),
+  };
+});
 
 // システムプロンプトとストリーム生成をモック（プロンプト構築の検証を単純化する）
 vi.mock("@novel-creator/llm", async (importOriginal) => {
@@ -41,43 +55,32 @@ vi.mock("@novel-creator/llm", async (importOriginal) => {
   };
 });
 
+// chat-context と chat-stream の関数をスパイ可能にする
+vi.mock("../src/core/chat/chat-context.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../src/core/chat/chat-context.js")>();
+  return {
+    ...actual,
+    buildChatContextPrompt: vi.fn(actual.buildChatContextPrompt),
+  };
+});
+vi.mock("../src/core/chat/chat-stream.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../src/core/chat/chat-stream.js")>();
+  return {
+    ...actual,
+    streamChatAssistantResponse: vi.fn(actual.streamChatAssistantResponse),
+  };
+});
+
 const mockSearchContext = vi.mocked(searchContext);
 const mockResolveLLMModelWithInfo = vi.mocked(resolveLLMModelWithInfo);
 const mockStreamTextResult = vi.mocked(streamTextResult);
+const mockBuildChatContextPrompt = vi.mocked(buildChatContextPrompt);
+const mockStreamChatAssistantResponse = vi.mocked(streamChatAssistantResponse);
 
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
 const NOVEL_ID = "22222222-2222-4222-8222-222222222222";
-
-/**
- * chat.service.ts の private メソッドへ型付きでアクセスするためのインターフェース。
- * 分割した各責務をユニットテストから直接検証するために使用する。
- */
-type ChatServiceInternals = {
-  ensureSession(sessionId: string): Promise<Record<string, unknown>>;
-  persistUserMessage(
-    sessionId: string,
-    messages: { role: string; parts: { type: string; text?: string }[] }[]
-  ): Promise<{ userText: string }>;
-  buildChatContext(
-    sessionId: string,
-    effectiveNovelId: string | null | undefined,
-    userText: string,
-    sessionNovelId?: string | null
-  ): Promise<{ prompt: string; warnings: string[] }>;
-  buildChatTools(
-    effectiveNovelId: string | null | undefined
-  ): ToolSet | undefined;
-  streamAssistantResponse(
-    sessionId: string,
-    llmModel: LanguageModel,
-    prompt: string,
-    tools: ToolSet | undefined
-  ): Promise<Response>;
-};
-
-function internalsOf(service: ChatDomainService): ChatServiceInternals {
-  return service as unknown as ChatServiceInternals;
-}
 
 /**
  * chat.service が使う DB チェーンをテーブル参照で振り分けるモック DB を構築する。
@@ -143,15 +146,18 @@ function createMockDb(
   return { db, insertCalls, selectedTables, updateCalls };
 }
 
-function createService(db: unknown): ChatDomainService {
-  const ctx = {
+function createTestContext(db: unknown): ServiceContext {
+  return {
     db,
     embedding: {},
     env: {},
     llm: {},
     vectorStore: {},
   } as unknown as ServiceContext;
-  return new ChatDomainService(ctx);
+}
+
+function createService(db: unknown): ChatDomainService {
+  return new ChatDomainService(createTestContext(db));
 }
 
 /**
@@ -192,45 +198,42 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
     it("セッションが存在する場合はセッション行を返すこと", async () => {
       const session = { id: SESSION_ID, novelId: null, title: "相談" };
       const { db } = createMockDb({ session });
-      const service = createService(db);
+      const ctx = createTestContext(db);
 
-      const result = await internalsOf(service).ensureSession(SESSION_ID);
+      const result = await ensureChatSession(ctx, SESSION_ID);
 
       expect(result).toEqual(session);
     });
 
     it("セッションが存在しない場合は NotFoundError を投げること", async () => {
       const { db } = createMockDb({ session: null });
-      const service = createService(db);
+      const ctx = createTestContext(db);
 
-      await expect(
-        internalsOf(service).ensureSession(SESSION_ID)
-      ).rejects.toBeInstanceOf(NotFoundError);
-      await expect(
-        internalsOf(service).ensureSession(SESSION_ID)
-      ).rejects.toThrow("Chat session not found");
+      await expect(ensureChatSession(ctx, SESSION_ID)).rejects.toBeInstanceOf(
+        NotFoundError
+      );
+      await expect(ensureChatSession(ctx, SESSION_ID)).rejects.toThrow(
+        "Chat session not found"
+      );
     });
   });
 
   describe("persistUserMessage", () => {
     it("最後の role=user メッセージの text パートを結合して永続化し、updatedAt を更新すること", async () => {
       const { db, insertCalls, updateCalls } = createMockDb({});
-      const service = createService(db);
+      const ctx = createTestContext(db);
 
       const parts = [
         { text: "こんにちは", type: "text" },
         { text: "世界", type: "text" },
       ];
-      const { userText } = await internalsOf(service).persistUserMessage(
-        SESSION_ID,
-        [
-          {
-            parts: [{ text: "どうしましたか？", type: "text" }],
-            role: "assistant",
-          },
-          { parts, role: "user" },
-        ]
-      );
+      const { userText } = await persistChatUserMessage(ctx, SESSION_ID, [
+        {
+          parts: [{ text: "どうしましたか？", type: "text" }],
+          role: "assistant",
+        },
+        { parts, role: "user" },
+      ]);
 
       // 途中の assistant を無視して最後の user メッセージが採用される
       expect(userText).toBe("こんにちは世界");
@@ -256,11 +259,10 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
 
     it("role=user メッセージが存在しない場合は ValidationError を投げ、永続化しないこと", async () => {
       const { db, insertCalls, updateCalls } = createMockDb({});
-      const service = createService(db);
+      const ctx = createTestContext(db);
 
-      const internals = internalsOf(service);
       await expect(
-        internals.persistUserMessage(SESSION_ID, [
+        persistChatUserMessage(ctx, SESSION_ID, [
           {
             parts: [{ text: "どうしましたか？", type: "text" }],
             role: "assistant",
@@ -285,17 +287,14 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
           },
         ],
       });
-      const service = createService(db);
+      const ctx = createTestContext(db);
 
-      const { userText } = await internalsOf(service).persistUserMessage(
-        SESSION_ID,
-        [
-          {
-            parts: [{ text: "こんにちは世界", type: "text" }],
-            role: "user",
-          },
-        ]
-      );
+      const { userText } = await persistChatUserMessage(ctx, SESSION_ID, [
+        {
+          parts: [{ text: "こんにちは世界", type: "text" }],
+          role: "user",
+        },
+      ]);
 
       expect(userText).toBe("こんにちは世界");
       // 重複のため user 行の再保存はスキップされる
@@ -325,9 +324,10 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
           },
         ],
       });
-      const service = createService(db);
+      const ctx = createTestContext(db);
 
-      const { prompt, warnings } = await internalsOf(service).buildChatContext(
+      const { prompt, warnings } = await buildChatContextPrompt(
+        ctx,
         SESSION_ID,
         undefined,
         "今回の質問"
@@ -372,9 +372,10 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
         characters: ["人物Aの説明"],
         settings: ["設定Aの説明"],
       });
-      const service = createService(db);
+      const ctx = createTestContext(db);
 
-      const { prompt, warnings } = await internalsOf(service).buildChatContext(
+      const { prompt, warnings } = await buildChatContextPrompt(
+        ctx,
         SESSION_ID,
         NOVEL_ID,
         "今回の質問"
@@ -415,9 +416,10 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
         },
       });
       mockSearchContext.mockRejectedValue(new Error("rag unavailable"));
-      const service = createService(db);
+      const ctx = createTestContext(db);
 
-      const { prompt, warnings } = await internalsOf(service).buildChatContext(
+      const { prompt, warnings } = await buildChatContextPrompt(
+        ctx,
         SESSION_ID,
         NOVEL_ID,
         "今回の質問"
@@ -436,10 +438,11 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
 
     it("要求 novelId とセッションの novelId が不一致の場合は ValidationError を投げること", async () => {
       const { db } = createMockDb({ history: [] });
-      const service = createService(db);
+      const ctx = createTestContext(db);
 
       await expect(
-        internalsOf(service).buildChatContext(
+        buildChatContextPrompt(
+          ctx,
           SESSION_ID,
           NOVEL_ID,
           "今回の質問",
@@ -452,22 +455,22 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
   describe("buildChatTools", () => {
     it("小説コンテキストがある場合に読み取りツールと提案ツールをマージすること", () => {
       const { db } = createMockDb({});
-      const service = createService(db);
+      const ctx = createTestContext(db);
       vi.mocked(createReadTools).mockReturnValue({ getNovelInfo: {} } as never);
       vi.mocked(createProposeTools).mockReturnValue({
         proposeCreateCharacter: {},
       } as never);
 
-      const tools = internalsOf(service).buildChatTools(NOVEL_ID);
+      const tools = buildChatTools(ctx, NOVEL_ID);
 
       expect(tools).toEqual({ getNovelInfo: {}, proposeCreateCharacter: {} });
     });
 
     it("小説コンテキストがない場合は undefined を返しツールを構築しないこと", () => {
       const { db } = createMockDb({});
-      const service = createService(db);
+      const ctx = createTestContext(db);
 
-      const tools = internalsOf(service).buildChatTools(null);
+      const tools = buildChatTools(ctx, null);
 
       expect(tools).toBeUndefined();
       expect(createReadTools).not.toHaveBeenCalled();
@@ -476,12 +479,12 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
 
     it("ツール構築に失敗してもエラーにせず undefined を返すこと", () => {
       const { db } = createMockDb({});
-      const service = createService(db);
+      const ctx = createTestContext(db);
       vi.mocked(createReadTools).mockImplementation(() => {
         throw new Error("tool build failed");
       });
 
-      const tools = internalsOf(service).buildChatTools(NOVEL_ID);
+      const tools = buildChatTools(ctx, NOVEL_ID);
 
       expect(tools).toBeUndefined();
     });
@@ -490,15 +493,21 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
   describe("streamAssistantResponse", () => {
     it("ストリーム完了後に assistant メッセージを永続化し updatedAt を更新すること", async () => {
       const { db, insertCalls, updateCalls } = createMockDb({});
-      const service = createService(db);
+      const ctx = createTestContext(db);
       mockStreamTextResult.mockResolvedValue(
         createFakeStreamResult("テスト回答") as never
       );
 
-      const res = await internalsOf(service).streamAssistantResponse(
+      const res = await streamChatAssistantResponse(
+        ctx,
         SESSION_ID,
-        {} as LanguageModel,
+        {
+          model: {} as LanguageModel,
+          modelId: "test-model",
+          provider: "openai",
+        },
         "prompt",
+        undefined,
         undefined
       );
 
@@ -591,10 +600,11 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
           }),
         })),
       };
-      const contextService = createService(delayedDb);
+      const contextCtx = createTestContext(delayedDb);
 
       const contextStart = Date.now();
-      const { prompt } = await internalsOf(contextService).buildChatContext(
+      const { prompt } = await buildChatContextPrompt(
+        contextCtx,
         SESSION_ID,
         NOVEL_ID,
         "今回の質問"
@@ -611,13 +621,14 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
         settings: ["設定Aの説明"],
       });
 
-      // サービス層: buildChatContext と resolveLLMModelWithInfo の並列実行
+      // サービス層: buildChatContextPrompt と resolveLLMModelWithInfo の並列実行
       const SERVICE_DELAY_MS = 100;
+      mockBuildChatContextPrompt.mockClear();
+      vi.mocked(createReadTools).mockReturnValue({} as never);
       const { db } = createMockDb({
         session: { id: SESSION_ID, novelId: NOVEL_ID, title: "相談" },
       });
       const service = createService(db);
-      const serviceInternals = internalsOf(service);
       mockResolveLLMModelWithInfo.mockImplementation(async () => {
         await sleep(SERVICE_DELAY_MS);
         return {
@@ -626,15 +637,11 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
           provider: "ollama",
         };
       });
-      const buildSpy = vi
-        .spyOn(serviceInternals, "buildChatContext")
-        .mockImplementation(async () => {
-          await sleep(SERVICE_DELAY_MS);
-          return { prompt: "PARALLEL_PROMPT", warnings: [] };
-        });
-      const streamSpy = vi
-        .spyOn(serviceInternals, "streamAssistantResponse")
-        .mockResolvedValue(new Response("ok"));
+      mockBuildChatContextPrompt.mockImplementation(async () => {
+        await sleep(SERVICE_DELAY_MS);
+        return { prompt: "PARALLEL_PROMPT", warnings: [] };
+      });
+      mockStreamChatAssistantResponse.mockResolvedValue(new Response("ok"));
 
       const serviceStart = Date.now();
       const res = await service.streamCreativeChat({
@@ -653,10 +660,12 @@ describe("ChatDomainService - 分割された責務のユニットテスト", ()
       // 逐次実行なら 200ms (= 100ms x 2) 以上かかるため、160ms 未満なら並列実行の証拠になる
       expect(res.status).toBe(200);
       expect(serviceElapsed).toBeLessThan(160);
-      expect(buildSpy).toHaveBeenCalledTimes(1);
+      expect(mockBuildChatContextPrompt).toHaveBeenCalledTimes(1);
       expect(mockResolveLLMModelWithInfo).toHaveBeenCalledTimes(1);
-      expect(streamSpy).toHaveBeenCalledTimes(1);
-      expect(streamSpy.mock.calls[0]?.[2]).toBe("PARALLEL_PROMPT");
+      expect(mockStreamChatAssistantResponse).toHaveBeenCalledTimes(1);
+      expect(mockStreamChatAssistantResponse.mock.calls[0]?.[3]).toBe(
+        "PARALLEL_PROMPT"
+      );
     });
   });
 });

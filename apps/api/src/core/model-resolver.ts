@@ -94,20 +94,6 @@ export function isOpenCodeRoutedEndpoint(
   );
 }
 
-/** TEMP DEBUG 用に baseUrl のホスト部のみを取り出す（キーやパスは出さない）。確認後に削除する。 */
-export function hostOfBaseUrl(
-  baseUrl: string | null | undefined
-): string | null {
-  if (!baseUrl) {
-    return null;
-  }
-  try {
-    return new URL(baseUrl).host;
-  } catch {
-    return "(invalid-url)";
-  }
-}
-
 /**
  * OpenCode 互換エンドポイント向けのリクエスト単位ヘッダーを構築する。
  * sessionId には会話単位で安定した ID（chatSessions.id / sectionId / novelId）を渡す。

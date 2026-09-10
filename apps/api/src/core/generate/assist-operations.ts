@@ -16,12 +16,10 @@ import {
   streamText,
 } from "@novel-creator/llm";
 import { eq } from "drizzle-orm";
-import { appLogger } from "../../middleware/logger.js";
 import { searchContext } from "../../rag.js";
 import { mergeAsyncIterables } from "../merge-async-iterables.js";
 import {
   buildOpenCodeSessionHeaders,
-  hostOfBaseUrl,
   resolveLLMModelWithInfo,
 } from "../model-resolver.js";
 import { fetchNovelStructureWithContents } from "../novel-structure.js";
@@ -131,15 +129,6 @@ export async function* inlineAssistOp(
     sectionId,
     ctx.env.LLM_BASE_URL
   );
-  // TEMP DEBUG: OpenCode ヘッダー付与の判定確認用（確認後に削除する）。
-  appLogger.info("[TEMP DEBUG] generate headers", {
-    baseUrlHost: hostOfBaseUrl(
-      resolved.baseUrl ?? ctx.env.LLM_BASE_URL ?? null
-    ),
-    headerAttached: headers !== undefined,
-    op: "inline-assist",
-    provider: resolved.provider,
-  });
 
   const buildPrompt = (variantIndex: number) =>
     inlineAssistPrompt({
