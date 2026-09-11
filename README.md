@@ -346,7 +346,7 @@ pnpm deploy
 | VectorDB       | pgvector                     | Cloudflare Vectorize             |
 | API ランタイム | Node.js（@hono/node-server） | Workers（wrangler）              |
 | Web 配信       | Vite dev サーバー            | Workers Static Assets            |
-| LLM            | 同左（AI SDK で抽象化）      | 同左                             |
+| LLM            | OpenAI (gpt-4o-mini)         | Workers AI (@cf/google/gemma-4-26b-a4b-it) |
 | Embedding      | OpenAI (text-embedding-3-small / 1536次元) | Workers AI (@cf/baai/bge-m3 / 1024次元) |
 
 `VECTOR_STORE_PROVIDER` を `pgvector` → `vectorize` に変更するだけで VectorStore 実装が切り替わります。

@@ -7,6 +7,7 @@ import {
   createEmbeddingProvider,
   createLLMProvider,
   createWorkersAIEmbeddingModel,
+  createWorkersAILanguageModel,
   type WorkersAiBinding,
 } from "@novel-creator/llm";
 import type { Env } from "@novel-creator/shared";
@@ -85,7 +86,10 @@ export function createContextForWorkers(
   }
 ): AppContext["Variables"] {
   const db = createDbForHyperdrive(bindings.hyperdrive);
-  const llm = createLLMProvider(env);
+  const llm =
+    env.LLM_PROVIDER === "workers-ai" && bindings.ai
+      ? createWorkersAILanguageModel(bindings.ai, env.LLM_MODEL)
+      : createLLMProvider(env);
   const embedding =
     env.EMBEDDING_PROVIDER === "workers-ai" && bindings.ai
       ? createWorkersAIEmbeddingModel(bindings.ai, env.EMBEDDING_MODEL)

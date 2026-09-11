@@ -25,8 +25,8 @@
     }
   ],
   "vars": {
-    "LLM_PROVIDER": "openai",
-    "LLM_MODEL": "gpt-4o-mini",
+    "LLM_PROVIDER": "workers-ai",
+    "LLM_MODEL": "@cf/google/gemma-4-26b-a4b-it",
     "EMBEDDING_PROVIDER": "workers-ai",
     "EMBEDDING_MODEL": "@cf/baai/bge-m3",
     "EMBEDDING_DIMENSIONS": "1024",

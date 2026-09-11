@@ -20,6 +20,7 @@
     "@ai-sdk/google": "4.0.57",
     "@ai-sdk/openai": "^4.0.51",
     "ai": "7.0.84",
+    "workers-ai-provider": "^4.0.0",
     "zod": "^4.5.2"
   },
   "devDependencies": {

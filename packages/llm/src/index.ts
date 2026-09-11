@@ -84,6 +84,8 @@ export {
 } from "./templateEngine.js";
 export {
   createWorkersAIEmbeddingModel,
+  createWorkersAILanguageModel,
   DEFAULT_WORKERS_AI_EMBEDDING_MODEL,
+  DEFAULT_WORKERS_AI_LLM_MODEL,
   type WorkersAiBinding,
 } from "./workers-ai.js";

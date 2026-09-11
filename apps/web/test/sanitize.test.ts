@@ -52,6 +52,17 @@ describe("renderMarkdownWithRuby", () => {
     const out = renderMarkdownWithRuby("|a《b未閉じ");
     expect(out).not.toContain("<ruby>");
   });
+
+  it("インライン数式 $\\rightarrow$ が KaTeX としてレンダリングされる", () => {
+    const out = renderMarkdownWithRuby("概要 $\\rightarrow$ 設定");
+    expect(out).toContain('class="katex"');
+    expect(out).not.toContain("$\\rightarrow$");
+  });
+
+  it("ブロック数式 $$E=mc^2$$ が KaTeX としてレンダリングされる", () => {
+    const out = renderMarkdownWithRuby("$$\nE=mc^2\n$$");
+    expect(out).toContain('class="katex-display"');
+  });
 });
 
 describe("renderRubyLine", () => {

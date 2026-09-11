@@ -1,15 +1,26 @@
 import { parseRubyToHtml } from "@novel-creator/shared";
 import DOMPurify, { type Config } from "dompurify";
 import { marked } from "marked";
+import markedKatex from "marked-katex-extension";
+
+// marked に KaTeX 数式拡張を登録（インライン $...$ およびブロック $$...$$ 対応）
+marked.use(
+  markedKatex({
+    throwOnError: false,
+    nonStandard: true,
+  })
+);
 
 /**
  * Markdownプレビュー共通サニタイズ設定。
  * - ruby/rt/rp を明示的に許可（ルビが消えないようにする）
  * - 傍点用 span.emphasis-dots が消えないように class を許可
+ * - KaTeX 数式（MathML / SVG）を許可
  */
 export const SANITIZE_CONFIG: Config = {
+  USE_PROFILES: { html: true, mathMl: true, svg: true },
   ADD_TAGS: ["ruby", "rt", "rp"],
-  ADD_ATTR: ["class"],
+  ADD_ATTR: ["class", "style", "aria-hidden"],
 };
 
 export function sanitizeHtml(dirty: string): string {

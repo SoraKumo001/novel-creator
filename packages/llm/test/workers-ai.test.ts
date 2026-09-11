@@ -3,6 +3,7 @@ import { generateEmbedding, generateEmbeddings } from "../src/embeddings.js";
 import { createEmbeddingModel, createLanguageModel } from "../src/provider.js";
 import {
   createWorkersAIEmbeddingModel,
+  createWorkersAILanguageModel,
   DEFAULT_WORKERS_AI_EMBEDDING_MODEL,
   type WorkersAiBinding,
 } from "../src/workers-ai.js";
@@ -82,6 +83,15 @@ describe("Workers AI Embedding Adapter", () => {
     ).toThrow(
       "Workers AI embedding provider requires the Cloudflare Workers AI binding"
     );
+  });
+
+  it("createWorkersAILanguageModel が正常に LanguageModel インスタンスを生成すること", () => {
+    const mockAi: WorkersAiBinding = {
+      run: vi.fn(),
+    };
+    const model = createWorkersAILanguageModel(mockAi);
+    expect(model.modelId).toBe("@cf/google/gemma-4-26b-a4b-it");
+    expect(model.provider).toBe("workersai.chat");
   });
 
   it("createLanguageModel で workers-ai を指定するとエラーをスローすること", () => {

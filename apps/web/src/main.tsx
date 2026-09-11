@@ -5,6 +5,7 @@ import { createRoot } from "react-dom/client";
 
 import { queryClient } from "./lib/queryClient";
 import { router } from "./router";
+import "katex/dist/katex.min.css";
 import "./styles/globals.css";
 
 const rootElement = document.getElementById("root")!;
