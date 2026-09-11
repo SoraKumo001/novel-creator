@@ -234,12 +234,21 @@ http://localhost:5173 にアクセス。
 | ------------- | ------------------------------------------------------------------ |
 | `pnpm deploy` | Web をビルドし、Cloudflare Workers（Static Assets 統合）にデプロイ |
 
+## Cloudflare 移行
 ## Cloudflare へのデプロイ
 
+ローカル環境から Cloudflare（Workers + Hyperdrive + Vectorize + Static Assets）へ移行可能。
 本アプリケーションは、**Cloudflare Workers** の **Static Assets 機能** を利用して、バックエンド API（Hono / Workers）とフロントエンド SPA（React / Vite）を同一オリジンで一括配信・デプロイします。
 
+### デプロイ（Workers + Static Assets）
 ### アーキテクチャ概要
 
+- `apps/api/wrangler.jsonc` に Hyperdrive・Vectorize binding および Static Assets（`../web/dist`）を定義済み
+- `pnpm deploy` で Web ビルドと Worker デプロイを一括実行
+- 事前準備:
+  1. Hyperdrive 構成を作成（外部 PostgreSQL を接続先に設定）
+  2. Vectorize インデックスを作成（`novel-creator`）
+  3. `wrangler secret put MASTER_SECRET` 等でシークレットを設定
 * **API & Web ホスティング**: Cloudflare Workers（Static Assets 統合配信）
 * **データベース接続**: Cloudflare Hyperdrive（外部 PostgreSQL への接続プール＆高速化）
 * **ベクトルストア**: `pgvector`（PostgreSQL 側で実行）または `vectorize`（Cloudflare Vectorize）
@@ -248,33 +257,15 @@ http://localhost:5173 にアクセス。
 
 ### デプロイ手順
 
-#### 1. 外部 PostgreSQL の準備と pgvector の有効化
-
-デプロイ先の外部 PostgreSQL（Supabase, Neon 等）で、以下を実行しておきます：
-
-1. **`pgvector` 拡張機能の有効化**
-   `VECTOR_STORE_PROVIDER=pgvector`（デフォルト）を利用する場合、データベース側で `vector` エクステンションの有効化が必須です。
-   SQL エディタから以下を実行してください：
-   ```sql
-   CREATE EXTENSION IF NOT EXISTS vector;
-   ```
-   *(※ Supabase の場合、ダッシュボードの「Database」→「Extensions」から `vector` をトグル ON にして有効化することもできます)*
-
-2. **テーブルマイグレーションの実行**
-   外部 PostgreSQL の接続文字列を指定してマイグレーションを実行し、テーブルを作成します：
-   ```bash
-   DATABASE_URL="postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres" pnpm db:migrate
-   ```
-
-#### 2. Cloudflare アカウントへのログイン
+#### 1. Cloudflare アカウントへのログイン
 
 ```bash
 npx wrangler login
 ```
 
-#### 3. データベース接続（Hyperdrive）の作成
+#### 2. データベース接続（Hyperdrive）の作成
 
-外部 PostgreSQL への接続を高速化するため、Hyperdrive 構成を作成します。
+外部の PostgreSQL（Supabase や Neon 等）への接続を高速化するため、Hyperdrive 構成を作成します。
 
 ```bash
 npx wrangler hyperdrive create novel-db --connection-string="postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres"
@@ -292,7 +283,7 @@ npx wrangler hyperdrive create novel-db --connection-string="postgresql://postgr
 ]
 ```
 
-#### 4. （任意）Vectorize インデックスの作成
+#### 3. （任意）Vectorize インデックスの作成
 
 ※ `VECTOR_STORE_PROVIDER=pgvector` を使用する場合はこの手順はスキップ可能です。
 Cloudflare Vectorize を使用する場合は以下を実行します：
@@ -304,7 +295,7 @@ npx wrangler vectorize create novel-creator --dimensions 768 --metric cosine
 
 その後、`apps/api/wrangler.jsonc` で `VECTOR_STORE_PROVIDER` を `"vectorize"` に設定し、`vectorize` バインディングを追加します。
 
-#### 5. シークレット（環境変数）の設定
+#### 4. シークレット（環境変数）の設定
 
 Workers の実行に必要なシークレットを登録します。
 
@@ -327,7 +318,7 @@ cd ../..
 
 ※ `LLM_MODEL` や `EMBEDDING_MODEL` などの一般的な変数は [`apps/api/wrangler.jsonc`](file:///c:/prog/apps/novel-creator/apps/api/wrangler.jsonc) の `vars` で指定可能です。
 
-#### 6. デプロイの実行
+#### 5. デプロイの実行
 
 プロジェクトルートからデプロイコマンドを実行します。
 
@@ -339,7 +330,7 @@ pnpm deploy
 1. `apps/web` の Vite ビルド（`apps/web/dist` の生成）
 2. `apps/api` のデプロイ（Worker とビルドされた Web アセットを Cloudflare に一括デプロイ）
 
-#### 7. 初回アクセスとセットアップ
+#### 6. 初回アクセスとセットアップ
 
 デプロイ完了時にターミナルに出力された URL（例: `https://novel-creator.<your-subdomain>.workers.dev`）にブラウザでアクセスします。
 * 初回アクセス時は自動的に `/setup`（初期管理者セットアップ画面）へリダイレクトされます。
