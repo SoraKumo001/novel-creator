@@ -1,5 +1,7 @@
 import { parseEnvFromBindings } from "@novel-creator/shared/env";
 
+import type { VectorizeBinding } from "@novel-creator/vector";
+
 import { createApp } from "./app.js";
 import { createContextForWorkers } from "./context.js";
 
@@ -11,8 +13,10 @@ import { createContextForWorkers } from "./context.js";
  * は parseEnvFromBindings 内で除外される。
  */
 export type WorkerEnv = {
-  HYPERDRIVE: { connectionString: string };
-  VECTORIZE_INDEX: unknown;
+  ASSETS?: Fetcher;
+  HYPERDRIVE?: { connectionString: string };
+  VECTORIZE_INDEX?: VectorizeBinding;
+  DATABASE_URL?: string;
   BETTER_AUTH_URL?: string;
   MASTER_SECRET?: string;
   WEB_ORIGIN?: string;
@@ -33,14 +37,34 @@ export default {
     env: WorkerEnv,
     ctx: ExecutionContext
   ): Promise<Response> {
-    const parsedEnv = parseEnvFromBindings(env);
+    const connectionString =
+      env.DATABASE_URL ?? env.HYPERDRIVE?.connectionString;
+
+    const parsedEnv = parseEnvFromBindings({
+      ...env,
+      DATABASE_URL: connectionString,
+    });
+
+    const hyperdrive = env.HYPERDRIVE ?? {
+      connectionString: connectionString ?? "",
+    };
 
     const context = createContextForWorkers(parsedEnv, {
-      hyperdrive: env.HYPERDRIVE,
+      hyperdrive,
       vectorize: env.VECTORIZE_INDEX,
     });
 
     const app = createApp(context);
-    return app.fetch(request, env, ctx);
+    const response = await app.fetch(request, env, ctx);
+
+    // API 以外の 404 は静的アセット (SPA) へフォールバック
+    const url = new URL(request.url);
+    const isApiRoute =
+      url.pathname === "/api" || url.pathname.startsWith("/api/");
+    if (response.status === 404 && env.ASSETS && !isApiRoute) {
+      return env.ASSETS.fetch(request);
+    }
+
+    return response;
   },
 };

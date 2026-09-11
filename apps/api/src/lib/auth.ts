@@ -88,7 +88,7 @@ function buildAuth(env: Env, db: Database | AnyAuthDb, secret: string) {
     },
     plugins: [admin()],
     secret,
-    trustedOrigins: [env.WEB_ORIGIN],
+    trustedOrigins: env.WEB_ORIGIN ? [env.WEB_ORIGIN] : [],
     // role はクライアントから書き込ませない（admin プラグイン経由の管理のみ）。
     user: {
       additionalFields: {},

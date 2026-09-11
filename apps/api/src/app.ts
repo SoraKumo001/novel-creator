@@ -72,7 +72,7 @@ export function createApp(context: AppContext["Variables"]) {
       allowHeaders: ["Content-Type", "Authorization", "Cookie"],
       credentials: true,
       exposeHeaders: ["Content-Type", "Set-Cookie"],
-      origin: [context.env.WEB_ORIGIN],
+      origin: (origin) => context.env.WEB_ORIGIN ?? origin ?? "*",
     })
   );
   app.use("*", logger);

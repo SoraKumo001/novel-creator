@@ -196,64 +196,156 @@ http://localhost:5173 にアクセス。
 
 ### 初期設定・DB
 
-| コマンド              | 内容                                                  |
-| --------------------- | ----------------------------------------------------- |
-| `pnpm db:setup`       | DB 起動 + マイグレーション実行                        |
-| `pnpm db:setup:fresh` | DB 起動 + スキーマ反映（使い捨て試作用）              |
-| `pnpm db:up`          | Docker で PostgreSQL 起動                             |
-| `pnpm db:down`        | Docker で PostgreSQL 停止                             |
-| `pnpm db:push`        | DB スキーマ反映（使い捨て試作専用。migrate 済み DB には実行禁止） |
-| `pnpm db:generate`    | マイグレーション生成                                  |
-| `pnpm db:migrate`     | マイグレーションスクリプト実行                        |
-| `pnpm db:reset`       | スキーマ再作成（search_path 内のスキーマを DROP & 再作成して初期化） |
-| `pnpm db:studio`      | Drizzle Studio 起動                                   |
+| コマンド           | 内容                                                                 |
+| ------------------ | -------------------------------------------------------------------- |
+| `pnpm db:setup`    | DB 起動 + マイグレーション実行                                       |
+| `pnpm db:up`       | Docker で PostgreSQL 起動                                            |
+| `pnpm db:down`     | Docker で PostgreSQL 停止                                            |
+| `pnpm db:push`     | DB スキーマ反映（使い捨て試作専用。migrate 済み DB には実行禁止）    |
+| `pnpm db:generate` | マイグレーション生成                                                 |
+| `pnpm db:migrate`  | マイグレーションスクリプト実行                                       |
+| `pnpm db:reset`    | スキーマ再作成（search_path 内のスキーマを DROP & 再作成して初期化） |
+| `pnpm db:studio`   | Drizzle Studio 起動                                                  |
 
 ### 開発・UI確認
 
-| コマンド               | 内容                                    |
-| ---------------------- | --------------------------------------- |
-| `pnpm dev`             | 全パッケージ並列開発サーバー            |
-| `pnpm dev:api`         | API 開発サーバー（Node.js、ポート3000） |
-| `pnpm dev:web`         | Web 開発サーバー（Vite、ポート5173）    |
-| `pnpm dev:worker`      | API 開発サーバー（Wrangler / Workers）  |
-| `pnpm storybook`       | Storybook 起動（コンポーネント確認）    |
-| `pnpm storybook:build` | Storybook 静的ビルド                    |
+| コマンド          | 内容                                    |
+| ----------------- | --------------------------------------- |
+| `pnpm dev`        | 全パッケージ並列開発サーバー            |
+| `pnpm dev:api`    | API 開発サーバー（Node.js、ポート3000） |
+| `pnpm dev:web`    | Web 開発サーバー（Vite、ポート5173）    |
+| `pnpm dev:worker` | API 開発サーバー（Wrangler / Workers）  |
+| `pnpm storybook`  | Storybook 起動（コンポーネント確認）    |
 
 ### 品質チェック
 
-| コマンド             | 内容                               |
-| -------------------- | ---------------------------------- |
-| `pnpm typecheck`     | 全パッケージの型チェック           |
+| コマンド             | 内容                                 |
+| -------------------- | ------------------------------------ |
+| `pnpm typecheck`     | 全パッケージの型チェック             |
 | `pnpm lint:check`    | Ultracite によるリント・体裁チェック |
-| `pnpm lint:fix`      | Ultracite による自動修正           |
-| `pnpm test`          | Vitest テスト実行                  |
-| `pnpm test:coverage` | テストカバレッジ付き実行           |
-| `pnpm build`         | 全パッケージビルド                 |
+| `pnpm lint:fix`      | Ultracite による自動修正             |
+| `pnpm test`          | Vitest テスト実行                    |
+| `pnpm test:coverage` | テストカバレッジ付き実行             |
+| `pnpm build`         | 全パッケージビルド                   |
 
 ### デプロイ
 
-| コマンド          | 内容                                 |
-| ----------------- | ------------------------------------ |
-| `pnpm deploy:api` | API を Cloudflare Workers にデプロイ |
-| `pnpm deploy:web` | Web を Cloudflare Pages にデプロイ   |
+| コマンド      | 内容                                                               |
+| ------------- | ------------------------------------------------------------------ |
+| `pnpm deploy` | Web をビルドし、Cloudflare Workers（Static Assets 統合）にデプロイ |
 
-## Cloudflare 移行
+## Cloudflare へのデプロイ
 
-ローカル環境から Cloudflare（Workers + Hyperdrive + Vectorize）へ移行可能。
+本アプリケーションは、**Cloudflare Workers** の **Static Assets 機能** を利用して、バックエンド API（Hono / Workers）とフロントエンド SPA（React / Vite）を同一オリジンで一括配信・デプロイします。
 
-### API（Workers）
+### アーキテクチャ概要
 
-- `apps/api/wrangler.jsonc` に Hyperdrive・Vectorize binding を定義済み
-- `pnpm deploy:api` でデプロイ
-- 事前準備:
-  1. Hyperdrive 構成を作成（外部 PostgreSQL を接続先に設定）
-  2. Vectorize インデックスを作成（`novel-creator`）
-  3. `wrangler secret put LLM_API_KEY` で API キー設定
+* **API & Web ホスティング**: Cloudflare Workers（Static Assets 統合配信）
+* **データベース接続**: Cloudflare Hyperdrive（外部 PostgreSQL への接続プール＆高速化）
+* **ベクトルストア**: `pgvector`（PostgreSQL 側で実行）または `vectorize`（Cloudflare Vectorize）
 
-### Web（Pages）
+---
 
-- `apps/web/wrangler.jsonc` に静的アセット設定を定義済み
-- `pnpm deploy:web` でデプロイ
+### デプロイ手順
+
+#### 1. 外部 PostgreSQL の準備と pgvector の有効化
+
+デプロイ先の外部 PostgreSQL（Supabase, Neon 等）で、以下を実行しておきます：
+
+1. **`pgvector` 拡張機能の有効化**
+   `VECTOR_STORE_PROVIDER=pgvector`（デフォルト）を利用する場合、データベース側で `vector` エクステンションの有効化が必須です。
+   SQL エディタから以下を実行してください：
+   ```sql
+   CREATE EXTENSION IF NOT EXISTS vector;
+   ```
+   *(※ Supabase の場合、ダッシュボードの「Database」→「Extensions」から `vector` をトグル ON にして有効化することもできます)*
+
+2. **テーブルマイグレーションの実行**
+   外部 PostgreSQL の接続文字列を指定してマイグレーションを実行し、テーブルを作成します：
+   ```bash
+   DATABASE_URL="postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres" pnpm db:migrate
+   ```
+
+#### 2. Cloudflare アカウントへのログイン
+
+```bash
+npx wrangler login
+```
+
+#### 3. データベース接続（Hyperdrive）の作成
+
+外部 PostgreSQL への接続を高速化するため、Hyperdrive 構成を作成します。
+
+```bash
+npx wrangler hyperdrive create novel-db --connection-string="postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres"
+```
+
+コマンド実行後に表示される `id`（例: `ae06ed29802e41e5b590d3957d819a72`）をコピーし、[`apps/api/wrangler.jsonc`](file:///c:/prog/apps/novel-creator/apps/api/wrangler.jsonc) の `hyperdrive[0].id` に設定します。
+
+```jsonc
+"hyperdrive": [
+  {
+    "binding": "HYPERDRIVE",
+    "id": "あなたのHyperdrive_ID",
+    "localConnectionString": "postgres://novel:novel@localhost:5433/novel"
+  }
+]
+```
+
+#### 4. （任意）Vectorize インデックスの作成
+
+※ `VECTOR_STORE_PROVIDER=pgvector` を使用する場合はこの手順はスキップ可能です。
+Cloudflare Vectorize を使用する場合は以下を実行します：
+
+```bash
+# 例: 768 次元のコサイン類似度インデックスを作成
+npx wrangler vectorize create novel-creator --dimensions 768 --metric cosine
+```
+
+その後、`apps/api/wrangler.jsonc` で `VECTOR_STORE_PROVIDER` を `"vectorize"` に設定し、`vectorize` バインディングを追加します。
+
+#### 5. シークレット（環境変数）の設定
+
+Workers の実行に必要なシークレットを登録します。
+
+```bash
+# apps/api ディレクトリに移動
+cd apps/api
+
+# MASTER_SECRET（認証および暗号化のマスターキー・32バイトbase64等）
+npx wrangler secret put MASTER_SECRET
+
+# LLM API キー
+npx wrangler secret put LLM_API_KEY
+
+# （LLMと別のプロバイダを使用する場合）Embedding API キー
+npx wrangler secret put EMBEDDING_API_KEY
+
+# ルートディレクトリに戻る
+cd ../..
+```
+
+※ `LLM_MODEL` や `EMBEDDING_MODEL` などの一般的な変数は [`apps/api/wrangler.jsonc`](file:///c:/prog/apps/novel-creator/apps/api/wrangler.jsonc) の `vars` で指定可能です。
+
+#### 6. デプロイの実行
+
+プロジェクトルートからデプロイコマンドを実行します。
+
+```bash
+pnpm deploy
+```
+
+このコマンド 1 つで以下が順次実行されます：
+1. `apps/web` の Vite ビルド（`apps/web/dist` の生成）
+2. `apps/api` のデプロイ（Worker とビルドされた Web アセットを Cloudflare に一括デプロイ）
+
+#### 7. 初回アクセスとセットアップ
+
+デプロイ完了時にターミナルに出力された URL（例: `https://novel-creator.<your-subdomain>.workers.dev`）にブラウザでアクセスします。
+* 初回アクセス時は自動的に `/setup`（初期管理者セットアップ画面）へリダイレクトされます。
+* 管理者のメールアドレス・パスワードを登録して利用を開始してください。
+
+---
 
 ### 移行時の切り替えポイント
 
@@ -262,10 +354,13 @@ http://localhost:5173 にアクセス。
 | RDB            | PostgreSQL（Docker）         | Hyperdrive 経由で外部 PostgreSQL |
 | VectorDB       | pgvector                     | Cloudflare Vectorize             |
 | API ランタイム | Node.js（@hono/node-server） | Workers（wrangler）              |
+| Web 配信       | Vite dev サーバー            | Workers Static Assets            |
 | LLM            | 同左（AI SDK で抽象化）      | 同左                             |
 
 `VECTOR_STORE_PROVIDER` を `pgvector` → `vectorize` に変更するだけで VectorStore 実装が切り替わる。
 DB 接続は `createDb`（Node.js） / `createDbForHyperdrive`（Workers）で自動選択。
+`VECTOR_STORE_PROVIDER` を `pgvector` → `vectorize` に変更するだけで VectorStore 実装が切り替わります。
+DB 接続は `createDb`（Node.js） / `createDbForHyperdrive`（Workers）で自動選択されます。
 
 ## LLM と Embedding のプロバイダ分離
 

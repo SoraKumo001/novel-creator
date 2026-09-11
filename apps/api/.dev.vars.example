@@ -1,0 +1,19 @@
+# Cloudflare Workers ローカル開発用環境変数サンプル (.dev.vars.example)
+DATABASE_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres
+
+LLM_PROVIDER=openai
+LLM_API_KEY=your-llm-api-key
+LLM_MODEL=gpt-4o-mini
+LLM_BASE_URL=
+
+EMBEDDING_PROVIDER=openai
+EMBEDDING_API_KEY=
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_DIMENSIONS=1536
+
+VECTOR_STORE_PROVIDER=pgvector
+
+MASTER_SECRET=your-32-byte-base64-secret
+BETTER_AUTH_URL=http://localhost:8787
+WEB_ORIGIN=http://localhost:5173
+NODE_ENV=development

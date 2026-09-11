@@ -24,6 +24,7 @@ export {
   DEFAULT_LLM_TIMEOUT_MS,
 } from "./llm-config.js";
 export {
+  type RetryAttemptInfo,
   type RetryOptions,
   withRetry,
 } from "./retry.js";

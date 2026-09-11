@@ -1,5 +1,17 @@
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Pool } from "pg";
 import { getSearchPath } from "./index.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ルートの .env ファイルが存在すればロードする
+const rootEnvPath = path.resolve(__dirname, "../../../.env");
+if (fs.existsSync(rootEnvPath) && typeof process.loadEnvFile === "function") {
+  process.loadEnvFile(rootEnvPath);
+}
 
 async function runReset() {
   const connectionString =

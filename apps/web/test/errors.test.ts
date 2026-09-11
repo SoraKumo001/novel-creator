@@ -34,4 +34,28 @@ describe("errors", () => {
     expect(err.message).toContain("429");
     expect(err.message).toContain("レート制限");
   });
+
+  it("parseResponseError はログイン時の 401 でメール・パスワード不一致メッセージを返すこと", async () => {
+    const res = new Response(
+      JSON.stringify({ message: "Invalid email or password" }),
+      {
+        status: 401,
+        statusText: "Unauthorized",
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    const err = await parseResponseError(res, "ログイン");
+    expect(err.message).toBe(
+      "メールアドレスまたはパスワードが正しくありません"
+    );
+  });
+
+  it("parseResponseError は AI アクション時の 401 で AI 認証エラーメッセージを返すこと", async () => {
+    const res = new Response("Unauthorized", {
+      status: 401,
+      statusText: "Unauthorized",
+    });
+    const err = await parseResponseError(res, "AI編集");
+    expect(err.message).toContain("AIサービスの認証に失敗しました (401)");
+  });
 });

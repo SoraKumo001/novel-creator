@@ -73,7 +73,7 @@ export function createContext(env: Env): AppContext["Variables"] {
  */
 export function createContextForWorkers(
   env: Env,
-  bindings: { hyperdrive: Hyperdrive; vectorize: VectorizeBinding }
+  bindings: { hyperdrive: Hyperdrive; vectorize?: VectorizeBinding }
 ): AppContext["Variables"] {
   const db = createDbForHyperdrive(bindings.hyperdrive);
   const llm = createLLMProvider(env);

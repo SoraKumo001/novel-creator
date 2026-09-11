@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { characters, novels, settings } from "@novel-creator/db";
-import { generateEmbedding, generateEmbeddings } from "@novel-creator/llm";
+import {
+  generateEmbedding,
+  generateEmbeddings,
+  type RetryAttemptInfo,
+} from "@novel-creator/llm";
 import type { VectorRecord } from "@novel-creator/vector";
 import { eq } from "drizzle-orm";
 import { appLogger } from "../middleware/logger.js";
@@ -222,6 +226,9 @@ export class ReindexDomainService {
     // 4. バッチサイズ（25件ずつ）で embedMany（generateEmbeddings）を一括実行 & upsertBatch
     const batchSize = 25;
     let completedCount = 0;
+    let successfulCount = 0;
+    let failedCount = 0;
+    let lastError: Error | null = null;
 
     for (let i = 0; i < itemsToEmbed.length; i += batchSize) {
       const batch = itemsToEmbed.slice(i, i + batchSize);
@@ -242,11 +249,29 @@ export class ReindexDomainService {
         total,
       });
 
+      const handleRetry = (info: RetryAttemptInfo, itemTitle?: string) => {
+        const seconds = Math.ceil(info.delayMs / 1000);
+        const prefix = info.isRateLimit
+          ? "⏳ レート制限のため待機中..."
+          : "🔄 一時エラーのため再試行中...";
+        const itemInfo = itemTitle ? ` [${itemTitle}]` : "";
+        onProgress?.({
+          current: completedCount,
+          itemTitle: itemTitle ?? batch[0]?.title,
+          percent: batchStartPercent,
+          stage: `${prefix}${itemInfo} (${seconds}秒後に再試行 ${info.attempt}/${info.maxRetries})`,
+          total,
+        });
+      };
+
       try {
         const embeddings = await generateEmbeddings(
           model,
           batch.map((item) => item.content),
-          { dimensions }
+          {
+            dimensions,
+            onRetry: (info) => handleRetry(info),
+          }
         );
 
         vectorRecords = batch.map((item, idx) => ({
@@ -259,6 +284,8 @@ export class ReindexDomainService {
           novelId: item.novelId,
         }));
       } catch (batchErr) {
+        lastError =
+          batchErr instanceof Error ? batchErr : new Error(String(batchErr));
         appLogger.warn(
           "Batch embedding failed, falling back to individual calls:",
           batchErr
@@ -268,6 +295,7 @@ export class ReindexDomainService {
           try {
             const vector = await generateEmbedding(model, item.content, {
               dimensions,
+              onRetry: (info) => handleRetry(info, item.title),
             });
             vectorRecords.push({
               content: item.content,
@@ -279,6 +307,8 @@ export class ReindexDomainService {
               novelId: item.novelId,
             });
           } catch (e) {
+            lastError = e instanceof Error ? e : new Error(String(e));
+            failedCount += 1;
             appLogger.warn(`Failed to embed ${item.title}:`, e);
           }
         }
@@ -286,6 +316,7 @@ export class ReindexDomainService {
 
       if (vectorRecords.length > 0) {
         await this.ctx.vectorStore.upsertBatch(vectorRecords);
+        successfulCount += vectorRecords.length;
       }
 
       completedCount += batch.length;
@@ -300,14 +331,32 @@ export class ReindexDomainService {
       });
     }
 
+    if (successfulCount === 0 && total > 0) {
+      throw (
+        lastError ??
+        new Error(
+          "ベクトルの生成に失敗しました。APIキーまたはモデル設定をご確認ください。"
+        )
+      );
+    }
+
+    const finalStage =
+      failedCount > 0
+        ? `全 ${total} 件中 ${successfulCount} 件の再構築が完了しました（${failedCount} 件失敗）`
+        : `全 ${total} 件のインデックス再構築が完了しました`;
+
     onProgress?.({
       current: total,
+      error:
+        failedCount > 0
+          ? `${failedCount} 件のベクトル化に失敗しました`
+          : undefined,
       percent: 100,
-      stage: `全 ${total} 件のインデックス再構築が完了しました`,
+      stage: finalStage,
       total,
     });
 
-    return { dimensions, totalIndexed: total };
+    return { dimensions, totalIndexed: successfulCount };
   }
 
   /**

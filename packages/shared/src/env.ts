@@ -33,7 +33,7 @@ export const envSchema = z.object({
     .default("development"),
 
   VECTOR_STORE_PROVIDER: z.enum(["pgvector", "vectorize"]).default("pgvector"),
-  WEB_ORIGIN: z.string().default("http://localhost:5173"),
+  WEB_ORIGIN: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -61,7 +61,7 @@ export function createPgVectorStore(
   }
   const pool = new Pool({
     connectionString,
-    options: `-c search_path=${searchPath},public`,
+    options: `-c search_path=${searchPath},public,extensions`,
   });
   const db = drizzle(pool, { schema: { vectorEmbeddings } });
 
@@ -80,6 +80,7 @@ export function createPgVectorStore(
             : "WITH (lists = 100)";
         await db.execute(
           sql.raw(`
+          CREATE EXTENSION IF NOT EXISTS vector;
           CREATE TABLE IF NOT EXISTS vector_embeddings (
             id uuid PRIMARY KEY,
             novel_id uuid NOT NULL,
@@ -177,6 +178,7 @@ export function createPgVectorStore(
           : "WITH (lists = 100)";
       await db.execute(
         sql.raw(`
+        CREATE EXTENSION IF NOT EXISTS vector;
         DROP TABLE IF EXISTS vector_embeddings CASCADE;
         CREATE TABLE vector_embeddings (
           id uuid PRIMARY KEY,

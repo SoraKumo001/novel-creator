@@ -1,28 +1,25 @@
 {
-  "name": "novel-creator-api",
+  "name": "novel-creator",
   "main": "src/worker.ts",
   "compatibility_date": "2025-01-01",
   "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
   "hyperdrive": [
     {
       "binding": "HYPERDRIVE",
-      "id": "hyperdrive-id",
+      "id": "ae06ed29802e41e5b590d3957d819a72",
       "localConnectionString": "postgres://novel:novel@localhost:5433/novel"
-    }
-  ],
-  "vectorize": [
-    {
-      "binding": "VECTORIZE_INDEX",
-      "index_name": "novel-creator"
     }
   ],
   "vars": {
     "LLM_PROVIDER": "openai",
     "LLM_MODEL": "gpt-4o-mini",
     "EMBEDDING_MODEL": "text-embedding-3-small",
-    "VECTOR_STORE_PROVIDER": "vectorize",
-    "BETTER_AUTH_URL": "https://api.example.com",
-    "WEB_ORIGIN": "https://web.example.com"
+    "VECTOR_STORE_PROVIDER": "pgvector"
     // NOTE: MASTER_SECRET は secrets 運用 (`wrangler secret put MASTER_SECRET`)。
   }
 }

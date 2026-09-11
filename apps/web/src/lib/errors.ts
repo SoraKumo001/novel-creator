@@ -66,6 +66,35 @@ export function isNotFoundError(e: unknown): boolean {
 }
 
 /**
+ * 既知の英語エラーメッセージを日本語に変換するマップ。
+ */
+const KNOWN_ERROR_TRANSLATIONS: Record<string, string> = {
+  "invalid email or password":
+    "メールアドレスまたはパスワードが正しくありません",
+  "user already exists": "このメールアドレスは既に登録されています",
+  "sign-up is disabled": "新規ユーザー登録は無効化されています",
+  "password is too short": "パスワードが短すぎます",
+  "invalid password": "パスワードが正しくありません",
+  "user not found": "ユーザーが見つかりません",
+  "session expired":
+    "セッションの有効期限が切れました。再度ログインしてください",
+};
+
+/**
+ * エラーメッセージ内の英語表記をユーザー向けの日本語に変換する。
+ */
+export function translateErrorMessage(message: string): string {
+  const trimmed = message.trim();
+  const lower = trimmed.toLowerCase();
+  for (const [key, val] of Object.entries(KNOWN_ERROR_TRANSLATIONS)) {
+    if (lower === key || lower.includes(key)) {
+      return val;
+    }
+  }
+  return trimmed;
+}
+
+/**
  * Fetch Response オブジェクトから適切な日本語エラーメッセージを抽出・構築する。
  */
 export async function parseResponseError(
@@ -89,38 +118,78 @@ export async function parseResponseError(
     }
   }
 
+  const translatedDetail = detail ? translateErrorMessage(detail) : "";
+  const isAiAction =
+    defaultActionName.includes("AI") ||
+    Boolean(
+      res.url &&
+        (res.url.includes("/api/ai") ||
+          res.url.includes("/api/chat") ||
+          res.url.includes("/api/generate"))
+    );
+  const isAuthAction =
+    defaultActionName === "ログイン" ||
+    defaultActionName.includes("認証") ||
+    defaultActionName.includes("登録") ||
+    Boolean(res.url && res.url.includes("/auth/"));
+
   if (res.status === 502) {
     return new Error(
-      `APIサーバーに接続できませんでした (502 Bad Gateway)。バックエンドサーバー（pnpm dev）が起動しているか確認してください。${detail ? ` [詳細: ${detail}]` : ""}`
+      `APIサーバーに接続できませんでした (502 Bad Gateway)。バックエンドサーバー（pnpm dev）が起動しているか確認してください。${translatedDetail ? ` [詳細: ${translatedDetail}]` : ""}`
     );
   }
 
   if (res.status === 504) {
+    const prefix = isAiAction ? "AIの処理" : "処理";
     return new Error(
-      `AIの処理がタイムアウトしました (504 Gateway Timeout)。指示内容を簡潔にして再試行してください。${detail ? ` [詳細: ${detail}]` : ""}`
+      `${prefix}がタイムアウトしました (504 Gateway Timeout)。${isAiAction ? "指示内容を簡潔にして再試行してください。" : "しばらく待ってから再試行してください。"}${translatedDetail ? ` [詳細: ${translatedDetail}]` : ""}`
     );
   }
 
   if (res.status === 429) {
+    const prefix = isAiAction
+      ? "AIサービスのレート制限（利用制限）に達しました"
+      : "アクセスが集中しています";
     return new Error(
-      `AIサービスのレート制限（利用制限）に達しました (429)。しばらく待ってから再試行してください。${detail ? ` [詳細: ${detail}]` : ""}`
+      `${prefix} (429)。しばらく待ってから再試行してください。${translatedDetail ? ` [詳細: ${translatedDetail}]` : ""}`
     );
   }
 
-  if (res.status === 401 || res.status === 403) {
+  if (res.status === 401) {
+    if (isAuthAction) {
+      return new Error(
+        translatedDetail || "メールアドレスまたはパスワードが正しくありません"
+      );
+    }
+    if (isAiAction) {
+      return new Error(
+        `AIサービスの認証に失敗しました (401)。APIキー設定をご確認ください。${translatedDetail ? ` [詳細: ${translatedDetail}]` : ""}`
+      );
+    }
     return new Error(
-      `AIサービスの認証に失敗しました (${res.status})。APIキー設定をご確認ください。${detail ? ` [詳細: ${detail}]` : ""}`
+      translatedDetail || "認証に失敗しました。ログインしてください。"
+    );
+  }
+
+  if (res.status === 403) {
+    if (isAiAction) {
+      return new Error(
+        `AIサービスの権限がありません (403)。${translatedDetail ? ` [詳細: ${translatedDetail}]` : ""}`
+      );
+    }
+    return new Error(
+      translatedDetail || `アクセス権限がありません (${res.status})。`
     );
   }
 
   if (res.status >= 500) {
     return new Error(
-      `サーバーエラーが発生しました (${res.status} ${res.statusText})。${detail ? ` [詳細: ${detail}]` : ""}`
+      `サーバーエラーが発生しました (${res.status} ${res.statusText})。${translatedDetail ? ` [詳細: ${translatedDetail}]` : ""}`
     );
   }
 
   return new Error(
-    detail ||
+    translatedDetail ||
       `${defaultActionName}に失敗しました (${res.status} ${res.statusText})`
   );
 }

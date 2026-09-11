@@ -1,7 +1,4 @@
-import {
-  type NeonDatabase,
-  drizzle as neonDrizzle,
-} from "drizzle-orm/neon-serverless";
+import { type NeonDatabase } from "drizzle-orm/neon-serverless";
 import {
   type NodePgDatabase,
   drizzle as nodeDrizzle,
@@ -56,11 +53,11 @@ export function createDb(connectionString: string): Database {
 }
 
 /**
- * Cloudflare Workers 環境向けに Hyperdrive 経由で PostgreSQL へ接続する。
- * @neondatabase/serverless を使用するため、nodejs_compat フラグで動作する。
+ * Cloudflare Workers 環境向けに Hyperdrive または PostgreSQL（Supabase 等）へ接続する。
+ * nodejs_compat フラグにより Workers 上でも pg.Pool が動作するため、createDb を使用する。
  */
 export function createDbForHyperdrive(hyperdrive: Hyperdrive): Database {
-  return neonDrizzle(hyperdrive.connectionString, { schema });
+  return createDb(hyperdrive.connectionString);
 }
 
 export { schema };

@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -8,6 +9,12 @@ import { getSearchPath } from "./index.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// ルートの .env ファイルが存在すればロードする
+const rootEnvPath = path.resolve(__dirname, "../../../.env");
+if (fs.existsSync(rootEnvPath) && typeof process.loadEnvFile === "function") {
+  process.loadEnvFile(rootEnvPath);
+}
 
 async function runMigrate() {
   const connectionString =
@@ -28,8 +35,11 @@ async function runMigrate() {
       // 識別子として安全にエスケープ（ダブルクォート内のダブルクォートを二重化）
       const safeSchemaName = searchPath.replace(/"/g, '""');
       await pool.query(`CREATE SCHEMA IF NOT EXISTS "${safeSchemaName}";`);
-      console.log(`[db:migrate] Ensured schema "${searchPath}" exists.`);
     }
+
+    // pgvector 拡張機能が存在しない場合は作成する
+    await pool.query("CREATE EXTENSION IF NOT EXISTS vector;");
+    console.log('[db:migrate] Ensured extension "vector" exists.');
 
     const db = drizzle(pool);
     const migrationsFolder = path.resolve(__dirname, "../drizzle");

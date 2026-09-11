@@ -15,8 +15,11 @@ export {
   generateText,
   JSONValidationError,
   type ProviderOptions,
+  type RetryAttemptInfo,
+  type RetryOptions,
   streamText,
   streamTextResult,
+  withRetry,
 } from "./generate.js";
 export { listModels } from "./models.js";
 export {
