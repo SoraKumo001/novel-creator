@@ -234,36 +234,23 @@ http://localhost:5173 にアクセス。
 | ------------- | ------------------------------------------------------------------ |
 | `pnpm deploy` | Web をビルドし、Cloudflare Workers（Static Assets 統合）にデプロイ |
 
-## Cloudflare 移行
 ## Cloudflare へのデプロイ
 
 ローカル環境から Cloudflare（Workers + Hyperdrive + Vectorize + Static Assets）へ移行可能。
 本アプリケーションは、**Cloudflare Workers** の **Static Assets 機能** を利用して、バックエンド API（Hono / Workers）とフロントエンド SPA（React / Vite）を同一オリジンで一括配信・デプロイします。
 
-### デプロイ（Workers + Static Assets）
 ### アーキテクチャ概要
 
-- `apps/api/wrangler.jsonc` に Hyperdrive・Vectorize binding および Static Assets（`../web/dist`）を定義済み
-- `pnpm deploy` で Web ビルドと Worker デプロイを一括実行
-- 事前準備:
-  1. Hyperdrive 構成を作成（外部 PostgreSQL を接続先に設定）
-  2. Vectorize インデックスを作成（`novel-creator`） ※pgvectorを使わない場合
-  3. `wrangler secret put MASTER_SECRET` 等でシークレットを設定
-* **API & Web ホスティング**: Cloudflare Workers（Static Assets 統合配信）
-* **データベース接続**: Cloudflare Hyperdrive（外部 PostgreSQL への接続プール＆高速化）
-* **ベクトルストア**: `pgvector`（PostgreSQL 側で実行）または `vectorize`（Cloudflare Vectorize）
+- **API & Web ホスティング**: Cloudflare Workers（Static Assets 統合配信）
+- **データベース接続**: Cloudflare Hyperdrive（外部 PostgreSQL への接続プール＆高速化）
+- **ベクトルストア**: `vectorize`（Cloudflare Vectorize）または `pgvector`（PostgreSQL 側で実行）
+- **LLM / Embedding**: Workers AI（デフォルト: Gemma 4 26B A4B / BGE-M3）または外部プロバイダ
 
 ---
 
-### デプロイ手順
+### 事前準備（共通）
 
-#### 1. Cloudflare アカウントへのログイン
-
-```bash
-npx wrangler login
-```
-
-#### 2. データベース接続（Hyperdrive）の作成
+#### 1. データベース接続（Hyperdrive）の作成
 
 外部の PostgreSQL（Supabase や Neon 等）への接続を高速化するため、Hyperdrive 構成を作成します。
 
@@ -271,7 +258,7 @@ npx wrangler login
 npx wrangler hyperdrive create novel-db --connection-string="postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres"
 ```
 
-コマンド実行後に表示される `id`（例: `ae06ed29802e41e5b590d3957d819a72`）をコピーし、[`apps/api/wrangler.jsonc`](file:///c:/prog/apps/novel-creator/apps/api/wrangler.jsonc) の `hyperdrive[0].id` に設定します。
+コマンド実行後に表示される `id`（例: `ae06ed29802e41e5b590d3957d819a72`）をコピーし、[`apps/api/wrangler.jsonc`](./apps/api/wrangler.jsonc) の `hyperdrive[0].id` に設定します。
 
 ```jsonc
 "hyperdrive": [
@@ -283,7 +270,7 @@ npx wrangler hyperdrive create novel-db --connection-string="postgresql://postgr
 ]
 ```
 
-#### 3. Vectorize インデックスの作成
+#### 2. Vectorize インデックスの作成
 
 Workers 環境ではデフォルトで **Cloudflare Vectorize** と **Workers AI（`@cf/baai/bge-m3`, 1024次元）** を使用するように構成されています。以下のコマンドで 1024 次元の Vectorize インデックスを作成します：
 
@@ -294,10 +281,48 @@ npx wrangler vectorize create novel-creator-embeddings --dimensions 1024 --metri
 ※ `apps/api/wrangler.jsonc` にはあらかじめ `"vectorize": [{ "binding": "VECTORIZE_INDEX", "index_name": "novel-creator-embeddings" }]` が設定されています。
 ※ 外部 PostgreSQL の `pgvector` を Workers でも継続して使用したい場合は、`wrangler.jsonc` の `VECTOR_STORE_PROVIDER` を `"pgvector"` に変更してください。
 
+---
 
-#### 4. シークレット（環境変数）の設定
+### 方法 A: Cloudflare WebUI（Workers Builds / GitHub 連携）での自動デプロイ
 
-Workers の実行に必要なシークレットを登録します。
+Cloudflare ダッシュボード上で GitHub リポジトリと連携し、プッシュ時に自動でビルド＆デプロイを行う推奨設定です。
+
+1. **GitHub リポジトリの接続**:
+   - Cloudflare ダッシュボードにログインし、**Compute (Workers) > Workers & Pages** に移動します。
+   - **Create** をクリックし、**Connect to Git**（Git に接続）を選択して GitHub アカウントと本リポジトリ（`SoraKumo001/novel-creator`）を選択します。
+   - （※既に Worker が作成済みの場合は、該当 Worker の **Settings > Builds** から GitHub 連携を有効化できます）
+
+2. **ビルド設定（Build settings）の構成**:
+   モノレポ全体（共有パッケージ・Web・API）をビルドして API の Static Assets として配信するため、以下のように設定します：
+
+   | 設定項目 | 入力値 / 選択 | 補足 |
+   | :--- | :--- | :--- |
+   | **Framework preset** | `None` | プリセットなし |
+   | **Root directory** | `/`（空欄またはルート） | モノレポ全体を参照するためサブディレクトリは指定しません |
+   | **Build command** | `pnpm -r build` | 全パッケージの型・成果物をビルド |
+   | **Deploy command** | `npx wrangler deploy -c apps/api/wrangler.jsonc` | API 側の wrangler.jsonc を指定してデプロイ |
+
+3. **環境変数・シークレット（Variables and Secrets）の設定**:
+   - Worker の **Settings > Variables and Secrets** にて、以下を **Secret** として追加します：
+     - `MASTER_SECRET`: 暗号化および認証用マスターキー（32バイト以上のランダム文字列・必須）
+     - （外部 LLM / Embedding を使用する場合のみ）`LLM_API_KEY`, `EMBEDDING_API_KEY`
+   ※ `apps/api/wrangler.jsonc` の `vars` に定義されている環境変数（`LLM_PROVIDER=workers-ai` 等）は自動的に適用されます。
+
+4. **デプロイの実行**:
+   - **Save and Deploy** をクリックすると、初回ビルドとデプロイが開始されます。
+   - 以降は指定したブランチ（`main` 等）への Git push に連動して自動デプロイされます。
+
+---
+
+### 方法 B: CLI（ローカル環境）からの手動デプロイ
+
+#### 1. Cloudflare アカウントへのログイン
+
+```bash
+npx wrangler login
+```
+
+#### 2. シークレットの設定
 
 ```bash
 # apps/api ディレクトリに移動
@@ -306,19 +331,11 @@ cd apps/api
 # MASTER_SECRET（認証および暗号化のマスターキー・32バイトbase64等）
 npx wrangler secret put MASTER_SECRET
 
-# LLM API キー
-npx wrangler secret put LLM_API_KEY
-
-# （LLMと別のプロバイダを使用する場合）Embedding API キー
-npx wrangler secret put EMBEDDING_API_KEY
-
 # ルートディレクトリに戻る
 cd ../..
 ```
 
-※ `LLM_MODEL` や `EMBEDDING_MODEL` などの一般的な変数は [`apps/api/wrangler.jsonc`](file:///c:/prog/apps/novel-creator/apps/api/wrangler.jsonc) の `vars` で指定可能です。
-
-#### 5. デプロイの実行
+#### 3. デプロイの実行
 
 プロジェクトルートからデプロイコマンドを実行します。
 
@@ -330,11 +347,13 @@ pnpm deploy
 1. `apps/web` の Vite ビルド（`apps/web/dist` の生成）
 2. `apps/api` のデプロイ（Worker とビルドされた Web アセットを Cloudflare に一括デプロイ）
 
-#### 6. 初回アクセスとセットアップ
+---
 
-デプロイ完了時にターミナルに出力された URL（例: `https://novel-creator.<your-subdomain>.workers.dev`）にブラウザでアクセスします。
-* 初回アクセス時は自動的に `/setup`（初期管理者セットアップ画面）へリダイレクトされます。
-* 管理者のメールアドレス・パスワードを登録して利用を開始してください。
+### 初回アクセスとセットアップ
+
+デプロイ完了時の URL（例: `https://novel-creator.<your-subdomain>.workers.dev`）にブラウザでアクセスします。
+- 初回アクセス時は自動的に `/setup`（初期管理者セットアップ画面）へリダイレクトされます。
+- 管理者のメールアドレス・パスワードを登録して利用を開始してください。
 
 ---
 

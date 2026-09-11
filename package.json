@@ -17,6 +17,7 @@
     "db:studio": "pnpm --filter @novel-creator/db db:studio",
     "db:up": "docker compose up -d",
     "deploy": "pnpm --filter @novel-creator/web build && pnpm --filter @novel-creator/api deploy",
+    "deploy:ci": "pnpm -r build && npx wrangler deploy -c apps/api/wrangler.jsonc",
     "dev": "pnpm -r --parallel dev",
     "dev:api": "pnpm --filter @novel-creator/api dev",
     "dev:web": "pnpm --filter @novel-creator/web dev",
