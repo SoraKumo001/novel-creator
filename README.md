@@ -247,7 +247,7 @@ http://localhost:5173 にアクセス。
 - `pnpm deploy` で Web ビルドと Worker デプロイを一括実行
 - 事前準備:
   1. Hyperdrive 構成を作成（外部 PostgreSQL を接続先に設定）
-  2. Vectorize インデックスを作成（`novel-creator`）
+  2. Vectorize インデックスを作成（`novel-creator`） ※pgvectorを使わない場合
   3. `wrangler secret put MASTER_SECRET` 等でシークレットを設定
 * **API & Web ホスティング**: Cloudflare Workers（Static Assets 統合配信）
 * **データベース接続**: Cloudflare Hyperdrive（外部 PostgreSQL への接続プール＆高速化）

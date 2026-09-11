@@ -55,11 +55,6 @@ export function NavFooter({
                 <p className="truncate font-medium text-foreground text-xs">
                   {user?.name || user?.email || "ログイン中"}
                 </p>
-                {user?.name && (
-                  <p className="truncate text-[11px] text-muted">
-                    {user.email}
-                  </p>
-                )}
               </div>
               <button
                 type="button"
@@ -123,9 +118,6 @@ export function NavFooter({
                 </button>
               );
             })}
-          </div>
-          <div className="px-1 text-center text-[11px] text-muted-foreground">
-            <p>物語を創り、世界を紡ぐ。</p>
           </div>
         </>
       )}
