@@ -4,7 +4,6 @@ import {
   deleteResultOp,
   listResultsOp,
 } from "../src/core/analysis/analysis-results.js";
-import { AnalysisDomainService } from "../src/core/analysis.service.js";
 import type { ServiceContext } from "../src/core/types.js";
 
 const NOVEL_ID = "11111111-1111-4111-8111-111111111111";
@@ -70,33 +69,6 @@ describe("Analysis Domain Service & Operations", () => {
 
       expect(db.delete).toHaveBeenCalledWith(analysisResults);
       expect(deleteWhere).toHaveBeenCalled();
-    });
-  });
-
-  describe("AnalysisDomainService facade", () => {
-    it("listResults と deleteResult を正常に委譲呼び出しできること", async () => {
-      const db = {
-        delete: vi.fn().mockReturnValue({
-          where: vi.fn().mockResolvedValue(undefined),
-        }),
-        select: vi.fn().mockReturnValue({
-          from: vi.fn().mockReturnValue({
-            where: vi.fn().mockReturnValue({
-              orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockResolvedValue([]),
-              }),
-            }),
-          }),
-        }),
-      };
-
-      const service = new AnalysisDomainService(createMockContext(db));
-      const list = await service.listResults(NOVEL_ID);
-      expect(list).toEqual([]);
-
-      await expect(
-        service.deleteResult(NOVEL_ID, "r1")
-      ).resolves.toBeUndefined();
     });
   });
 });

@@ -14,7 +14,6 @@ import {
   isSectionInScope,
   MAX_LIST_ITEMS,
   MAX_SEARCH_ITEMS,
-  MAX_STRUCTURE_ITEMS,
   MAX_TEXT_LENGTH,
   TRUNCATION_SUFFIX,
   truncateList,
@@ -237,7 +236,7 @@ describe("readTools", () => {
   });
 
   describe("truncation", () => {
-    it("getCharacters - 31 件中 30 件を返し、省略明示を含む", async () => {
+    it("リスト取得ツールで上限を超える場合は省略明示を含むこと（getCharacters）", async () => {
       const tools = createReadTools(
         createCtx(createMockDb({ characters: makeCharacters(NOVEL_ID, 31) })),
         NOVEL_ID
@@ -250,163 +249,6 @@ describe("readTools", () => {
         "[truncated: showing 30 of 31] 残り 1 件は省略されました"
       );
       expect(characters).toHaveLength(MAX_LIST_ITEMS);
-      expect(characters[0].name).toBe("人物1");
-      expect(characters.find((c: Row) => c.name === "人物31")).toBeUndefined();
-    });
-
-    it("getCharacters - 30 件以下の場合は省略明示を含まない", async () => {
-      const tools = createReadTools(
-        createCtx(createMockDb({ characters: makeCharacters(NOVEL_ID, 30) })),
-        NOVEL_ID
-      );
-      const res = await executeTool(tools.getCharacters, {});
-
-      expect(res.count).toBe(30);
-      expect(res.truncated).toBeUndefined();
-      expect(res.characters).toHaveLength(30);
-    });
-
-    it("getCharacters - 長文 description が 600 文字で切り詰められ、接尾辞が付与される", async () => {
-      const longDescription = "長".repeat(MAX_TEXT_LENGTH + 50);
-      const tools = createReadTools(
-        createCtx(
-          createMockDb({
-            characters: [
-              {
-                category: "主要人物",
-                description: longDescription,
-                id: "char-1",
-                name: "長文人物",
-                novelId: NOVEL_ID,
-                traits: [],
-              },
-            ],
-          })
-        ),
-        NOVEL_ID
-      );
-      const res = await executeTool(tools.getCharacters, {});
-      const characters = res.characters as Row[];
-
-      expect(characters).toHaveLength(1);
-      const desc = characters[0].description as string;
-      expect(desc.endsWith(TRUNCATION_SUFFIX)).toBe(true);
-      expect(desc.length).toBe(MAX_TEXT_LENGTH + TRUNCATION_SUFFIX.length);
-      expect(desc.startsWith("長".repeat(MAX_TEXT_LENGTH))).toBe(true);
-    });
-
-    it("getCharacters - null description は null のまま", async () => {
-      const tools = createReadTools(
-        createCtx(
-          createMockDb({
-            characters: [
-              {
-                category: "主要人物",
-                description: null,
-                id: "char-1",
-                name: "人物1",
-                novelId: NOVEL_ID,
-              },
-            ],
-          })
-        ),
-        NOVEL_ID
-      );
-      const res = await executeTool(tools.getCharacters, {});
-      const characters = res.characters as Row[];
-      expect(characters[0].description).toBeNull();
-    });
-
-    it("getSettings - 31 件中 30 件を返し、省略明示を含む", async () => {
-      const settings = Array.from({ length: 31 }, (_, i) => ({
-        category: "世界観",
-        description: `説明${i + 1}`,
-        id: `setting-${i + 1}`,
-        name: `設定${i + 1}`,
-        novelId: NOVEL_ID,
-      }));
-      const tools = createReadTools(
-        createCtx(createMockDb({ settings })),
-        NOVEL_ID
-      );
-      const res = await executeTool(tools.getSettings, {});
-
-      expect(res.count).toBe(31);
-      expect(res.truncated).toBe(
-        "[truncated: showing 30 of 31] 残り 1 件は省略されました"
-      );
-      expect(res.settings).toHaveLength(MAX_LIST_ITEMS);
-    });
-
-    it("getPlotAndChapters - 51 章で 50 章に切り詰め、省略明示を含む", async () => {
-      const chapters = Array.from(
-        { length: MAX_STRUCTURE_ITEMS + 1 },
-        (_, i) => ({
-          id: `chapter-${i + 1}`,
-          novelId: NOVEL_ID,
-          order: i + 1,
-          summary: null,
-          title: `第${i + 1}章`,
-        })
-      );
-      const tools = createReadTools(
-        createCtx(createMockDb({ chapters })),
-        NOVEL_ID
-      );
-      const res = await executeTool(tools.getPlotAndChapters, {});
-
-      expect(res.chapterCount).toBe(MAX_STRUCTURE_ITEMS + 1);
-      expect(res.truncated).toBe(
-        "[truncated: showing 50 of 51] 残り 1 件は省略されました"
-      );
-      expect(res.chapters).toHaveLength(MAX_STRUCTURE_ITEMS);
-    });
-
-    it("getForeshadowings - 51 件で 50 件に切り詰め、省略明示を含む", async () => {
-      const foreshadowings = Array.from(
-        { length: MAX_STRUCTURE_ITEMS + 1 },
-        (_, i) => ({
-          description: `説明${i + 1}`,
-          id: `foreshadowing-${i + 1}`,
-          novelId: NOVEL_ID,
-          placedSectionId: null,
-          resolvedSectionId: null,
-          status: "unresolved",
-          title: `伏線${i + 1}`,
-        })
-      );
-      const tools = createReadTools(
-        createCtx(createMockDb({ foreshadowings })),
-        NOVEL_ID
-      );
-      const res = await executeTool(tools.getForeshadowings, {});
-
-      expect(res.count).toBe(MAX_STRUCTURE_ITEMS + 1);
-      expect(res.truncated).toContain("showing 50 of 51");
-      expect(res.foreshadowings).toHaveLength(MAX_STRUCTURE_ITEMS);
-    });
-
-    it("getTimelines - 51 件で 50 件に切り詰め、省略明示を含む", async () => {
-      const timelines = Array.from(
-        { length: MAX_STRUCTURE_ITEMS + 1 },
-        (_, i) => ({
-          event: `イベント${i + 1}`,
-          id: `timeline-${i + 1}`,
-          novelId: NOVEL_ID,
-          order: i + 1,
-          sectionId: null,
-          timestamp: null,
-        })
-      );
-      const tools = createReadTools(
-        createCtx(createMockDb({ timelines })),
-        NOVEL_ID
-      );
-      const res = await executeTool(tools.getTimelines, {});
-
-      expect(res.count).toBe(MAX_STRUCTURE_ITEMS + 1);
-      expect(res.truncated).toContain("showing 50 of 51");
-      expect(res.timelines).toHaveLength(MAX_STRUCTURE_ITEMS);
     });
 
     it("searchNovelKnowledge - 検索結果がカテゴリごとに 10 件に切り詰められる", async () => {

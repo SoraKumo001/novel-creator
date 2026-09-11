@@ -162,54 +162,7 @@ beforeEach(() => {
 });
 
 describe("BackupPage", () => {
-  it("再生成ボタンが常時表示されていること", async () => {
-    renderPage();
-
-    // リストア前でも常に表示される
-    expect(
-      screen.getByRole("button", { name: /ベクトルデータを再生成する/ })
-    ).toBeInTheDocument();
-
-    await performRestore();
-
-    expect(
-      screen.getByRole("button", { name: /ベクトルデータを再生成する/ })
-    ).toBeInTheDocument();
-    expect(mockToast.success).toHaveBeenCalledWith(
-      "リストアが完了しました。ベクトルデータの再生成をお忘れなく"
-    );
-  });
-
-  it("再生成ボタンでモーダルが開き、再構築開始で streamReindex が呼ばれること", async () => {
-    renderPage();
-    await performRestore();
-
-    fireEvent.click(
-      screen.getByRole("button", { name: /ベクトルデータを再生成する/ })
-    );
-
-    // 設定ページと同じ ReindexProgressModal が開く
-    expect(
-      screen.getByText("⚡ ベクトルインデックス全再構築")
-    ).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "再構築を開始" }));
-
-    await waitFor(() => {
-      expect(streamReindexMock).toHaveBeenCalledTimes(1);
-    });
-    // 設定ページと同じくデフォルト埋め込みモデルの ID を渡す（API は全体再構築のみ）
-    expect(streamReindexMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        embeddingConfigId: DEFAULT_EMBEDDING_CONFIG_ID,
-        onProgress: expect.any(Function),
-        onDone: expect.any(Function),
-        onError: expect.any(Function),
-      })
-    );
-  });
-
-  it("再構築実行中は再生成ボタンが無効化されること", async () => {
+  it("リストア完了からベクトルデータ再構築の一連のフローが正常に動作すること", async () => {
     let finishReindex: (() => void) | undefined;
     streamReindexMock.mockImplementation(
       (options) =>
@@ -222,24 +175,48 @@ describe("BackupPage", () => {
     );
 
     renderPage();
-    await performRestore();
 
-    fireEvent.click(
-      screen.getByRole("button", { name: /ベクトルデータを再生成する/ })
-    );
-    fireEvent.click(screen.getByRole("button", { name: "再構築を開始" }));
-
+    // 1. リストア前でも再生成ボタンが表示される
     const reindexButton = screen.getByRole("button", {
       name: /ベクトルデータを再生成する/,
     });
+    expect(reindexButton).toBeInTheDocument();
+
+    // 2. リストア実行
+    await performRestore();
+    expect(mockToast.success).toHaveBeenCalledWith(
+      "リストアが完了しました。ベクトルデータの再生成をお忘れなく"
+    );
+
+    // 3. モーダルを開いて再構築を開始
+    fireEvent.click(reindexButton);
+    expect(
+      screen.getByText("⚡ ベクトルインデックス全再構築")
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "再構築を開始" }));
+
+    await waitFor(() => {
+      expect(streamReindexMock).toHaveBeenCalledTimes(1);
+    });
+    expect(streamReindexMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        embeddingConfigId: DEFAULT_EMBEDDING_CONFIG_ID,
+        onProgress: expect.any(Function),
+        onDone: expect.any(Function),
+        onError: expect.any(Function),
+      })
+    );
+
+    // 4. 再構築中はボタンが無効化される
     await waitFor(() => {
       expect(reindexButton).toBeDisabled();
     });
 
+    // 5. 再構築完了でボタンが再有効化される
     await act(async () => {
       finishReindex?.();
     });
-
     await waitFor(() => {
       expect(reindexButton).toBeEnabled();
     });

@@ -74,7 +74,7 @@ describe("Nav component", () => {
     ).toBeInTheDocument();
   });
 
-  it("「メニューを縮小」ボタンをクリックすると縮小状態になり、展開ボタンが表示されること", () => {
+  it("メニューの縮小と再展開が切り替わり、localStorage に状態が永続化されること", () => {
     render(<Nav />);
 
     const collapseButton = screen.getByRole("button", {
@@ -85,21 +85,12 @@ describe("Nav component", () => {
     // テキストが非表示になり、展開ボタンが表示される
     expect(screen.queryByText("Novel Creator")).not.toBeInTheDocument();
     expect(screen.queryByText("小説一覧")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "メニューを展開" })
-    ).toBeInTheDocument();
     expect(localStorage.getItem("novel-creator:nav-collapsed")).toBe("true");
-  });
-
-  it("「メニューを展開」ボタンをクリックすると通常サイズに戻ること", () => {
-    localStorage.setItem("novel-creator:nav-collapsed", "true");
-    render(<Nav />);
-
-    expect(screen.queryByText("小説一覧")).not.toBeInTheDocument();
 
     const expandButton = screen.getByRole("button", { name: "メニューを展開" });
     fireEvent.click(expandButton);
 
+    // 再展開されてテキストが復帰する
     expect(screen.getByText("小説一覧")).toBeInTheDocument();
     expect(localStorage.getItem("novel-creator:nav-collapsed")).toBe("false");
   });

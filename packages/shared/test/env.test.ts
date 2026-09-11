@@ -23,9 +23,6 @@ function spyOnConsoleWarn() {
 describe("parseEnvFromBindings", () => {
   it("DATABASE_URL バインディングが無ければエラーを投げること", () => {
     expect(() => parseEnvFromBindings({})).toThrow(/DATABASE_URL/);
-  });
-
-  it("DATABASE_URL が undefined でもエラーを投げること", () => {
     expect(() => parseEnvFromBindings({ DATABASE_URL: undefined })).toThrow(
       /DATABASE_URL/
     );

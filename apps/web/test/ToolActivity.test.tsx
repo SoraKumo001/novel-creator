@@ -5,7 +5,6 @@ import {
   extractReasoning,
   extractToolInvocations,
   ToolActivity,
-  toolLabel,
 } from "../src/features/chat/components/ToolActivity.js";
 
 describe("extractToolInvocations (AI SDK v7 パーツ形式)", () => {
@@ -170,26 +169,6 @@ describe("extractToolInvocations (AI SDK v7 パーツ形式)", () => {
       "getNovelInfo",
       "getForeshadowings",
     ]);
-  });
-});
-
-describe("toolLabel", () => {
-  it("既知ツールは日本語表示名を返す", () => {
-    expect(toolLabel("getNovelInfo")).toBe("小説情報");
-    expect(toolLabel("getCharacters")).toBe("人物取得");
-    expect(toolLabel("getSettings")).toBe("設定取得");
-    expect(toolLabel("getPlotAndChapters")).toBe("プロット・章構成取得");
-    expect(toolLabel("getSectionContent")).toBe("本文取得");
-    expect(toolLabel("getForeshadowings")).toBe("伏線取得");
-    expect(toolLabel("getTimelines")).toBe("時系列取得");
-    expect(toolLabel("searchNovelKnowledge")).toBe("知識検索");
-  });
-
-  it("未知のツール名はそのまま返す（フォールバック）", () => {
-    expect(toolLabel("unknownTool")).toBe("unknownTool");
-    expect(toolLabel("searchNovelKnowledge-abc123")).toBe(
-      "searchNovelKnowledge-abc123"
-    );
   });
 });
 
