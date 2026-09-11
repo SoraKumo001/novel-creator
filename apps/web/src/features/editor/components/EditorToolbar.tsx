@@ -1,100 +1,13 @@
-import {
-  type RefObject,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@/components/Button.js";
 import { PencilIcon, SparklesIcon } from "@/components/Icons.js";
 import { LLMModelSelector } from "@/components/LLMModelSelector.js";
 import { ReadingTime } from "@/components/ReadingTime.js";
+import { useAnchorMenu } from "@/hooks/useAnchorMenu.js";
 import type { Section } from "@/lib/types.js";
 import { EDITOR_AI_MENU_ACTIONS } from "../lib/analysisActions.js";
-
-interface AnchorMenuPosition {
-  bottom?: number;
-  right: number;
-  top?: number;
-}
-
-/**
- * ツールバー dropdown を body ポータル＋fixed 配置で出すための位置決め。
- * メニューを in-flow の absolute のままにすると、祖先の overflow-hidden
- *（SectionEditorView / EditorTab の main / タブ wrappers）での切り取りや、
- * Monaco 内部レイヤー（suggest z-40・overlaymessage z-10000 等）との
- * ペイント順負けでエディタ面の裏に隠れる。Modal と同じく document.body
- * 直下・z-50 に描画して両方を回避する。見た目（幅・配色・右端揃え・
- * ボタンとの 4px ギャップ）は従来と同一。下に収まらないときだけ上向きに反転する。
- *
- * 初回ペイントのちらつき対策として、トリガー rect は render 中に同期取得し
- *（effect 後の setState を待たない）、flip 判定に必要なメニュー高さが
- * 実測できるまでは visibility:hidden のまま描画する。実測前の中途半端な
- * 座標で可視ペイントされることがないため、斜め上からの遷移アニメに
- * 見えることもない。
- */
-function useAnchorMenu(
-  open: boolean,
-  triggerRef: RefObject<HTMLDivElement | null>
-) {
-  const menuRef = useRef<HTMLDivElement>(null);
-  const syncRect =
-    open && typeof window !== "undefined"
-      ? (triggerRef.current?.getBoundingClientRect() ?? null)
-      : null;
-  const syncPosition: AnchorMenuPosition = {
-    right: syncRect ? Math.max(8, window.innerWidth - syncRect.right) : 0,
-    top: syncRect ? syncRect.bottom + 4 : 0,
-  };
-  // マウント後に実測した位置（flip 済み）。null の間は非表示のままにする。
-  const [measuredPosition, setMeasuredPosition] =
-    useState<AnchorMenuPosition | null>(null);
-
-  useLayoutEffect(() => {
-    if (!open) {
-      // null → null の setState は bail out されるためループしない
-      setMeasuredPosition(null);
-      return;
-    }
-    const decide = () => {
-      const trigger = triggerRef.current;
-      if (!trigger || typeof window === "undefined") {
-        return;
-      }
-      const rect = trigger.getBoundingClientRect();
-      const gap = 4;
-      const right = Math.max(8, window.innerWidth - rect.right);
-      const menuHeight = menuRef.current?.offsetHeight ?? 0;
-      if (
-        menuHeight > 0 &&
-        rect.bottom + gap + menuHeight > window.innerHeight &&
-        rect.top - gap - menuHeight > 0
-      ) {
-        setMeasuredPosition({
-          bottom: window.innerHeight - rect.top + gap,
-          right,
-        });
-      } else {
-        setMeasuredPosition({ top: rect.bottom + gap, right });
-      }
-    };
-    decide();
-    window.addEventListener("resize", decide);
-    // エディタ内スクロールでトリガーが動いても追従する
-    window.addEventListener("scroll", decide, true);
-    return () => {
-      window.removeEventListener("resize", decide);
-      window.removeEventListener("scroll", decide, true);
-    };
-  }, [open, triggerRef]);
-
-  return {
-    menuRef,
-    position: measuredPosition ?? syncPosition,
-    ready: measuredPosition !== null,
-  };
-}
+import { SaveStatusBadge } from "./SaveStatusBadge.js";
 
 interface EditorToolbarProps {
   canExtract: boolean;
@@ -296,6 +209,7 @@ export function EditorToolbar({
               />
               {saving ? "保存中..." : isDirty ? "未保存" : "保存完了"}
             </span>
+            <SaveStatusBadge isDirty={isDirty} saving={saving} />
           </div>
 
           {/* 文字数・進捗・読了目安 */}

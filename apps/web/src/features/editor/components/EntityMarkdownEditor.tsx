@@ -4,13 +4,15 @@ import { Button } from "@/components/Button.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
 import { HistoryDiffModal } from "@/components/HistoryDiffModal.js";
 import { Loading } from "@/components/Loading.js";
+import { ReadingTime } from "@/components/ReadingTime.js";
 import {
   EditorSidebarShell,
   MarkdownDraftBanner,
-  MarkdownInsertButtons,
+  MarkdownFormatBar,
   MarkdownPreviewDock,
   MarkdownTocNav,
   MarkdownToolbarRow,
+  MarkdownViewDropdown,
   SelectionConsultBar,
   TocHeader,
   TocToggleButton,
@@ -19,6 +21,7 @@ import {
   useOverlapHover,
 } from "@/features/editor/components/MarkdownEditorCore.js";
 import { MonacoEditor } from "@/features/editor/components/MonacoEditor.js";
+import { SaveStatusBadge } from "@/features/editor/components/SaveStatusBadge.js";
 import { useEntityMarkdownActions } from "@/hooks/useEntityMarkdownActions.js";
 import { useMarkdownEntityEditor } from "@/hooks/useMarkdownEntityEditor.js";
 import { useMonacoPrefs } from "@/hooks/useMonacoPrefs.js";
@@ -205,21 +208,54 @@ export function EntityMarkdownEditor<
 
       <MarkdownToolbarRow
         left={
-          <>
+          <div className="flex items-center gap-3">
             <TocToggleButton
               active={isSidebarOpen || hover.isHovered}
               onToggle={() => setIsSidebarOpen((prev) => !prev)}
               onMouseEnter={hover.handleMouseEnter}
             />
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-foreground text-sm sm:text-base">
+                  {entityTitle}
+                </h3>
+                <SaveStatusBadge isDirty={isDirty} saving={isBusy} />
+              </div>
+              <div className="mt-0.5 flex items-center gap-2 text-muted-foreground text-xs sm:gap-3">
+                <span>
+                  文字数:{" "}
+                  <strong className="text-foreground">
+                    {markdown.length.toLocaleString()}
+                  </strong>
+                </span>
+                <span>•</span>
+                <ReadingTime chars={markdown.length} />
+              </div>
+            </div>
+          </div>
+        }
+        right={
+          <>
+            <MarkdownViewDropdown
+              previewOpen={previewOpen}
+              onTogglePreview={() => setPreviewOpen((prev) => !prev)}
+              editorFontSize={editorFontSize}
+              onEditorFontSize={handleEditorFontSize}
+              editorWordWrap={editorWordWrap}
+              onToggleWordWrap={handleToggleWordWrap}
+              onOpenHistory={() => setHistoryOpen(true)}
+              disabled={isBusy}
+            />
             <Button
               size="sm"
-              variant="primary"
-              onClick={handleSave}
-              disabled={!isDirty || isBusy}
-              isLoading={isBusy}
+              variant="secondary"
+              onClick={handleOpenChat}
+              disabled={isBusy}
+              title="選択中のテキストまたは現在のセクションについてチャットでAIに相談"
             >
-              保存
+              💬 チャットで相談
             </Button>
+            {extraToolbarActions}
             <Button
               size="sm"
               variant="secondary"
@@ -239,79 +275,13 @@ export function EntityMarkdownEditor<
             </Button>
             <Button
               size="sm"
-              variant="secondary"
-              onClick={() => setHistoryOpen(true)}
-              title="マークダウンの編集履歴と差分を確認・復元"
+              variant="primary"
+              onClick={handleSave}
+              disabled={!isDirty || isBusy}
+              isLoading={isBusy}
+              title="変更を保存 (Ctrl+S)"
             >
-              🕒 履歴
-            </Button>
-            <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
-            <MarkdownInsertButtons
-              onInsert={insertMarkdown}
-              disabled={isBusy}
-            />
-            <span className="mx-1 h-5 w-px bg-border" aria-hidden="true" />
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={handleOpenFind}
-              disabled={isBusy}
-              title="エディタ内を検索・置換 (Ctrl+F)"
-            >
-              🔍 検索
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => handleEditorFontSize(-1)}
-              disabled={isBusy || editorFontSize <= 10}
-              title="エディタの文字を小さく"
-            >
-              A-
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => handleEditorFontSize(1)}
-              disabled={isBusy || editorFontSize >= 24}
-              title="エディタの文字を大きく"
-            >
-              A+
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={handleToggleWordWrap}
-              disabled={isBusy}
-              title="行の折返し表示を切替"
-            >
-              {editorWordWrap === "on" ? "↩ 折返し:ON" : "↪ 折返し:OFF"}
-            </Button>
-            {isDirty && (
-              <span className="text-muted-foreground text-xs">
-                （未保存の変更があります）
-              </span>
-            )}
-          </>
-        }
-        right={
-          <>
-            {extraToolbarActions}
-            <Button
-              size="sm"
-              variant={previewOpen ? "primary" : "secondary"}
-              onClick={() => setPreviewOpen((prev) => !prev)}
-              title="エディタ横にプレビューを表示"
-            >
-              👁 プレビュー
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={handleOpenChat}
-              title="選択中のテキストまたは現在のセクションについてチャットでAIに相談"
-            >
-              💬 チャットで相談
+              保存
             </Button>
           </>
         }
@@ -332,20 +302,27 @@ export function EntityMarkdownEditor<
           renderToc={renderTocContent}
         />
 
-        <main className="relative flex-1 overflow-hidden">
-          <MonacoEditor
-            value={markdown}
-            onChange={handleEditorChange}
-            onMount={handleEditorMount}
-            onSelectionChange={handleSelectionChange}
-            fontSize={editorFontSize}
-            wordWrap={editorWordWrap}
+        <main className="relative flex flex-1 flex-col overflow-hidden">
+          <MarkdownFormatBar
+            onInsert={insertMarkdown}
+            onOpenFind={handleOpenFind}
+            disabled={isBusy}
           />
-          <SelectionConsultBar
-            selectedText={selectedText}
-            label="選択範囲をチャットで相談"
-            onConsult={handleOpenChat}
-          />
+          <div className="relative flex-1 overflow-hidden">
+            <MonacoEditor
+              value={markdown}
+              onChange={handleEditorChange}
+              onMount={handleEditorMount}
+              onSelectionChange={handleSelectionChange}
+              fontSize={editorFontSize}
+              wordWrap={editorWordWrap}
+            />
+            <SelectionConsultBar
+              selectedText={selectedText}
+              label="選択範囲をチャットで相談"
+              onConsult={handleOpenChat}
+            />
+          </div>
         </main>
 
         {previewOpen && (

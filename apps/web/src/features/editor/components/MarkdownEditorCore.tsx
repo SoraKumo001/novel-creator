@@ -1,6 +1,8 @@
 import type { MarkdownCategoryNode } from "@novel-creator/shared";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/Button.js";
+import { useAnchorMenu } from "@/hooks/useAnchorMenu.js";
 import {
   usePersistedState,
   useSidebarResize,
@@ -234,9 +236,190 @@ export function MarkdownToolbarRow({
   right?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-border border-b bg-surface px-4 py-2">
-      <div className="flex items-center gap-2">{left}</div>
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b bg-surface px-4 py-2.5 sm:px-5">
+      <div className="flex items-center gap-3 sm:gap-4">{left}</div>
       {right && <div className="flex items-center gap-2">{right}</div>}
+    </header>
+  );
+}
+
+export function MarkdownViewDropdown({
+  previewOpen,
+  onTogglePreview,
+  editorFontSize,
+  onEditorFontSize,
+  editorWordWrap,
+  onToggleWordWrap,
+  onOpenHistory,
+  disabled,
+}: {
+  disabled?: boolean;
+  editorFontSize: number;
+  editorWordWrap: "on" | "off";
+  onEditorFontSize: (delta: number) => void;
+  onOpenHistory: () => void;
+  onTogglePreview: () => void;
+  onToggleWordWrap: () => void;
+  previewOpen: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const anchorMenu = useAnchorMenu(open, triggerRef);
+  const canPortal = typeof document !== "undefined";
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        triggerRef.current?.contains(target) ||
+        anchorMenu.menuRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open, anchorMenu.menuRef]);
+
+  return (
+    <div className="relative" ref={triggerRef}>
+      <Button
+        size="sm"
+        variant="secondary"
+        onClick={() => setOpen((prev) => !prev)}
+        disabled={disabled}
+        rightIcon={<span className="text-[10px]">▼</span>}
+      >
+        👁️ 表示
+      </Button>
+
+      {open &&
+        canPortal &&
+        createPortal(
+          <div
+            ref={anchorMenu.menuRef}
+            style={{
+              bottom: anchorMenu.position.bottom,
+              right: anchorMenu.position.right,
+              top: anchorMenu.position.top,
+              visibility: anchorMenu.ready ? undefined : "hidden",
+            }}
+            className="fade-in zoom-in-95 fixed z-50 w-52 animate-in divide-y divide-border/40 rounded-xl border border-border bg-surface py-1.5 shadow-xl duration-100"
+          >
+            <div className="py-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onTogglePreview();
+                }}
+                className="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
+              >
+                <span>👁️</span>
+                <span>
+                  {previewOpen ? "プレビューを閉じる" : "プレビューを表示"}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onOpenHistory();
+                }}
+                className="flex w-full cursor-pointer items-center gap-2 px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
+              >
+                <span>🕒</span>
+                <span>編集履歴・差分比較</span>
+              </button>
+            </div>
+
+            <div className="px-3.5 py-2 text-xs">
+              <div className="mb-1.5 flex items-center justify-between text-muted-foreground">
+                <span>文字サイズ</span>
+                <span className="font-mono text-[11px]">
+                  {editorFontSize}px
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => onEditorFontSize(-1)}
+                  disabled={editorFontSize <= 10}
+                  className="flex-1 rounded border border-border bg-surface px-2 py-1 text-center font-medium text-foreground transition hover:bg-surface-hover disabled:opacity-40"
+                  title="文字サイズを縮小"
+                >
+                  A- 小さく
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onEditorFontSize(1)}
+                  disabled={editorFontSize >= 24}
+                  className="flex-1 rounded border border-border bg-surface px-2 py-1 text-center font-medium text-foreground transition hover:bg-surface-hover disabled:opacity-40"
+                  title="文字サイズを拡大"
+                >
+                  A+ 大きく
+                </button>
+              </div>
+            </div>
+
+            <div className="py-1">
+              <button
+                type="button"
+                onClick={() => {
+                  onToggleWordWrap();
+                }}
+                className="flex w-full cursor-pointer items-center justify-between px-3.5 py-2 text-left text-foreground text-xs transition hover:bg-surface-raised"
+              >
+                <div className="flex items-center gap-2">
+                  <span>↩</span>
+                  <span>行の折り返し</span>
+                </div>
+                <span className="rounded bg-surface-raised px-1.5 py-0.5 font-medium text-[10px] text-muted-foreground">
+                  {editorWordWrap === "on" ? "ON" : "OFF"}
+                </span>
+              </button>
+            </div>
+          </div>,
+          document.body
+        )}
+    </div>
+  );
+}
+
+export function MarkdownFormatBar({
+  onInsert,
+  onOpenFind,
+  disabled,
+}: {
+  disabled?: boolean;
+  onInsert: (kind: MarkdownInsertKind) => void;
+  onOpenFind: () => void;
+}) {
+  return (
+    <div
+      className="flex shrink-0 items-center justify-between border-border border-b bg-surface-raised/40 px-4 py-1"
+      role="toolbar"
+      aria-label="書式・検索ツールバー"
+    >
+      <div className="flex items-center gap-1">
+        <MarkdownInsertButtons onInsert={onInsert} disabled={disabled} />
+      </div>
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={onOpenFind}
+          disabled={disabled}
+          title="エディタ内を検索・置換 (Ctrl+F)"
+          className="flex items-center gap-1 rounded border border-border bg-surface px-2 py-1 text-muted-foreground text-xs transition hover:bg-surface-hover hover:text-foreground disabled:opacity-50"
+        >
+          <span>🔍</span>
+          <span>検索</span>
+        </button>
+      </div>
     </div>
   );
 }

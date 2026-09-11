@@ -65,20 +65,29 @@ describe("EntityMarkdownEditor", () => {
     savingMarkdown: false,
   };
 
-  it("ツールバーボタン（保存、整形、破棄、履歴、チャットで相談）が描画されること", async () => {
+  it("タイトル、保存ステータス、文字数、ツールバーボタン（保存、整形、破棄、チャット相談、表示）が描画されること", async () => {
     render(<EntityMarkdownEditor {...defaultProps} />);
 
-    expect(
-      await screen.findByRole("button", { name: "保存" })
-    ).toBeInTheDocument();
+    expect(await screen.findByText("人物")).toBeInTheDocument();
+    expect(screen.getByText("保存完了")).toBeInTheDocument();
+    expect(screen.getByText(/文字数:/)).toBeInTheDocument();
+
+    expect(screen.getByRole("button", { name: "保存" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /整形/ })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /変更を破棄/ })
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /履歴/ })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /チャットで相談/ })
     ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /表示/ })).toBeInTheDocument();
+
+    // 表示ドロップダウンを開くと履歴ボタンが存在すること
+    const { act, fireEvent } = await import("@testing-library/react");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /表示/ }));
+    });
+    expect(screen.getByRole("button", { name: /履歴/ })).toBeInTheDocument();
   });
 
   it("「チャットで相談」をクリックすると openChat が呼び出されること", async () => {
@@ -150,16 +159,13 @@ describe("EntityMarkdownEditor", () => {
     });
   });
 
-  it("Monaco最小設定（検索・文字サイズ・折返し）ボタンが描画され、文字サイズ変更が永続化されること", async () => {
+  it("Monaco最小設定（検索・文字サイズ・折返し）が動作し、文字サイズ変更が永続化されること", async () => {
     localStorage.clear();
     render(<EntityMarkdownEditor {...defaultProps} />);
 
     expect(
       await screen.findByRole("button", { name: /検索/ })
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "A-" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "A+" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /折返し/ })).toBeInTheDocument();
 
     const { act, fireEvent } = await import("@testing-library/react");
     // エディタ未マウントでも検索ボタンは no-op で落ちないこと
@@ -167,20 +173,31 @@ describe("EntityMarkdownEditor", () => {
       fireEvent.click(screen.getByRole("button", { name: /検索/ }));
     });
 
-    // A+ で 16 に永続化されること
+    // 「表示」ドロップダウンを開く
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: "A+" }));
+      fireEvent.click(screen.getByRole("button", { name: /表示/ }));
+    });
+
+    expect(screen.getByRole("button", { name: /小さく/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /大きく/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /折り返し/ })
+    ).toBeInTheDocument();
+
+    // A+ (大きく) で 16 に永続化されること
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /大きく/ }));
     });
     expect(localStorage.getItem("test-key:monaco-font-size")).toBe("16");
 
     // 折返しトグルで off が永続化されること
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /折返し/ }));
+      fireEvent.click(screen.getByRole("button", { name: /折り返し/ }));
     });
     expect(localStorage.getItem("test-key:monaco-word-wrap")).toBe("off");
   });
 
-  it("プレビュードックは既定で閉じており、開くと横プレビューが表示されること", async () => {
+  it("プレビュードックは既定で閉じており、表示メニューから開くと横プレビューが表示されること", async () => {
     localStorage.clear();
     render(<EntityMarkdownEditor {...defaultProps} />);
     await screen.findByTestId("monaco-editor");
@@ -190,8 +207,12 @@ describe("EntityMarkdownEditor", () => {
     ).not.toBeInTheDocument();
 
     const { act, fireEvent } = await import("@testing-library/react");
+    // 表示メニューを開いてプレビューを表示
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /プレビュー/ }));
+      fireEvent.click(screen.getByRole("button", { name: /表示/ }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /プレビューを表示/ }));
     });
 
     const dock = await screen.findByRole("complementary", {
@@ -214,9 +235,14 @@ describe("EntityMarkdownEditor", () => {
     await screen.findByTestId("monaco-editor");
 
     const { act, fireEvent } = await import("@testing-library/react");
+    // 表示メニューを開いてプレビューを表示
     await act(async () => {
-      fireEvent.click(screen.getByRole("button", { name: /プレビュー/ }));
+      fireEvent.click(screen.getByRole("button", { name: /表示/ }));
     });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /プレビューを表示/ }));
+    });
+
     const dock = await screen.findByRole("complementary", {
       name: "プレビュー",
     });
