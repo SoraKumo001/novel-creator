@@ -1,1 +1,0 @@
-ALTER TABLE "foreshadowings" ADD COLUMN "category" text DEFAULT '未分類' NOT NULL;

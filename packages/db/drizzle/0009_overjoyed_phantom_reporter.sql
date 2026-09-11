@@ -1,1 +1,0 @@
-ALTER TABLE "novels" ADD COLUMN "style_guide" text;
