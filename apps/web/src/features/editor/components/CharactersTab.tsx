@@ -1,4 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { Button } from "@/components/Button.js";
+import { CharacterGraphModal } from "@/components/CharacterGraphModal.js";
 import { MarkdownText } from "@/components/MarkdownText.js";
 import { Tag } from "@/components/Tag.js";
 import { EntityListTab } from "@/features/editor/components/EntityListTab.js";
@@ -25,63 +28,81 @@ export function CharactersTab({
     savingMarkdown,
   } = useCharacters(novel.id);
   const navigate = useNavigate();
+  const [isGraphOpen, setIsGraphOpen] = useState(false);
 
   return (
-    <EntityListTab<Character>
-      novelId={novel.id}
-      onRefresh={onRefresh}
-      entities={characters}
-      loading={loading}
-      deleting={deleting}
-      onDelete={deleteCharacter}
-      config={{
-        title: "人物一覧",
-        newLabel: "新規作成",
-        sidebarLabel: "目次 (カテゴリ / 人物)",
-        sidebarEmpty: "人物が見つかりません",
-        loadingMessage: "人物を読み込み中...",
-        emptyTitle: "人物が登録されていません",
-        emptyDescription: "主人公や脇役を登録して、物語を豊かにしましょう。",
-        idPrefix: "char",
-        cardHeight: "h-64",
-        categoryOf: (c) => c.category || "未分類",
-        onNew: () =>
-          navigate({
-            to: "/novels/$novelId/characters/new",
-            params: { novelId: novel.id },
-          }),
-        onEdit: (character) =>
-          navigate({
-            to: "/novels/$novelId/characters/$characterId",
-            params: { novelId: novel.id, characterId: character.id },
-          }),
-        renderCardBody: (character) => (
-          <MarkdownText
-            content={character.description || "説明なし"}
-            className="text-sm"
-          />
-        ),
-        renderCardFooter: (character) =>
-          character.traits && character.traits.length > 0 ? (
-            character.traits.map((t) => <Tag key={t}>{t}</Tag>)
-          ) : (
-            <span className="text-[11px] text-muted-foreground italic">
-              特徴なし
-            </span>
+    <>
+      <EntityListTab<Character>
+        novelId={novel.id}
+        onRefresh={onRefresh}
+        entities={characters}
+        loading={loading}
+        deleting={deleting}
+        onDelete={deleteCharacter}
+        extraHeaderActions={
+          <Button
+            variant="secondary"
+            onClick={() => setIsGraphOpen(true)}
+            leftIcon={<span>📊</span>}
+            className="shrink-0 whitespace-nowrap"
+          >
+            人物相関図
+          </Button>
+        }
+        config={{
+          title: "人物一覧",
+          newLabel: "新規作成",
+          sidebarLabel: "目次 (カテゴリ / 人物)",
+          sidebarEmpty: "人物が見つかりません",
+          loadingMessage: "人物を読み込み中...",
+          emptyTitle: "人物が登録されていません",
+          emptyDescription: "主人公や脇役を登録して、物語を豊かにしましょう。",
+          idPrefix: "char",
+          cardHeight: "h-64",
+          categoryOf: (c) => c.category || "未分類",
+          onNew: () =>
+            navigate({
+              to: "/novels/$novelId/characters/new",
+              params: { novelId: novel.id },
+            }),
+          onEdit: (character) =>
+            navigate({
+              to: "/novels/$novelId/characters/$characterId",
+              params: { novelId: novel.id, characterId: character.id },
+            }),
+          renderCardBody: (character) => (
+            <MarkdownText
+              content={character.description || "説明なし"}
+              className="text-sm"
+            />
           ),
-        renderMarkdownEditor: (novelId) => (
-          <PresetEntityMarkdownEditor
-            preset="characters"
-            novelId={novelId}
-            fetchMarkdown={fetchCharactersMarkdown}
-            saveMarkdown={saveCharactersMarkdown}
-            savingMarkdown={savingMarkdown}
-          />
-        ),
-        deleteTitle: "人物を削除しますか？",
-        deleteMessage: "この操作は元に戻せません。",
-        deleteConfirmLabel: "削除",
-      }}
-    />
+          renderCardFooter: (character) =>
+            character.traits && character.traits.length > 0 ? (
+              character.traits.map((t) => <Tag key={t}>{t}</Tag>)
+            ) : (
+              <span className="text-[11px] text-muted-foreground italic">
+                特徴なし
+              </span>
+            ),
+          renderMarkdownEditor: (novelId) => (
+            <PresetEntityMarkdownEditor
+              preset="characters"
+              novelId={novelId}
+              fetchMarkdown={fetchCharactersMarkdown}
+              saveMarkdown={saveCharactersMarkdown}
+              savingMarkdown={savingMarkdown}
+            />
+          ),
+          deleteTitle: "人物を削除しますか？",
+          deleteMessage: "この操作は元に戻せません。",
+          deleteConfirmLabel: "削除",
+        }}
+      />
+      <CharacterGraphModal
+        isOpen={isGraphOpen}
+        onClose={() => setIsGraphOpen(false)}
+        characters={characters}
+      />
+    </>
   );
 }

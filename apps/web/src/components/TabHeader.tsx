@@ -25,13 +25,13 @@ export function TabHeader({
 }: TabHeaderProps) {
   return (
     <div
-      className={`flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b pb-3 ${className}`}
+      className={`flex shrink-0 flex-wrap items-center justify-between gap-3 border-border border-b pt-1 pb-3 ${className}`}
     >
       <div className="flex items-center gap-3">
         <h2 className="font-bold text-foreground text-xl">{title}</h2>
         {leftExtra}
       </div>
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <div className="flex flex-wrap items-center gap-2 py-1 sm:gap-3">
         {rightControls}
         {children}
         {viewModeSwitch}

@@ -63,6 +63,7 @@ export function EntityListTab<
   deleting,
   onDelete,
   config,
+  extraHeaderActions,
 }: {
   novelId: string;
   onRefresh: () => Promise<void>;
@@ -71,6 +72,7 @@ export function EntityListTab<
   deleting: boolean;
   onDelete: (id: string) => Promise<void>;
   config: EntityListTabConfig<T>;
+  extraHeaderActions?: ReactNode;
 }) {
   const [viewMode, setViewMode] = useState<"cards" | "markdown">("cards");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -146,8 +148,8 @@ export function EntityListTab<
         rightControls={
           viewMode === "cards" && (
             <>
-              <div className="flex shrink-0 items-center gap-1.5 text-muted-foreground text-xs">
-                <span>並び順:</span>
+              <div className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-muted-foreground text-xs">
+                <span className="shrink-0 whitespace-nowrap">並び順:</span>
                 <Select
                   aria-label="並び順"
                   value={sortOption}
@@ -172,6 +174,7 @@ export function EntityListTab<
                   <option value="name-desc">名前降順 (ん→あ)</option>
                 </Select>
               </div>
+              {extraHeaderActions}
               <Button
                 onClick={config.onNew}
                 leftIcon={<PlusIcon />}

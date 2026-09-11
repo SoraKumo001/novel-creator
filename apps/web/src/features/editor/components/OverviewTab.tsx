@@ -44,6 +44,7 @@ export function OverviewTab({
   const infoEditModal = useModalState();
   const deleteConfirmModal = useModalState();
   const heatmapModal = useModalState();
+  const characterGraphModal = useModalState();
 
   const { styleGuideModal, handleSaveStyleGuide } = useStyleGuideModal({
     novelId: novel.id,
@@ -138,6 +139,7 @@ export function OverviewTab({
         infoEdit: infoEditModal,
         deleteConfirm: deleteConfirmModal,
         heatmap: heatmapModal,
+        characterGraph: characterGraphModal,
         styleGuide: styleGuideModal,
         arc: arcModal,
         arcHistory: {

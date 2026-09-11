@@ -1,6 +1,7 @@
 import { ActionCardButton } from "@/components/ActionCardButton.js";
 import { Button } from "@/components/Button.js";
 import { Card, CardHeader } from "@/components/Card.js";
+import { CharacterGraphModal } from "@/components/CharacterGraphModal.js";
 import { CharacterHeatmapModal } from "@/components/CharacterHeatmapModal.js";
 import { CharacterVoiceCheckerModal } from "@/components/CharacterVoiceCheckerModal.js";
 import { ConfirmDialog } from "@/components/ConfirmDialog.js";
@@ -33,6 +34,7 @@ export interface OverviewModalBundle {
     error: string | null;
   };
   arcHistory: { isHistoryView: boolean; viewedAt: string | null; key: number };
+  characterGraph: { isOpen: boolean; open: () => void; close: () => void };
   deleteConfirm: { isOpen: boolean; open: () => void; close: () => void };
   heatmap: { isOpen: boolean; open: () => void; close: () => void };
   infoEdit: { isOpen: boolean; open: () => void; close: () => void };
@@ -108,7 +110,21 @@ export function OverviewView(props: OverviewViewProps) {
           label="章数 / 節数"
           value={`${novel.chapters.length} 章 / ${props.totalSections} 節`}
         />
-        <StatCard label="登場人物" value={`${novel.characters.length} 人`} />
+        <StatCard
+          label="登場人物"
+          value={`${novel.characters.length} 人`}
+          action={
+            novel.characters.length > 0 ? (
+              <button
+                type="button"
+                onClick={modals.characterGraph.open}
+                className="cursor-pointer text-[11px] text-primary hover:underline"
+              >
+                相関図
+              </button>
+            ) : undefined
+          }
+        />
         <StatCard label="世界観設定" value={`${novel.settings.length} 件`} />
         <StatCard
           label="目標文字数"
@@ -358,6 +374,12 @@ export function OverviewView(props: OverviewViewProps) {
         onClose={modals.heatmap.close}
         characters={novel.characters}
         chapters={props.chapters}
+      />
+
+      <CharacterGraphModal
+        isOpen={modals.characterGraph.isOpen}
+        onClose={modals.characterGraph.close}
+        characters={novel.characters}
       />
 
       <StyleGuideModal

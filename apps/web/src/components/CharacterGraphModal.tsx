@@ -20,6 +20,7 @@ export function CharacterGraphModal({
   characters,
 }: CharacterGraphModalProps) {
   const [viewCode, setViewCode] = useState(false);
+  const [zoom, setZoom] = useState(100);
   const containerRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
 
@@ -52,12 +53,16 @@ export function CharacterGraphModal({
     }
   };
 
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 20, 200));
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 20, 40));
+  const handleZoomReset = () => setZoom(100);
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="人物相関図・勢力図 (Mermaid)"
-      size="xl"
+      size="full"
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>
@@ -78,17 +83,53 @@ export function CharacterGraphModal({
       }
     >
       <div className="space-y-3">
-        <p className="text-muted-foreground text-xs">
-          登場人物のカテゴリ（陣営）と、人物詳細に記述された人間関係（例:
-          「田中: 友人」など）から相関図を自動生成しています。
-        </p>
+        <div className="flex flex-col gap-2 text-muted-foreground text-xs sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            登場人物のカテゴリ（陣営）と、人物詳細に記述された人間関係（例:
+            「田中: 友人」など）から相関図を自動生成しています。
+          </p>
+          {!viewCode && (
+            <div className="flex shrink-0 items-center gap-1.5 self-end sm:self-auto">
+              <span className="w-10 text-right font-mono text-[11px]">
+                {zoom}%
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleZoomOut}
+                disabled={zoom <= 40}
+                title="縮小"
+              >
+                −
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleZoomReset}
+                disabled={zoom === 100}
+                title="100%にリセット"
+              >
+                リセット
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleZoomIn}
+                disabled={zoom >= 200}
+                title="拡大"
+              >
+                ＋
+              </Button>
+            </div>
+          )}
+        </div>
 
         {viewCode ? (
           <div className="space-y-2">
             <textarea
               readOnly
               value={mermaidCode}
-              rows={12}
+              rows={16}
               className="w-full select-all rounded-lg border border-border bg-surface-raised p-3 font-mono text-foreground text-xs leading-relaxed focus:outline-none"
             />
           </div>
@@ -96,9 +137,17 @@ export function CharacterGraphModal({
           <div
             ref={containerRef}
             key={mermaidCode}
-            className="flex max-h-[500px] min-h-[320px] items-center justify-center overflow-auto rounded-xl border border-border bg-surface-raised/40 p-4"
+            className="max-h-[72vh] min-h-[400px] overflow-auto rounded-xl border border-border bg-surface-raised/40 p-6"
           >
-            <div className="mermaid w-full text-center">{mermaidCode}</div>
+            <div
+              style={{
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: "top center",
+              }}
+              className="mermaid mx-auto flex w-fit min-w-fit justify-center transition-transform duration-150 [&_svg]:max-w-none"
+            >
+              {mermaidCode}
+            </div>
           </div>
         )}
       </div>
