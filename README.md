@@ -20,7 +20,7 @@
 | 🗄️ **[データモデル & DB設計](./doc/data-model.md)**                   | ERダイアグラム、PostgreSQL (Drizzle ORM) スキーマ、VectorStore設計         |
 | 🧠 **[LLM連携 & RAGアーキテクチャ](./doc/llm-and-rag.md)**            | マルチプロバイダ抽象化、RAG検索、Agentic Tool Calling、プロンプトエンジン  |
 | ✍️ **[機能詳細 & 創作ワークフロー](./doc/features-and-workflows.md)** | 創作フロー、縦書きビューアー、インライン推敲、バリエーション生成、分析機能 |
-| 📡 **[MCPサーバー](./doc/mcp-server.md)**                            | Tools40・Streamable HTTP・Web発行キー認証の MCP サーバー仕様               |
+| 📡 **[MCPサーバー](./doc/mcp-server.md)**                            | Tools55・Resources5・Prompts10・Streamable HTTP・Web発行キー認証の MCP サーバー仕様 |
 
 ## アーキテクチャ
 
@@ -100,16 +100,21 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 | `settings`         | 設定（カテゴリ別：世界観、魔法、地理、文化 等）  |
 | `timelines`        | 時系列情報（イベント、順序、作中時間、節連携）   |
 | `foreshadowings`   | 伏線管理（タイトル、状態、設置節・回収節連携）   |
+| `ideas`            | アイデア帳（プロット着想メモ、ステータス管理、MCP連携） |
+| `analysis_results` | ストーリー分析履歴（感情アーク・口調・ペルソナレビュー結果） |
 | `chat_sessions`    | AI創作相談チャットのセッション・対話履歴         |
 | `llm_instructions` | LLM 指示履歴（再利用・プロンプト管理）           |
 | `edit_histories`   | 編集差分履歴（変更前後のテキスト比較・Undo用）   |
 | `custom_prompts`   | カスタムプロンプトテンプレート（推敲/生成/相談） |
+| `llm_configs`      | LLM プロバイダ・モデル個別設定                   |
+| `embedding_configs`| Embedding プロバイダ・モデル・次元数設定        |
 | `mcp_api_keys`     | Web発行のMCP APIキー（ハッシュ＋暗号文保管・失効/期限管理） |
 
 ## 主な機能
 
 - **執筆・エディタ・プレビュー環境**:
   - Monaco Editor による本格的な執筆環境 & 集中モード（Zen Mode）
+  - **💾 保存状態インジケーター (`SaveStatusBadge`)**: 自動保存および手動保存の状態（保存完了 / 保存中 / 未保存 / エラー）をリアルタイムにエディタツールバーに可視化
   - **📖 文庫本風 縦書きプレビュー (`VerticalPreviewModal`)**: `writing-mode: vertical-rl` による縦書き表示、明朝/ゴシック切替、文字サイズ・行間調整
   - **ルビ・傍点記法サポート**: `|漢字《かんじ》`、`《《傍点》》` の自動パース・レンダリング
   - **✨ インライン AI 推敲・加筆 (`InlineAIAssistant`)**: エディタ上で範囲選択したテキストを「描写を深める」「心理・感情強化」「会話をテンポよく」「簡潔にする」「別の言い回し」「自由指示」、および**登録したカスタムプロンプト**で即座に書き換え・直後挿入
@@ -117,6 +122,7 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
   - **🪄 カスタムプロンプト作成・登録機能 (`CustomPromptModal` / `/settings`)**: `{selectedText}`, `{surroundingText}`, `{characters}`, `{styleGuide}`, `{instruction}` などの変数を組み込んだ独自プロンプトの作成・編集・作品専用/全体共有管理
   - **🎯 執筆目標 & 進捗トラッキング**: 節単位および作品全体の目標文字数（例: 100,000字）管理、読了目安時間（約400文字/分）算出、達成度プログレスバー
   - 日本語文字数・英語単語数を正確に判別するリアルタイム文字カウント
+  - **📝 節メタ情報直接編集**: 執筆エディタ上から章・節のタイトルやあらすじを直接確認・編集
 - **設定・登場人物の管理 & 整合性支援**:
   - カード一覧表示 ⇄ Markdown 一括編集モードのシームレス切り替え
   - 人物・設定の個別作成・詳細編集ページ（AI による下書き自動生成対応）
@@ -137,24 +143,24 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 - **AI 創作相談チャット（Creative Chat & Agentic Tool Calling）**:
   - AI SDK UI Message Stream によるリアルタイムストリーミング対話
   - **自律的ツール呼び出し (Tool Calling)**: 小説情報、登場人物、設定、章節プロット、節本文、伏線、時系列、セマンティック検索（RAG）の8種類の参照ツールを LLM が自律的に取得して回答
-- **伏線 & 時系列 & 履歴管理**:
+- **伏線 & 時系列 & アイデア & 履歴管理**:
+  - **💡 アイデア帳・ストーリー発想メモ (`ideas`)**: 創作の断片やブレスト案の保存、ステータス管理（`draft` / `adopted` / `rejected`）、MCPプロンプト連携
   - 伏線の設置・回収・破棄のステータス管理と節の紐付け
   - 作中時間ベースのタイムライン・イベント管理（新規作成・更新・削除）
   - 過去のプロンプト実行履歴一覧（`PromptHistoryList`）
   - AI 編集差分履歴の視覚的比較モーダル（`HistoryDiffModal`）
 - **LLM 生成 & 支援機能**:
-
   - プロット生成（RAG で既存設定・人物をコンテキストに自動反映）
   - 章・節の概要自動生成
-  - 本文ストリーミング生成
+  - **本文ストリーミング生成**: 前節の文脈、当該章のタイトル・概要、節概要、関連設定・人物を統合して執筆
   - 本文校正モーダル（`ProofreadModal`: 誤字脱字、視点ブレ、表現の重複、表記揺れの指摘と推敲案）
   - 整合性更新（本文から時系列・設定情報を自動抽出）
-
 - **バックアップ & リストア & エクスポート**:
   - 小説全データ・チャット履歴の JSON エクスポート / インポート
   - 小説テキスト（.txt / .md）の整形出力（文字数統計・目次付き）
 - **📡 MCP サーバー（外部エージェント連携）**:
-  - Streamable HTTP（`POST /api/mcp`）のみで Tools40・Resources5・Prompts3 を公開
+  - Streamable HTTP（`POST /api/mcp`）のみで Tools 55・Resources 5・Prompts 10 を公開
+  - 節本文・伏線・年表のバッチ処理ツール、アイデア発想・評価プロンプト（`brainstorm_plot`, `twist_ideas`, `evaluate_ideas` 等）を完備
   - 認証は Web 発行キーのみ。管理者が設定画面の「MCP APIキー」タブで発行・失効
   - Claude Code 等の外部エージェントから執筆・整合性レビューを委譲可能。詳細は [MCPサーバー](./doc/mcp-server.md) を参照
 - **モダンな UI / UX**:
@@ -199,6 +205,7 @@ http://localhost:5173 にアクセス。
 | `pnpm db:push`        | DB スキーマ反映（使い捨て試作専用。migrate 済み DB には実行禁止） |
 | `pnpm db:generate`    | マイグレーション生成                                  |
 | `pnpm db:migrate`     | マイグレーションスクリプト実行                        |
+| `pnpm db:reset`       | スキーマ再作成（search_path 内のスキーマを DROP & 再作成して初期化） |
 | `pnpm db:studio`      | Drizzle Studio 起動                                   |
 
 ### 開発・UI確認

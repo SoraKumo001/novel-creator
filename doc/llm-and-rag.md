@@ -33,6 +33,10 @@ EMBEDDING_DIMENSIONS = 768 / 1536 / 3072
 
 ネットワークエラー、HTTP 429 (Rate Limit)、HTTP 500 系エラーに対して、**指数バックオフ付き自動リトライ (`withRetry`)** を備えています。また、LLM が Markdown コードブロック（`json ... `）を付与して返した場合でも、`generateJSON<T>` 内で自動トリム・パースする堅牢な実装となっています。
 
+### 1.4 OpenCode / 外部プロキシ互換ルーティング
+
+OpenCode や Console Go 等の OpenAI 互換プロキシエンドポイント（`isOpenCodeRoutedEndpoint`）への接続時、リクエストごとに `x-opencode-session` ヘッダーを自動付与するセッションハンドリングに対応しています。チャット、本文生成、推敲、分析操作などにおいて、同一セッション内の一貫したルーティングとコンテキスト管理を実現します。
+
 ---
 
 ## 2. RAG (検索拡張生成) パイプライン
@@ -145,7 +149,7 @@ export async function upsertEntityEmbedding(
 | **`plotGenerationPrompt`**                                    | タイトル、説明、RAGコンテキスト（設定・人物）からプロット全体の起承転結を生成  | Markdown 形式のプロット構想案         |
 | **`chapterSummaryPrompt`**                                    | 小説全体のプロットから、各章（第1章〜最終章）のタイトルと概要一覧を生成        | JSON 配列 (`[{ title, summary }]`)    |
 | **`sectionSummaryPrompt`**                                    | 特定の章の概要から、章を構成する節（シーン）のタイトルと詳細概要を生成         | JSON 配列 (`[{ title, summary }]`)    |
-| **`contentGenerationPrompt`**                                 | 前節の末尾本文、当該節の概要、関連設定・人物テキストを注入して本文を生成       | ストリーミング小説本文                |
+| **`contentGenerationPrompt`**                                 | 当該章のタイトル・概要、前節の末尾本文、当該節の概要、関連設定・人物テキスト、文体ガイドを注入して本文を生成 | ストリーミング小説本文                |
 | **`proofreadPrompt`**                                         | 執筆済み本文の誤字脱字、表現の重複、表記揺れ、地の文と台詞のバランスを校正     | 校正指摘・推敲後全文案・スコア        |
 | **`inlineAssistPrompt`**                                      | 選択範囲に対するピンポイント加筆・心理強化・会話改善・簡潔化・言い回し提案     | ストリーミング推敲本文テキスト        |
 | **`checkCharacterVoicePrompt`**                               | 人物設定（一人称・二人称・口調・性格）と本文を照合しキャラ崩壊・口調ブレを検出 | JSON 形式の指摘・理由・改善セリフ案   |

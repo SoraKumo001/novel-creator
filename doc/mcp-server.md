@@ -76,7 +76,7 @@ curl -X POST http://localhost:3000/api/mcp \
 | `novel-settings` | `novel://{novelId}/settings` |
 | `section-content` | `novel://{novelId}/section/{sectionId}` |
 
-## Prompts（3）
+## Prompts（10）
 
 実装: `apps/api/src/mcp/prompts.ts`。
 
