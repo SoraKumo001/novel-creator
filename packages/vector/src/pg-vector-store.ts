@@ -52,7 +52,17 @@ export function createPgVectorStore(
   connectionString: string,
   dimensions = DEFAULT_VECTOR_DIMENSIONS
 ): VectorStore {
-  const pool = new Pool({ connectionString });
+  let searchPath = "public";
+  try {
+    const url = new URL(connectionString);
+    searchPath = url.searchParams.get("schema") ?? "public";
+  } catch {
+    // connectionString が URL 形式でない場合はデフォルト "public"
+  }
+  const pool = new Pool({
+    connectionString,
+    options: `-c search_path=${searchPath},public`,
+  });
   const db = drizzle(pool, { schema: { vectorEmbeddings } });
 
   let schemaReady: Promise<void> | null = null;
@@ -98,12 +108,13 @@ export function createPgVectorStore(
    */
   async function validateExistingTableDimension(): Promise<void> {
     // pgvector の vector(n) は pg_attribute.atttypmod に次元 n を格納する。
-    // to_regclass はテーブルが存在しない場合に NULL を返すため、新規作成時は安全にスキップできる。
+    // to_regclass(current_schema() || '.vector_embeddings') で現在のターゲットスキーマ内のテーブルのみを対象とする。
+    // テーブルが存在しない場合は NULL を返すため、新規作成時は安全にスキップできる。
     const result = await db.execute(
       sql.raw(`
         SELECT a.atttypmod AS dimensions
         FROM pg_attribute a
-        WHERE a.attrelid = to_regclass('vector_embeddings')
+        WHERE a.attrelid = to_regclass(current_schema() || '.vector_embeddings')
           AND a.attname = 'embedding'
           AND a.attnum > 0
           AND NOT a.attisdropped

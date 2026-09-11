@@ -13,6 +13,7 @@
     "db:generate": "pnpm --filter @novel-creator/db db:generate",
     "db:migrate": "pnpm --filter @novel-creator/db db:migrate",
     "db:push": "pnpm --filter @novel-creator/db db:push",
+    "db:reset": "pnpm --filter @novel-creator/db db:reset",
     "db:setup": "docker compose up -d && pnpm --filter @novel-creator/db db:migrate",
     "db:setup:fresh": "docker compose up -d && pnpm --filter @novel-creator/db db:push",
     "db:studio": "pnpm --filter @novel-creator/db db:studio",

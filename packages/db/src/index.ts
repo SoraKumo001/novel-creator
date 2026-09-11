@@ -30,11 +30,28 @@ export type Database =
   | NeonDatabase<typeof schema>;
 
 /**
+ * 接続文字列からスキーマ名を取得する（デフォルト: "public"）。
+ */
+export function getSearchPath(connectionString: string): string {
+  try {
+    const url = new URL(connectionString);
+    return url.searchParams.get("schema") ?? "public";
+  } catch {
+    return "public";
+  }
+}
+
+/**
  * Node.js 環境向けに PostgreSQL へ接続する。
  * pg.Pool を使用するため、Node.js でのみ動作する。
+ * 接続文字列に ?schema=xxx が指定されている場合は search_path を自動設定する。
  */
 export function createDb(connectionString: string): Database {
-  const pool = new Pool({ connectionString });
+  const searchPath = getSearchPath(connectionString);
+  const pool = new Pool({
+    connectionString,
+    options: `-c search_path=${searchPath},public`,
+  });
   return nodeDrizzle(pool, { schema });
 }
 
