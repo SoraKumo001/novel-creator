@@ -82,3 +82,8 @@ export {
   renderPromptTemplate,
   type TemplateVariables,
 } from "./templateEngine.js";
+export {
+  createWorkersAIEmbeddingModel,
+  DEFAULT_WORKERS_AI_EMBEDDING_MODEL,
+  type WorkersAiBinding,
+} from "./workers-ai.js";

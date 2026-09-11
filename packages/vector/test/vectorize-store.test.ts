@@ -62,7 +62,7 @@ const NOVEL_B = "22222222-2222-4222-8222-222222222222";
 
 describe("VectorizeStore", () => {
   it("clearAll は topK 上限を超える件数でも全件削除できること", async () => {
-    const seed = Array.from({ length: 2500 }, (_, i) =>
+    const seed = Array.from({ length: 250 }, (_, i) =>
       makeVector(`v${i}`, { novelId: NOVEL_A, entityType: "content" })
     );
     const { binding, deleteCalls, queryCalls, vectors } =
@@ -72,12 +72,12 @@ describe("VectorizeStore", () => {
     await store.clearAll();
 
     expect(vectors.size).toBe(0);
-    // 2500 件 = 1000 + 1000 + 500 の削除バッチと、最終の空スキャンで 4 回クエリされる
+    // 250 件 = 100 + 100 + 50 の削除バッチと、最終の空スキャンで 4 回クエリされる
     expect(queryCalls.length).toBe(4);
     expect(deleteCalls.length).toBe(3);
-    expect(deleteCalls[0]).toHaveLength(1000);
-    expect(deleteCalls[1]).toHaveLength(1000);
-    expect(deleteCalls[2]).toHaveLength(500);
+    expect(deleteCalls[0]).toHaveLength(100);
+    expect(deleteCalls[1]).toHaveLength(100);
+    expect(deleteCalls[2]).toHaveLength(50);
   });
 
   it("clearAll は空のインデックスでは 1 回だけクエリして終了すること", async () => {
@@ -93,7 +93,7 @@ describe("VectorizeStore", () => {
 
   it("deleteByEntity は topK 上限を超える件数でも全件削除できること", async () => {
     const seed = [
-      ...Array.from({ length: 2500 }, (_, i) =>
+      ...Array.from({ length: 250 }, (_, i) =>
         makeVector(`v${i}`, { entityId: "e1", entityType: "character" })
       ),
       makeVector("other-1", { entityId: "e2", entityType: "character" }),
@@ -116,7 +116,7 @@ describe("VectorizeStore", () => {
 
   it("deleteByNovel は topK 上限を超える件数でも全件削除できること", async () => {
     const seed = [
-      ...Array.from({ length: 2500 }, (_, i) =>
+      ...Array.from({ length: 250 }, (_, i) =>
         makeVector(`v${i}`, { novelId: NOVEL_A })
       ),
       makeVector("other-1", { novelId: NOVEL_B }),

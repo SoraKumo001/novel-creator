@@ -15,11 +15,22 @@
       "localConnectionString": "postgres://novel:novel@localhost:5433/novel"
     }
   ],
+  "ai": {
+    "binding": "AI"
+  },
+  "vectorize": [
+    {
+      "binding": "VECTORIZE_INDEX",
+      "index_name": "novel-creator-embeddings"
+    }
+  ],
   "vars": {
     "LLM_PROVIDER": "openai",
     "LLM_MODEL": "gpt-4o-mini",
-    "EMBEDDING_MODEL": "text-embedding-3-small",
-    "VECTOR_STORE_PROVIDER": "pgvector"
+    "EMBEDDING_PROVIDER": "workers-ai",
+    "EMBEDDING_MODEL": "@cf/baai/bge-m3",
+    "EMBEDDING_DIMENSIONS": "1024",
+    "VECTOR_STORE_PROVIDER": "vectorize"
     // NOTE: MASTER_SECRET は secrets 運用 (`wrangler secret put MASTER_SECRET`)。
   }
 }

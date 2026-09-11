@@ -283,17 +283,17 @@ npx wrangler hyperdrive create novel-db --connection-string="postgresql://postgr
 ]
 ```
 
-#### 3. （任意）Vectorize インデックスの作成
+#### 3. Vectorize インデックスの作成
 
-※ `VECTOR_STORE_PROVIDER=pgvector` を使用する場合はこの手順はスキップ可能です。
-Cloudflare Vectorize を使用する場合は以下を実行します：
+Workers 環境ではデフォルトで **Cloudflare Vectorize** と **Workers AI（`@cf/baai/bge-m3`, 1024次元）** を使用するように構成されています。以下のコマンドで 1024 次元の Vectorize インデックスを作成します：
 
 ```bash
-# 例: 768 次元のコサイン類似度インデックスを作成
-npx wrangler vectorize create novel-creator --dimensions 768 --metric cosine
+npx wrangler vectorize create novel-creator-embeddings --dimensions 1024 --metric cosine
 ```
 
-その後、`apps/api/wrangler.jsonc` で `VECTOR_STORE_PROVIDER` を `"vectorize"` に設定し、`vectorize` バインディングを追加します。
+※ `apps/api/wrangler.jsonc` にはあらかじめ `"vectorize": [{ "binding": "VECTORIZE_INDEX", "index_name": "novel-creator-embeddings" }]` が設定されています。
+※ 外部 PostgreSQL の `pgvector` を Workers でも継続して使用したい場合は、`wrangler.jsonc` の `VECTOR_STORE_PROVIDER` を `"pgvector"` に変更してください。
+
 
 #### 4. シークレット（環境変数）の設定
 
@@ -347,16 +347,15 @@ pnpm deploy
 | API ランタイム | Node.js（@hono/node-server） | Workers（wrangler）              |
 | Web 配信       | Vite dev サーバー            | Workers Static Assets            |
 | LLM            | 同左（AI SDK で抽象化）      | 同左                             |
+| Embedding      | OpenAI (text-embedding-3-small / 1536次元) | Workers AI (@cf/baai/bge-m3 / 1024次元) |
 
-`VECTOR_STORE_PROVIDER` を `pgvector` → `vectorize` に変更するだけで VectorStore 実装が切り替わる。
-DB 接続は `createDb`（Node.js） / `createDbForHyperdrive`（Workers）で自動選択。
 `VECTOR_STORE_PROVIDER` を `pgvector` → `vectorize` に変更するだけで VectorStore 実装が切り替わります。
 DB 接続は `createDb`（Node.js） / `createDbForHyperdrive`（Workers）で自動選択されます。
 
 ## LLM と Embedding のプロバイダ分離
 
 LLM（テキスト生成）と Embedding（ベクトル生成）で別のプロバイダ・モデルを指定可能。
-対応プロバイダ: `openai` / `anthropic` / `ollama` / `google`
+対応プロバイダ: `openai` / `anthropic` / `ollama` / `google` / `custom_openai` / `workers-ai`（Workers環境）
 
 ```bash
 # 例: LLM は OllamaCloud、Embedding は Google を使用

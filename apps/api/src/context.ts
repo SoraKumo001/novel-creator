@@ -3,7 +3,12 @@ import {
   createDbForHyperdrive,
   type Database,
 } from "@novel-creator/db";
-import { createEmbeddingProvider, createLLMProvider } from "@novel-creator/llm";
+import {
+  createEmbeddingProvider,
+  createLLMProvider,
+  createWorkersAIEmbeddingModel,
+  type WorkersAiBinding,
+} from "@novel-creator/llm";
 import type { Env } from "@novel-creator/shared";
 import {
   createVectorStore,
@@ -73,11 +78,18 @@ export function createContext(env: Env): AppContext["Variables"] {
  */
 export function createContextForWorkers(
   env: Env,
-  bindings: { hyperdrive: Hyperdrive; vectorize?: VectorizeBinding }
+  bindings: {
+    hyperdrive: Hyperdrive;
+    vectorize?: VectorizeBinding;
+    ai?: WorkersAiBinding;
+  }
 ): AppContext["Variables"] {
   const db = createDbForHyperdrive(bindings.hyperdrive);
   const llm = createLLMProvider(env);
-  const embedding = createEmbeddingProvider(env);
+  const embedding =
+    env.EMBEDDING_PROVIDER === "workers-ai" && bindings.ai
+      ? createWorkersAIEmbeddingModel(bindings.ai, env.EMBEDDING_MODEL)
+      : createEmbeddingProvider(env);
   const vectorStore = createVectorStore(env, {
     vectorizeBinding: bindings.vectorize,
   });

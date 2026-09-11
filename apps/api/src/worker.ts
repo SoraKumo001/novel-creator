@@ -1,3 +1,4 @@
+import type { WorkersAiBinding } from "@novel-creator/llm";
 import { parseEnvFromBindings } from "@novel-creator/shared/env";
 
 import type { VectorizeBinding } from "@novel-creator/vector";
@@ -13,6 +14,7 @@ import { createContextForWorkers } from "./context.js";
  * は parseEnvFromBindings 内で除外される。
  */
 export type WorkerEnv = {
+  AI?: WorkersAiBinding;
   ASSETS?: Fetcher;
   HYPERDRIVE?: { connectionString: string };
   VECTORIZE_INDEX?: VectorizeBinding;
@@ -28,6 +30,7 @@ export type WorkerEnv = {
   EMBEDDING_API_KEY?: string;
   EMBEDDING_MODEL?: string;
   EMBEDDING_BASE_URL?: string;
+  EMBEDDING_DIMENSIONS?: string | number;
   VECTOR_STORE_PROVIDER?: string;
 };
 
@@ -50,6 +53,7 @@ export default {
     };
 
     const context = createContextForWorkers(parsedEnv, {
+      ai: env.AI,
       hyperdrive,
       vectorize: env.VECTORIZE_INDEX,
     });

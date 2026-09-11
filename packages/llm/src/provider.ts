@@ -173,6 +173,10 @@ export function createLanguageModel(
       instance = openai.chat(model);
       break;
     }
+    case "workers-ai":
+      throw new Error(
+        "Workers AI LLM provider is only supported via Cloudflare Workers AI binding"
+      );
     default: {
       const exhaustive: never = provider;
       throw new Error(`Unsupported LLM provider: ${String(exhaustive)}`);
@@ -220,6 +224,10 @@ export function createEmbeddingModel(
     case "custom_openai":
       instance = createOpenAI(settings).embedding(model);
       break;
+    case "workers-ai":
+      throw new Error(
+        "Workers AI embedding provider requires the Cloudflare Workers AI binding. Use createWorkersAIEmbeddingModel instead."
+      );
     default: {
       const exhaustive: never = provider;
       throw new Error(`Unsupported embedding provider: ${String(exhaustive)}`);

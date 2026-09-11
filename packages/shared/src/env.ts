@@ -75,6 +75,8 @@ export function parseEnvFromBindings(bindings: Record<string, unknown>): Env {
   for (const [key, value] of Object.entries(bindings)) {
     if (typeof value === "string" || value === undefined) {
       source[key] = value;
+    } else if (typeof value === "number" || typeof value === "boolean") {
+      source[key] = String(value);
     }
   }
 

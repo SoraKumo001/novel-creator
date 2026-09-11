@@ -43,8 +43,8 @@ export interface VectorizeBinding {
   upsert(vectors: VectorizeVectorInput[]): Promise<unknown>;
 }
 
-/** 1 回の query で取得できる最大件数（Vectorize の topK 上限）。 */
-const SCAN_BATCH_SIZE = 1000;
+/** 1 回の query で取得できる最大件数（Vectorize の topK 上限: 100）。 */
+const SCAN_BATCH_SIZE = 100;
 
 /**
  * Cloudflare Vectorize 向けの実装（移行用）。

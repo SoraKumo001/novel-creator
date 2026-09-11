@@ -13,5 +13,6 @@ export const llmProviders = [
   "google",
   "ollama",
   "custom_openai",
+  "workers-ai",
 ] as const;
 export type LLMProviderType = (typeof llmProviders)[number];
