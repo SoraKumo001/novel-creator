@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 本文から設定情報を抽出・更新するプロンプト。JSON 配列を返すよう指示する。
  */
@@ -32,4 +35,9 @@ ${existing}
     "description": "設定の説明"
   }
 ]`;
+  const template = getPromptTemplate("extractSettings");
+  return renderPromptTemplate(template.body, {
+    content,
+    existingSettings: existing,
+  });
 }

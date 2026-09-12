@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 人物情報を LLM で編集するプロンプト。
  */
@@ -43,4 +46,12 @@ ${instruction}
   "description": "人物の説明（マークダウン形式）",
   "traits": ["性格・特徴1", "性格・特徴2"]
 }`;
+  const template = getPromptTemplate("editCharacter");
+  return renderPromptTemplate(template.body, {
+    category,
+    description,
+    instruction,
+    name: character.name,
+    traits,
+  });
 }

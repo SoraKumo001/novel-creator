@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 小説情報（タイトル・あらすじ・登場人物・設定）から
  * 執筆スタイル・文体ガイドラインのドラフトを自動生成するプロンプト。
@@ -41,4 +44,11 @@ ${settings}
 4. **NG・禁止事項**: 視点ブレ防止や、世界観にそぐわない言葉遣いの禁止などを具体的に記述してください。
 5. **シーン別・演出方針**: バトル、心理描写、コメディ掛け合いなど、この作品ならではの演出ポイントがあれば追加してください。
 6. **Markdown形式のみを出力**: 見出し（#、##）や箇条書き（-）を用いて構造化し、解説や前置き等の不要なテキストは含めず、ガイドラインのMarkdownテキストのみを出力してください。`;
+  const template = getPromptTemplate("generateStyleGuideDraft");
+  return renderPromptTemplate(template.body, {
+    characters,
+    description: context.description || "（未設定）",
+    novelTitle: context.novelTitle,
+    settings,
+  });
 }

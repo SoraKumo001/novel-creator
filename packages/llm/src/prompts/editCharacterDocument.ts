@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 人物マークダウン文書全体を LLM で編集するプロンプト。
  * 出力は編集後のマークダウン文書全体。
@@ -45,4 +48,10 @@ ${contextBlock}
 - \`### 特徴\` / \`### 関係性\` のサブセクションは維持してください。
 - JSON や説明文は含めないでください。
 - マークダウンのみを出力してください。`;
+  const template = getPromptTemplate("editCharacterDocument");
+  return renderPromptTemplate(template.body, {
+    contextBlock,
+    document,
+    instruction,
+  });
 }

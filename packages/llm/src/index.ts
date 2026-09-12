@@ -56,11 +56,15 @@ export {
   inlineAssistPrompt,
   type MultiPersonaReviewContext,
   multiPersonaReviewPrompt,
+  type PromptMetadata,
+  type PromptTemplate,
   type ProofreadContext,
   plotGeneration,
   proofreadPrompt,
   type ReaderPersonaType,
   sectionSummary,
+  getPromptTemplate,
+  listPromptNames,
 } from "./prompts/index.js";
 export {
   clearModelCache,

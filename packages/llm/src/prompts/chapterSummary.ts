@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 個別の章の詳細な概要を生成するプロンプト。
  */
@@ -32,4 +35,12 @@ export function chapterSummary(
   "order": ${chapter.order},
   "summary": "詳細な章の概要"
 }`;
+  const template = getPromptTemplate("chapterSummary");
+  return renderPromptTemplate(template.body, {
+    chapterOrder: chapter.order,
+    chapterTitle: chapter.title,
+    description: novel.description,
+    existingSummary,
+    title: novel.title,
+  });
 }

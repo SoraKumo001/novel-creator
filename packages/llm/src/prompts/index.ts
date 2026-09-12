@@ -28,6 +28,8 @@ export type {
   InlineAssistContext,
 } from "./inlineAssist.js";
 export { inlineAssistPrompt } from "./inlineAssist.js";
+export type { PromptMetadata, PromptTemplate } from "./loader.js";
+export { getPromptTemplate, listPromptNames } from "./loader.js";
 export type {
   MultiPersonaReviewContext,
   ReaderPersonaType,

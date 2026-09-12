@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * ストーリー構想（あらすじ・今後の展開・結末・メモ等）用の LLM プロンプト群。
  */
@@ -63,6 +66,14 @@ ${contextBlock}
 
 # 出力形式
 編集後のセクション本文のみをマークダウン形式で出力してください。`;
+  const template = getPromptTemplate("editStoryOutlineSection");
+  return renderPromptTemplate(template.body, {
+    category: section.category,
+    content,
+    contextBlock,
+    instruction,
+    name: section.name,
+  });
 }
 
 /**
@@ -111,6 +122,12 @@ ${contextBlock}
 
 # 出力形式
 編集後のマークダウン文書全体を出力してください。`;
+  const template = getPromptTemplate("editStoryOutlineDocument");
+  return renderPromptTemplate(template.body, {
+    contextBlock,
+    instruction,
+    markdown,
+  });
 }
 
 /**
@@ -162,4 +179,11 @@ JSON 形式のみを出力してください（Markdown のコードブロック
     }
   ]
 }`;
+  const template = getPromptTemplate("generatePlotFromStoryOutline");
+  return renderPromptTemplate(template.body, {
+    characters,
+    novelTitle: params.novelTitle,
+    settings,
+    storyOutline: params.storyOutline,
+  });
 }

@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 設定情報を LLM で編集するプロンプト。
  */
@@ -31,4 +34,11 @@ ${instruction}
   "name": "設定の名前",
   "description": "設定の説明（マークダウン形式）"
 }`;
+  const template = getPromptTemplate("editSetting");
+  return renderPromptTemplate(template.body, {
+    category: setting.category,
+    description,
+    instruction,
+    name: setting.name,
+  });
 }

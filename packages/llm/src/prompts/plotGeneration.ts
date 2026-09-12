@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 小説の全体プロットと章立てを生成するプロンプト。
  */
@@ -44,4 +47,11 @@ ${characters}
     }
   ]
 }`;
+  const template = getPromptTemplate("plotGeneration");
+  return renderPromptTemplate(template.body, {
+    characters,
+    description: novel.description,
+    settings,
+    title: novel.title,
+  });
 }

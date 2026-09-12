@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 設定のドラフトを LLM で生成・反復修正するプロンプト。
  */
@@ -24,6 +27,10 @@ ${instruction}
   "name": "設定の名前",
   "description": "設定の説明（マークダウン形式）"
 }`;
+    const template = getPromptTemplate("createSettingDraft");
+    return renderPromptTemplate(template.body, {
+      instruction,
+    });
   }
 
   const description = currentDraft.description ?? "（未設定）";
@@ -52,4 +59,11 @@ ${instruction}
   "name": "設定の名前",
   "description": "設定の説明（マークダウン形式）"
 }`;
+  const template = getPromptTemplate("createSettingDraftModify");
+  return renderPromptTemplate(template.body, {
+    category: currentDraft.category,
+    description,
+    instruction,
+    name: currentDraft.name,
+  });
 }

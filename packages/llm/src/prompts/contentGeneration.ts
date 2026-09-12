@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 本文を生成するプロンプト。前の文脈、章情報、登場人物、設定を考慮する。
  */
@@ -70,4 +73,14 @@ ${styleGuideSection}
    - ルビを振る場合は \`｜親文字《るび》\` 形式、傍点（圏点）を振る場合は \`《《強調文字》》\` 形式を使用してください。
    - 会話文は「」を用い、会話文の末尾には句点（。）を付けないのが標準的です。
 10. 本文のみを出力してください。見出しや注釈、JSON は含めないでください。`;
+  const template = getPromptTemplate("contentGeneration");
+  return renderPromptTemplate(template.body, {
+    chapterSection,
+    characters,
+    previousContent,
+    sectionSummary: section.summary,
+    sectionTitle,
+    settings,
+    styleGuideSection,
+  });
 }

@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 伏線マークダウン文書全体を LLM で編集するプロンプト。
  * 出力は編集後のマークダウン文書全体。
@@ -48,4 +51,10 @@ ${contextBlock}
 - \`# カテゴリ\`（スラッシュ階層可） / \`## タイトル\` の見出し構造をすべて含めてください。
 - JSON や説明文は含めないでください。
 - マークダウンのみを出力してください。`;
+  const template = getPromptTemplate("editForeshadowingDocument");
+  return renderPromptTemplate(template.body, {
+    contextBlock,
+    document,
+    instruction,
+  });
 }

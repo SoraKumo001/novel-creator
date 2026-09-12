@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 export interface AnalyzeStoryArcContext {
   chapters: Array<{
     id: string;
@@ -21,15 +24,20 @@ export function analyzeStoryArcPrompt(context: AnalyzeStoryArcContext): string {
 ■ 章・節構成一覧:
 `;
 
+  let structureList = "";
   for (const ch of context.chapters) {
     prompt += `### 章: ${ch.title} (ID: ${ch.id})\n`;
+    structureList += `### 章: ${ch.title} (ID: ${ch.id})\n`;
     for (const sec of ch.sections) {
       prompt += `- 節: ${sec.title} (ID: ${sec.id})\n`;
+      structureList += `- 節: ${sec.title} (ID: ${sec.id})\n`;
       if (sec.summary) {
         prompt += `  概要: ${sec.summary}\n`;
+        structureList += `  概要: ${sec.summary}\n`;
       }
       if (sec.contentSnippet) {
         prompt += `  本文冒頭/抜粋: ${sec.contentSnippet}\n`;
+        structureList += `  本文冒頭/抜粋: ${sec.contentSnippet}\n`;
       }
     }
   }
@@ -61,4 +69,9 @@ export function analyzeStoryArcPrompt(context: AnalyzeStoryArcContext): string {
 }`;
 
   return prompt;
+  const template = getPromptTemplate("analyzeStoryArc");
+  return renderPromptTemplate(template.body, {
+    novelTitle: context.novelTitle ?? "未設定",
+    structureList,
+  });
 }

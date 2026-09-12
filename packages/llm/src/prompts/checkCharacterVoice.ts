@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 export interface CheckCharacterVoiceContext {
   body: string;
   characters: Array<{
@@ -21,23 +24,31 @@ export function checkCharacterVoicePrompt(
 ■ 登録キャラクター一覧:
 `;
 
+  let characterList = "";
   for (const char of context.characters) {
     prompt += `- **${char.name}**`;
+    characterList += `- **${char.name}**`;
     if (char.category) {
       prompt += ` (${char.category})`;
+      characterList += ` (${char.category})`;
     }
     prompt += "\n";
+    characterList += "\n";
     if (char.firstPerson) {
       prompt += `  - 一人称: ${char.firstPerson}\n`;
+      characterList += `  - 一人称: ${char.firstPerson}\n`;
     }
     if (char.secondPerson) {
       prompt += `  - 二人称: ${char.secondPerson}\n`;
+      characterList += `  - 二人称: ${char.secondPerson}\n`;
     }
     if (char.speechPattern) {
       prompt += `  - 口調・特徴: ${char.speechPattern}\n`;
+      characterList += `  - 口調・特徴: ${char.speechPattern}\n`;
     }
     if (char.description) {
       prompt += `  - 詳細設定: ${char.description}\n`;
+      characterList += `  - 詳細設定: ${char.description}\n`;
     }
   }
 
@@ -59,4 +70,9 @@ summary・reason・suggestion 等のすべてのテキスト値は必ず日本�
 }`;
 
   return prompt;
+  const template = getPromptTemplate("checkCharacterVoice");
+  return renderPromptTemplate(template.body, {
+    body: context.body,
+    characterList,
+  });
 }

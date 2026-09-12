@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 export type ReaderPersonaType =
   | "editor" // 商業文芸・ラノベ編集者（構成・引き・商業性重視）
   | "casual" // 一般エンタメ読者（面白さ・感情移入・爽快感重視）
@@ -18,6 +21,7 @@ export function multiPersonaReviewPrompt(
 ): string {
   let prompt = `あなたは多様な視点を持つ小説の査読チーム（編集者、ライト読者、設定考察派ファン、辛口文芸評論家）です。
 以下の小説テキストを精読し、4つの異なるペルソナになりきって独自の視点から感想・評価・改善点をフィードバックしてください。
+  let contextMeta = "";
 
 ■ 作品情報:
 - タイトル: ${context.novelTitle ?? "未設定"}
@@ -25,15 +29,19 @@ export function multiPersonaReviewPrompt(
 
   if (context.genre) {
     prompt += `- ジャンル: ${context.genre}\n`;
+    contextMeta += `- ジャンル: ${context.genre}\n`;
   }
   if (context.targetAudience) {
     prompt += `- ターゲット層: ${context.targetAudience}\n`;
+    contextMeta += `- ターゲット層: ${context.targetAudience}\n`;
   }
   if (context.chapterTitle) {
     prompt += `- 対象章: ${context.chapterTitle}\n`;
+    contextMeta += `- 対象章: ${context.chapterTitle}\n`;
   }
   if (context.sectionTitle) {
     prompt += `- 対象節: ${context.sectionTitle}\n`;
+    contextMeta += `- 対象節: ${context.sectionTitle}\n`;
   }
 
   prompt += `\n■ 対象本文:\n\`\`\`\n${context.text}\n\`\`\`\n\n`;
@@ -83,4 +91,10 @@ overallImpression・catchphrase・praise・criticism・advice 等のすべての
 }`;
 
   return prompt;
+  const template = getPromptTemplate("multiPersonaReview");
+  return renderPromptTemplate(template.body, {
+    contextMeta,
+    novelTitle: context.novelTitle ?? "未設定",
+    text: context.text,
+  });
 }

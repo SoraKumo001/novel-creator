@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 伏線マークダウンの単一セクションを LLM で編集するプロンプト。
  * 出力はプレーンなマークダウン本文（`##` 見出し行を含まない）。
@@ -57,4 +60,13 @@ ${contextBlock}
 - \`##\` 見出し行は含めないでください。
 - JSON や説明文は含めないでください。
 - 本文のマークダウンのみを出力してください。`;
+  const template = getPromptTemplate("editForeshadowingSection");
+  return renderPromptTemplate(template.body, {
+    category: section.category,
+    contextBlock,
+    description,
+    instruction,
+    status,
+    title: section.title,
+  });
 }

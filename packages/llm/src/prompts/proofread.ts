@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 export interface ProofreadContext {
   body: string;
   chapterTitle?: string;
@@ -12,6 +15,7 @@ export interface ProofreadContext {
 export function proofreadPrompt(context: ProofreadContext): string {
   let prompt = `あなたはプロの文芸編集者・校正者・ライトノベル作家です。
 以下の小説の本文を精読し、プロフェッショナルな視点から校正・推敲・レビューを行ってください。
+  let contextSections = "";
 
 【評価・推敲の重点ポイント】
 1. **視点（POV）のブレ**: 一人称/三人称の視点混同や、指定された執筆スタイル・視点人物が見聞きできない情報の不自然な描写がないか。
@@ -24,24 +28,31 @@ export function proofreadPrompt(context: ProofreadContext): string {
 
   if (context.novelTitle) {
     prompt += `■ 作品タイトル: ${context.novelTitle}\n`;
+    contextSections += `■ 作品タイトル: ${context.novelTitle}\n`;
   }
   if (context.chapterTitle) {
     prompt += `■ 章タイトル: ${context.chapterTitle}\n`;
+    contextSections += `■ 章タイトル: ${context.chapterTitle}\n`;
   }
   if (context.sectionTitle) {
     prompt += `■ 節タイトル: ${context.sectionTitle}\n`;
+    contextSections += `■ 節タイトル: ${context.sectionTitle}\n`;
   }
   if (context.sectionSummary) {
     prompt += `■ 節のあらすじ: ${context.sectionSummary}\n`;
+    contextSections += `■ 節のあらすじ: ${context.sectionSummary}\n`;
   }
   if (context.styleGuide) {
     prompt += `■ 作品の執筆スタイル・文体ガイドライン:\n${context.styleGuide}\n\n`;
+    contextSections += `■ 作品の執筆スタイル・文体ガイドライン:\n${context.styleGuide}\n\n`;
   }
   if (context.characters) {
     prompt += `■ 関連キャラクター情報:\n${context.characters}\n\n`;
+    contextSections += `■ 関連キャラクター情報:\n${context.characters}\n\n`;
   }
   if (context.settings) {
     prompt += `■ 関連設定・世界観:\n${context.settings}\n\n`;
+    contextSections += `■ 関連設定・世界観:\n${context.settings}\n\n`;
   }
 
   prompt += `■ 対象本文:
@@ -66,4 +77,9 @@ ${context.body}
 }`;
 
   return prompt;
+  const template = getPromptTemplate("proofread");
+  return renderPromptTemplate(template.body, {
+    body: context.body,
+    contextSections,
+  });
 }

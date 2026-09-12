@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 小説創作相談チャット用のシステムプロンプトを構築する。
  */
@@ -38,31 +41,38 @@ export function creativeChatSystemPrompt(
 5. **そのまま使えるテキスト**: 必要に応じて、設定資料や人物シートにコピー＆ペーストしやすいフォーマットで提示してください。小説本文のルビには \`｜漢字《るび》\`、傍点には \`《《強調》》\` 記法が利用可能です。矢印などの記号は LaTeX 記法（例: $\\rightarrow$）を使わず、必ず通常の文字記号（例: →）を使用してください。
 6. **アプリの使い方の質問への対応**: ユーザーがアプリの操作方法・機能の場所・使い方について質問した場合のみ、末尾の「アプリ機能カタログ」に基づき「機能名 → 場所 → 簡単な手順」の形式で簡潔に案内してください。カタログに無い機能は推測せず「その機能はありません」と伝えてください。案内後は創作相談へ戻るよう一言添えて、通常の創作パートナーとしての対応に戻ってください。それ以外の会話では常に創作相談を優先してください。`);
 
+  let novelContext = "";
   if (context?.novel) {
     parts.push(`\n# 現在相談中の小説情報
+    novelContext += `\n\n# 現在相談中の小説情報
 - タイトル: ${context.novel.title}
 - あらすじ・概要: ${context.novel.description || "（未設定）"}`);
+- あらすじ・概要: ${context.novel.description || "（未設定）"}`;
 
     const guide = context.styleGuide || context.novel.styleGuide;
     if (guide?.trim()) {
       parts.push(
         `\n# 登録済みの執筆スタイル・文体ガイドライン\n${guide.trim()}`
       );
+      novelContext += `\n\n# 登録済みの執筆スタイル・文体ガイドライン\n${guide.trim()}`;
     }
 
     if (context.settings && context.settings.length > 0) {
       parts.push(`\n# 登録済みの世界観・設定情報
 ${context.settings.map((s) => `- ${s}`).join("\n")}`);
+      novelContext += `\n\n# 登録済みの世界観・設定情報\n${context.settings.map((s) => `- ${s}`).join("\n")}`;
     }
 
     if (context.characters && context.characters.length > 0) {
       parts.push(`\n# 登録済みの登場人物情報
 ${context.characters.map((c) => `- ${c}`).join("\n")}`);
+      novelContext += `\n\n# 登録済みの登場人物情報\n${context.characters.map((c) => `- ${c}`).join("\n")}`;
     }
 
     if (context.additionalContext && context.additionalContext.length > 0) {
       parts.push(`\n# 関連する追加コンテキスト
 ${context.additionalContext.map((c) => `- ${c}`).join("\n")}`);
+      novelContext += `\n\n# 関連する参考情報\n${context.additionalContext.join("\n\n")}`;
     }
   } else {
     parts.push(`\n# コンテキスト
@@ -140,4 +150,9 @@ ${APP_USAGE_GUIDE}`);
 - 提案した内容は、ユーザーが「📥 設定・人物へ取り込む」ボタンから小説データに適用できます（この旨を軽く添えると親切です。必須ではありません）。`);
 
   return parts.join("\n");
+  const template = getPromptTemplate("creativeChat");
+  return renderPromptTemplate(template.body, {
+    appUsageGuide: APP_USAGE_GUIDE,
+    novelContext,
+  });
 }

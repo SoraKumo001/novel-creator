@@ -1,3 +1,6 @@
+import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
+
 /**
  * 伏線のドラフトを LLM で生成・反復修正するプロンプト。
  */
@@ -30,6 +33,10 @@ ${instruction}
   "description": "伏線の詳細メモ（意図、回収アイデア、関連人物など。マークダウン形式）",
   "status": "unresolved"
 }`;
+    const template = getPromptTemplate("createForeshadowingDraft");
+    return renderPromptTemplate(template.body, {
+      instruction,
+    });
   }
 
   const category = currentDraft.category ?? "未分類";
@@ -61,4 +68,12 @@ ${instruction}
   "description": "伏線の詳細メモ（マークダウン形式）",
   "status": "${status}"
 }`;
+  const template = getPromptTemplate("createForeshadowingDraftModify");
+  return renderPromptTemplate(template.body, {
+    category,
+    description,
+    instruction,
+    status,
+    title: currentDraft.title,
+  });
 }
