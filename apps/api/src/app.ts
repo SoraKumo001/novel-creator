@@ -1,5 +1,5 @@
 import { user } from "@novel-creator/db";
-import { count } from "drizzle-orm";
+import { asc, count, eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 
@@ -118,7 +118,35 @@ export function createApp(context: AppContext["Variables"]) {
       }
     }
     const auth = await createAuth(c.get("env"), c.get("db"));
-    return auth.handler(c.req.raw);
+    const response = await auth.handler(c.req.raw);
+
+    // Google OAuth コールバック完了時、システムに admin が不在なら初回ユーザーを admin に昇格
+    if (url.pathname.endsWith("/callback/google") && response.status < 400) {
+      try {
+        const db = c.get("db");
+        const [{ adminCount }] = await db
+          .select({ adminCount: count() })
+          .from(user)
+          .where(eq(user.role, "admin"));
+        if (adminCount === 0) {
+          const [firstUser] = await db
+            .select()
+            .from(user)
+            .orderBy(asc(user.createdAt))
+            .limit(1);
+          if (firstUser) {
+            await db
+              .update(user)
+              .set({ role: "admin" })
+              .where(eq(user.id, firstUser.id));
+          }
+        }
+      } catch {
+        // 昇格失敗時もコールバック自体のレスポンスは返す
+      }
+    }
+
+    return response;
   });
 
   // /api 配下は default-deny で認証を要求する。

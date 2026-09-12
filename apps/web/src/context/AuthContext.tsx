@@ -12,6 +12,7 @@ import {
   fetchAuthStatus,
   setupInitialAdmin,
   signInWithEmail,
+  signInWithGoogle as signInWithGoogleRequest,
   signOut as signOutRequest,
   signUpWithEmail,
 } from "@/lib/services/auth.js";
@@ -19,12 +20,14 @@ import type { AuthUser } from "@/lib/types.js";
 
 export interface AuthContextValue {
   authLoading: boolean;
+  googleAuthEnabled: boolean;
   initialized: boolean | null;
   isAdmin: boolean;
   isAuthenticated: boolean;
   refresh: () => Promise<void>;
   setupAdmin: (email: string, password: string, name: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: (callbackURL?: string) => Promise<void>;
   signOut: () => Promise<void>;
   signUp: (email: string, password: string, name?: string) => Promise<void>;
   user: AuthUser | null;
@@ -34,12 +37,14 @@ export const AuthContext = createContext<AuthContextValue | null>(null);
 
 const fallbackValue: AuthContextValue = {
   authLoading: false,
+  googleAuthEnabled: false,
   initialized: null,
   isAdmin: false,
   isAuthenticated: false,
   refresh: () => Promise.resolve(),
   setupAdmin: () => Promise.resolve(),
   signIn: () => Promise.resolve(),
+  signInWithGoogle: () => Promise.resolve(),
   signOut: () => Promise.resolve(),
   signUp: () => Promise.resolve(),
   user: null,
@@ -48,6 +53,7 @@ const fallbackValue: AuthContextValue = {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [initialized, setInitialized] = useState<boolean | null>(null);
+  const [googleAuthEnabled, setGoogleAuthEnabled] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
 
   const refresh = useCallback(async () => {
@@ -55,6 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const status = await fetchAuthStatus();
       setInitialized(status.initialized);
+      setGoogleAuthEnabled(status.googleAuthEnabled === true);
       if (!status.initialized) {
         setUser(null);
         return;
@@ -77,6 +84,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const session = await signInWithEmail(email, password);
     setUser(session.user);
     setInitialized(true);
+  }, []);
+
+  const signInWithGoogle = useCallback(async (callbackURL?: string) => {
+    await signInWithGoogleRequest(callbackURL);
   }, []);
 
   const signUp = useCallback(
@@ -106,11 +117,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       initialized,
+      googleAuthEnabled,
       authLoading,
       isAuthenticated: user !== null,
       isAdmin: user?.role === "admin",
       refresh,
       signIn,
+      signInWithGoogle,
       signUp,
       signOut,
       setupAdmin,
@@ -118,9 +131,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [
       user,
       initialized,
+      googleAuthEnabled,
       authLoading,
       refresh,
       signIn,
+      signInWithGoogle,
       signUp,
       signOut,
       setupAdmin,

@@ -109,9 +109,20 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 | `llm_configs`      | LLM プロバイダ・モデル個別設定                   |
 | `embedding_configs`| Embedding プロバイダ・モデル・次元数設定        |
 | `mcp_api_keys`     | Web発行のMCP APIキー（ハッシュ＋暗号文保管・失効/期限管理） |
+| `user`             | ユーザー（ID、メールアドレス、名前、ロール `admin`/`user`、凍結状態） |
+| `session`          | セッション（セッショントークン、有効期限、IP、UserAgent）     |
+| `account`          | 外部連携アカウント（Google OAuth ID、アクセストークン等）      |
+| `verification`     | 認証・検証トークン                                            |
 
 ## 主な機能
 
+- **🔐 ユーザー認証 & 権限管理 (Better Auth)**:
+  - **Google アカウント認証 (OAuth 2.0 / OpenID Connect)**: Google アカウントによるワンクリックログイン・オープンサインアップ
+  - **アカウント自動連携 (`accountLinking`)**: 同一メールアドレスのアカウント自動紐付け
+  - **初回管理者自動昇格**: ユーザーが存在しない初期状態で最初に Google ログインしたユーザーを自動的に `role: "admin"` へ昇格（メール/パスワードによる `/setup` も利用可能）
+  - **ロールベースの権限管理**: 管理者（`admin`）と一般ユーザー（`user`）
+  - **ユーザー管理画面 (`/users`)**: 管理者による登録ユーザー一覧確認、ロール変更、アカウント有効化/無効化
+  - **埋め込みモデル変更の管理者保護**: 埋め込みモデルの追加・編集・削除・デフォルト変更・インデックス全再構築操作を管理者のみに制限（一般ユーザーは参照のみ可能）
 - **執筆・エディタ・プレビュー環境**:
   - Monaco Editor による本格的な執筆環境 & 集中モード（Zen Mode）
   - **💾 保存状態インジケーター (`SaveStatusBadge`)**: 自動保存および手動保存の状態（保存完了 / 保存中 / 未保存 / エラー）をリアルタイムにエディタツールバーに可視化
@@ -180,8 +191,25 @@ LLM プロバイダは OpenAI / Anthropic / Ollama を切り替え可能。
 ```bash
 # 環境変数設定
 cp .env.example .env
-# .env の LLM_API_KEY 等を編集
+# .env の MASTER_SECRET、LLM_API_KEY 等を編集
+```
 
+#### Google OAuth 認証の設定（オプション）
+
+Google アカウントによるワンクリックログインやオープンサインアップを利用する場合：
+
+1. **[Google Cloud Console (APIとサービス > 認証情報)](https://console.cloud.google.com/apis/credentials)** で「OAuth 2.0 クライアント ID」（ウェブアプリケーション）を作成します。
+2. **「承認済みのリダイレクト URI」** に以下を追加します：
+   - ローカル開発: `http://localhost:3000/api/auth/callback/google`
+   - 本番環境: `https://<本番ドメイン>/api/auth/callback/google`
+3. 発行されたクライアント ID とシークレットを `.env` に設定します：
+   ```env
+   GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxx
+   ```
+※ 未設定の場合はメールアドレスとパスワードによる認証のみで動作します。
+
+```bash
 # 初期セットアップ（依存インストール + shared ビルド + DB 起動 + マイグレーション）
 pnpm setup
 
@@ -190,7 +218,7 @@ pnpm dev:api
 pnpm dev:web
 ```
 
-http://localhost:5173 にアクセス。
+http://localhost:5173 にアクセス。初期状態（ユーザー0件）では、Google アカウントまたはメール/パスワードで最初の管理者アカウントを作成します。
 
 ## スクリプト
 
@@ -305,6 +333,7 @@ Cloudflare ダッシュボード上で GitHub リポジトリと連携し、プ�
 3. **環境変数・シークレット（Variables and Secrets）の設定**:
    - Worker の **Settings > Variables and Secrets** にて、以下を **Secret** として追加します：
      - `MASTER_SECRET`: 暗号化および認証用マスターキー（32バイト以上のランダム文字列・必須）
+     - （Google 認証を使用する場合）`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
      - （外部 LLM / Embedding を使用する場合のみ）`LLM_API_KEY`, `EMBEDDING_API_KEY`
    ※ `apps/api/wrangler.jsonc` の `vars` に定義されている環境変数（`LLM_PROVIDER=workers-ai` 等）は自動的に適用されます。
 
@@ -331,6 +360,10 @@ cd apps/api
 # MASTER_SECRET（認証および暗号化のマスターキー・32バイトbase64等）
 npx wrangler secret put MASTER_SECRET
 
+# Google OAuth を有効化する場合
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put GOOGLE_CLIENT_SECRET
+
 # ルートディレクトリに戻る
 cd ../..
 ```
@@ -353,7 +386,7 @@ pnpm deploy
 
 デプロイ完了時の URL（例: `https://novel-creator.<your-subdomain>.workers.dev`）にブラウザでアクセスします。
 - 初回アクセス時は自動的に `/setup`（初期管理者セットアップ画面）へリダイレクトされます。
-- 管理者のメールアドレス・パスワードを登録して利用を開始してください。
+- Google アカウントまたはメール/パスワードで最初の管理者アカウントを登録して利用を開始してください。
 
 ---
 

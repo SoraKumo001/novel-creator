@@ -572,18 +572,12 @@ export interface AuthSession {
 }
 
 export interface AuthStatus {
+  googleAuthEnabled?: boolean;
   initialized: boolean;
 }
 
 export interface AdminUser extends AuthUser {
   createdAt?: string | null;
-}
-
-export interface CreateUserInput {
-  email: string;
-  name?: string;
-  password: string;
-  role?: UserRole;
 }
 
 export interface UpdateUserInput {

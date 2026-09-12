@@ -3,6 +3,7 @@ import { useState } from "react";
 import { EmbeddingConfigSection } from "@/components/settings/EmbeddingConfigSection.js";
 import { LLMConfigSection } from "@/components/settings/LLMConfigSection.js";
 import { McpKeySection } from "@/components/settings/McpKeySection.js";
+import { useAuth } from "@/hooks/useAuth.js";
 import { useCustomPrompts } from "@/hooks/useCustomPrompts.js";
 import { useEmbeddingConfigs } from "@/hooks/useEmbeddingConfigs.js";
 import { useLLMConfigs } from "@/hooks/useLLMConfigs.js";
@@ -28,6 +29,7 @@ export const Route = createLazyFileRoute("/settings")({
 });
 
 export function SettingsPage() {
+  const { isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState<SettingsTab>("llm");
 
   // LLM Configs フック
@@ -221,6 +223,7 @@ export function SettingsPage() {
       {/* ページヘッダー */}
       <SettingsHeader
         activeTab={activeTab}
+        isAdmin={isAdmin}
         onSeedPresets={() => void handleSeedPresets()}
         onCreateLlm={openCreateLlmModal}
         onCreateEmbedding={openCreateEmbeddingModal}
@@ -259,6 +262,7 @@ export function SettingsPage() {
           configs={embeddingConfigs}
           loading={embeddingLoading}
           error={embeddingError}
+          isAdmin={isAdmin}
           onOpenCreateModal={openCreateEmbeddingModal}
           onOpenEditModal={openEditEmbeddingModal}
           onSetDefault={setDefaultEmbedding}

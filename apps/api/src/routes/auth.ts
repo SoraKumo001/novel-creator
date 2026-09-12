@@ -11,15 +11,19 @@ import type { AppContext } from "../context.js";
  */
 export function registerAuthStatusRoute(app: Hono<AppContext>) {
   app.get("/api/auth/status", async (c) => {
+    const env = c.get("env");
+    const googleAuthEnabled = Boolean(
+      env.GOOGLE_CLIENT_ID?.trim() && env.GOOGLE_CLIENT_SECRET?.trim()
+    );
     try {
       const [{ value }] = await c
         .get("db")
         .select({ value: count() })
         .from(user);
-      return c.json({ initialized: value > 0 });
+      return c.json({ googleAuthEnabled, initialized: value > 0 });
     } catch {
       // 認証テーブル未マイグレーション時は未初期化扱いにする。
-      return c.json({ initialized: false });
+      return c.json({ googleAuthEnabled, initialized: false });
     }
   });
 }

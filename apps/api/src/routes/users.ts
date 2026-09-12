@@ -5,15 +5,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 
 import type { AppContext } from "../context.js";
-import { createAuth } from "../lib/auth.js";
 import { requireAdmin } from "../middleware/auth.js";
-
-const createUserSchema = z.object({
-  email: z.string().email(),
-  name: z.string().min(1).max(100).optional(),
-  password: z.string().min(8).max(128),
-  role: z.enum(["admin", "user"]).optional(),
-});
 
 const updateUserSchema = z
   .object({
@@ -69,53 +61,6 @@ const usersRouter = new Hono<AppContext>()
   .get("/", async (c) => {
     const rows = await c.get("db").select(userColumns).from(user);
     return c.json(rows.map(toAdminUser));
-  })
-  // POST /api/users - ユーザー作成（admin のみ）
-  .post("/", zValidator("json", createUserSchema), async (c) => {
-    const body = c.req.valid("json");
-    const db = c.get("db");
-    const auth = await createAuth(c.get("env"), db);
-    const createUser = auth.api.createUser as unknown as (args: {
-      body: { email: string; name: string; password: string; role?: string };
-      headers: Headers;
-    }) => Promise<{ user: { id: string } }>;
-    try {
-      const result = await createUser({
-        body: {
-          email: body.email,
-          name: body.name ?? (body.email.split("@")[0] || body.email),
-          password: body.password,
-          role: body.role ?? "user",
-        },
-        headers: c.req.raw.headers,
-      });
-      if (body.role) {
-        await db
-          .update(user)
-          .set({ role: body.role })
-          .where(eq(user.id, result.user.id));
-      }
-      const [created] = await db
-        .select(userColumns)
-        .from(user)
-        .where(eq(user.id, result.user.id));
-      if (!created) {
-        return c.json(
-          {
-            error: {
-              code: "INTERNAL_ERROR",
-              message: "ユーザーの作成に失敗しました。",
-            },
-          },
-          500
-        );
-      }
-      return c.json({ user: toAdminUser(created) }, 201);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "ユーザーの作成に失敗しました。";
-      return c.json({ error: { code: "VALIDATION_ERROR", message } }, 400);
-    }
   })
   // PATCH /api/users/:id - role / disabled 更新（admin のみ）
   .patch(

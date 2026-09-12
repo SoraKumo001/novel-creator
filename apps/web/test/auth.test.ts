@@ -41,11 +41,13 @@ describe("auth service", () => {
     expect(normalizeAuthSession(null).user).toBeNull();
   });
 
-  it("fetchAuthStatus は credentials:include で取得すること", async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ initialized: true }));
+  it("fetchAuthStatus は credentials:include で取得し googleAuthEnabled を返すこと", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({ initialized: true, googleAuthEnabled: true })
+    );
     vi.stubGlobal("fetch", fetchMock);
     const status = await fetchAuthStatus();
-    expect(status).toEqual({ initialized: true });
+    expect(status).toEqual({ initialized: true, googleAuthEnabled: true });
     expect(fetchMock).toHaveBeenCalledOnce();
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(init.credentials).toBe("include");
@@ -79,5 +81,37 @@ describe("auth service", () => {
       email: "a@example.com",
       password: "secret123",
     });
+  });
+
+  it("signInWithGoogle は /auth/sign-in/social に POST して取得した url へリダイレクトすること", async () => {
+    const targetUrl =
+      "https://accounts.google.com/o/oauth2/v2/auth?client_id=xxx";
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.endsWith("/auth/sign-in/social")) {
+        return jsonResponse({ url: targetUrl });
+      }
+      return jsonResponse({});
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // window.location のモック
+    const locationMock = { href: "", origin: "http://localhost:5173" };
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: locationMock,
+      writable: true,
+    });
+
+    const { signInWithGoogle } = await import("../src/lib/services/auth.js");
+    await signInWithGoogle("/dashboard");
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toEqual({
+      callbackURL: "http://localhost:5173/dashboard",
+      provider: "google",
+    });
+    expect(window.location.href).toBe(targetUrl);
   });
 });

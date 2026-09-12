@@ -86,9 +86,32 @@ function buildAuth(env: Env, db: Database | AnyAuthDb, secret: string) {
       enabled: true,
       requireEmailVerification: false,
     },
+    account: {
+      accountLinking: {
+        enabled: true,
+        trustedProviders: ["google"],
+      },
+    },
     plugins: [admin()],
     secret,
-    trustedOrigins: env.WEB_ORIGIN ? [env.WEB_ORIGIN] : [],
+    socialProviders: {
+      ...(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+        ? {
+            google: {
+              clientId: env.GOOGLE_CLIENT_ID,
+              clientSecret: env.GOOGLE_CLIENT_SECRET,
+            },
+          }
+        : {}),
+    },
+    trustedOrigins: Array.from(
+      new Set(
+        [
+          env.WEB_ORIGIN,
+          env.NODE_ENV !== "production" ? "http://localhost:5173" : undefined,
+        ].filter((origin): origin is string => Boolean(origin))
+      )
+    ),
     // role はクライアントから書き込ませない（admin プラグイン経由の管理のみ）。
     user: {
       additionalFields: {},

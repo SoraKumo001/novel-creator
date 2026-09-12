@@ -6,7 +6,6 @@ import type {
   AuthSession,
   AuthStatus,
   AuthUser,
-  CreateUserInput,
   NovelMember,
   NovelMemberDisplayRole,
   NovelMemberRole,
@@ -69,8 +68,37 @@ export async function fetchAuthStatus(): Promise<AuthStatus> {
   if (!res.ok) {
     throw await parseResponseError(res, "初期化状態の取得");
   }
-  const data = (await res.json()) as { initialized?: unknown };
-  return { initialized: data.initialized === true };
+  const data = (await res.json()) as {
+    googleAuthEnabled?: unknown;
+    initialized?: unknown;
+  };
+  return {
+    googleAuthEnabled: data.googleAuthEnabled === true,
+    initialized: data.initialized === true,
+  };
+}
+
+export async function signInWithGoogle(callbackURL = "/novels"): Promise<void> {
+  const fullCallbackURL =
+    typeof window !== "undefined"
+      ? new URL(callbackURL, window.location.origin).toString()
+      : callbackURL;
+
+  const raw = await postJson(
+    "/auth/sign-in/social",
+    { callbackURL: fullCallbackURL, provider: "google" },
+    "Googleログイン"
+  );
+  if (
+    raw &&
+    typeof raw === "object" &&
+    "url" in raw &&
+    typeof (raw as { url: unknown }).url === "string"
+  ) {
+    window.location.href = (raw as { url: string }).url;
+    return;
+  }
+  throw new Error("GoogleログインのURL取得に失敗しました");
 }
 
 export async function fetchAuthSession(): Promise<AuthSession> {
@@ -175,26 +203,6 @@ export async function fetchUsers(): Promise<AdminUser[]> {
     return [];
   }
   return list.map(normalizeAdminUser);
-}
-
-export async function createUserByAdmin(
-  input: CreateUserInput
-): Promise<AdminUser> {
-  const raw = await postJson(
-    "/users",
-    {
-      email: input.email,
-      password: input.password,
-      name: input.name,
-      role: input.role ?? "user",
-    },
-    "ユーザーの作成"
-  );
-  const created =
-    (raw as { user?: unknown } | null)?.user !== undefined
-      ? (raw as { user: unknown }).user
-      : raw;
-  return normalizeAdminUser(created);
 }
 
 export async function updateUserByAdmin(

@@ -11,14 +11,21 @@ import {
   updateEmbeddingConfigSchema,
 } from "../schemas/index.js";
 
-// Embedding 設定の読み書きは admin 限定とする。
+// Embedding 設定の変更は admin 限定、参照は全認証ユーザー許可。
 const embeddingConfigsRouter = new Hono<AppContext>()
-  .use(requireAdmin)
-  // GET /api/embedding-configs - 設定一覧取得
+  // GET /api/embedding-configs - 設定一覧取得（認証ユーザー閲覧可）
   .get("/", async (c) => {
     const rows = await getServices(c).embeddingConfig.listConfigs();
     return c.json(rows);
   })
+  // GET /api/embedding-configs/:id - 設定詳細取得（認証ユーザー閲覧可）
+  .get("/:id", zValidator("param", idParamSchema), async (c) => {
+    const { id } = c.req.valid("param");
+    const row = await getServices(c).embeddingConfig.getConfig(id);
+    return c.json(row);
+  })
+  // 以降の変更操作（作成、テスト、モデル取得、更新、削除、デフォルト設定）は admin 限定
+  .use(requireAdmin)
   // POST /api/embedding-configs - 設定新規作成
   .post("/", zValidator("json", createEmbeddingConfigSchema), async (c) => {
     const body = c.req.valid("json");
@@ -54,12 +61,6 @@ const embeddingConfigsRouter = new Hono<AppContext>()
       baseUrl: body.baseUrl,
     });
     return c.json(result);
-  })
-  // GET /api/embedding-configs/:id - 設定詳細取得
-  .get("/:id", zValidator("param", idParamSchema), async (c) => {
-    const { id } = c.req.valid("param");
-    const row = await getServices(c).embeddingConfig.getConfig(id);
-    return c.json(row);
   })
   // PUT /api/embedding-configs/:id - 設定更新
   .put(

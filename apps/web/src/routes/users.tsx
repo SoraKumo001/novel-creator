@@ -1,21 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 import { Button } from "@/components/Button.js";
-import { Card, CardHeader } from "@/components/Card.js";
+import { Card } from "@/components/Card.js";
 import { EmptyState } from "@/components/EmptyState.js";
-import { Input } from "@/components/Input.js";
 import { Loading } from "@/components/Loading.js";
 import { Select } from "@/components/Select.js";
 import { useAuth } from "@/hooks/useAuth.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import { userKeys } from "@/lib/queryKeys.js";
-import {
-  createUserByAdmin,
-  fetchUsers,
-  updateUserByAdmin,
-} from "@/lib/services/auth.js";
+import { fetchUsers, updateUserByAdmin } from "@/lib/services/auth.js";
 import type { UserRole } from "@/lib/types.js";
 import { RoutePending } from "@/routes/-pending.js";
 
@@ -28,10 +22,6 @@ export function UsersPage() {
   const { isAdmin, authLoading } = useAuth();
   const toast = useToast();
   const queryClient = useQueryClient();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     data: users = [],
@@ -45,25 +35,6 @@ export function UsersPage() {
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: userKeys.all });
-
-  const createMutation = useMutation({
-    mutationFn: () =>
-      createUserByAdmin({
-        email: email.trim(),
-        password,
-        name: name.trim() || undefined,
-        role: "user",
-      }),
-    onSuccess: () => {
-      setEmail("");
-      setPassword("");
-      setName("");
-      setFormError(null);
-      toast.success("ユーザーを作成しました");
-      void invalidate();
-    },
-    onError: (e) => setFormError(toErrorMessage(e)),
-  });
 
   const roleMutation = useMutation({
     mutationFn: ({ id, role }: { id: string; role: UserRole }) =>
@@ -104,61 +75,14 @@ export function UsersPage() {
     );
   }
 
-  async function handleCreate(e: React.FormEvent): Promise<void> {
-    e.preventDefault();
-    setFormError(null);
-    if (!email.trim() || !password) {
-      setFormError("メールアドレスとパスワードを入力してください");
-      return;
-    }
-    await createMutation.mutateAsync();
-  }
-
   return (
     <div className="max-w-4xl">
       <h1 className="font-bold text-2xl text-foreground tracking-tight">
         ユーザー管理
       </h1>
       <p className="mt-1 text-muted text-sm">
-        ユーザーの追加・権限変更・無効化ができます。
+        登録済みユーザーの権限変更・無効化ができます。
       </p>
-
-      <Card className="mt-6">
-        <CardHeader
-          title="ユーザーを追加"
-          subtitle="初期権限は一般ユーザーです"
-        />
-        <form onSubmit={handleCreate} className="flex flex-col gap-3">
-          <Input
-            label="名前"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="例: 山田太郎"
-            autoComplete="off"
-          />
-          <Input
-            label="メールアドレス"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="user@example.com"
-            autoComplete="off"
-          />
-          <Input
-            label="パスワード"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-          />
-          {formError && <p className="text-danger text-sm">{formError}</p>}
-          <div>
-            <Button type="submit" isLoading={createMutation.isPending}>
-              追加する
-            </Button>
-          </div>
-        </form>
-      </Card>
 
       <div className="mt-6">
         {isLoading && <Loading message="読み込み中..." />}
@@ -170,7 +94,7 @@ export function UsersPage() {
         {!isLoading && !error && users.length === 0 && (
           <EmptyState
             title="ユーザーがいません"
-            description="上のフォームから追加してください。"
+            description="登録されているユーザーが存在しません。"
           />
         )}
         {!isLoading && !error && users.length > 0 && (

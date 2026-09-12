@@ -17,6 +17,7 @@ import { ConfigCard } from "./ConfigCard.js";
 interface EmbeddingConfigSectionProps {
   configs: EmbeddingConfig[];
   error: string | null;
+  isAdmin?: boolean;
   isDeleting: boolean;
   isSettingDefault: boolean;
   loading: boolean;
@@ -34,6 +35,7 @@ export function EmbeddingConfigSection({
   configs,
   loading,
   error,
+  isAdmin = false,
   onOpenCreateModal,
   onOpenEditModal,
   onSetDefault,
@@ -94,17 +96,25 @@ export function EmbeddingConfigSection({
               🧬 埋め込みモデル（Embedding）とベクトルインデックス
             </strong>
             <p className="mt-0.5">
-              小説の登場人物や設定、本文をベクトル化してセマンティック検索（RAG）を行います。モデルを変更した場合は「インデックス全再構築」を行ってください。
+              小説の登場人物や設定、本文をベクトル化してセマンティック検索（RAG）を行います。
+              {!isAdmin && (
+                <span className="ml-1 text-primary">
+                  ※
+                  埋め込みモデルの変更・インデックス再構築は管理者権限が必要です。
+                </span>
+              )}
             </p>
           </div>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => void handleOpenReindex()}
-            isLoading={statusChecking}
-          >
-            ⚡ インデックス全再構築
-          </Button>
+          {isAdmin && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => void handleOpenReindex()}
+              isLoading={statusChecking}
+            >
+              ⚡ インデックス全再構築
+            </Button>
+          )}
         </div>
 
         {dimensionMismatch && !dimensionMismatch.match && (
@@ -148,11 +158,16 @@ export function EmbeddingConfigSection({
                 <br />
                 OpenAI、Google Gemini、Ollama などを登録して切り替えられます。
               </p>
-              <div className="mt-6">
-                <Button onClick={onOpenCreateModal} leftIcon={<span>＋</span>}>
-                  最初の埋め込みモデルを追加する
-                </Button>
-              </div>
+              {isAdmin && (
+                <div className="mt-6">
+                  <Button
+                    onClick={onOpenCreateModal}
+                    leftIcon={<span>＋</span>}
+                  >
+                    最初の埋め込みモデルを追加する
+                  </Button>
+                </div>
+              )}
             </div>
           </Card>
         ) : (
@@ -176,69 +191,71 @@ export function EmbeddingConfigSection({
                   description={cfg.description}
                   dimensionsLabel={`${cfg.dimensions} 次元`}
                   actions={
-                    <>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={async () => {
-                          setTestingId(cfg.id);
-                          try {
-                            const res = await onTestConnection({
-                              provider: cfg.provider,
-                              modelId: cfg.modelId,
-                              dimensions: cfg.dimensions,
-                              baseUrl: cfg.baseUrl ?? undefined,
-                            });
-                            if (res.success) {
-                              toast.success(`接続成功 (${res.latencyMs}ms)`);
-                            } else {
-                              toast.error(
-                                `接続失敗: ${res.error ?? "応答なし"}`
-                              );
-                            }
-                          } finally {
-                            setTestingId(null);
-                          }
-                        }}
-                        isLoading={isRowTesting}
-                      >
-                        接続テスト
-                      </Button>
-
-                      {!cfg.isDefault && (
+                    isAdmin ? (
+                      <>
                         <Button
                           variant="secondary"
                           size="sm"
                           onClick={async () => {
-                            await onSetDefault(cfg.id);
-                            toast.success(
-                              "デフォルト埋め込みモデルを変更しました"
-                            );
-                            onOpenReindexModal();
+                            setTestingId(cfg.id);
+                            try {
+                              const res = await onTestConnection({
+                                provider: cfg.provider,
+                                modelId: cfg.modelId,
+                                dimensions: cfg.dimensions,
+                                baseUrl: cfg.baseUrl ?? undefined,
+                              });
+                              if (res.success) {
+                                toast.success(`接続成功 (${res.latencyMs}ms)`);
+                              } else {
+                                toast.error(
+                                  `接続失敗: ${res.error ?? "応答なし"}`
+                                );
+                              }
+                            } finally {
+                              setTestingId(null);
+                            }
                           }}
-                          isLoading={isSettingDefault}
+                          isLoading={isRowTesting}
                         >
-                          デフォルトに設定
+                          接続テスト
                         </Button>
-                      )}
 
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => onOpenEditModal(cfg)}
-                      >
-                        編集
-                      </Button>
+                        {!cfg.isDefault && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={async () => {
+                              await onSetDefault(cfg.id);
+                              toast.success(
+                                "デフォルト埋め込みモデルを変更しました"
+                              );
+                              onOpenReindexModal();
+                            }}
+                            isLoading={isSettingDefault}
+                          >
+                            デフォルトに設定
+                          </Button>
+                        )}
 
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => setDeletingId(cfg.id)}
-                        disabled={isDeleting}
-                      >
-                        削除
-                      </Button>
-                    </>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => onOpenEditModal(cfg)}
+                        >
+                          編集
+                        </Button>
+
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => setDeletingId(cfg.id)}
+                          disabled={isDeleting}
+                        >
+                          削除
+                        </Button>
+                      </>
+                    ) : undefined
                   }
                 />
               );

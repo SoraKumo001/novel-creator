@@ -3,6 +3,7 @@ import type { SettingsTab } from "@/routes/-settingsTabs.js";
 
 export interface SettingsHeaderProps {
   activeTab: SettingsTab;
+  isAdmin?: boolean;
   onCreateEmbedding: () => void;
   onCreateLlm: () => void;
   onCreatePrompt: () => void;
@@ -15,6 +16,7 @@ export interface SettingsHeaderProps {
  */
 export function SettingsHeader({
   activeTab,
+  isAdmin = false,
   onSeedPresets,
   onCreateLlm,
   onCreateEmbedding,
@@ -36,24 +38,26 @@ export function SettingsHeader({
             🔄 プリセット復元
           </Button>
         )}
-        <Button
-          size="sm"
-          variant="primary"
-          onClick={
-            activeTab === "llm"
-              ? onCreateLlm
+        {!(activeTab === "embedding" && !isAdmin) && (
+          <Button
+            size="sm"
+            variant="primary"
+            onClick={
+              activeTab === "llm"
+                ? onCreateLlm
+                : activeTab === "embedding"
+                  ? onCreateEmbedding
+                  : onCreatePrompt
+            }
+            leftIcon={<span>＋</span>}
+          >
+            {activeTab === "llm"
+              ? "新しいLLMを追加"
               : activeTab === "embedding"
-                ? onCreateEmbedding
-                : onCreatePrompt
-          }
-          leftIcon={<span>＋</span>}
-        >
-          {activeTab === "llm"
-            ? "新しいLLMを追加"
-            : activeTab === "embedding"
-              ? "新しい埋め込みモデルを追加"
-              : "新しいプロンプトを追加"}
-        </Button>
+                ? "新しい埋め込みモデルを追加"
+                : "新しいプロンプトを追加"}
+          </Button>
+        )}
       </div>
     </div>
   );

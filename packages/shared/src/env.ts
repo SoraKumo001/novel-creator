@@ -20,6 +20,10 @@ export const envSchema = z.object({
   LLM_BASE_URL: z.string().optional(),
   LLM_MODEL: z.string().default("gpt-4o-mini"),
 
+  // --- Google OAuth ---
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+
   // --- LLM (テキスト生成) ---
   // プロバイダ選択肢は constants.ts の llmProviders に統一（custom_openai を含む）
   LLM_PROVIDER: z.enum(llmProviders).default("openai"),
