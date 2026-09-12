@@ -12,7 +12,6 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
     "build": "pnpm build:prompts && tsc -p tsconfig.json",
     "build:prompts": "node scripts/build-prompts.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit"

@@ -16,6 +16,7 @@ export function createSettingDraft(
   }
 
   const description = currentDraft.description ?? "（未設定）";
+
   const template = getPromptTemplate("createSettingDraftModify");
   return renderPromptTemplate(template.body, {
     category: currentDraft.category,

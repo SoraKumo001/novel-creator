@@ -9,7 +9,6 @@ export function sectionSummary(
   section: { title?: string; order: number }
 ): string {
   const sectionTitle = section.title ?? "（未設定）";
-
   const template = getPromptTemplate("sectionSummary");
   return renderPromptTemplate(template.body, {
     chapterSummary: chapter.summary,
