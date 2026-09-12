@@ -18,9 +18,11 @@ export const mcpApiKeys = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     keyHash: text("key_hash").notNull().unique(),
     name: text("name").notNull(),
-    novelId: uuid("novel_id").references(() => novels.id, {
-      onDelete: "cascade",
-    }),
+    novelId: uuid("novel_id")
+      .notNull()
+      .references(() => novels.id, {
+        onDelete: "cascade",
+      }),
     prefix: text("prefix").notNull(),
     revokedAt: timestamp("revoked_at"),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),

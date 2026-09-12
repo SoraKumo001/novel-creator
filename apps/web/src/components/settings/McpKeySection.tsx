@@ -6,9 +6,11 @@ import { Loading } from "@/components/Loading.js";
 import { Modal } from "@/components/Modal.js";
 import { Tag } from "@/components/Tag.js";
 import { useMcpKeys } from "@/hooks/useMcpKeys.js";
+import { useNovels } from "@/hooks/useNovels.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import type { CreateMcpKeyResult, McpKey } from "@/lib/services/mcpKey.js";
+import type { Novel } from "@/lib/types.js";
 
 function formatDateTime(value: string | null | undefined): string {
   if (!value) {
@@ -25,6 +27,7 @@ export function McpKeySection() {
   const toast = useToast();
   const { keys, loading, error, createKey, revokeKey, creating, revoking } =
     useMcpKeys();
+  const { novels, loading: novelsLoading } = useNovels();
 
   const [issueOpen, setIssueOpen] = useState(false);
   const [name, setName] = useState("");
@@ -34,7 +37,7 @@ export function McpKeySection() {
   const [copied, setCopied] = useState(false);
   const [revokingId, setRevokingId] = useState<string | null>(null);
 
-  if (loading) {
+  if (loading || novelsLoading) {
     return <Loading message="MCP APIキーを読み込み中..." />;
   }
 
@@ -46,17 +49,28 @@ export function McpKeySection() {
     );
   }
 
+  function handleOpenIssueModal(): void {
+    if (novels.length === 1 && !novelId && novels[0]) {
+      setNovelId(novels[0].id);
+    }
+    setIssueOpen(true);
+  }
+
   async function handleIssue(): Promise<void> {
     const trimmedName = name.trim();
     if (!trimmedName) {
       toast.error("キー名を入力してください");
       return;
     }
+    if (!novelId.trim()) {
+      toast.error("対象の作品を選択してください");
+      return;
+    }
     try {
       const result = await createKey({
-        name: trimmedName,
-        novelId: novelId.trim() ? novelId.trim() : null,
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+        name: trimmedName,
+        novelId: novelId.trim(),
       });
       setIssued(result);
       setCopied(false);
@@ -99,15 +113,12 @@ export function McpKeySection() {
               発行済みキーがありません
             </h3>
             <p className="mt-1 text-muted text-sm">
-              MCPサーバーから利用するためのAPIキーを発行できます。
+              作品ごとにMCPサーバーから利用するためのAPIキーを発行できます。
               <br />
               平文キーは発行直後にのみ表示されます。
             </p>
             <div className="mt-6">
-              <Button
-                onClick={() => setIssueOpen(true)}
-                leftIcon={<span>＋</span>}
-              >
+              <Button onClick={handleOpenIssueModal} leftIcon={<span>＋</span>}>
                 最初のキーを発行する
               </Button>
             </div>
@@ -117,6 +128,7 @@ export function McpKeySection() {
           isOpen={issueOpen}
           name={name}
           novelId={novelId}
+          novels={novels}
           expiresAt={expiresAt}
           creating={creating}
           onChangeName={setName}
@@ -139,10 +151,10 @@ export function McpKeySection() {
     <>
       <div className="flex items-center justify-between">
         <p className="text-muted text-sm">
-          平文キーは発行直後にのみ表示されます。一覧ではマスク表示のみです。
+          MCPキーは選択した作品に紐付き、該当作品のコンテキストでのみ利用できます。
         </p>
         <Button
-          onClick={() => setIssueOpen(true)}
+          onClick={handleOpenIssueModal}
           leftIcon={<span>＋</span>}
           size="sm"
         >
@@ -161,6 +173,7 @@ export function McpKeySection() {
                     <span className="truncate font-semibold text-foreground text-lg">
                       {key.name}
                     </span>
+                    <Tag>{`📖 ${key.novelTitle ?? key.novelId}`}</Tag>
                     {revoked ? <Tag>失効済み</Tag> : <Tag>有効</Tag>}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-foreground-secondary text-xs">
@@ -176,14 +189,6 @@ export function McpKeySection() {
                         {key.masked}
                       </code>
                     </div>
-                    {key.novelId && (
-                      <div>
-                        <span className="text-muted">Novel ID:</span>{" "}
-                        <code className="rounded bg-surface-raised px-1.5 py-0.5 font-mono text-foreground">
-                          {key.novelId}
-                        </code>
-                      </div>
-                    )}
                     <div>
                       <span className="text-muted">有効期限:</span>{" "}
                       {formatDateTime(key.expiresAt)}
@@ -216,6 +221,7 @@ export function McpKeySection() {
         isOpen={issueOpen}
         name={name}
         novelId={novelId}
+        novels={novels}
         expiresAt={expiresAt}
         creating={creating}
         onChangeName={setName}
@@ -260,6 +266,7 @@ interface IssueModalProps {
   isOpen: boolean;
   name: string;
   novelId: string;
+  novels: Novel[];
   onChangeExpiresAt: (v: string) => void;
   onChangeName: (v: string) => void;
   onChangeNovelId: (v: string) => void;
@@ -271,6 +278,7 @@ function IssueModal({
   isOpen,
   name,
   novelId,
+  novels,
   expiresAt,
   creating,
   onChangeName,
@@ -279,6 +287,8 @@ function IssueModal({
   onClose,
   onSubmit,
 }: IssueModalProps) {
+  const hasNovels = novels.length > 0;
+
   return (
     <Modal
       isOpen={isOpen}
@@ -290,7 +300,7 @@ function IssueModal({
           <Button variant="secondary" onClick={onClose} disabled={creating}>
             キャンセル
           </Button>
-          <Button onClick={onSubmit} isLoading={creating}>
+          <Button onClick={onSubmit} isLoading={creating} disabled={!hasNovels}>
             発行する
           </Button>
         </>
@@ -298,25 +308,34 @@ function IssueModal({
     >
       <div className="space-y-4">
         <label className="block space-y-1 text-sm">
+          <span className="font-medium text-foreground">対象作品（必須）</span>
+          {hasNovels ? (
+            <select
+              value={novelId}
+              onChange={(e) => onChangeNovelId(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-foreground"
+            >
+              <option value="">作品を選択してください</option>
+              {novels.map((n) => (
+                <option key={n.id} value={n.id}>
+                  {n.title}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p className="rounded-lg border border-warning-border bg-warning-subtle p-2.5 text-warning-subtle-fg text-xs">
+              対象の作品がありません。先に作品を作成してください。
+            </p>
+          )}
+        </label>
+        <label className="block space-y-1 text-sm">
           <span className="font-medium text-foreground">キー名（必須）</span>
           <input
             type="text"
             value={name}
             onChange={(e) => onChangeName(e.target.value)}
-            placeholder="例: claude-code-local"
+            placeholder="例: claude-code-work"
             className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-foreground"
-          />
-        </label>
-        <label className="block space-y-1 text-sm">
-          <span className="font-medium text-foreground">
-            小説ID（任意・未指定で全体）
-          </span>
-          <input
-            type="text"
-            value={novelId}
-            onChange={(e) => onChangeNovelId(e.target.value)}
-            placeholder="未指定可"
-            className="w-full rounded-lg border border-border bg-surface px-3 py-2 font-mono text-foreground"
           />
         </label>
         <label className="block space-y-1 text-sm">

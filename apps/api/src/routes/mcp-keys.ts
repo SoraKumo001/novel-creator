@@ -1,10 +1,10 @@
 import { zValidator } from "@hono/zod-validator";
-import type { McpApiKey } from "@novel-creator/db";
 import { Hono } from "hono";
 import type { AppContext } from "../context.js";
 import {
   createMcpKey,
   listMcpKeys,
+  type McpApiKeyWithNovel,
   revokeMcpKey,
 } from "../core/mcp-key.service.js";
 import {
@@ -12,18 +12,18 @@ import {
   getSecretEncryptionKeyValue,
   maskApiKeyForDisplay,
 } from "../lib/secret-crypto.js";
-import { requireAdmin } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
 import { createMcpKeySchema, idParamSchema } from "../schemas/index.js";
 
 /** 生キー・暗号文・ハッシュを除外した公開形（マスクなし）。 */
-function stripSecretFields(row: McpApiKey) {
+function stripSecretFields(row: McpApiKeyWithNovel) {
   const { encryptedKey: _encrypted, keyHash: _hash, ...rest } = row;
   return rest;
 }
 
-// MCP API キーの発行・管理は admin 限定とする。
+// MCP API キーの発行・管理は認証済みユーザー（自身の作品キー）が利用可能
 const mcpKeysRouter = new Hono<AppContext>()
-  .use(requireAdmin)
+  .use(requireAuth)
   // GET /api/mcp-keys - 発行済みキー一覧（生キー・暗号文・ハッシュは返さない）
   .get("/", async (c) => {
     const user = c.get("user");
@@ -33,7 +33,11 @@ const mcpKeysRouter = new Hono<AppContext>()
         401
       );
     }
-    const rows = await listMcpKeys(c.get("db"), user.id);
+    const novelId = c.req.query("novelId");
+    const rows = await listMcpKeys(c.get("db"), user.id, {
+      isAdmin: user.role === "admin",
+      novelId: novelId || null,
+    });
     const secretKeyValue = await getSecretEncryptionKeyValue(c.get("env"));
     const keys = await Promise.all(
       rows.map(async (row) => {
@@ -59,10 +63,11 @@ const mcpKeysRouter = new Hono<AppContext>()
       {
         expiresAt: body.expiresAt ? new Date(body.expiresAt) : null,
         name: body.name,
-        novelId: body.novelId ?? null,
+        novelId: body.novelId,
         userId: user.id,
       },
-      c.get("env")
+      c.get("env"),
+      user
     );
     const { apiKeyMasked } = maskApiKeyForDisplay(plainKey);
     return c.json(
@@ -77,7 +82,8 @@ const mcpKeysRouter = new Hono<AppContext>()
   // DELETE /api/mcp-keys/:id - キー失効（revokedAt を設定する）
   .delete("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
-    await revokeMcpKey(c.get("db"), id);
+    const user = c.get("user");
+    await revokeMcpKey(c.get("db"), id, user);
     return c.json({ success: true });
   });
 

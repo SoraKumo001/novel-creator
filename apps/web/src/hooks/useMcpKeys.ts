@@ -21,7 +21,11 @@ interface UseMcpKeysReturn {
   revoking: boolean;
 }
 
-export function useMcpKeys(): UseMcpKeysReturn {
+interface UseMcpKeysOptions {
+  novelId?: string;
+}
+
+export function useMcpKeys(options?: UseMcpKeysOptions): UseMcpKeysReturn {
   const queryClient = useQueryClient();
 
   const {
@@ -30,8 +34,10 @@ export function useMcpKeys(): UseMcpKeysReturn {
     error,
     refetch,
   } = useQuery({
-    queryKey: mcpKeyKeys.all,
-    queryFn: () => fetchMcpKeys(),
+    queryKey: options?.novelId
+      ? [...mcpKeyKeys.all, { novelId: options.novelId }]
+      : mcpKeyKeys.all,
+    queryFn: () => fetchMcpKeys(options?.novelId),
   });
 
   const createMutation = useMutation({

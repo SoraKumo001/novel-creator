@@ -14,7 +14,8 @@ export interface McpKey {
   id: string;
   masked: string;
   name: string;
-  novelId?: string | null;
+  novelId: string;
+  novelTitle?: string | null;
   prefix: string;
   revokedAt?: string | null;
 }
@@ -22,7 +23,7 @@ export interface McpKey {
 export interface CreateMcpKeyInput {
   expiresAt?: string | null;
   name: string;
-  novelId?: string | null;
+  novelId: string;
 }
 
 export interface CreateMcpKeyResult {
@@ -36,8 +37,9 @@ interface ListMcpKeysResponse {
   keys: McpKey[];
 }
 
-export async function fetchMcpKeys(): Promise<McpKey[]> {
-  const res = await apiFetch("/mcp-keys", { method: "GET" });
+export async function fetchMcpKeys(novelId?: string | null): Promise<McpKey[]> {
+  const query = novelId ? `?novelId=${encodeURIComponent(novelId)}` : "";
+  const res = await apiFetch(`/mcp-keys${query}`, { method: "GET" });
   if (!res.ok) {
     throw await parseResponseError(res, "MCP APIキー一覧の取得");
   }
@@ -49,12 +51,12 @@ export async function createMcpKey(
   input: CreateMcpKeyInput
 ): Promise<CreateMcpKeyResult> {
   const res = await apiFetch("/mcp-keys", {
-    method: "POST",
     body: JSON.stringify({
-      name: input.name,
-      novelId: input.novelId ?? null,
       expiresAt: input.expiresAt ?? null,
+      name: input.name,
+      novelId: input.novelId,
     }),
+    method: "POST",
   });
   if (!res.ok) {
     throw await parseResponseError(res, "MCP APIキーの発行");
