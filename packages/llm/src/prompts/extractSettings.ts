@@ -12,29 +12,6 @@ export function extractSettings(
     ? existingSettings.map((s) => `- ${s}`).join("\n")
     : "（既存の設定なし）";
 
-  return `あなたは小説の設定管理の専門家です。以下の小説本文から、設定情報を抽出・更新してください。
-
-# 本文
-${content}
-
-# 既存の設定
-${existing}
-
-# 指示
-1. 本文中に登場する世界観・設定（場所、時代、ルール、技術、社会制度、アイテムなど）を抽出してください。
-2. 既存の設定と重複するものは、本文の情報で更新・補完してください。
-3. 各設定について、カテゴリ（場所、人物関係、魔法・技術、社会・文化、アイテムなど）を付けてください。
-4. 本文から読み取れる範囲で、具体的かつ簡潔に記述してください。
-
-# 出力形式
-以下の JSON 配列形式で出力してください。JSON 以外のテキストは含めないでください。
-[
-  {
-    "category": "設定のカテゴリ（スラッシュ区切りで階層化可能。例: 世界観, 世界観 / 魔法体系 / 禁忌魔法, 組織 / 採取ギルド）",
-    "name": "設定の名前",
-    "description": "設定の説明"
-  }
-]`;
   const template = getPromptTemplate("extractSettings");
   return renderPromptTemplate(template.body, {
     content,

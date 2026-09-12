@@ -1,16 +1,16 @@
 import { PROMPT_TEMPLATES } from "./generated/templates.js";
 
 export interface PromptMetadata {
-  name: string;
-  description?: string;
   category?: string;
+  description?: string;
+  name: string;
   variables?: string[];
   [key: string]: unknown;
 }
 
 export interface PromptTemplate {
-  metadata: PromptMetadata;
   body: string;
+  metadata: PromptMetadata;
 }
 
 /**

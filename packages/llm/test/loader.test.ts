@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  getPromptTemplate,
-  listPromptNames,
-} from "../src/prompts/loader.js";
+import { getPromptTemplate, listPromptNames } from "../src/prompts/loader.js";
 import { renderPromptTemplate } from "../src/templateEngine.js";
 
 describe("Prompt Loader", () => {

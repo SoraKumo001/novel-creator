@@ -51,9 +51,11 @@ export {
   type GenerateStyleGuideDraftContext,
   generatePlotFromStoryOutline,
   generateStyleGuideDraftPrompt,
+  getPromptTemplate,
   type InlineAssistAction,
   type InlineAssistContext,
   inlineAssistPrompt,
+  listPromptNames,
   type MultiPersonaReviewContext,
   multiPersonaReviewPrompt,
   type PromptMetadata,
@@ -63,8 +65,6 @@ export {
   proofreadPrompt,
   type ReaderPersonaType,
   sectionSummary,
-  getPromptTemplate,
-  listPromptNames,
 } from "./prompts/index.js";
 export {
   clearModelCache,

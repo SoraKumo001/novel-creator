@@ -69,4 +69,6 @@ export const PROMPT_TEMPLATES: Record<string, PromptTemplate> = ${JSON.stringify
 `;
 
 fs.writeFileSync(outFile, code, "utf-8");
-console.log(`Generated ${Object.keys(templates).length} prompt templates -> ${outFile}`);
+console.log(
+  `Generated ${Object.keys(templates).length} prompt templates -> ${outFile}`
+);
