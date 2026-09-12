@@ -49,7 +49,9 @@ export function SettingsHeader({
             🔄 プリセット復元
           </Button>
         )}
-        {!(activeTab === "embedding" && !isAdmin) && (
+        {(activeTab === "llm" ||
+          (activeTab === "embedding" && isAdmin) ||
+          activeTab === "prompt") && (
           <Button
             size="sm"
             variant="primary"

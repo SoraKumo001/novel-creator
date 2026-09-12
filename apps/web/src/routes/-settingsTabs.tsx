@@ -1,4 +1,4 @@
-export type SettingsTab = "llm" | "embedding" | "prompt" | "mcp";
+export type SettingsTab = "llm" | "embedding" | "prompt" | "mcp" | "account";
 
 export interface SettingsTabsProps {
   activeTab: SettingsTab;
@@ -70,6 +70,18 @@ export function SettingsTabs({
         >
           <span aria-hidden="true">🔑</span>
           <span>MCP APIキー ({mcpKeyCount})</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange("account")}
+          className={`group flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 font-medium text-sm transition ${
+            activeTab === "account"
+              ? "border-primary bg-primary/5 font-semibold text-primary"
+              : "border-transparent text-muted-foreground hover:border-border hover:bg-surface-hover hover:text-foreground"
+          }`}
+        >
+          <span aria-hidden="true">👤</span>
+          <span>アカウント</span>
         </button>
       </div>
     </nav>

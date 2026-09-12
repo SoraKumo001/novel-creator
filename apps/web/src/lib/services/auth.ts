@@ -224,6 +224,26 @@ export async function updateUserByAdmin(
   return normalizeAdminUser(updated);
 }
 
+export async function updateUserProfile(name: string): Promise<AuthUser> {
+  const res = await apiFetch("/users/me", {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    throw await parseResponseError(res, "プロフィールの更新");
+  }
+  const raw = (await res.json()) as unknown;
+  const updated =
+    (raw as { user?: unknown } | null)?.user !== undefined
+      ? (raw as { user: unknown }).user
+      : raw;
+  const user = normalizeAuthUser(updated);
+  if (!user) {
+    throw new Error("プロフィールの更新結果が無効です");
+  }
+  return user;
+}
+
 function normalizeNovelMember(raw: unknown): NovelMember {
   const obj = (raw ?? {}) as Record<string, unknown>;
   const roleRaw = obj.role;

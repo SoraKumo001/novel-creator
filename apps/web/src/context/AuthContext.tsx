@@ -15,6 +15,7 @@ import {
   signInWithGoogle as signInWithGoogleRequest,
   signOut as signOutRequest,
   signUpWithEmail,
+  updateUserProfile,
 } from "@/lib/services/auth.js";
 import type { AuthUser } from "@/lib/types.js";
 
@@ -30,6 +31,7 @@ export interface AuthContextValue {
   signInWithGoogle: (callbackURL?: string) => Promise<void>;
   signOut: () => Promise<void>;
   signUp: (email: string, password: string, name?: string) => Promise<void>;
+  updateProfile: (name: string) => Promise<void>;
   user: AuthUser | null;
 }
 
@@ -47,6 +49,7 @@ const fallbackValue: AuthContextValue = {
   signInWithGoogle: () => Promise.resolve(),
   signOut: () => Promise.resolve(),
   signUp: () => Promise.resolve(),
+  updateProfile: () => Promise.resolve(),
   user: null,
 };
 
@@ -113,6 +116,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const updateProfile = useCallback(async (name: string) => {
+    const updated = await updateUserProfile(name);
+    setUser(updated);
+  }, []);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -127,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
       setupAdmin,
+      updateProfile,
     }),
     [
       user,
@@ -139,6 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signUp,
       signOut,
       setupAdmin,
+      updateProfile,
     ]
   );
 

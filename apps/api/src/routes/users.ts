@@ -7,6 +7,14 @@ import { z } from "zod";
 import type { AppContext } from "../context.js";
 import { requireAdmin } from "../middleware/auth.js";
 
+const updateProfileSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "ユーザー名を入力してください。")
+    .max(50, "ユーザー名は50文字以内で入力してください。"),
+});
+
 const updateUserSchema = z
   .object({
     disabled: z.boolean().optional(),
@@ -54,8 +62,36 @@ const userColumns = {
   role: user.role,
 } as const;
 
-// ユーザー管理は admin 限定とする。
 const usersRouter = new Hono<AppContext>()
+  // PATCH /api/users/me - 自身のユーザー名（表示名）更新（全ログインユーザー）
+  .patch("/me", zValidator("json", updateProfileSchema), async (c) => {
+    const current = c.get("user");
+    if (!current?.id) {
+      return c.json(
+        { error: { code: "UNAUTHORIZED", message: "Authentication required" } },
+        401
+      );
+    }
+    const { name } = c.req.valid("json");
+    const db = c.get("db");
+    const [updated] = await db
+      .update(user)
+      .set({
+        name,
+        updatedAt: new Date(),
+      })
+      .where(eq(user.id, current.id))
+      .returning(userColumns);
+
+    if (!updated) {
+      return c.json(
+        { error: { code: "NOT_FOUND", message: "User not found" } },
+        404
+      );
+    }
+    return c.json({ user: toAdminUser(updated) });
+  })
+  // 以下のユーザー管理は admin 限定とする。
   .use(requireAdmin)
   // GET /api/users - ユーザー一覧取得
   .get("/", async (c) => {

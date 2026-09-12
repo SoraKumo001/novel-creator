@@ -1,5 +1,6 @@
 import { createLazyFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
+import { AccountSection } from "@/components/settings/AccountSection.js";
 import { EmbeddingConfigSection } from "@/components/settings/EmbeddingConfigSection.js";
 import { LLMConfigSection } from "@/components/settings/LLMConfigSection.js";
 import { McpKeySection } from "@/components/settings/McpKeySection.js";
@@ -289,6 +290,9 @@ export function SettingsPage() {
 
       {/* MCP APIキー タブ */}
       {activeTab === "mcp" && <McpKeySection />}
+
+      {/* アカウント タブ */}
+      {activeTab === "account" && <AccountSection />}
 
       {/* モーダル群 */}
       <SettingsModals
