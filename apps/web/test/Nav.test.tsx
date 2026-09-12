@@ -41,13 +41,22 @@ vi.mock("@/hooks/useTheme.js", () => ({
 }));
 
 // mock useAuth（未ログイン状態）
+const authMock = {
+  user: null as {
+    id: string;
+    name: string | null;
+    email: string | null;
+    role: "admin" | "member";
+    avatarUrl: string | null;
+  } | null,
+  isAdmin: false,
+  isAuthenticated: false,
+  signOut: vi.fn(),
+};
+
+// mock useAuth
 vi.mock("@/hooks/useAuth.js", () => ({
-  useAuth: () => ({
-    user: null,
-    isAdmin: false,
-    isAuthenticated: false,
-    signOut: vi.fn(),
-  }),
+  useAuth: () => authMock,
 }));
 
 // mock useToast
@@ -61,6 +70,9 @@ vi.mock("@/hooks/useToast.js", () => ({
 describe("Nav component", () => {
   beforeEach(() => {
     localStorage.clear();
+    authMock.user = null;
+    authMock.isAdmin = false;
+    authMock.isAuthenticated = false;
   });
 
   it("初期状態（展開時）でロゴ名・メニューテキスト・縮小ボタンが表示されること", () => {
@@ -71,6 +83,66 @@ describe("Nav component", () => {
     expect(screen.getByText("AI創作相談")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "メニューを縮小" })
+    ).toBeInTheDocument();
+  });
+
+  it("管理者でログインしている場合、管理者バッジとユーザー管理リンクが表示されること", () => {
+    authMock.user = {
+      id: "admin-1",
+      name: "管理者ユーザー",
+      email: "admin@example.com",
+      role: "admin",
+      avatarUrl: null,
+    };
+    authMock.isAdmin = true;
+    authMock.isAuthenticated = true;
+
+    render(<Nav />);
+
+    expect(screen.getByText("管理者ユーザー")).toBeInTheDocument();
+    expect(screen.getByText("admin@example.com")).toBeInTheDocument();
+    expect(screen.getByText("👑 管理者")).toBeInTheDocument();
+    expect(screen.getByText("ユーザー管理")).toBeInTheDocument();
+  });
+
+  it("一般ユーザーでログインしている場合、一般バッジが表示されユーザー管理リンクは表示されないこと", () => {
+    authMock.user = {
+      id: "member-1",
+      name: "一般ユーザー",
+      email: "member@example.com",
+      role: "member",
+      avatarUrl: null,
+    };
+    authMock.isAdmin = false;
+    authMock.isAuthenticated = true;
+
+    render(<Nav />);
+
+    expect(screen.getByText("一般ユーザー")).toBeInTheDocument();
+    expect(screen.getByText("👤 一般")).toBeInTheDocument();
+    expect(screen.queryByText("ユーザー管理")).not.toBeInTheDocument();
+  });
+
+  it("メニュー縮小時でも管理者の場合はロールアイコンが表示されること", () => {
+    authMock.user = {
+      id: "admin-1",
+      name: "管理者ユーザー",
+      email: "admin@example.com",
+      role: "admin",
+      avatarUrl: null,
+    };
+    authMock.isAdmin = true;
+    authMock.isAuthenticated = true;
+
+    render(<Nav />);
+
+    const collapseButton = screen.getByRole("button", {
+      name: "メニューを縮小",
+    });
+    fireEvent.click(collapseButton);
+
+    expect(
+      screen.getByLabelText("ログイン中: 管理者ユーザー（管理者）")
     ).toBeInTheDocument();
   });
 

@@ -25,9 +25,20 @@ export function SettingsHeader({
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="font-bold text-2xl text-foreground tracking-tight">
-          <span aria-hidden="true">⚙️</span> 設定
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="font-bold text-2xl text-foreground tracking-tight">
+            <span aria-hidden="true">⚙️</span> 設定
+          </h1>
+          <span
+            className={`inline-flex items-center rounded border px-2 py-0.5 font-semibold text-xs ${
+              isAdmin
+                ? "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                : "border-border bg-surface-hover text-muted-foreground"
+            }`}
+          >
+            {isAdmin ? "👑 管理者" : "👤 一般"}
+          </span>
+        </div>
         <p className="mt-1 text-muted-foreground text-xs">
           LLMプロバイダ、埋め込みモデル、およびカスタムプロンプトを管理します。
         </p>
