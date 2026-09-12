@@ -35,6 +35,20 @@ describe("prompts schema & instructions", () => {
     expect(prompt).toContain("- 一人称: 俺");
   });
 
+  it("contentGeneration: glossaries が用語集セクションとして注入されること", () => {
+    const without = contentGeneration(
+      { summary: "節の概要", title: "節タイトル" },
+      {}
+    );
+    expect(without).not.toContain("用語集");
+    const withGlossary = contentGeneration(
+      { summary: "節の概要", title: "節タイトル" },
+      { glossaries: ["[用語] 王都ルミナス\n首都"] }
+    );
+    expect(withGlossary).toContain("用語集");
+    expect(withGlossary).toContain("王都ルミナス");
+  });
+
   it("extractTimeline: JSON 出力指示が含まれること", () => {
     const prompt = extractTimeline("本文テキスト");
     expect(prompt).toContain('"event"');

@@ -2,6 +2,7 @@ export type { AnalyzeSettingImpactContext } from "./analyzeSettingImpact.js";
 export { analyzeSettingImpactPrompt } from "./analyzeSettingImpact.js";
 export type { AnalyzeStoryArcContext } from "./analyzeStoryArc.js";
 export { analyzeStoryArcPrompt } from "./analyzeStoryArc.js";
+export type { ChapterSummaryGrounding } from "./chapterSummary.js";
 export { chapterSummary } from "./chapterSummary.js";
 export type { CheckCharacterVoiceContext } from "./checkCharacterVoice.js";
 export { checkCharacterVoicePrompt } from "./checkCharacterVoice.js";
@@ -38,6 +39,7 @@ export { multiPersonaReviewPrompt } from "./multiPersonaReview.js";
 export { plotGeneration } from "./plotGeneration.js";
 export type { ProofreadContext } from "./proofread.js";
 export { proofreadPrompt } from "./proofread.js";
+export type { SectionSummaryGrounding } from "./sectionSummary.js";
 export { sectionSummary } from "./sectionSummary.js";
 export {
   editStoryOutlineDocument,

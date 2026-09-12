@@ -87,6 +87,10 @@ export {
   type TemplateVariables,
 } from "./templateEngine.js";
 export {
+  truncateHead,
+  truncateTailShared,
+} from "./truncate.js";
+export {
   createWorkersAIEmbeddingModel,
   createWorkersAILanguageModel,
   DEFAULT_WORKERS_AI_EMBEDDING_MODEL,

@@ -10,6 +10,8 @@ import { assertFound, type ServiceContext } from "../types.js";
 export interface SectionPromptContext {
   chapter: typeof chapters.$inferSelect | null;
   characters: string;
+  contents: string;
+  foreshadowings: string;
   novel: typeof novels.$inferSelect | null;
   section: typeof sections.$inferSelect;
   settings: string;
@@ -43,14 +45,29 @@ export async function resolveSectionPromptContext(
         ctx.vectorStore,
         ctx.embedding,
         novel.id,
-        { query: buildRagQuery(section) },
+        {
+          contentMinScore: 0.3,
+          contentTopK: 3,
+          foreshadowingTopK: 3,
+          minScore: 0.25,
+          query: buildRagQuery(section),
+          topK: 5,
+        },
         ctx.env
       )
-    : { characters: [], settings: [] };
+    : {
+        characters: [],
+        contents: [],
+        foreshadowings: [],
+        glossaries: [],
+        settings: [],
+      };
 
   return {
     chapter: chapter ?? null,
     characters: context.characters.join("\n"),
+    contents: context.contents.join("\n"),
+    foreshadowings: context.foreshadowings.join("\n"),
     novel: novel ?? null,
     section,
     settings: context.settings.join("\n"),

@@ -2339,4 +2339,58 @@ export function registerMcpTools(
       }
     }
   );
+
+  server.tool(
+    "list_glossary",
+    "小説の用語集一覧を取得します。参照専用であり作成・更新・削除は行いません。",
+    {
+      novelId: z.string().describe("小説ID (UUID)"),
+    },
+    async ({ novelId }) => {
+      try {
+        assertNovelScope(auth, novelId);
+        const list = await services.glossary.listGlossary(novelId);
+        return {
+          content: [{ type: "text", text: JSON.stringify(list, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `用語集一覧の取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
+
+  server.tool(
+    "list_consistency_reports",
+    "節単位の用語集整合性チェック結果の一覧を取得します。参照専用であり新規チェック実行や削除は行いません。",
+    {
+      novelId: z.string().describe("小説ID (UUID)"),
+    },
+    async ({ novelId }) => {
+      try {
+        assertNovelScope(auth, novelId);
+        const list = await services.analysis.listConsistencyReports(novelId);
+        return {
+          content: [{ type: "text", text: JSON.stringify(list, null, 2) }],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `整合性チェック結果の取得に失敗しました: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+    }
+  );
 }

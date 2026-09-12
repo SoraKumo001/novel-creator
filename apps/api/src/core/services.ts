@@ -13,6 +13,7 @@ import { CustomPromptDomainService } from "./custom-prompt.service.js";
 import { EmbeddingConfigDomainService } from "./embedding-config.service.js";
 import { ForeshadowingDomainService } from "./foreshadowing.service.js";
 import { GenerateDomainService } from "./generate.service.js";
+import { GlossaryDomainService } from "./glossary.service.js";
 import { HistoryDomainService } from "./history.service.js";
 import { IdeaDomainService } from "./idea.service.js";
 import { LlmConfigDomainService } from "./llm-config.service.js";
@@ -35,6 +36,7 @@ export interface DomainServices {
   embeddingConfig: EmbeddingConfigDomainService;
   foreshadowing: ForeshadowingDomainService;
   generate: GenerateDomainService;
+  glossary: GlossaryDomainService;
   history: HistoryDomainService;
   idea: IdeaDomainService;
   llmConfig: LlmConfigDomainService;
@@ -58,6 +60,7 @@ export function createDomainServices(ctx: ServiceContext): DomainServices {
     embeddingConfig: new EmbeddingConfigDomainService(ctx),
     foreshadowing: new ForeshadowingDomainService(ctx),
     generate: new GenerateDomainService(ctx),
+    glossary: new GlossaryDomainService(ctx),
     history: new HistoryDomainService(ctx),
     idea: new IdeaDomainService(ctx),
     llmConfig: new LlmConfigDomainService(ctx),

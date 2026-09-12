@@ -12,6 +12,7 @@ import { novelAnalysisRouter } from "./novels/analysis.js";
 import { novelChaptersRouter } from "./novels/chapters.js";
 import { novelCharactersRouter } from "./novels/characters.js";
 import { novelForeshadowingsRouter } from "./novels/foreshadowings.js";
+import { novelGlossaryRouter } from "./novels/glossary.js";
 import { novelInstructionsRouter } from "./novels/instructions.js";
 import { novelMembersRouter } from "./novels/members.js";
 import { novelSettingsRouter } from "./novels/settings.js";
@@ -88,6 +89,7 @@ const novelsRouter = new Hono<AppContext>()
   .route("/", novelCharactersRouter)
   .route("/", novelSettingsRouter)
   .route("/", novelForeshadowingsRouter)
+  .route("/", novelGlossaryRouter)
   .route("/", novelTimelinesRouter)
   .route("/", novelInstructionsRouter)
   .route("/", novelAnalysisRouter)

@@ -107,6 +107,7 @@
       "suspicious": {
         "noAlert": "off",
         "noArrayIndexKey": "off",
+        "noConsole": "error",
         "noDuplicateJsxProps": "off",
         "noEmptyBlockStatements": "off",
         "noEmptySource": "off",
@@ -123,5 +124,24 @@
         "useAwait": "off"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      // ログの単一シンクと CLI/運用スクリプトでのみ console を許可する。
+      "includes": [
+        "apps/api/src/middleware/logger.ts",
+        "packages/shared/src/env.ts",
+        "**/scripts/**",
+        "**/migrate.ts",
+        "**/reset.ts"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    }
+  ]
 }

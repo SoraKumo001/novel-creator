@@ -4,11 +4,13 @@ import {
   characters,
   chatMessages,
   chatSessions,
+  consistencyReports,
   contents,
   customPrompts,
   type Database,
   editHistories,
   foreshadowings,
+  glossaryEntries,
   llmInstructions,
   novelMembers,
   sections,
@@ -31,8 +33,10 @@ export type NovelResource =
   | "setting"
   | "timeline"
   | "foreshadowing"
+  | "glossary"
   | "llmInstruction"
   | "analysisResult"
+  | "consistencyReport"
   | "history"
   | "customPrompt"
   | "chatSession"
@@ -64,14 +68,18 @@ export async function resolveNovelId(
     case "setting":
     case "timeline":
     case "foreshadowing":
+    case "glossary":
     case "llmInstruction":
     case "analysisResult":
+    case "consistencyReport":
     case "history": {
       const table = {
         analysisResult: analysisResults,
         chapter: chapters,
         character: characters,
+        consistencyReport: consistencyReports,
         foreshadowing: foreshadowings,
+        glossary: glossaryEntries,
         history: editHistories,
         llmInstruction: llmInstructions,
         setting: settings,

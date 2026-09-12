@@ -19,6 +19,9 @@ export const envSchema = z.object({
   LLM_API_KEY: z.string().optional(),
   LLM_BASE_URL: z.string().optional(),
   LLM_MODEL: z.string().default("gpt-4o-mini"),
+  LOG_LEVEL: z
+    .enum(["debug", "error", "info", "silent", "warn"])
+    .default("info"),
 
   // --- Google OAuth ---
   GOOGLE_CLIENT_ID: z.string().optional(),

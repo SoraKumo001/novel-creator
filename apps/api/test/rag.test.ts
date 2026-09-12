@@ -9,6 +9,7 @@ const searchContentByType: Record<string, string> = {
   character: "主人公アリス",
   content: "王都へ続く街道の場面",
   foreshadowing: "伏線: 王国の鍵 (unresolved)",
+  glossary: "用語: 王都ルミナス（おうとるみなす）",
   setting: "王都ルミナス",
 };
 
@@ -47,29 +48,36 @@ describe("rag.ts", () => {
     expect(result.contents).toEqual(["王都へ続く街道の場面"]);
     expect(result.foreshadowings).toEqual(["伏線: 王国の鍵 (unresolved)"]);
     expect(result.settings).toEqual(["王都ルミナス"]);
+    expect(result.glossaries).toEqual(["用語: 王都ルミナス（おうとるみなす）"]);
     expect(mockVectorStore.search).toHaveBeenCalledWith([0.1, 0.2, 0.3], {
       entityType: "character",
       minScore: 0.7,
       novelId: "novel-1",
-      topK: 3,
+      topK: 6,
     });
     expect(mockVectorStore.search).toHaveBeenCalledWith([0.1, 0.2, 0.3], {
       entityType: "content",
       minScore: 0.7,
       novelId: "novel-1",
-      topK: 3,
+      topK: 6,
     });
     expect(mockVectorStore.search).toHaveBeenCalledWith([0.1, 0.2, 0.3], {
       entityType: "foreshadowing",
       minScore: 0.7,
       novelId: "novel-1",
-      topK: 3,
+      topK: 6,
     });
     expect(mockVectorStore.search).toHaveBeenCalledWith([0.1, 0.2, 0.3], {
       entityType: "setting",
       minScore: 0.7,
       novelId: "novel-1",
-      topK: 3,
+      topK: 6,
+    });
+    expect(mockVectorStore.search).toHaveBeenCalledWith([0.1, 0.2, 0.3], {
+      entityType: "glossary",
+      minScore: 0.7,
+      novelId: "novel-1",
+      topK: 6,
     });
   });
 
@@ -94,10 +102,11 @@ describe("rag.ts", () => {
     );
 
     expect(searchOptions).toEqual([
-      expect.objectContaining({ entityType: "character", topK: 5 }),
-      expect.objectContaining({ entityType: "content", topK: 3 }),
-      expect.objectContaining({ entityType: "foreshadowing", topK: 5 }),
-      expect.objectContaining({ entityType: "setting", topK: 5 }),
+      expect.objectContaining({ entityType: "character", topK: 10 }),
+      expect.objectContaining({ entityType: "content", topK: 6 }),
+      expect.objectContaining({ entityType: "foreshadowing", topK: 10 }),
+      expect.objectContaining({ entityType: "setting", topK: 10 }),
+      expect.objectContaining({ entityType: "glossary", topK: 10 }),
     ]);
   });
 

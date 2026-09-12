@@ -41,6 +41,11 @@ async function runMigrate() {
     await pool.query("CREATE EXTENSION IF NOT EXISTS vector;");
     console.log('[db:migrate] Ensured extension "vector" exists.');
 
+    // Phase3-3b (FTS+RRF): 日本語全文検索用の trigram 拡張を作成する。
+    // 権限不足で作成できない環境では simple tsvector のみに縮小する（0005 migration 参照）。
+    await pool.query("CREATE EXTENSION IF NOT EXISTS pg_trgm;");
+    console.log('[db:migrate] Ensured extension "pg_trgm" exists.');
+
     const db = drizzle(pool);
     const migrationsFolder = path.resolve(__dirname, "../drizzle");
     console.log(

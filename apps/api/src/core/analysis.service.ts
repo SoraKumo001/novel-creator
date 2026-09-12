@@ -8,6 +8,11 @@ import type {
   AnalysisStreamEvent,
   PersonaReviewInput,
 } from "./analysis/analysis-types.js";
+import {
+  deleteConsistencyReportOp,
+  listConsistencyReportsOp,
+  streamCheckGlossaryOp,
+} from "./consistency/consistency-operations.js";
 import type { ServiceContext } from "./types.js";
 
 export type { AnalysisStreamEvent, PersonaReviewInput };
@@ -42,6 +47,21 @@ export class AnalysisDomainService {
     input: PersonaReviewInput
   ): AsyncGenerator<AnalysisStreamEvent, void, undefined> {
     yield* streamPersonaReviewOp(this.ctx, novelId, input);
+  }
+
+  async *streamCheckGlossary(
+    novelId: string,
+    sectionId: string
+  ): AsyncGenerator<AnalysisStreamEvent, void, undefined> {
+    yield* streamCheckGlossaryOp(this.ctx, novelId, sectionId);
+  }
+
+  async listConsistencyReports(novelId: string) {
+    return listConsistencyReportsOp(this.ctx, novelId);
+  }
+
+  async deleteConsistencyReport(novelId: string, reportId: string) {
+    return deleteConsistencyReportOp(this.ctx, novelId, reportId);
   }
 
   async listResults(

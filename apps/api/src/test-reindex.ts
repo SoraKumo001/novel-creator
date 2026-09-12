@@ -3,30 +3,33 @@ import { parseEnv } from "@novel-creator/shared/env";
 import { config } from "dotenv";
 import { createContext } from "./context.js";
 import { ReindexDomainService } from "./core/reindex.service.js";
+import { appLogger } from "./middleware/logger.js";
 
 config({ path: path.resolve(process.cwd(), "../../.env") });
 const env = parseEnv();
 
-console.log("ENV CONFIG:", {
+appLogger.info("ENV CONFIG:", {
   DATABASE_URL: env.DATABASE_URL,
-  EMBEDDING_PROVIDER: env.EMBEDDING_PROVIDER,
-  EMBEDDING_MODEL: env.EMBEDDING_MODEL,
   EMBEDDING_DIMENSIONS: env.EMBEDDING_DIMENSIONS,
+  EMBEDDING_MODEL: env.EMBEDDING_MODEL,
+  EMBEDDING_PROVIDER: env.EMBEDDING_PROVIDER,
 });
 
-async function main() {
+async function main(): Promise<void> {
   const ctx = createContext(env);
   const reindexService = new ReindexDomainService(ctx.services.reindex["ctx"]);
 
-  console.log("Starting reindexAll...");
+  appLogger.info("Starting reindexAll...");
   try {
     const result = await reindexService.reindexAll(null, (progress) => {
-      console.log("PROGRESS:", progress);
+      appLogger.debug("PROGRESS:", progress);
     });
-    console.log("RESULT:", result);
+    appLogger.info("RESULT:", result);
   } catch (err) {
-    console.error("REINDEX ERROR:", err);
+    appLogger.error("REINDEX ERROR:", err);
   }
 }
 
-main().catch(console.error);
+main().catch((err: unknown) => {
+  appLogger.error("REINDEX FAILED:", err);
+});

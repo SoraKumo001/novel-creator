@@ -8,6 +8,8 @@ import {
   analyzeSettingImpactBodySchema,
   analyzeStoryArcBodySchema,
   checkCharacterVoiceBodySchema,
+  checkGlossaryBodySchema,
+  consistencyReportParamsSchema,
   generateStyleGuideDraftBodySchema,
   idParamSchema,
   listAnalysisResultsQuerySchema,
@@ -154,6 +156,58 @@ export const novelAnalysisRouter = new Hono<AppContext>()
           await emit(ev.type, ev);
         }
       });
+    }
+  )
+  // POST /api/novels/:id/generate/check-glossary - 節単位の用語集整合性チェック (SSE ストリーミング)
+  .post(
+    "/:id/generate/check-glossary",
+    zValidator("param", idParamSchema),
+    zValidator("json", checkGlossaryBodySchema),
+    async (c) => {
+      const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
+      const jsonBody = c.req.valid("json");
+
+      return streamEvents(c, async (emit) => {
+        for await (const ev of getServices(c).analysis.streamCheckGlossary(
+          novelId,
+          jsonBody.sectionId
+        )) {
+          await emit(ev.type, ev);
+        }
+      });
+    }
+  )
+  // GET /api/novels/:id/consistency-reports - 用語集整合性チェック履歴一覧
+  .get(
+    "/:id/consistency-reports",
+    zValidator("param", idParamSchema),
+    async (c) => {
+      const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
+      return c.json(
+        await getServices(c).analysis.listConsistencyReports(novelId)
+      );
+    }
+  )
+  // DELETE /api/novels/:id/consistency-reports/:reportId - 用語集整合性チェック履歴削除
+  .delete(
+    "/:id/consistency-reports/:reportId",
+    zValidator("param", consistencyReportParamsSchema),
+    async (c) => {
+      const { id, reportId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
+      await getServices(c).analysis.deleteConsistencyReport(id, reportId);
+      return c.json({ ok: true });
     }
   )
   // GET /api/novels/:id/analysis-results - AI 分析結果履歴一覧

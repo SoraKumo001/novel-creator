@@ -8,14 +8,26 @@ import {
   plotGeneration,
   sectionSummary,
   streamText,
+  truncateHead,
 } from "@novel-creator/llm";
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, asc, desc, eq, lt } from "drizzle-orm";
 import { searchContext } from "../../rag.js";
 import {
   buildOpenCodeSessionHeaders,
   resolveLLMModelWithInfo,
 } from "../model-resolver.js";
 import { assertFound, type ServiceContext } from "../types.js";
+
+/**
+ * Phase1: 直前文脈用の末尾優先切り詰め。接続部（末尾）を残す。
+ */
+function truncateTail(text: string, limit: number): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= limit) {
+    return trimmed;
+  }
+  return trimmed.slice(-limit);
+}
 
 export async function generatePlotOp(
   ctx: ServiceContext,
@@ -73,13 +85,23 @@ export async function generateChapterSummaryOp(
     .where(eq(novels.id, chapter.novelId));
   assertFound(novel, "Novel not found");
 
+  const chapterSections = await ctx.db
+    .select()
+    .from(sections)
+    .where(eq(sections.chapterId, chapterId))
+    .orderBy(asc(sections.order));
+  const sectionSummaries = chapterSections
+    .map((s) => s.summary?.trim() ?? "")
+    .filter((s) => s.length > 0);
+
   const prompt = chapterSummary(
     { description: novel.description ?? "", title: novel.title },
     {
       order: chapter.order,
       summary: chapter.summary ?? undefined,
       title: chapter.title,
-    }
+    },
+    { sectionSummaries }
   );
 
   const result = await generateJSON<{
@@ -111,9 +133,28 @@ export async function generateSectionSummaryOp(
     .where(eq(chapters.id, section.chapterId));
   assertFound(chapter, "Chapter not found");
 
+  const [content] = await ctx.db
+    .select()
+    .from(contents)
+    .where(eq(contents.sectionId, sectionId));
+  const bodyExcerpt = content?.body?.trim()
+    ? truncateHead(content.body, 6000)
+    : undefined;
+
+  const siblings = await ctx.db
+    .select()
+    .from(sections)
+    .where(eq(sections.chapterId, section.chapterId))
+    .orderBy(asc(sections.order));
+  const previousSummaries = siblings
+    .filter((s) => s.order < section.order && s.summary?.trim())
+    .slice(-2)
+    .map((s) => (s.summary as string).trim());
+
   const prompt = sectionSummary(
     { summary: chapter.summary ?? "", title: chapter.title },
-    { order: section.order, title: section.title ?? undefined }
+    { order: section.order, title: section.title ?? undefined },
+    { bodyExcerpt, previousSummaries }
   );
 
   const result = await generateJSON<{
@@ -154,14 +195,22 @@ export async function* generateSectionContentOp(
   const prevIndex = previousSections.findIndex((s) => s.id === sectionId);
   let previousContent: string | undefined;
   if (prevIndex > 0) {
-    const prevSection = previousSections[prevIndex - 1];
-    if (prevSection) {
+    // 直前 N=2 件を同一章内から取得（末尾優先・各2000字上限で切り詰め）
+    const targetSections = previousSections.slice(
+      Math.max(0, prevIndex - 2),
+      prevIndex
+    );
+    const bodies: string[] = [];
+    for (const target of targetSections) {
       const [prevContent] = await ctx.db
         .select()
         .from(contents)
-        .where(eq(contents.sectionId, prevSection.id));
-      previousContent = prevContent?.body;
+        .where(eq(contents.sectionId, target.id));
+      if (prevContent?.body?.trim()) {
+        bodies.push(truncateTail(prevContent.body, 2000));
+      }
     }
+    previousContent = bodies.length > 0 ? bodies.join("\n\n") : undefined;
   } else {
     // 章の第1節の場合、前章の最終節本文を取得して章またぎの文脈断絶を防ぐ
     const previousChapters = await ctx.db
@@ -189,7 +238,9 @@ export async function* generateSectionContentOp(
           .select()
           .from(contents)
           .where(eq(contents.sectionId, lastSection.id));
-        previousContent = prevContent?.body;
+        previousContent = prevContent?.body?.trim()
+          ? truncateTail(prevContent.body, 2000)
+          : undefined;
       }
     }
   }
@@ -199,8 +250,13 @@ export async function* generateSectionContentOp(
     ctx.embedding,
     chapter.novelId,
     {
+      contentMinScore: 0.3,
+      contentTopK: 3,
+      foreshadowingTopK: 3,
+      minScore: 0.25,
       previousContent,
       query: `${section.title ?? ""} ${section.summary ?? ""}`,
+      topK: 5,
     },
     ctx.env
   );
@@ -218,6 +274,9 @@ export async function* generateSectionContentOp(
         title: chapter.title,
       },
       characters: ragContext.characters,
+      contents: ragContext.contents,
+      foreshadowings: ragContext.foreshadowings,
+      glossaries: ragContext.glossaries,
       previousContent: ragContext.previousContent,
       settings: ragContext.settings,
       styleGuide: novel?.styleGuide,
