@@ -4,6 +4,7 @@ import { Hono } from "hono";
 import type { AppContext } from "../context.js";
 
 import { getServices } from "../core/services.js";
+import { assertNovelAccess, resolveNovelId } from "../middleware/auth.js";
 import {
   generateContentBodySchema,
   idParamSchema,
@@ -18,6 +19,11 @@ const sectionsRouter = new Hono<AppContext>()
   // GET /api/sections/:id - 節個別取得（本文含む）
   .get("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const novelId = await resolveNovelId(c.get("db"), "section", id);
+    const denied = await assertNovelAccess(c, novelId);
+    if (denied) {
+      return denied;
+    }
     const result = await getServices(c).section.getSectionWithContent(id);
     return c.json({
       ...result.section,
@@ -31,6 +37,11 @@ const sectionsRouter = new Hono<AppContext>()
     zValidator("json", updateSectionSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "section", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const row = await getServices(c).section.updateSection(id, body);
       return c.json(row);
@@ -39,12 +50,22 @@ const sectionsRouter = new Hono<AppContext>()
   // DELETE /api/sections/:id - 節削除
   .delete("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const novelId = await resolveNovelId(c.get("db"), "section", id);
+    const denied = await assertNovelAccess(c, novelId);
+    if (denied) {
+      return denied;
+    }
     await getServices(c).section.deleteSection(id);
     return c.json({ success: true });
   })
   // GET /api/sections/:id/content - 本文取得
   .get("/:id/content", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const novelId = await resolveNovelId(c.get("db"), "section", id);
+    const denied = await assertNovelAccess(c, novelId);
+    if (denied) {
+      return denied;
+    }
     const row = await getServices(c).content.getContent(id);
     return c.json(row);
   })
@@ -55,6 +76,11 @@ const sectionsRouter = new Hono<AppContext>()
     zValidator("json", updateContentSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "section", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const row = await getServices(c).content.updateContent(
         id,
@@ -71,6 +97,11 @@ const sectionsRouter = new Hono<AppContext>()
     zValidator("param", idParamSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "section", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const result = await getServices(c).generate.generateSectionSummary(id);
       return c.json(result);
     }
@@ -82,6 +113,11 @@ const sectionsRouter = new Hono<AppContext>()
     zValidator("json", generateContentBodySchema.optional()),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "section", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const jsonBody = c.req.valid("json");
       return sseStream(
         c,
@@ -98,6 +134,11 @@ const sectionsRouter = new Hono<AppContext>()
     zValidator("param", idParamSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "section", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const result = await getServices(c).generate.extractEntities(id);
       return c.json(result);
     }
@@ -109,6 +150,11 @@ const sectionsRouter = new Hono<AppContext>()
     zValidator("json", proofreadBodySchema.optional()),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "section", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const jsonBody = c.req.valid("json");
       const result = await getServices(c).generate.proofreadContent(
         id,
@@ -125,6 +171,11 @@ const sectionsRouter = new Hono<AppContext>()
     zValidator("json", inlineAssistBodySchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "section", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       return sseStream(
         c,

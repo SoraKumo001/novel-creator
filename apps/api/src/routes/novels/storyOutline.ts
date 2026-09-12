@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import type { AppContext } from "../../context.js";
 import { getServices } from "../../core/services.js";
+import { assertNovelAccess } from "../../middleware/auth.js";
 import {
   editStoryOutlineDocumentSchema,
   editStoryOutlineSectionSchema,
@@ -17,6 +18,10 @@ export const novelStoryOutlineRouter = new Hono<AppContext>()
     zValidator("param", idParamSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const markdown = await getServices(c).novel.getStoryOutline(id);
       return c.json({ markdown });
     }
@@ -28,6 +33,10 @@ export const novelStoryOutlineRouter = new Hono<AppContext>()
     zValidator("json", saveStoryOutlineSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const { markdown } = c.req.valid("json");
       const updated = await getServices(c).novel.saveStoryOutline(id, markdown);
       return c.json({ novel: updated, success: true });
@@ -40,6 +49,10 @@ export const novelStoryOutlineRouter = new Hono<AppContext>()
     zValidator("json", editStoryOutlineSectionSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const editedContent = await getServices(c).novel.editStoryOutlineSection(
         id,
@@ -64,6 +77,10 @@ export const novelStoryOutlineRouter = new Hono<AppContext>()
     zValidator("json", editStoryOutlineDocumentSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const editedDocument = await getServices(
         c
@@ -82,6 +99,10 @@ export const novelStoryOutlineRouter = new Hono<AppContext>()
     zValidator("json", generatePlotFromOutlineSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const result = await getServices(c).novel.generatePlotFromOutline(id, {
         modelConfigId: body.modelConfigId,

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 
 import type { AppContext } from "../context.js";
 import { getServices } from "../core/services.js";
+import { assertNovelAccess, resolveNovelId } from "../middleware/auth.js";
 import {
   createSectionSchema,
   idParamSchema,
@@ -13,6 +14,11 @@ const chaptersRouter = new Hono<AppContext>()
   // GET /api/chapters/:id - 章個別取得（節一覧含む）
   .get("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const novelId = await resolveNovelId(c.get("db"), "chapter", id);
+    const denied = await assertNovelAccess(c, novelId);
+    if (denied) {
+      return denied;
+    }
     const result = await getServices(c).chapter.getChapterWithSections(id);
     return c.json({
       ...result.chapter,
@@ -26,6 +32,11 @@ const chaptersRouter = new Hono<AppContext>()
     zValidator("json", updateChapterSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "chapter", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const row = await getServices(c).chapter.updateChapter(id, body);
       return c.json(row);
@@ -34,6 +45,11 @@ const chaptersRouter = new Hono<AppContext>()
   // DELETE /api/chapters/:id - 章削除
   .delete("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const novelId = await resolveNovelId(c.get("db"), "chapter", id);
+    const denied = await assertNovelAccess(c, novelId);
+    if (denied) {
+      return denied;
+    }
     await getServices(c).chapter.deleteChapter(id);
     return c.json({ success: true });
   })
@@ -44,6 +60,11 @@ const chaptersRouter = new Hono<AppContext>()
     zValidator("json", createSectionSchema),
     async (c) => {
       const { id: chapterId } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "chapter", chapterId);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const row = await getServices(c).section.createSection({
         chapterId,
@@ -60,6 +81,11 @@ const chaptersRouter = new Hono<AppContext>()
     zValidator("param", idParamSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "chapter", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const result = await getServices(c).generate.generateChapterSummary(id);
       return c.json(result);
     }

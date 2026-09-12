@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppContext } from "../../context.js";
 import { getServices } from "../../core/services.js";
+import { assertNovelAccess } from "../../middleware/auth.js";
 import {
   createSettingSchema,
   editSettingDocumentSchema,
@@ -20,6 +21,10 @@ export const novelSettingsRouter = new Hono<AppContext>()
     zValidator("query", z.object({ category: z.string().optional() })),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const { category } = c.req.valid("query");
       const rows = await getServices(c).setting.listSettings(id, category);
       return c.json(rows);
@@ -32,6 +37,10 @@ export const novelSettingsRouter = new Hono<AppContext>()
     zValidator("json", createSettingSchema),
     async (c) => {
       const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const row = await getServices(c).setting.createSetting({
         category: body.category,
@@ -49,6 +58,11 @@ export const novelSettingsRouter = new Hono<AppContext>()
     zValidator("param", idParamSchema),
     zValidator("json", settingDraftSchema),
     async (c) => {
+      const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const { instruction, currentDraft } = c.req.valid("json");
       const result = await getServices(c).setting.generateDraft(
         instruction,
@@ -63,6 +77,10 @@ export const novelSettingsRouter = new Hono<AppContext>()
     zValidator("param", idParamSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const markdown = await getServices(c).setting.getMarkdown(id);
       return c.json({ markdown });
     }
@@ -74,6 +92,10 @@ export const novelSettingsRouter = new Hono<AppContext>()
     zValidator("json", saveSettingsMarkdownSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const { markdown } = c.req.valid("json");
       const result = await getServices(c).setting.saveMarkdown(id, markdown);
       return c.json({
@@ -91,6 +113,10 @@ export const novelSettingsRouter = new Hono<AppContext>()
     zValidator("json", editSettingSectionSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const parsedSummary = await getServices(c).setting.editSettingSection({
         category: body.category,
@@ -109,6 +135,10 @@ export const novelSettingsRouter = new Hono<AppContext>()
     zValidator("json", editSettingDocumentSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const { markdown, instruction } = c.req.valid("json");
       const parsedSummary = await getServices(c).setting.editSettingDocument(
         id,

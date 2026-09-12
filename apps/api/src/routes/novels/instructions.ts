@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import type { AppContext } from "../../context.js";
 import { getServices } from "../../core/services.js";
+import { assertNovelAccess } from "../../middleware/auth.js";
 import {
   createLlmInstructionSchema,
   idParamSchema,
@@ -16,6 +17,10 @@ export const novelInstructionsRouter = new Hono<AppContext>()
     zValidator("query", z.object({ entityType: z.string().optional() })),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const { entityType } = c.req.valid("query");
       const rows = await getServices(c).llmInstruction.listInstructions(
         id,
@@ -31,6 +36,10 @@ export const novelInstructionsRouter = new Hono<AppContext>()
     zValidator("json", createLlmInstructionSchema),
     async (c) => {
       const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const row = await getServices(c).llmInstruction.createInstruction({
         entityType: body.entityType,

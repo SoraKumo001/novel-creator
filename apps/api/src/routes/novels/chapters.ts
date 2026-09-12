@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import type { AppContext } from "../../context.js";
 import { getServices } from "../../core/services.js";
+import { assertNovelAccess } from "../../middleware/auth.js";
 import {
   createChapterSchema,
   idParamSchema,
@@ -12,6 +13,10 @@ export const novelChaptersRouter = new Hono<AppContext>()
   // GET /api/novels/:id/chapters - 章一覧
   .get("/:id/chapters", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const denied = await assertNovelAccess(c, id);
+    if (denied) {
+      return denied;
+    }
     const rows = await getServices(c).chapter.listChapters(id);
     return c.json(rows);
   })
@@ -22,6 +27,10 @@ export const novelChaptersRouter = new Hono<AppContext>()
     zValidator("json", createChapterSchema),
     async (c) => {
       const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const row = await getServices(c).chapter.createChapter({
         novelId,
@@ -38,6 +47,10 @@ export const novelChaptersRouter = new Hono<AppContext>()
     zValidator("param", idParamSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const markdown = await getServices(c).chapter.getMarkdown(id);
       return c.json({ markdown });
     }
@@ -49,6 +62,10 @@ export const novelChaptersRouter = new Hono<AppContext>()
     zValidator("json", savePlotMarkdownSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const { markdown } = c.req.valid("json");
       const result = await getServices(c).chapter.saveMarkdown(id, markdown);
       return c.json({

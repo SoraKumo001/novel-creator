@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import type { AppContext } from "../context.js";
 import { getServices } from "../core/services.js";
+import { assertNovelAccess, resolveNovelId } from "../middleware/auth.js";
 import {
   editInstructionSchema,
   idParamSchema,
@@ -12,6 +13,11 @@ const settingsRouter = new Hono<AppContext>()
   // GET /api/settings/:id - 設定個別取得
   .get("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const novelId = await resolveNovelId(c.get("db"), "setting", id);
+    const denied = await assertNovelAccess(c, novelId);
+    if (denied) {
+      return denied;
+    }
     const setting = await getServices(c).setting.getSetting(id);
     return c.json(setting);
   })
@@ -22,6 +28,11 @@ const settingsRouter = new Hono<AppContext>()
     zValidator("json", updateSettingSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "setting", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const row = await getServices(c).setting.updateSetting(id, {
         category: body.category,
@@ -35,6 +46,11 @@ const settingsRouter = new Hono<AppContext>()
   // DELETE /api/settings/:id - 設定削除
   .delete("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const novelId = await resolveNovelId(c.get("db"), "setting", id);
+    const denied = await assertNovelAccess(c, novelId);
+    if (denied) {
+      return denied;
+    }
     await getServices(c).setting.deleteSetting(id);
     return c.json({ success: true });
   })
@@ -45,6 +61,11 @@ const settingsRouter = new Hono<AppContext>()
     zValidator("json", editInstructionSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "setting", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const { instruction } = c.req.valid("json");
       const row = await getServices(c).setting.editSettingWithInstruction(
         id,

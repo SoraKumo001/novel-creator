@@ -28,12 +28,14 @@ vi.mock("../src/core/services.js", () => ({
 const NOVEL_ID = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d";
 
 // vector ルーターの requireAdmin はテストでは素通りさせる。
+// vector ルーターの requireAdmin および認可チェックはテストでは素通りさせる。
 // fail-closed の検証は auth-fail-closed.test.ts で行う。
 vi.mock("../src/middleware/auth.js", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../src/middleware/auth.js")>();
   return {
     ...actual,
+    assertNovelAccess: () => null,
     requireAdmin: (_c: unknown, next: () => Promise<void>) => next(),
   };
 });

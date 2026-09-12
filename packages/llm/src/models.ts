@@ -14,6 +14,7 @@ export async function listModels(
   }
   const res = await fetch(url, {
     headers,
+    redirect: "error",
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) {

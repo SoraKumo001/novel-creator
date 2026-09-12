@@ -18,6 +18,17 @@ vi.mock("../src/rag.js", () => ({
   upsertEntityEmbedding: vi.fn(),
 }));
 
+// ルーター単体テストのため認可チェックをスタブ
+vi.mock("../src/middleware/auth.js", async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import("../src/middleware/auth.js")>();
+  return {
+    ...actual,
+    assertNovelAccess: () => null,
+    resolveNovelId: () => null,
+  };
+});
+
 // streamText のみモック化し、プロンプト組立（inlineAssistPrompt 等）は実物を使う
 vi.mock("@novel-creator/llm", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@novel-creator/llm")>();

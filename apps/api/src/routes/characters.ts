@@ -3,6 +3,7 @@ import { Hono } from "hono";
 
 import type { AppContext } from "../context.js";
 import { getServices } from "../core/services.js";
+import { assertNovelAccess, resolveNovelId } from "../middleware/auth.js";
 import {
   editInstructionSchema,
   idParamSchema,
@@ -13,6 +14,11 @@ const charactersRouter = new Hono<AppContext>()
   // GET /api/characters/:id - 人物個別取得
   .get("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const novelId = await resolveNovelId(c.get("db"), "character", id);
+    const denied = await assertNovelAccess(c, novelId);
+    if (denied) {
+      return denied;
+    }
     const character = await getServices(c).character.getCharacter(id);
     return c.json(character);
   })
@@ -23,6 +29,11 @@ const charactersRouter = new Hono<AppContext>()
     zValidator("json", updateCharacterSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "character", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const row = await getServices(c).character.updateCharacter(id, {
         category: body.category,
@@ -37,6 +48,11 @@ const charactersRouter = new Hono<AppContext>()
   // DELETE /api/characters/:id - 人物削除
   .delete("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const novelId = await resolveNovelId(c.get("db"), "character", id);
+    const denied = await assertNovelAccess(c, novelId);
+    if (denied) {
+      return denied;
+    }
     await getServices(c).character.deleteCharacter(id);
     return c.json({ success: true });
   })
@@ -47,6 +63,11 @@ const charactersRouter = new Hono<AppContext>()
     zValidator("json", editInstructionSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "character", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const { instruction } = c.req.valid("json");
       const row = await getServices(c).character.editCharacterWithInstruction(
         id,

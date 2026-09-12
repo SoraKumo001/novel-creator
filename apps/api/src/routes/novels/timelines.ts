@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import type { AppContext } from "../../context.js";
 import { getServices } from "../../core/services.js";
+import { assertNovelAccess } from "../../middleware/auth.js";
 import {
   createTimelineSchema,
   idParamSchema,
@@ -12,6 +13,10 @@ export const novelTimelinesRouter = new Hono<AppContext>()
   // GET /api/novels/:id/timelines - 時系列一覧
   .get("/:id/timelines", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const denied = await assertNovelAccess(c, id);
+    if (denied) {
+      return denied;
+    }
     const rows = await getServices(c).timeline.listTimelines(id);
     return c.json(rows);
   })
@@ -22,6 +27,10 @@ export const novelTimelinesRouter = new Hono<AppContext>()
     zValidator("json", createTimelineSchema),
     async (c) => {
       const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const row = await getServices(c).timeline.createTimeline({
         event: body.event,
@@ -39,6 +48,10 @@ export const novelTimelinesRouter = new Hono<AppContext>()
     zValidator("param", idParamSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const markdown = await getServices(c).timeline.getMarkdown(id);
       return c.json({ markdown });
     }
@@ -50,6 +63,10 @@ export const novelTimelinesRouter = new Hono<AppContext>()
     zValidator("json", saveTimelinesMarkdownSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const { markdown } = c.req.valid("json");
       const result = await getServices(c).timeline.saveMarkdown(id, markdown);
       return c.json({

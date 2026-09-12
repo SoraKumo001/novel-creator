@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import type { AppContext } from "../../context.js";
 import { getServices } from "../../core/services.js";
+import { assertNovelAccess } from "../../middleware/auth.js";
 import {
   analysisResultParamsSchema,
   analyzeSettingImpactBodySchema,
@@ -23,6 +24,10 @@ export const novelAnalysisRouter = new Hono<AppContext>()
     zValidator("json", modelConfigBodySchema.optional()),
     async (c) => {
       const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const jsonBody = c.req.valid("json");
       const result = await getServices(c).generate.generatePlot(
         novelId,
@@ -38,6 +43,10 @@ export const novelAnalysisRouter = new Hono<AppContext>()
     zValidator("json", generateStyleGuideDraftBodySchema.optional()),
     async (c) => {
       const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const jsonBody = c.req.valid("json");
       const draft = await getServices(c).generate.generateStyleGuideDraft(
         novelId,
@@ -53,6 +62,10 @@ export const novelAnalysisRouter = new Hono<AppContext>()
     zValidator("json", checkCharacterVoiceBodySchema.optional()),
     async (c) => {
       const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const jsonBody = c.req.valid("json");
 
       return streamEvents(c, async (emit) => {
@@ -74,6 +87,10 @@ export const novelAnalysisRouter = new Hono<AppContext>()
     zValidator("json", analyzeSettingImpactBodySchema),
     async (c) => {
       const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const result = await getServices(c).generate.analyzeSettingImpact(
         novelId,
@@ -95,6 +112,10 @@ export const novelAnalysisRouter = new Hono<AppContext>()
     zValidator("json", analyzeStoryArcBodySchema.optional()),
     async (c) => {
       const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const jsonBody = c.req.valid("json");
 
       return streamEvents(c, async (emit) => {
@@ -114,6 +135,10 @@ export const novelAnalysisRouter = new Hono<AppContext>()
     zValidator("json", multiPersonaReviewBodySchema.optional()),
     async (c) => {
       const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const jsonBody = c.req.valid("json");
 
       return streamEvents(c, async (emit) => {
@@ -138,6 +163,10 @@ export const novelAnalysisRouter = new Hono<AppContext>()
     zValidator("query", listAnalysisResultsQuerySchema),
     async (c) => {
       const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const query = c.req.valid("query");
       return c.json(
         await getServices(c).analysis.listResults(novelId, query.analysisType)
@@ -150,6 +179,10 @@ export const novelAnalysisRouter = new Hono<AppContext>()
     zValidator("param", analysisResultParamsSchema),
     async (c) => {
       const { id, resultId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       await getServices(c).analysis.deleteResult(id, resultId);
       return c.json({ ok: true });
     }

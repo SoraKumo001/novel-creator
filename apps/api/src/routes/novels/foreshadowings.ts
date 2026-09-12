@@ -2,6 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import type { AppContext } from "../../context.js";
 import { getServices } from "../../core/services.js";
+import { assertNovelAccess } from "../../middleware/auth.js";
 import {
   createForeshadowingSchema,
   editForeshadowingDocumentSchema,
@@ -15,6 +16,10 @@ export const novelForeshadowingsRouter = new Hono<AppContext>()
   // GET /api/novels/:id/foreshadowings - 伏線一覧
   .get("/:id/foreshadowings", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const denied = await assertNovelAccess(c, id);
+    if (denied) {
+      return denied;
+    }
     const rows =
       await getServices(c).foreshadowing.getForeshadowingsByNovel(id);
     return c.json(rows);
@@ -26,6 +31,10 @@ export const novelForeshadowingsRouter = new Hono<AppContext>()
     zValidator("json", createForeshadowingSchema),
     async (c) => {
       const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const row = await getServices(c).foreshadowing.createForeshadowing(
         novelId,
@@ -47,6 +56,11 @@ export const novelForeshadowingsRouter = new Hono<AppContext>()
     zValidator("param", idParamSchema),
     zValidator("json", foreshadowingDraftSchema),
     async (c) => {
+      const { id: novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const { instruction, currentDraft } = c.req.valid("json");
       const result = await getServices(c).foreshadowing.generateDraft(
         instruction,
@@ -61,6 +75,10 @@ export const novelForeshadowingsRouter = new Hono<AppContext>()
     zValidator("param", idParamSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const markdown = await getServices(c).foreshadowing.getMarkdown(id);
       return c.json({ markdown });
     }
@@ -72,6 +90,10 @@ export const novelForeshadowingsRouter = new Hono<AppContext>()
     zValidator("json", saveForeshadowingsMarkdownSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const { markdown } = c.req.valid("json");
       const result = await getServices(c).foreshadowing.saveMarkdown(
         id,
@@ -92,6 +114,10 @@ export const novelForeshadowingsRouter = new Hono<AppContext>()
     zValidator("json", editForeshadowingSectionSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const result = await getServices(
         c
@@ -115,6 +141,10 @@ export const novelForeshadowingsRouter = new Hono<AppContext>()
     zValidator("json", editForeshadowingDocumentSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, id);
+      if (denied) {
+        return denied;
+      }
       const { instruction } = c.req.valid("json");
       const result = await getServices(
         c

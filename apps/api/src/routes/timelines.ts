@@ -3,6 +3,7 @@ import { Hono } from "hono";
 
 import type { AppContext } from "../context.js";
 import { getServices } from "../core/services.js";
+import { assertNovelAccess, resolveNovelId } from "../middleware/auth.js";
 import { idParamSchema, updateTimelineSchema } from "../schemas/index.js";
 
 const timelinesRouter = new Hono<AppContext>()
@@ -13,6 +14,11 @@ const timelinesRouter = new Hono<AppContext>()
     zValidator("json", updateTimelineSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "timeline", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const row = await getServices(c).timeline.updateTimeline(id, body);
       return c.json(row);
@@ -21,6 +27,11 @@ const timelinesRouter = new Hono<AppContext>()
   // DELETE /api/timelines/:id - 時系列削除
   .delete("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const novelId = await resolveNovelId(c.get("db"), "timeline", id);
+    const denied = await assertNovelAccess(c, novelId);
+    if (denied) {
+      return denied;
+    }
     await getServices(c).timeline.deleteTimeline(id);
     return c.json({ success: true });
   });

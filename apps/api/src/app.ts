@@ -72,7 +72,20 @@ export function createApp(context: AppContext["Variables"]) {
       allowHeaders: ["Content-Type", "Authorization", "Cookie"],
       credentials: true,
       exposeHeaders: ["Content-Type", "Set-Cookie"],
-      origin: (origin) => context.env.WEB_ORIGIN ?? origin ?? "*",
+      origin: (origin) => {
+        if (context.env.WEB_ORIGIN) {
+          return context.env.WEB_ORIGIN;
+        }
+        if (context.env.NODE_ENV !== "production") {
+          if (
+            origin &&
+            /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+          ) {
+            return origin;
+          }
+        }
+        return "";
+      },
     })
   );
   app.use("*", logger);
@@ -101,7 +114,8 @@ export function createApp(context: AppContext["Variables"]) {
   // OPTIONS プリフライトは先頭の cors が応答するためここには届かない。
   app.use("/api/auth/*", async (c) => {
     const url = new URL(c.req.url);
-    if (url.pathname.endsWith("/sign-up/email") && c.req.method === "POST") {
+    const normalizedPath = url.pathname.replace(/\/+$/, "");
+    if (normalizedPath.endsWith("/sign-up/email") && c.req.method === "POST") {
       try {
         const [{ value }] = await c
           .get("db")

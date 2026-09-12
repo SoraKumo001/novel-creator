@@ -3,6 +3,7 @@ import { Hono } from "hono";
 
 import type { AppContext } from "../context.js";
 import { getServices } from "../core/services.js";
+import { assertNovelAccess, resolveNovelId } from "../middleware/auth.js";
 import {
   createForeshadowingSchema,
   idParamSchema,
@@ -17,6 +18,10 @@ const foreshadowingsRouter = new Hono<AppContext>()
     zValidator("param", novelIdParamSchema),
     async (c) => {
       const { novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const items =
         await getServices(c).foreshadowing.getForeshadowingsByNovel(novelId);
       return c.json(items);
@@ -29,6 +34,10 @@ const foreshadowingsRouter = new Hono<AppContext>()
     zValidator("json", createForeshadowingSchema),
     async (c) => {
       const { novelId } = c.req.valid("param");
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const item = await getServices(c).foreshadowing.createForeshadowing(
         novelId,
@@ -40,6 +49,11 @@ const foreshadowingsRouter = new Hono<AppContext>()
   // GET /api/foreshadowings/:id - 伏線個別取得
   .get("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const novelId = await resolveNovelId(c.get("db"), "foreshadowing", id);
+    const denied = await assertNovelAccess(c, novelId);
+    if (denied) {
+      return denied;
+    }
     const item = await getServices(c).foreshadowing.getForeshadowing(id);
     return c.json(item);
   })
@@ -50,6 +64,11 @@ const foreshadowingsRouter = new Hono<AppContext>()
     zValidator("json", updateForeshadowingSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const novelId = await resolveNovelId(c.get("db"), "foreshadowing", id);
+      const denied = await assertNovelAccess(c, novelId);
+      if (denied) {
+        return denied;
+      }
       const body = c.req.valid("json");
       const item = await getServices(c).foreshadowing.updateForeshadowing(
         id,
@@ -61,6 +80,11 @@ const foreshadowingsRouter = new Hono<AppContext>()
   // DELETE /api/foreshadowings/:id - 伏線削除
   .delete("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
+    const novelId = await resolveNovelId(c.get("db"), "foreshadowing", id);
+    const denied = await assertNovelAccess(c, novelId);
+    if (denied) {
+      return denied;
+    }
     await getServices(c).foreshadowing.deleteForeshadowing(id);
     return c.json({ success: true as const });
   });

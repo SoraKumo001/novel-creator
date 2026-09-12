@@ -52,10 +52,13 @@ export async function resolveNovelId(
   resource: NovelResource,
   id: string
 ): Promise<string | null> {
+  if (resource === "novel") {
+    return id;
+  }
+  if (!db || typeof db.select !== "function") {
+    return null;
+  }
   switch (resource) {
-    case "novel": {
-      return id;
-    }
     case "chapter":
     case "character":
     case "setting":

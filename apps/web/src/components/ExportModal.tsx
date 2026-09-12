@@ -7,6 +7,7 @@ import {
 import { useMemo, useState } from "react";
 import { useToast } from "@/hooks/useToast.js";
 import { formatCharCount } from "@/lib/format.js";
+import { sanitizeHtml } from "@/lib/sanitize.js";
 import { Button } from "./Button.js";
 import { Modal } from "./Modal.js";
 
@@ -203,7 +204,7 @@ export function ExportModal({ isOpen, onClose, novel }: ExportModalProps) {
           {isHtml && htmlPreview ? (
             <div
               className="max-h-80 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-surface-raised p-3 text-foreground text-xs leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: formattedText }}
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(formattedText) }}
             />
           ) : (
             <textarea
