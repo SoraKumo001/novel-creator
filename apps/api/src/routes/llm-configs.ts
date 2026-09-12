@@ -2,7 +2,7 @@ import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
 import type { AppContext } from "../context.js";
 import { getServices } from "../core/services.js";
-import { requireAdmin } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
 import {
   createLlmConfigSchema,
   idParamSchema,
@@ -11,26 +11,32 @@ import {
   updateLlmConfigSchema,
 } from "../schemas/index.js";
 
-// LLM 設定の読み書きは admin 限定とする。
+// LLM 設定は認証済みユーザー（一般ユーザーは自身の個別設定＋システム設定の参照、adminはシステム設定の管理）が利用可能
 const llmConfigsRouter = new Hono<AppContext>()
-  .use(requireAdmin)
+  .use(requireAuth)
   // GET /api/llm-configs - 設定一覧取得
   .get("/", async (c) => {
-    const rows = await getServices(c).llmConfig.listConfigs();
+    const user = c.get("user");
+    const rows = await getServices(c).llmConfig.listConfigs(user);
     return c.json(rows);
   })
   // POST /api/llm-configs - 設定新規作成
   .post("/", zValidator("json", createLlmConfigSchema), async (c) => {
+    const user = c.get("user");
     const body = c.req.valid("json");
-    const row = await getServices(c).llmConfig.createConfig({
-      apiKey: body.apiKey || null,
-      baseUrl: body.baseUrl || null,
-      description: body.description || null,
-      isDefault: body.isDefault ?? false,
-      modelId: body.modelId,
-      name: body.name,
-      provider: body.provider,
-    });
+    const row = await getServices(c).llmConfig.createConfig(
+      {
+        apiKey: body.apiKey || null,
+        baseUrl: body.baseUrl || null,
+        description: body.description || null,
+        isDefault: body.isDefault ?? false,
+        isSystem: body.isSystem,
+        modelId: body.modelId,
+        name: body.name,
+        provider: body.provider,
+      },
+      user
+    );
     return c.json(row, 201);
   })
   // POST /api/llm-configs/test - 接続テスト
@@ -56,7 +62,8 @@ const llmConfigsRouter = new Hono<AppContext>()
   // GET /api/llm-configs/:id - 設定詳細取得
   .get("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
-    const row = await getServices(c).llmConfig.getConfig(id);
+    const user = c.get("user");
+    const row = await getServices(c).llmConfig.getConfig(id, user);
     return c.json(row);
   })
   // PUT /api/llm-configs/:id - 設定更新
@@ -66,31 +73,41 @@ const llmConfigsRouter = new Hono<AppContext>()
     zValidator("json", updateLlmConfigSchema),
     async (c) => {
       const { id } = c.req.valid("param");
+      const user = c.get("user");
       const body = c.req.valid("json");
-      const row = await getServices(c).llmConfig.updateConfig(id, {
-        ...(body.name === undefined ? {} : { name: body.name }),
-        ...(body.provider === undefined ? {} : { provider: body.provider }),
-        ...(body.modelId === undefined ? {} : { modelId: body.modelId }),
-        ...(body.baseUrl === undefined ? {} : { baseUrl: body.baseUrl }),
-        ...(body.apiKey === undefined ? {} : { apiKey: body.apiKey }),
-        ...(body.isDefault === undefined ? {} : { isDefault: body.isDefault }),
-        ...(body.description === undefined
-          ? {}
-          : { description: body.description }),
-      });
+      const row = await getServices(c).llmConfig.updateConfig(
+        id,
+        {
+          ...(body.name === undefined ? {} : { name: body.name }),
+          ...(body.provider === undefined ? {} : { provider: body.provider }),
+          ...(body.modelId === undefined ? {} : { modelId: body.modelId }),
+          ...(body.baseUrl === undefined ? {} : { baseUrl: body.baseUrl }),
+          ...(body.apiKey === undefined ? {} : { apiKey: body.apiKey }),
+          ...(body.isDefault === undefined
+            ? {}
+            : { isDefault: body.isDefault }),
+          ...(body.isSystem === undefined ? {} : { isSystem: body.isSystem }),
+          ...(body.description === undefined
+            ? {}
+            : { description: body.description }),
+        },
+        user
+      );
       return c.json(row);
     }
   )
   // DELETE /api/llm-configs/:id - 設定削除
   .delete("/:id", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
-    await getServices(c).llmConfig.deleteConfig(id);
+    const user = c.get("user");
+    await getServices(c).llmConfig.deleteConfig(id, user);
     return c.json({ success: true });
   })
   // POST /api/llm-configs/:id/set-default - デフォルトに設定
   .post("/:id/set-default", zValidator("param", idParamSchema), async (c) => {
     const { id } = c.req.valid("param");
-    const row = await getServices(c).llmConfig.setDefault(id);
+    const user = c.get("user");
+    const row = await getServices(c).llmConfig.setDefault(id, user);
     return c.json(row);
   });
 

@@ -4,7 +4,12 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { ZodError } from "zod";
 
 import type { AppContext } from "../context.js";
-import { AppError, NotFoundError, ValidationError } from "../core/types.js";
+import {
+  AppError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from "../core/types.js";
 import { appLogger } from "./logger.js";
 
 /**
@@ -120,6 +125,13 @@ export function classifyError(err: unknown): ClassifiedError {
       details: err.details,
       message: err.message,
       status: err.status as ContentfulStatusCode,
+    };
+  }
+  if (err instanceof ForbiddenError) {
+    return {
+      code: "FORBIDDEN",
+      message: err.message,
+      status: 403,
     };
   }
   if (err instanceof NotFoundError) {

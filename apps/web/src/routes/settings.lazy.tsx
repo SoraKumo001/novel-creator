@@ -246,6 +246,7 @@ export function SettingsPage() {
           configs={llmConfigs}
           loading={llmLoading}
           error={llmError}
+          isAdmin={isAdmin}
           onOpenCreateModal={openCreateLlmModal}
           onOpenEditModal={openEditLlmModal}
           onSetDefault={setDefaultLLM}

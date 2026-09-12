@@ -6,13 +6,36 @@ vi.mock("drizzle-orm", async (importOriginal) => {
   const actual = await importOriginal<typeof import("drizzle-orm")>();
   return {
     ...actual,
+    and: vi.fn((...conditions: unknown[]) => ({
+      __andMarker: true,
+      conditions,
+    })),
     eq: vi.fn((column: unknown, value: unknown) => ({
       __eqMarker: true,
       column,
       value,
     })),
+    isNull: vi.fn((column: unknown) => ({
+      __isNullMarker: true,
+      column,
+    })),
   };
 });
+
+function hasDefaultCondition(cond: unknown): boolean {
+  if (!cond || typeof cond !== "object") return false;
+  if ("value" in cond && (cond as { value: unknown }).value === true)
+    return true;
+  if (
+    "conditions" in cond &&
+    Array.isArray((cond as { conditions: unknown[] }).conditions)
+  ) {
+    return (cond as { conditions: unknown[] }).conditions.some(
+      hasDefaultCondition
+    );
+  }
+  return false;
+}
 
 // create*ModelFromConfig をスパイし、どの設定からモデルが生成されたかを判別できるようにする。
 vi.mock("@novel-creator/llm", async (importOriginal) => {
@@ -87,27 +110,25 @@ function createMockDb(options: {
   embeddingById?: ConfigRow[];
   embeddingDefault?: ConfigRow[];
 }) {
-  const whereCalls: { table: unknown; value: unknown }[] = [];
+  const whereCalls: { table: unknown; cond: unknown }[] = [];
 
   const from = vi.fn().mockImplementation((table: unknown) => ({
-    where: vi
-      .fn()
-      .mockImplementation(async (cond: { value?: unknown } | undefined) => {
-        whereCalls.push({ table, value: cond?.value });
-        let byId: ConfigRow[] | undefined;
-        let byDefault: ConfigRow[] | undefined;
-        if (table === llmConfigs) {
-          byId = options.llmById;
-          byDefault = options.llmDefault;
-        } else if (table === embeddingConfigs) {
-          byId = options.embeddingById;
-          byDefault = options.embeddingDefault;
-        }
-        if (cond?.value === true) {
-          return byDefault ?? [];
-        }
-        return byId ?? [];
-      }),
+    where: vi.fn().mockImplementation(async (cond: unknown) => {
+      whereCalls.push({ cond, table });
+      let byId: ConfigRow[] | undefined;
+      let byDefault: ConfigRow[] | undefined;
+      if (table === llmConfigs) {
+        byId = options.llmById;
+        byDefault = options.llmDefault;
+      } else if (table === embeddingConfigs) {
+        byId = options.embeddingById;
+        byDefault = options.embeddingDefault;
+      }
+      if (hasDefaultCondition(cond)) {
+        return byDefault ?? [];
+      }
+      return byId ?? [];
+    }),
   }));
 
   const db = {

@@ -329,10 +329,12 @@ export interface LLMConfig {
   hasApiKey: boolean;
   id: string;
   isDefault: boolean;
+  isSystem?: boolean;
   modelId: string;
   name: string;
   provider: LLMProviderType;
   updatedAt: string | Date | null;
+  userId?: string | null;
 }
 
 export interface CreateLLMConfigInput {
@@ -340,6 +342,7 @@ export interface CreateLLMConfigInput {
   baseUrl?: string | null;
   description?: string | null;
   isDefault?: boolean;
+  isSystem?: boolean;
   modelId: string;
   name: string;
   provider: LLMProviderType;
@@ -350,6 +353,7 @@ export interface UpdateLLMConfigInput {
   baseUrl?: string | null;
   description?: string | null;
   isDefault?: boolean;
+  isSystem?: boolean;
   modelId?: string;
   name?: string;
   provider?: LLMProviderType;

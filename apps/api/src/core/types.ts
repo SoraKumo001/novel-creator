@@ -9,6 +9,7 @@ export interface ServiceContext {
   env: Env;
   llm: LanguageModel;
   mcpAuth?: McpAuth;
+  userId?: string | null;
   vectorStore: VectorStore;
 }
 
@@ -38,11 +39,22 @@ export class ValidationError extends Error {
 }
 
 export type ErrorCode =
+  | "FORBIDDEN"
   | "NOT_FOUND"
   | "VALIDATION_ERROR"
   | "INTERNAL_ERROR"
   | "HISTORY_ERROR"
   | "VECTOR_ERROR";
+
+export class ForbiddenError extends Error {
+  readonly code = "FORBIDDEN";
+  readonly status = 403;
+
+  constructor(message = "Forbidden") {
+    super(message);
+    this.name = "ForbiddenError";
+  }
+}
 
 /**
  * Phase 1 のエラー契約: 分類可能なアプリエラー基底クラス。

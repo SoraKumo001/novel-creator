@@ -14,6 +14,7 @@ interface ConfigCardProps {
   modelId: string;
   name: string;
   provider: string;
+  scopeBadge?: ReactNode;
 }
 
 /**
@@ -30,6 +31,7 @@ export function ConfigCard({
   modelId,
   name,
   provider,
+  scopeBadge,
 }: ConfigCardProps) {
   return (
     <Card className={interactiveCardHover}>
@@ -40,6 +42,7 @@ export function ConfigCard({
               {name}
             </span>
             <ProviderBadge provider={provider} />
+            {scopeBadge}
             {dimensionsLabel && (
               <span className="rounded-full border border-primary/20 bg-primary/10 px-2 py-0.5 font-semibold text-primary text-xs">
                 {dimensionsLabel}

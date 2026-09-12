@@ -9,7 +9,7 @@ import {
   testLLMConnection,
 } from "@novel-creator/llm";
 import type { LanguageModel } from "ai";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, isNull, or } from "drizzle-orm";
 import {
   decryptApiKey,
   encryptApiKey,
@@ -17,11 +17,22 @@ import {
   maskApiKeyForDisplay,
 } from "../lib/secret-crypto.js";
 import { resolveLLMModel as resolveLLMModelShared } from "./model-resolver.js";
-import { assertFound, type ServiceContext, ValidationError } from "./types.js";
+import {
+  assertFound,
+  ForbiddenError,
+  type ServiceContext,
+  ValidationError,
+} from "./types.js";
 
 export interface MaskedLLMConfig extends Omit<LLMConfig, "apiKey"> {
   apiKeyMasked: string | null;
   hasApiKey: boolean;
+  isSystem: boolean;
+}
+
+export interface UserContext {
+  id: string;
+  role?: string | null;
 }
 
 /**
@@ -84,6 +95,7 @@ export class LlmConfigDomainService {
       ...rest,
       apiKeyMasked,
       hasApiKey,
+      isSystem: row.userId === null,
     };
   }
 
@@ -100,24 +112,68 @@ export class LlmConfigDomainService {
     return row;
   }
 
-  async listConfigs(): Promise<MaskedLLMConfig[]> {
-    const rows = await this.ctx.db
-      .select()
-      .from(llmConfigs)
-      .orderBy(desc(llmConfigs.isDefault), desc(llmConfigs.createdAt));
+  /**
+   * 設定一覧を取得する。
+   * - ログインユーザーの設定 ＋ システム共通設定 (userId IS NULL) を返却する。
+   * - ソート順: ユーザーデフォルト > ユーザー個別 > システムデフォルト > システム共通 > 作成日時降順
+   */
+  async listConfigs(user?: UserContext | null): Promise<MaskedLLMConfig[]> {
+    const rows = user
+      ? await this.ctx.db
+          .select()
+          .from(llmConfigs)
+          .where(or(isNull(llmConfigs.userId), eq(llmConfigs.userId, user.id)))
+          .orderBy(desc(llmConfigs.isDefault), desc(llmConfigs.createdAt))
+      : await this.ctx.db
+          .select()
+          .from(llmConfigs)
+          .orderBy(desc(llmConfigs.isDefault), desc(llmConfigs.createdAt));
 
-    return Promise.all(rows.map((row) => this.toMasked(row)));
+    const masked = await Promise.all(rows.map((row) => this.toMasked(row)));
+
+    return masked.sort((a, b) => {
+      // 1. ユーザー自身のデフォルト
+      const aUserDefault = user && a.userId === user.id && a.isDefault ? 1 : 0;
+      const bUserDefault = user && b.userId === user.id && b.isDefault ? 1 : 0;
+      if (aUserDefault !== bUserDefault) return bUserDefault - aUserDefault;
+
+      // 2. ユーザー自身の個別設定
+      const aUser = user && a.userId === user.id ? 1 : 0;
+      const bUser = user && b.userId === user.id ? 1 : 0;
+      if (aUser !== bUser) return bUser - aUser;
+
+      // 3. システム共通デフォルト
+      const aSysDefault = a.userId === null && a.isDefault ? 1 : 0;
+      const bSysDefault = b.userId === null && b.isDefault ? 1 : 0;
+      if (aSysDefault !== bSysDefault) return bSysDefault - aSysDefault;
+
+      // 4. 作成日時降順
+      return (
+        new Date(b.createdAt ?? 0).getTime() -
+        new Date(a.createdAt ?? 0).getTime()
+      );
+    });
   }
 
   /**
    * マスク済み設定を返す。生の apiKey は含まない (S0-1)。
    */
-  async getConfig(id: string): Promise<MaskedLLMConfig> {
-    return this.toMasked(await this.findRawById(id));
+  async getConfig(
+    id: string,
+    user?: UserContext | null
+  ): Promise<MaskedLLMConfig> {
+    const row = await this.findRawById(id);
+    if (user && row.userId && row.userId !== user.id && user.role !== "admin") {
+      throw new ForbiddenError("Forbidden");
+    }
+    return this.toMasked(row);
   }
 
   async createConfig(
-    data: Omit<NewLLMConfig, "id" | "createdAt" | "updatedAt">
+    data: Omit<NewLLMConfig, "id" | "createdAt" | "updatedAt"> & {
+      isSystem?: boolean;
+    },
+    user?: UserContext | null
   ): Promise<MaskedLLMConfig> {
     if (!data.name?.trim()) {
       throw new ValidationError("Name is required");
@@ -126,12 +182,33 @@ export class LlmConfigDomainService {
       throw new ValidationError("Model ID is required");
     }
 
-    // 初めてのモデル設定なら自動的に isDefault を true にする
-    const existingCount = await this.ctx.db.select().from(llmConfigs);
-    const shouldBeDefault = data.isDefault || existingCount.length === 0;
+    const isAdmin = user ? user.role === "admin" : true;
+    // user が渡されていない場合はシステム共通設定として扱う
+    const isSystem = user ? (isAdmin ? (data.isSystem ?? false) : false) : true;
+    const targetUserId = isSystem ? null : (user?.id ?? null);
+
+    if (!isSystem && !targetUserId) {
+      throw new ValidationError("User ID is required for user LLM config");
+    }
+
+    // 同一スコープ（ユーザー個別 or システム共通）内の既存設定数をカウント
+    const scopeCondition = targetUserId
+      ? eq(llmConfigs.userId, targetUserId)
+      : isNull(llmConfigs.userId);
+
+    const existingInScope = await this.ctx.db
+      .select()
+      .from(llmConfigs)
+      .where(scopeCondition);
+
+    // そのスコープで初めての設定なら自動的に isDefault を true にする
+    const shouldBeDefault = data.isDefault || existingInScope.length === 0;
 
     if (shouldBeDefault) {
-      await this.ctx.db.update(llmConfigs).set({ isDefault: false });
+      await this.ctx.db
+        .update(llmConfigs)
+        .set({ isDefault: false })
+        .where(scopeCondition);
     }
 
     // apiKey は保存前に必ず暗号化する。鍵未設定時はここで明示エラーになる。
@@ -143,9 +220,14 @@ export class LlmConfigDomainService {
     const [row] = await this.ctx.db
       .insert(llmConfigs)
       .values({
-        ...data,
         apiKey,
+        baseUrl: data.baseUrl,
+        description: data.description,
         isDefault: shouldBeDefault,
+        modelId: data.modelId,
+        name: data.name,
+        provider: data.provider,
+        userId: targetUserId,
       })
       .returning();
 
@@ -155,12 +237,41 @@ export class LlmConfigDomainService {
 
   async updateConfig(
     id: string,
-    data: Partial<Omit<NewLLMConfig, "id" | "createdAt" | "updatedAt">>
+    data: Partial<Omit<NewLLMConfig, "id" | "createdAt" | "updatedAt">> & {
+      isSystem?: boolean;
+    },
+    user?: UserContext | null
   ): Promise<MaskedLLMConfig> {
     const current = await this.findRawById(id);
+    const isAdmin = user ? user.role === "admin" : true;
+
+    // 権限チェック
+    if (user) {
+      if (current.userId === null) {
+        if (!isAdmin) {
+          throw new ForbiddenError("Admin only");
+        }
+      } else if (current.userId !== user.id && !isAdmin) {
+        throw new ForbiddenError("Forbidden");
+      }
+    }
+
+    let targetUserId = current.userId;
+    if (isAdmin && data.isSystem !== undefined) {
+      targetUserId = data.isSystem
+        ? null
+        : (current.userId ?? user?.id ?? null);
+    }
+
+    const scopeCondition = targetUserId
+      ? eq(llmConfigs.userId, targetUserId)
+      : isNull(llmConfigs.userId);
 
     if (data.isDefault) {
-      await this.ctx.db.update(llmConfigs).set({ isDefault: false });
+      await this.ctx.db
+        .update(llmConfigs)
+        .set({ isDefault: false })
+        .where(scopeCondition);
     }
 
     // apiKey が undefined で渡された場合（変更なし）は既存の保存値を維持する。
@@ -170,12 +281,15 @@ export class LlmConfigDomainService {
         ? current.apiKey
         : await encryptApiKey(data.apiKey, await this.getSecretKeyValue());
 
+    const { isSystem: _, ...restData } = data;
+
     const [row] = await this.ctx.db
       .update(llmConfigs)
       .set({
-        ...data,
+        ...restData,
         apiKey,
         updatedAt: new Date(),
+        userId: targetUserId,
       })
       .where(eq(llmConfigs.id, id))
       .returning();
@@ -184,20 +298,39 @@ export class LlmConfigDomainService {
     return this.toMasked(row);
   }
 
-  async deleteConfig(id: string): Promise<void> {
+  async deleteConfig(id: string, user?: UserContext | null): Promise<void> {
     const current = await this.findRawById(id);
+    const isAdmin = user ? user.role === "admin" : true;
+
+    if (user) {
+      if (current.userId === null) {
+        if (!isAdmin) {
+          throw new ForbiddenError("Admin only");
+        }
+      } else if (current.userId !== user.id && !isAdmin) {
+        throw new ForbiddenError("Forbidden");
+      }
+    }
+
     const [deleted] = await this.ctx.db
       .delete(llmConfigs)
       .where(eq(llmConfigs.id, id))
       .returning();
     assertFound(deleted, "LLM Config not found");
 
-    // 削除されたものがデフォルトだった場合、残りの最新レコードをデフォルトにする
+    // 削除されたものがデフォルトだった場合、同一スコープ内の残りの最新レコードをデフォルトにする
     if (current.isDefault) {
+      const scopeCondition = current.userId
+        ? eq(llmConfigs.userId, current.userId)
+        : isNull(llmConfigs.userId);
+
       const [latest] = await this.ctx.db
         .select()
         .from(llmConfigs)
-        .orderBy(desc(llmConfigs.createdAt));
+        .where(scopeCondition)
+        .orderBy(desc(llmConfigs.createdAt))
+        .limit(1);
+
       if (latest) {
         await this.ctx.db
           .update(llmConfigs)
@@ -207,9 +340,32 @@ export class LlmConfigDomainService {
     }
   }
 
-  async setDefault(id: string): Promise<MaskedLLMConfig> {
-    await this.findRawById(id);
-    await this.ctx.db.update(llmConfigs).set({ isDefault: false });
+  async setDefault(
+    id: string,
+    user?: UserContext | null
+  ): Promise<MaskedLLMConfig> {
+    const current = await this.findRawById(id);
+    const isAdmin = user ? user.role === "admin" : true;
+
+    if (user) {
+      if (current.userId === null) {
+        if (!isAdmin) {
+          throw new ForbiddenError("Admin only");
+        }
+      } else if (current.userId !== user.id && !isAdmin) {
+        throw new ForbiddenError("Forbidden");
+      }
+    }
+
+    const scopeCondition = current.userId
+      ? eq(llmConfigs.userId, current.userId)
+      : isNull(llmConfigs.userId);
+
+    await this.ctx.db
+      .update(llmConfigs)
+      .set({ isDefault: false })
+      .where(scopeCondition);
+
     const [row] = await this.ctx.db
       .update(llmConfigs)
       .set({ isDefault: true, updatedAt: new Date() })
@@ -236,8 +392,9 @@ export class LlmConfigDomainService {
    * LanguageModel を解決する。共通リゾルバへの委譲（従来の id→miss→default 挙動を維持）。
    */
   async resolveLanguageModel(
-    modelConfigId?: string | null
+    modelConfigId?: string | null,
+    userId?: string | null
   ): Promise<LanguageModel> {
-    return resolveLLMModelShared(this.ctx, modelConfigId, "useDefault");
+    return resolveLLMModelShared(this.ctx, modelConfigId, "useDefault", userId);
   }
 }

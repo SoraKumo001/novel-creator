@@ -9,6 +9,7 @@ import { Modal } from "@/components/Modal.js";
 import { ModalFooter } from "@/components/ModalFooter.js";
 import { Select } from "@/components/Select.js";
 import { Textarea } from "@/components/Textarea.js";
+import { useAuth } from "@/hooks/useAuth.js";
 import { useToast } from "@/hooks/useToast.js";
 import { toErrorMessage } from "@/lib/errors.js";
 import { listEmbeddingModels } from "@/lib/services/embeddingConfig.js";
@@ -139,6 +140,7 @@ export type ConfigFormModalProps = EmbeddingFormModalProps | LLMFormModalProps;
 
 export function ConfigFormModal(props: ConfigFormModalProps) {
   const toast = useToast();
+  const { isAdmin } = useAuth();
   const { kind, configsCount, isOpen, isSubmitting, onClose } = props;
   const config = KIND_CONFIG[kind];
 
@@ -149,6 +151,7 @@ export function ConfigFormModal(props: ConfigFormModalProps) {
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [isDefault, setIsDefault] = useState(false);
+  const [isSystem, setIsSystem] = useState(false);
   const [description, setDescription] = useState("");
 
   const [testingInline, setTestingInline] = useState(false);
@@ -174,7 +177,15 @@ export function ConfigFormModal(props: ConfigFormModalProps) {
       }
       setBaseUrl(editingConfig.baseUrl ?? "");
       setApiKey("");
-      setIsDefault(editingConfig.isDefault);
+      const isSys =
+        "isSystem" in editingConfig &&
+        typeof editingConfig.isSystem === "boolean"
+          ? editingConfig.isSystem
+          : "userId" in editingConfig
+            ? (editingConfig as { userId?: string | null }).userId === null ||
+              (editingConfig as { userId?: string | null }).userId === undefined
+            : true;
+      setIsSystem(isSys);
       setDescription(editingConfig.description ?? "");
     } else {
       setName("");
@@ -184,11 +195,12 @@ export function ConfigFormModal(props: ConfigFormModalProps) {
       setBaseUrl("");
       setApiKey("");
       setIsDefault(configsCount === 0);
+      setIsSystem(isAdmin);
       setDescription("");
     }
     setTestResult(null);
     setModelOptions([]);
-  }, [isOpen, editingConfig, configsCount, kind, config]);
+  }, [isOpen, editingConfig, configsCount, kind, config, isAdmin]);
 
   function applyPreset(preset: EmbeddingPreset | LLMPreset): void {
     setName(preset.name);
@@ -298,7 +310,10 @@ export function ConfigFormModal(props: ConfigFormModalProps) {
       const trimmedApiKey = apiKey.trim();
       if (props.kind === "llm") {
         if (props.editingConfig) {
-          const input: UpdateLLMConfigInput = { ...baseInput };
+          const input: UpdateLLMConfigInput = {
+            ...baseInput,
+            isSystem: isAdmin ? isSystem : undefined,
+          };
           if (trimmedApiKey) {
             input.apiKey = trimmedApiKey;
           }
@@ -308,6 +323,7 @@ export function ConfigFormModal(props: ConfigFormModalProps) {
           const input: CreateLLMConfigInput = {
             ...baseInput,
             apiKey: trimmedApiKey || null,
+            isSystem: isAdmin ? isSystem : false,
           };
           await props.onCreate(input);
           toast.success(config.toastCreated);
@@ -469,6 +485,15 @@ export function ConfigFormModal(props: ConfigFormModalProps) {
           onChange={setIsDefault}
           label={config.defaultCheckboxLabel}
         />
+
+        {kind === "llm" && isAdmin && (
+          <FormCheckRow
+            id="isSystemCheck"
+            checked={isSystem}
+            onChange={setIsSystem}
+            label="システム共通設定として登録する（全ユーザーに提供）"
+          />
+        )}
 
         <Textarea
           label="備考・説明 (任意)"

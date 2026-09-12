@@ -1,5 +1,6 @@
 import { llmProviders } from "@novel-creator/shared";
 import { boolean, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { user } from "./auth.js";
 
 export const llmConfigs = pgTable("llm_configs", {
   // NOTE(S0-1): api_key は AES-GCM 暗号文 ("enc:v1:...") またはレガシー平文を格納する。
@@ -15,6 +16,7 @@ export const llmConfigs = pgTable("llm_configs", {
   name: text("name").notNull(),
   provider: text("provider", { enum: [...llmProviders] }).notNull(),
   updatedAt: timestamp("updated_at").defaultNow(),
+  userId: text("user_id").references(() => user.id, { onDelete: "cascade" }),
 });
 
 export type LLMConfig = typeof llmConfigs.$inferSelect;

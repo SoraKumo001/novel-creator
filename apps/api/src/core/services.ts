@@ -1,3 +1,8 @@
+import type { Database } from "@novel-creator/db";
+import type { Env } from "@novel-creator/shared";
+import type { VectorStore } from "@novel-creator/vector";
+import type { EmbeddingModel, LanguageModel } from "ai";
+import type { AuthUser } from "../context.js";
 import { AnalysisDomainService } from "./analysis.service.js";
 import { BackupDomainService } from "./backup.service.js";
 import { ChapterDomainService } from "./chapter.service.js";
@@ -17,7 +22,7 @@ import { ReindexDomainService } from "./reindex.service.js";
 import { SectionDomainService } from "./section.service.js";
 import { SettingDomainService } from "./setting.service.js";
 import { TimelineDomainService } from "./timeline.service.js";
-import type { ServiceContext } from "./types.js";
+import type { McpAuth, ServiceContext } from "./types.js";
 
 export interface DomainServices {
   analysis: AnalysisDomainService;
@@ -69,10 +74,55 @@ export function createDomainServices(ctx: ServiceContext): DomainServices {
  * Hono コンテキストから DomainServices を取得する。
  * services はリクエストミドルウェアで生成・注入されることが前提。
  * 未設定の場合は配線ミスのため例外を投げる（on-demand 生成は行わない）。
+ * ログインユーザーが存在する場合は、そのユーザーの userId が注入された
+ * 専用の DomainServices を生成・キャッシュして返す。
  */
 export function getServices(c: {
-  var: { services: DomainServices };
+  get?: (key: string) => unknown;
+  set?: (key: string, value: unknown) => void;
+  var: {
+    db?: Database;
+    embedding?: EmbeddingModel;
+    env?: Env;
+    llm?: LanguageModel;
+    mcpAuth?: McpAuth;
+    requestServices?: DomainServices;
+    services?: DomainServices;
+    user?: AuthUser;
+    vectorStore?: VectorStore;
+  };
 }): DomainServices {
+  const user =
+    c.var.user ?? (c.get ? (c.get("user") as AuthUser | undefined) : undefined);
+
+  if (
+    user?.id &&
+    c.var.db &&
+    c.var.env &&
+    c.var.llm &&
+    c.var.embedding &&
+    c.var.vectorStore
+  ) {
+    if (c.var.requestServices) {
+      return c.var.requestServices;
+    }
+    const reqServices = createDomainServices({
+      db: c.var.db,
+      embedding: c.var.embedding,
+      env: c.var.env,
+      llm: c.var.llm,
+      mcpAuth: c.var.mcpAuth,
+      userId: user.id,
+      vectorStore: c.var.vectorStore,
+    });
+    if (c.set) {
+      c.set("requestServices", reqServices);
+    } else {
+      c.var.requestServices = reqServices;
+    }
+    return reqServices;
+  }
+
   const services: DomainServices | undefined = c.var.services;
   if (!services) {
     throw new Error("services is not set on request context");

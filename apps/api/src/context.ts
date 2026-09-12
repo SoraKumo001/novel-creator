@@ -43,15 +43,16 @@ export interface AuthSession {
 
 export interface AppContext extends HonoEnv {
   Variables: {
-    env: Env;
     db: Database;
-    llm: LanguageModel;
     embedding: EmbeddingModel;
-    vectorStore: VectorStore;
-    services: DomainServices;
+    env: Env;
+    llm: LanguageModel;
     mcpAuth?: McpAuth;
-    user?: AuthUser;
+    requestServices?: DomainServices;
+    services: DomainServices;
     session?: AuthSession;
+    user?: AuthUser;
+    vectorStore: VectorStore;
   };
 }
 

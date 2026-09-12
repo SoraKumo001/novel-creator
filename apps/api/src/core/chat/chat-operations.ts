@@ -20,6 +20,7 @@ export interface StreamCreativeChatInput {
   modelConfigId?: string | null;
   novelId?: string | null;
   sessionId: string;
+  userId?: string | null;
 }
 
 /**
@@ -33,7 +34,7 @@ export async function streamCreativeChatOp(
   ctx: ServiceContext,
   input: StreamCreativeChatInput
 ): Promise<Response> {
-  const { sessionId, novelId, messages, modelConfigId } = input;
+  const { sessionId, novelId, messages, modelConfigId, userId } = input;
 
   const session = await ensureChatSession(ctx, sessionId);
   const { userText } = await persistChatUserMessage(ctx, sessionId, messages);
@@ -48,7 +49,7 @@ export async function streamCreativeChatOp(
         userText,
         session.novelId
       ),
-      resolveLLMModelWithInfo(ctx, modelConfigId, "throw"),
+      resolveLLMModelWithInfo(ctx, modelConfigId, "throw", userId),
     ]);
 
   if (context.warnings.length > 0) {

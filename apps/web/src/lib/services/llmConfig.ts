@@ -30,6 +30,7 @@ export async function createLLMConfig(
       baseUrl: input.baseUrl || null,
       apiKey: input.apiKey || null,
       isDefault: input.isDefault ?? false,
+      isSystem: input.isSystem,
       description: input.description || null,
     },
   });

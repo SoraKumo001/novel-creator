@@ -69,6 +69,7 @@ export class ChatDomainService {
     novelId?: string | null;
     messages: z.infer<typeof chatRequestSchema>["messages"];
     modelConfigId?: string | null;
+    userId?: string | null;
   }): Promise<Response> {
     return streamCreativeChatOp(this.ctx, input);
   }

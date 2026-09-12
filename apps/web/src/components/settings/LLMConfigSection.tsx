@@ -15,6 +15,7 @@ import { ConfigCard } from "./ConfigCard.js";
 interface LLMConfigSectionProps {
   configs: LLMConfig[];
   error: string | null;
+  isAdmin?: boolean;
   isDeleting: boolean;
   isSettingDefault: boolean;
   loading: boolean;
@@ -31,6 +32,7 @@ export function LLMConfigSection({
   configs,
   loading,
   error,
+  isAdmin = false,
   onOpenCreateModal,
   onOpenEditModal,
   onSetDefault,
@@ -85,6 +87,9 @@ export function LLMConfigSection({
       <div className="grid gap-4">
         {configs.map((cfg) => {
           const isRowTesting = testingId === cfg.id;
+          const isSystem =
+            cfg.isSystem ?? (cfg.userId === null || cfg.userId === undefined);
+          const canManage = isAdmin || !isSystem;
 
           return (
             <ConfigCard
@@ -94,6 +99,17 @@ export function LLMConfigSection({
               isDefault={cfg.isDefault}
               modelId={cfg.modelId}
               baseUrl={cfg.baseUrl}
+              scopeBadge={
+                isSystem ? (
+                  <span className="inline-flex items-center rounded-full border border-border bg-surface-raised px-2.5 py-0.5 font-medium text-foreground-secondary text-xs">
+                    🌐 システム共通
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full border border-primary/20 bg-primary/10 px-2.5 py-0.5 font-medium text-primary text-xs">
+                    👤 ユーザー設定
+                  </span>
+                )
+              }
               apiKeyDisplay={
                 cfg.hasApiKey
                   ? (cfg.apiKeyMasked ?? "登録済み")
@@ -127,7 +143,7 @@ export function LLMConfigSection({
                     接続テスト
                   </Button>
 
-                  {!cfg.isDefault && (
+                  {canManage && !cfg.isDefault && (
                     <Button
                       variant="secondary"
                       size="sm"
@@ -138,22 +154,26 @@ export function LLMConfigSection({
                     </Button>
                   )}
 
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => onOpenEditModal(cfg)}
-                  >
-                    編集
-                  </Button>
+                  {canManage && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onOpenEditModal(cfg)}
+                    >
+                      編集
+                    </Button>
+                  )}
 
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => setDeletingId(cfg.id)}
-                    disabled={isDeleting}
-                  >
-                    削除
-                  </Button>
+                  {canManage && (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => setDeletingId(cfg.id)}
+                      disabled={isDeleting}
+                    >
+                      削除
+                    </Button>
+                  )}
                 </>
               }
             />

@@ -19,14 +19,14 @@ type Row = Record<string, unknown>;
 function createFakeDb() {
   const rows: Row[] = [];
 
-  const fromResult = (): Row[] & {
-    orderBy: (...args: unknown[]) => Promise<Row[]>;
-    where: (...args: unknown[]) => Promise<Row[]>;
-  } => {
+  const fromResult = () => {
     const snapshot = [...rows];
     return Object.assign(snapshot, {
       orderBy: async (..._args: unknown[]): Promise<Row[]> => [...rows],
-      where: async (..._args: unknown[]): Promise<Row[]> => [...rows],
+      where: (..._args: unknown[]) =>
+        Object.assign([...rows], {
+          orderBy: async (..._args2: unknown[]): Promise<Row[]> => [...rows],
+        }),
     });
   };
 

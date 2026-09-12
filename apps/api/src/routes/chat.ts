@@ -17,12 +17,20 @@ const chatRouter = new Hono<AppContext>()
   .post("/", zValidator("json", chatRequestSchema), async (c) => {
     const { sessionId, novelId, messages, modelConfigId } = c.req.valid("json");
     const current = c.get("user");
-    // modelConfigId の指定は admin 限定（所有チェックは解決後の小説で行う）。
-    if (modelConfigId && current && current.role !== "admin") {
-      return c.json(
-        { error: { code: "FORBIDDEN", message: "Admin only" } },
-        403
-      );
+    // modelConfigId のアクセス権チェック（存在かつ他人の個別設定ならエラー）
+    if (
+      typeof modelConfigId === "string" &&
+      current &&
+      current.role !== "admin"
+    ) {
+      try {
+        await getServices(c).llmConfig.getConfig(modelConfigId, current);
+      } catch {
+        return c.json(
+          { error: { code: "FORBIDDEN", message: "Forbidden" } },
+          403
+        );
+      }
     }
     if (current) {
       // body の novelId はヒント扱いとし、セッションの novelId を DB から再解決して突合する。
@@ -53,6 +61,7 @@ const chatRouter = new Hono<AppContext>()
       modelConfigId,
       novelId,
       sessionId,
+      userId: current?.id,
     });
   })
 

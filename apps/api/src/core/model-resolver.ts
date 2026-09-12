@@ -10,7 +10,7 @@ import {
 } from "@novel-creator/llm";
 import type { LLMProviderType } from "@novel-creator/shared";
 import type { EmbeddingModel, LanguageModel } from "ai";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import {
   decryptApiKey,
   getSecretEncryptionKeyValue,
@@ -122,13 +122,20 @@ export function buildOpenCodeSessionHeaders(
  * 1. modelConfigId が指定されていればその設定でモデルを生成
  * 2. 見つからない場合は onMissing ポリシーに従う（'throw' なら NotFoundError）
  * 3. デフォルト設定（isDefault = true）があればそれを使用
+ * 3. デフォルト設定の解決:
+ *    a. userId が指定されている場合、ユーザー個別のデフォルト設定（userId = userId AND isDefault = true）
+ *    b. システム共通のデフォルト設定（userId IS NULL AND isDefault = true）
+ *    c. レガシー設定など他のデフォルト設定
  * 4. DB に設定がなければ ctx.llm（環境変数由来の既定モデル）を使用
  */
 export async function resolveLLMModelWithInfo(
   ctx: ServiceContext,
   modelConfigId?: string | null,
-  onMissing: ResolveMissingPolicy = "throw"
+  onMissing: ResolveMissingPolicy = "throw",
+  userId?: string | null
 ): Promise<ResolvedLLMModel> {
+  const effectiveUserId = userId ?? ctx.userId ?? null;
+
   return resolveFromConfigTable<LLMConfig, ResolvedLLMModel>(
     ctx,
     modelConfigId,
@@ -146,14 +153,39 @@ export async function resolveLLMModelWithInfo(
           .select()
           .from(llmConfigs)
           .where(eq(llmConfigs.id, id));
+        // 他人の個別設定へのアクセスは遮断する
+        if (
+          config &&
+          config.userId &&
+          effectiveUserId &&
+          config.userId !== effectiveUserId
+        ) {
+          return undefined;
+        }
         return config;
       },
       async findDefault(context) {
-        const [config] = await context.db
+        if (effectiveUserId) {
+          const [userConfig] = await context.db
+            .select()
+            .from(llmConfigs)
+            .where(
+              and(
+                eq(llmConfigs.userId, effectiveUserId),
+                eq(llmConfigs.isDefault, true)
+              )
+            );
+          if (userConfig) {
+            return userConfig;
+          }
+        }
+        const [sysConfig] = await context.db
           .select()
           .from(llmConfigs)
-          .where(eq(llmConfigs.isDefault, true));
-        return config;
+          .where(
+            and(isNull(llmConfigs.userId), eq(llmConfigs.isDefault, true))
+          );
+        return sysConfig;
       },
       toResult: async (config, context) => {
         // 保存値 (暗号文の可能性あり) をサーバ内でのみ復号してクライアントを構築する。
@@ -178,15 +210,17 @@ export async function resolveLLMModelWithInfo(
  * LLM モデルを解決する。
  * 1. modelConfigId が指定されていればその設定でモデルを生成
  * 2. 見つからない場合は onMissing ポリシーに従う（'throw' なら NotFoundError）
- * 3. デフォルト設定（isDefault = true）があればそれを使用
+ * 3. デフォルト設定（ユーザー個別デフォルト → システム共通デフォルト）があればそれを使用
  * 4. DB に設定がなければ ctx.llm（環境変数由来の既定モデル）を使用
  */
 export async function resolveLLMModel(
   ctx: ServiceContext,
   modelConfigId?: string | null,
-  onMissing: ResolveMissingPolicy = "throw"
+  onMissing: ResolveMissingPolicy = "throw",
+  userId?: string | null
 ): Promise<LanguageModel> {
-  return (await resolveLLMModelWithInfo(ctx, modelConfigId, onMissing)).model;
+  return (await resolveLLMModelWithInfo(ctx, modelConfigId, onMissing, userId))
+    .model;
 }
 
 /** resolveEmbeddingModel の戻り値。DB 設定から解決した場合は元の設定行も返す。 */
