@@ -1,4 +1,5 @@
 import { renderPromptTemplate } from "../templateEngine.js";
+import { getPromptTemplate } from "./loader.js";
 
 export type InlineAssistAction =
   | "expand" // 描写・五感・情景を膨らませる
@@ -80,17 +81,7 @@ export function inlineAssistPrompt(context: InlineAssistContext): string {
     return rendered;
   }
 
-  let prompt = `あなたはプロの小説執筆アシスタントです。
-作家が執筆中の小説本文の一部（選択範囲）に対して、指定された方針で推敲・書き換え・加筆を行ってください。
-
-【最重要ルール】
-- 前後の文脈に自然に繋がる文章にしてください。
-- 作品の執筆スタイル・文体ガイドライン、登場人物の口調や世界観を崩さないでください。
-- 余計な挨拶や解説（「以下のように書き換えました」等）は一切含めず、**書き換え後の本文テキストのみ**を出力してください。
-- ルビ記法（|漢字《かんじ》）が含まれる場合は適切に保持・活用してください。
-
-`;
-
+  let variantHint = "";
   if (
     context.totalVariants &&
     context.totalVariants > 1 &&
@@ -99,31 +90,37 @@ export function inlineAssistPrompt(context: InlineAssistContext): string {
     const hint =
       VARIANT_HINTS[context.variantIndex] ||
       `【バリエーション 案${context.variantIndex}】`;
-    prompt += `${hint}\n\n`;
+    variantHint = `${hint}\n\n`;
   }
 
+  let contextSections = "";
   if (context.novelTitle) {
-    prompt += `■ 作品タイトル: ${context.novelTitle}\n`;
+    contextSections += `■ 作品タイトル: ${context.novelTitle}\n`;
   }
   if (context.styleGuide) {
-    prompt += `■ 作品の執筆スタイル・文体ガイドライン:\n${context.styleGuide}\n\n`;
+    contextSections += `■ 作品の執筆スタイル・文体ガイドライン:\n${context.styleGuide}\n\n`;
   }
   if (context.characters) {
-    prompt += `■ 関連キャラクター情報:\n${context.characters}\n\n`;
+    contextSections += `■ 関連キャラクター情報:\n${context.characters}\n\n`;
   }
   if (context.surroundingText) {
-    prompt += `■ 前後の文脈:\n${context.surroundingText}\n\n`;
+    contextSections += `■ 前後の文脈:\n${context.surroundingText}\n\n`;
   }
 
-  prompt += `■ 指針: ${ACTION_DESCRIPTIONS[context.action]}\n`;
+  let customInstructionSection = "";
   if (
     (context.action === "custom" || context.customInstruction) &&
     context.customInstruction
   ) {
-    prompt += `■ 作家からの指示: ${context.customInstruction}\n`;
+    customInstructionSection = `■ 作家からの指示: ${context.customInstruction}\n`;
   }
 
-  prompt += `\n■ 書き換え対象テキスト:\n"""\n${context.selectedText}\n"""\n\n書き換え後のテキストのみを出力してください:`;
-
-  return prompt;
+  const template = getPromptTemplate("inlineAssist");
+  return renderPromptTemplate(template.body, {
+    actionDescription: ACTION_DESCRIPTIONS[context.action],
+    contextSections,
+    customInstructionSection,
+    selectedText: context.selectedText,
+    variantHint,
+  });
 }
